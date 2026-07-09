@@ -1,12 +1,8 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+// Self-hosted Manrope (variable) via fontsource — no build-time Google Fonts
+// fetch, which the CI build network can't reach.
+import "@fontsource-variable/manrope";
 import "./globals.css";
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Niyyah - Muslim Productivity",
@@ -15,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={manrope.variable}>
+    <html lang="en">
       <body className="antialiased min-h-screen">{children}</body>
     </html>
   );
