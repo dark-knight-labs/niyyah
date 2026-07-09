@@ -1,41 +1,45 @@
 @import "tailwindcss";
 
+/* Niyyah — light, white-minimalist theme.
+   Everything is token-driven: change a value here and it propagates
+   to every page (pages consume var(--*) + Tailwind color mapping). */
 :root {
-  --background: #fafaf9;
-  --foreground: #1c1917;
-  --muted: #f5f5f4;
-  --muted-foreground: #78716c;
-  --border: #e7e5e4;
-  --accent: #2d8a5e;
-  --accent-light: #dcfce7;
-  --destructive: #ef4444;
+  color-scheme: light;
+
+  --background: #ffffff;
+  --surface: #fafafa;
+  --foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #ededed;
+  --accent: #1f8a5b;
+  --accent-fg: #ffffff;
+  --accent-light: #eaf6ef;
+  --destructive: #dc2626;
+
+  --radius: 0.625rem;
+  --font-sans: var(--font-manrope), system-ui, -apple-system, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-fg: var(--muted-foreground);
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-light: var(--accent-light);
-  --font-sans: "Inter", system-ui, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0c0a09;
-    --foreground: #fafaf9;
-    --muted: #1c1917;
-    --muted-foreground: #a8a29e;
-    --border: #292524;
-    --accent: #34d399;
-    --accent-light: #064e3b;
-  }
+  --color-destructive: var(--destructive);
+  --font-sans: var(--font-sans);
+  --radius: var(--radius);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
 }
