@@ -3,7 +3,7 @@ stages:
   - deploy
 
 variables:
-  REGISTRY: gitlab-registry.homelab.alamin.rocks/niyyah/app
+  REGISTRY: $CI_REGISTRY_IMAGE
 
 .build:
   stage: build
