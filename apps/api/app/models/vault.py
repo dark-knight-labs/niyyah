@@ -1,4 +1,5 @@
-from datetime import date, datetime, timezone
+import datetime as dt
+from datetime import datetime, timezone
 
 from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -10,7 +11,7 @@ class VaultDay(Base):
     __tablename__ = "vault_days"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    date: Mapped[date] = mapped_column(Date, unique=True, nullable=False, index=True)
+    date: Mapped[dt.date] = mapped_column(Date, unique=True, nullable=False, index=True)
     mode: Mapped[str] = mapped_column(String(20), nullable=False)
     possible: Mapped[int] = mapped_column(Integer, nullable=False)
     total: Mapped[int] = mapped_column(Integer, nullable=False)
