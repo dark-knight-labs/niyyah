@@ -101,3 +101,9 @@ def test_extracts_focus_and_log():
     parsed = parse_daily_note(FULL_DAY, date(2026, 8, 23))
     assert parsed.focus == "Most important thing today: ship the vault dashboard"
     assert parsed.log == "- entry one\n- entry two"
+
+
+def test_block_never_mentioned_is_absent_not_zero():
+    parsed = parse_daily_note(FULL_DAY, date(2026, 8, 23))
+    assert "ops" not in parsed.blocks
+    assert "body" not in parsed.blocks
