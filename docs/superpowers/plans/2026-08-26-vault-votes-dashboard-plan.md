@@ -1726,7 +1726,7 @@ export function WeeklyPulse({ week }: WeeklyPulseProps) {
   return (
     <div className="border border-[var(--border)] bg-[var(--surface)] rounded p-4 mb-4">
       <p className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)] mb-3">Weekly Pulse</p>
-      <div className="flex items-end gap-2 h-24 relative">
+      <div className="flex gap-2 h-24 relative">
         <div
           className="absolute left-0 right-0 border-t border-dashed border-[var(--muted-foreground)]"
           style={{ bottom: `${week.week_pct}%` }}
