@@ -2,20 +2,35 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { vaultApi } from "@/lib/vault-api";
-import { VaultDayData } from "@/lib/vault-types";
+import { VaultDayData, VaultMonthData, VaultWeekData } from "@/lib/vault-types";
 import { VaultHeader } from "@/components/vault/header";
 import { BlockCards } from "@/components/vault/block-cards";
+import { WeeklyPulse } from "@/components/vault/weekly-pulse";
+import { MonthlyHeatmap } from "@/components/vault/monthly-heatmap";
+
+function currentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
 
 export default function VaultPage() {
   const [today, setToday] = useState<VaultDayData | null>(null);
+  const [week, setWeek] = useState<VaultWeekData | null>(null);
+  const [month, setMonth] = useState<VaultMonthData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     setLoading(true);
-    vaultApi
-      .today()
-      .then(setToday)
-      .catch(() => setToday(null))
+    Promise.all([
+      vaultApi.today().catch(() => null),
+      vaultApi.week().catch(() => null),
+      vaultApi.month(currentMonth()).catch(() => null),
+    ])
+      .then(([t, w, m]) => {
+        setToday(t);
+        setWeek(w);
+        setMonth(m);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -35,6 +50,8 @@ export default function VaultPage() {
     <div>
       <VaultHeader today={today} onSynced={load} />
       <BlockCards today={today} />
+      <WeeklyPulse week={week} />
+      <MonthlyHeatmap month={month} />
     </div>
   );
 }
