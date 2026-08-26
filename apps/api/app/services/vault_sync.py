@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -29,7 +30,9 @@ def _ensure_repo(workdir: str) -> None:
             _run_git(["pull", "--ff-only"], cwd=workdir)
             return
         except subprocess.CalledProcessError:
-            pass  # stale/broken checkout — fall through and re-clone
+            # Stale/broken checkout — wipe it so `git clone` (which refuses to
+            # clone into a non-empty directory) can actually recover below.
+            shutil.rmtree(path, ignore_errors=True)
 
     path.mkdir(parents=True, exist_ok=True)
     try:

@@ -167,6 +167,30 @@ possible: 2
 
 
 @pytest.mark.asyncio
+async def test_sync_recovers_from_broken_checkout_by_reclone(tmp_path, db_session, monkeypatch):
+    gitlab_repo = _make_repo(tmp_path, "gitlab-xarvis", {"2026-08-20.md": DAY_1})
+    monkeypatch.setattr(settings, "vault_gitlab_url", gitlab_repo)
+    monkeypatch.setattr(settings, "vault_github_url", str(tmp_path / "unused"))
+
+    # Simulate a broken/stale checkout: a workdir whose .git is garbage, so
+    # `git pull --ff-only` fails. Before the fix, the fallback `git clone`
+    # would then refuse to clone into this still-non-empty directory forever.
+    workdir = tmp_path / "work"
+    (workdir / ".git").mkdir(parents=True)
+    (workdir / ".git" / "garbage").write_text("not a real git repo", encoding="utf-8")
+    (workdir / "some-leftover-file.txt").write_text("stale", encoding="utf-8")
+
+    result = await vault_sync.sync_vault(db_session, workdir=str(workdir))
+
+    assert result.errors == []
+    assert result.synced_days == 1
+    day = (await db_session.execute(
+        VaultDay.__table__.select().where(VaultDay.date == date(2026, 8, 20))
+    )).first()
+    assert day is not None
+
+
+@pytest.mark.asyncio
 async def test_sync_skips_malformed_file_and_reports_error(tmp_path, db_session, monkeypatch):
     gitlab_repo = _make_repo(tmp_path, "gitlab-xarvis", {
         "2026-08-20.md": DAY_1,
