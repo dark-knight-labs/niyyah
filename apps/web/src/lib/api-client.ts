@@ -6,6 +6,14 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
+export type ApiError = Error & { status?: number };
+
+function httpError(message: string, status?: number): ApiError {
+  const err = new Error(message) as ApiError;
+  err.status = status;
+  return err;
+}
+
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   const headers: Record<string, string> = {
@@ -38,7 +46,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
           headers,
           body: opts.body ? JSON.stringify(opts.body) : undefined,
         });
-        if (!retry.ok) throw new Error(`API error: ${retry.status}`);
+        if (!retry.ok) throw httpError(`API error: ${retry.status}`, retry.status);
         if (retry.status === 204) return undefined as T;
         return retry.json();
       }
@@ -46,12 +54,12 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     window.location.href = "/login";
-    throw new Error("Session expired");
+    throw httpError("Session expired", 401);
   }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || `API error: ${res.status}`);
+    throw httpError(err.detail || `API error: ${res.status}`, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

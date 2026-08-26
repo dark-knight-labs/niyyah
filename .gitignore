@@ -13,3 +13,12 @@ htmlcov/
 .coverage
 alembic/versions/*.pyc
 test.db
+
+# graphify -- regenerated locally (graphify update .), no need to commit
+graphify-out/
+
+# local worktrees for isolated subagent-driven-development work
+.worktrees/
+
+# subagent-driven-development scratch (progress ledger, task briefs/reports)
+.superpowers/

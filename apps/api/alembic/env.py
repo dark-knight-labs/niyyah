@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models so Alembic sees them
-from app.models import user, persona, principle, tracker  # noqa: F401
+from app.models import user, persona, principle, tracker, vault  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

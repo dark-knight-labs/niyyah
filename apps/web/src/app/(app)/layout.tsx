@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import { logout } from "@/lib/auth";
 import {
   LayoutDashboard,
@@ -10,6 +11,7 @@ import {
   Calendar,
   Compass,
   CheckSquare,
+  Activity,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -20,12 +22,14 @@ const nav = [
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/principles", label: "Principles", icon: Compass },
   { href: "/tracker", label: "Tracker", icon: CheckSquare },
+  { href: "/vault", label: "Vault", icon: Activity },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
+  useTheme();
 
   if (loading) {
     return (

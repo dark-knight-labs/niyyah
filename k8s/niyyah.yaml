@@ -13,6 +13,13 @@ stringData:
   ACCESS_TOKEN_EXPIRE_MINUTES: "15"
   REFRESH_TOKEN_EXPIRE_DAYS: "7"
   CORS_ORIGINS: https://niyyah.alamin.rocks
+  VAULT_GITLAB_URL: ssh://git@gitlab.alamin.rocks:2222/pkm/xarvis.git
+  VAULT_GITHUB_URL: https://github.com/dark-knight-labs/xarvis.git
+  VAULT_SYNC_SECRET: changeme-vault-sync-shared-secret-generate-secure-random
+  VAULT_WORKDIR: /app/data/vault-sync
+  GIT_SSH_COMMAND: ssh -i /app/.ssh/vault_deploy_key -o StrictHostKeyChecking=accept-new
+  VAULT_DEPLOY_KEY: |
+    changeme-replace-with-real-ed25519-private-key-PEM-contents-before-applying
 
 ---
 # Backend PVC (for any persistent data/uploads)
@@ -70,6 +77,10 @@ spec:
           volumeMounts:
             - name: backend-data
               mountPath: /app/data
+            - name: vault-deploy-key
+              mountPath: /app/.ssh/vault_deploy_key
+              subPath: vault_deploy_key
+              readOnly: true
           resources:
             requests:
               memory: "256Mi"
@@ -93,6 +104,13 @@ spec:
         - name: backend-data
           persistentVolumeClaim:
             claimName: niyyah-backend-pvc
+        - name: vault-deploy-key
+          secret:
+            secretName: niyyah-config
+            items:
+              - key: VAULT_DEPLOY_KEY
+                path: vault_deploy_key
+                mode: 0o400
 
 ---
 # Backend Service
