@@ -19,3 +19,6 @@ graphify-out/
 
 # local worktrees for isolated subagent-driven-development work
 .worktrees/
+
+# subagent-driven-development scratch (progress ledger, task briefs/reports)
+.superpowers/
