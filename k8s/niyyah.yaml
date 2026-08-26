@@ -7,7 +7,7 @@ metadata:
   namespace: niyyah
 type: Opaque
 stringData:
-  DATABASE_URL: postgresql+asyncpg://niyyah:changeme-niyyah-postgres-password@niyyah-postgres:5432/niyyah
+  DATABASE_URL: postgresql+asyncpg://niyyah:changeme-shared-pg-password@shared-pg-rw.shared-data.svc.cluster.local:5432/niyyah
   REDIS_URL: redis://niyyah-redis:6379/0
   SECRET_KEY: changeme-niyyah-secret-key-generate-secure-random
   ACCESS_TOKEN_EXPIRE_MINUTES: "15"
@@ -63,10 +63,10 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
       imagePullSecrets:
-        - name: registry-credentials
+        - name: gitlab-registry-pull
       containers:
         - name: api
-          image: gitlab-registry.homelab.alamin.rocks/niyyah/app/api:latest
+          image: gitlab-registry.alamin.rocks/niyyah/app/api:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
@@ -156,10 +156,10 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
       imagePullSecrets:
-        - name: registry-credentials
+        - name: gitlab-registry-pull
       containers:
         - name: web
-          image: gitlab-registry.homelab.alamin.rocks/niyyah/app/web:latest
+          image: gitlab-registry.alamin.rocks/niyyah/app/web:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
