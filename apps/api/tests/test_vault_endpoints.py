@@ -73,3 +73,30 @@ async def test_streaks_resets_on_zero_and_ignores_absent_blocks(auth_client: Asy
     streaks = resp.json()["streaks"]
     assert streaks["soul"]["current"] == 1
     assert streaks["soul"]["longest"] == 1
+
+
+@pytest.mark.asyncio
+async def test_streaks_ignore_days_where_block_is_entirely_absent(auth_client: AsyncClient, seed_day):
+    today = date.today()
+    await seed_day(today - timedelta(days=2), blocks={"soul": 2})
+    await seed_day(today - timedelta(days=1))  # no vote for "soul" at all this day (absent, not zero)
+    await seed_day(today, blocks={"soul": 3})
+    resp = await auth_client.get("/api/v1/vault/streaks")
+    assert resp.status_code == 200
+    streaks = resp.json()["streaks"]
+    assert streaks["soul"]["current"] == 2  # absent day didn't break the streak
+    assert streaks["soul"]["longest"] == 2
+
+
+@pytest.mark.asyncio
+async def test_blocks_returns_series_and_averages(auth_client: AsyncClient, seed_day):
+    today = date.today()
+    await seed_day(today - timedelta(days=1), blocks={"soul": 1, "body": 2})
+    await seed_day(today, blocks={"soul": 3, "body": 2})
+    resp = await auth_client.get("/api/v1/vault/blocks?days=7")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["range"] == 7
+    assert sorted(body["blocks"]["soul"]) == [1, 3]
+    assert body["averages"]["soul"] == 2.0
+    assert body["averages"]["body"] == 2.0
