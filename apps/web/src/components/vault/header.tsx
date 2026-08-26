@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { RefreshCw } from "lucide-react";
 import { vaultApi } from "@/lib/vault-api";
 import { VaultDayData } from "@/lib/vault-types";
@@ -39,22 +39,37 @@ export function VaultHeader({ today, onSynced }: VaultHeaderProps) {
   const modeColor = today ? MODE_COLORS[today.mode] ?? "#71717a" : "#71717a";
 
   return (
-    <div className="border border-[var(--border)] bg-[var(--surface)] rounded px-4 py-3 mb-4">
+    <div
+      className="widget border border-[var(--border)] bg-[var(--surface)] rounded px-4 pt-4 pb-3 mb-4"
+      style={{ "--widget-accent": modeColor } as CSSProperties}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold uppercase tracking-wider">Vault</h1>
-          {today && (
-            <span
-              className="text-xs uppercase tracking-wider px-2 py-0.5 rounded font-mono"
-              style={{ backgroundColor: `${modeColor}22`, color: modeColor }}
-            >
-              {today.mode}
-            </span>
-          )}
+          <span
+            className="w-2 h-2 rounded-full pulse-dot shrink-0"
+            style={{ backgroundColor: modeColor }}
+            title="Live"
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold uppercase tracking-wider">Vault</h1>
+              {today && (
+                <span
+                  className="text-xs uppercase tracking-wider px-2 py-0.5 rounded font-mono"
+                  style={{ backgroundColor: `${modeColor}22`, color: modeColor }}
+                >
+                  {today.mode}
+                </span>
+              )}
+            </div>
+            <p className="font-hand text-lg leading-none text-[var(--muted-foreground)] mt-0.5">
+              today&rsquo;s ledger
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           {today && (
-            <span className="font-mono text-sm">
+            <span className="font-mono text-sm tabular-nums">
               {today.total}/{today.possible} · {today.pct}%
             </span>
           )}

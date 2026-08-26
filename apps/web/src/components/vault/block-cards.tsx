@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+import { Check } from "lucide-react";
 import { BLOCK_COLORS, BLOCK_LABELS, BLOCK_ORDER } from "@/lib/vault-constants";
 import { VaultDayData } from "@/lib/vault-types";
 
@@ -14,21 +16,35 @@ export function BlockCards({ today }: BlockCardsProps) {
         return (
           <div
             key={block}
-            className="border border-[var(--border)] rounded px-3 py-2"
-            style={{ backgroundColor: stars > 0 ? `${color}14` : "var(--surface)" }}
+            className="widget border border-[var(--border)] rounded px-3 pt-3 pb-2"
+            style={
+              {
+                backgroundColor: stars > 0 ? `${color}14` : "var(--surface)",
+                "--widget-accent": color,
+              } as CSSProperties
+            }
           >
-            <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color }}>
+            <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color }}>
               {BLOCK_LABELS[block]}
             </p>
             <div className="flex items-center gap-1">
-              {[1, 2, 3].map((level) => (
-                <span
-                  key={level}
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: level <= stars ? color : "var(--border)" }}
-                />
-              ))}
-              <span className="font-mono text-xs ml-1 text-[var(--muted-foreground)]">{stars}</span>
+              {/* Bullet-journal habit-tracker boxes: filled square = checked. */}
+              {[1, 2, 3].map((level) => {
+                const checked = level <= stars;
+                return (
+                  <span
+                    key={level}
+                    className="w-3 h-3 rounded-[2px] border flex items-center justify-center"
+                    style={{
+                      backgroundColor: checked ? color : "transparent",
+                      borderColor: checked ? color : "var(--border)",
+                    }}
+                  >
+                    {checked && <Check size={9} strokeWidth={3} color="var(--accent-fg)" />}
+                  </span>
+                );
+              })}
+              <span className="font-mono text-xs ml-1 tabular-nums text-[var(--muted-foreground)]">{stars}</span>
             </div>
           </div>
         );
