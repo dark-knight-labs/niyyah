@@ -27,7 +27,7 @@ export interface VaultMonthData {
 
 export interface VaultBlocksSeriesData {
   range: number;
-  blocks: Record<string, number[]>;
+  blocks: Record<string, (number | null)[]>;
   averages: Record<string, number>;
 }
 

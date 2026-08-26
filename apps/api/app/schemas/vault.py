@@ -32,7 +32,7 @@ class VaultMonthResponse(BaseModel):
 
 class VaultBlocksSeriesResponse(BaseModel):
     range: int
-    blocks: dict[str, list[int]]
+    blocks: dict[str, list[int | None]]
     averages: dict[str, float]
 
 

@@ -21,6 +21,7 @@ from app.schemas.vault import (
     VaultSyncResponse,
     VaultWeekResponse,
 )
+from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_sync import sync_vault
 
 router = APIRouter(prefix="/vault", tags=["vault"])
@@ -112,12 +113,25 @@ async def get_blocks(days: int = 30, user: User = Depends(get_current_user), db:
     start = end - timedelta(days=days - 1)
     day_rows = await _get_days_range(db, start, end)
 
-    series: dict[str, list[int]] = {}
-    for day in day_rows:
-        for vote in day.block_votes:
-            series.setdefault(vote.block, []).append(vote.stars)
+    # Every block gets one entry per day in [start, end], using None where
+    # that block has no vote at all that day. A block present on only some
+    # days must not yield a shorter array than one present every day — the
+    # frontend renders each array element as an equal-width bar, so mismatched
+    # lengths silently render different time spans as the same width.
+    votes_by_date = {day.date: {v.block: v.stars for v in day.block_votes} for day in day_rows}
+    date_range = [start + timedelta(days=i) for i in range(days)]
 
-    averages = {block: round(sum(values) / len(values), 2) for block, values in series.items() if values}
+    series: dict[str, list[int | None]] = {block: [] for block in CANONICAL_BLOCKS}
+    for d in date_range:
+        day_votes = votes_by_date.get(d, {})
+        for block in CANONICAL_BLOCKS:
+            series[block].append(day_votes.get(block))
+
+    averages: dict[str, float] = {}
+    for block, values in series.items():
+        present = [v for v in values if v is not None]
+        if present:
+            averages[block] = round(sum(present) / len(present), 2)
 
     return VaultBlocksSeriesResponse(range=days, blocks=series, averages=averages)
 

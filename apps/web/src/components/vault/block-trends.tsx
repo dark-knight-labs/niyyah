@@ -24,13 +24,26 @@ export function BlockTrends({ series }: BlockTrendsProps) {
                 {BLOCK_LABELS[block]}
               </span>
               <div className="flex-1 flex items-end gap-px h-6">
-                {values.map((v, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-sm"
-                    style={{ height: `${Math.max((v / 3) * 100, 4)}%`, backgroundColor: color }}
-                  />
-                ))}
+                {values.map((v, i) =>
+                  v === null ? (
+                    // No data for this day (block wasn't applicable) — a faint
+                    // full-height marker, visually distinct from an actual
+                    // "voted 0" bar rather than rendering as an empty gap.
+                    <div
+                      key={i}
+                      className="flex-1 rounded-sm bg-[var(--border)]"
+                      style={{ height: "100%", opacity: 0.15 }}
+                      title="No data"
+                    />
+                  ) : (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-sm"
+                      style={{ height: `${Math.max((v / 3) * 100, 4)}%`, backgroundColor: color }}
+                      title={`${v} star${v === 1 ? "" : "s"}`}
+                    />
+                  )
+                )}
               </div>
               <span className="font-mono text-xs w-8 text-right text-[var(--muted-foreground)]">{avg}</span>
             </div>

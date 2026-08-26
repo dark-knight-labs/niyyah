@@ -89,14 +89,24 @@ async def test_streaks_ignore_days_where_block_is_entirely_absent(auth_client: A
 
 
 @pytest.mark.asyncio
-async def test_blocks_returns_series_and_averages(auth_client: AsyncClient, seed_day):
+async def test_blocks_returns_date_aligned_series_and_averages(auth_client: AsyncClient, seed_day):
     today = date.today()
+    # "soul" is present on both days; "body" only on the earlier day, so its
+    # array must still be `days`-long with a None for the day it's absent —
+    # not a shorter array — and its average must only count the present value.
     await seed_day(today - timedelta(days=1), blocks={"soul": 1, "body": 2})
-    await seed_day(today, blocks={"soul": 3, "body": 2})
+    await seed_day(today, blocks={"soul": 3})
     resp = await auth_client.get("/api/v1/vault/blocks?days=7")
     assert resp.status_code == 200
     body = resp.json()
     assert body["range"] == 7
-    assert sorted(body["blocks"]["soul"]) == [1, 3]
+
+    soul_series = body["blocks"]["soul"]
+    body_series = body["blocks"]["body"]
+    assert len(soul_series) == 7
+    assert len(body_series) == 7  # same length as "soul", even though absent on 6 of 7 days
+    assert soul_series[-2:] == [1, 3]  # the two seeded days, in date order
+    assert body_series[-2:] == [2, None]  # present on day -1, absent (None) on today
+
     assert body["averages"]["soul"] == 2.0
-    assert body["averages"]["body"] == 2.0
+    assert body["averages"]["body"] == 2.0  # average of the single present value, not skewed by Nones
