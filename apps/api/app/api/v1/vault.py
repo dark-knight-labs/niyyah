@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import date, timedelta
 
@@ -25,6 +26,7 @@ from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_sync import sync_vault
 
 router = APIRouter(prefix="/vault", tags=["vault"])
+logger = logging.getLogger(__name__)
 
 
 def _day_to_response(day: VaultDay) -> VaultDayResponse:
@@ -170,8 +172,17 @@ async def _sync_vault_in_background() -> None:
     # reused here — open a fresh session for the lifetime of this task.
     # Referenced via the module (not imported by name) so tests can
     # monkeypatch app.core.database.async_session to point at the test DB.
-    async with database.async_session() as session:
-        await sync_vault(session)
+    try:
+        async with database.async_session() as session:
+            result = await sync_vault(session)
+        if result.errors:
+            logger.warning(
+                "vault webhook sync completed with %d error(s): %s", len(result.errors), result.errors
+            )
+        else:
+            logger.info("vault webhook sync completed: %d day(s) synced", result.synced_days)
+    except Exception:
+        logger.exception("vault webhook sync failed unexpectedly")
 
 
 @router.post("/sync/webhook", status_code=status.HTTP_202_ACCEPTED)

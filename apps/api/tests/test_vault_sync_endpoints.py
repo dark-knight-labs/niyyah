@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from httpx import AsyncClient
 
@@ -5,7 +7,7 @@ from app.core import database
 from app.core.config import settings
 from app.models.vault import VaultDay
 from tests.conftest import TestSession
-from tests.test_vault_sync import DAY_1, _make_repo
+from tests.test_vault_sync import BROKEN_FRONTMATTER, DAY_1, _make_repo
 
 
 @pytest.mark.asyncio
@@ -100,3 +102,33 @@ async def test_webhook_accepts_gitlab_token_header(client: AsyncClient, tmp_path
     )
     assert resp.status_code == 202
     assert resp.json() == {"accepted": True}
+
+
+@pytest.mark.asyncio
+async def test_webhook_background_sync_logs_errors_instead_of_discarding_them(
+    client: AsyncClient, tmp_path, monkeypatch, caplog
+):
+    # The webhook's background sync has no caller to return SyncResult.errors
+    # to, so per-file errors must at least be logged rather than silently
+    # discarded. One good file + one malformed file exercises that path.
+    gitlab_repo = _make_repo(tmp_path, "gitlab-xarvis", {
+        "2026-08-20.md": DAY_1,
+        "2026-08-21.md": BROKEN_FRONTMATTER,
+    })
+    monkeypatch.setattr(settings, "vault_gitlab_url", gitlab_repo)
+    monkeypatch.setattr(settings, "vault_github_url", str(tmp_path / "unused"))
+    monkeypatch.setattr(settings, "vault_workdir", str(tmp_path / "work"))
+    monkeypatch.setattr(database, "async_session", TestSession)
+
+    with caplog.at_level(logging.WARNING, logger="app.api.v1.vault"):
+        resp = await client.post(
+            "/api/v1/vault/sync/webhook",
+            headers={"X-Vault-Sync-Secret": settings.vault_sync_secret},
+        )
+
+    assert resp.status_code == 202
+    assert resp.json() == {"accepted": True}
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "2026-08-21.md" in warnings[0].getMessage()
