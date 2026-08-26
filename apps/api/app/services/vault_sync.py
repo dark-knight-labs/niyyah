@@ -91,6 +91,14 @@ async def sync_vault(db: AsyncSession, workdir: str | None = None) -> SyncResult
             else:
                 db.add(VaultBlockVote(vault_day_id=day.id, block=block, stars=stars))
 
+        # A re-sync must remove votes for blocks no longer present in the note
+        # (e.g. mode changed full -> off, or a callout was deleted) — otherwise
+        # day.total (from parsed.total) desyncs from the sum of stored rows,
+        # and /streaks' "absent means not stored" invariant breaks.
+        for block, vote in existing_votes.items():
+            if block not in parsed.blocks:
+                await db.delete(vote)
+
         result.synced_days += 1
 
     await db.commit()

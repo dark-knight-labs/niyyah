@@ -111,6 +111,62 @@ async def test_sync_is_idempotent(tmp_path, db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_resync_deletes_votes_for_blocks_no_longer_in_note(tmp_path, db_session, monkeypatch):
+    # DAY_1 (below) has both soul and body blocks; the re-synced version only has soul
+    # (simulating a mode change, e.g. full -> off, or someone editing the callout out).
+    two_block_day = """---
+mode: full
+possible: 21
+---
+> [!soul]+ Soul
+> - [x] ⭐⭐ Prayed 5x Fard + Sunnah
+
+> [!body]+ Body
+> - [x] ⭐ Walk / 20min bodyweight
+"""
+    one_block_day = """---
+mode: off
+possible: 2
+---
+> [!soul]+ Soul
+> - [x] ⭐⭐ Prayed 5x Fard + Sunnah
+"""
+    repo_dir = tmp_path / "gitlab-xarvis"
+    gitlab_repo = _make_repo(tmp_path, "gitlab-xarvis", {"2026-08-20.md": two_block_day})
+    monkeypatch.setattr(settings, "vault_gitlab_url", gitlab_repo)
+    monkeypatch.setattr(settings, "vault_github_url", str(tmp_path / "unused"))
+    workdir = str(tmp_path / "work")
+
+    result = await vault_sync.sync_vault(db_session, workdir=workdir)
+    assert result.errors == []
+
+    day = (await db_session.execute(
+        VaultDay.__table__.select().where(VaultDay.date == date(2026, 8, 20))
+    )).first()
+    votes = (await db_session.execute(
+        VaultBlockVote.__table__.select().where(VaultBlockVote.vault_day_id == day.id)
+    )).fetchall()
+    assert {v.block for v in votes} == {"soul", "body"}
+
+    # Now the note changes to drop the "body" block entirely; re-sync from that repo.
+    (repo_dir / "Calendar" / "Daily" / "2026-08-20.md").write_text(one_block_day, encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo_dir, check=True)
+    subprocess.run(["git", "commit", "--quiet", "-m", "drop body block"], cwd=repo_dir, check=True)
+
+    result = await vault_sync.sync_vault(db_session, workdir=workdir)
+    assert result.errors == []
+
+    day = (await db_session.execute(
+        VaultDay.__table__.select().where(VaultDay.date == date(2026, 8, 20))
+    )).first()
+    votes = (await db_session.execute(
+        VaultBlockVote.__table__.select().where(VaultBlockVote.vault_day_id == day.id)
+    )).fetchall()
+    assert {v.block for v in votes} == {"soul"}
+    assert day.total == 2  # sum of remaining blocks, matching parsed.total
+
+
+@pytest.mark.asyncio
 async def test_sync_skips_malformed_file_and_reports_error(tmp_path, db_session, monkeypatch):
     gitlab_repo = _make_repo(tmp_path, "gitlab-xarvis", {
         "2026-08-20.md": DAY_1,
