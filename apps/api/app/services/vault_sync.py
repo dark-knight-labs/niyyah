@@ -69,40 +69,47 @@ async def sync_vault(db: AsyncSession, workdir: str | None = None) -> SyncResult
             result.errors.append(f"{note_path.name}: {exc}")
             continue
 
-        existing = await db.execute(select(VaultDay).where(VaultDay.date == parsed.date))
-        day = existing.scalar_one_or_none()
-        if day is None:
-            day = VaultDay(
-                date=parsed.date, mode=parsed.mode, possible=parsed.possible, total=parsed.total,
-                focus=parsed.focus, log=parsed.log,
-            )
-            db.add(day)
-            await db.flush()
-        else:
-            day.mode = parsed.mode
-            day.possible = parsed.possible
-            day.total = parsed.total
-            day.focus = parsed.focus
-            day.log = parsed.log
-            day.synced_at = datetime.now(timezone.utc)
-
-        votes_result = await db.execute(select(VaultBlockVote).where(VaultBlockVote.vault_day_id == day.id))
-        existing_votes = {v.block: v for v in votes_result.scalars().all()}
-        for block, stars in parsed.blocks.items():
-            if block in existing_votes:
-                existing_votes[block].stars = stars
+        try:
+            existing = await db.execute(select(VaultDay).where(VaultDay.date == parsed.date))
+            day = existing.scalar_one_or_none()
+            if day is None:
+                day = VaultDay(
+                    date=parsed.date, mode=parsed.mode, possible=parsed.possible, total=parsed.total,
+                    focus=parsed.focus, log=parsed.log,
+                )
+                db.add(day)
+                await db.flush()
             else:
-                db.add(VaultBlockVote(vault_day_id=day.id, block=block, stars=stars))
+                day.mode = parsed.mode
+                day.possible = parsed.possible
+                day.total = parsed.total
+                day.focus = parsed.focus
+                day.log = parsed.log
+                day.synced_at = datetime.now(timezone.utc)
 
-        # A re-sync must remove votes for blocks no longer present in the note
-        # (e.g. mode changed full -> off, or a callout was deleted) — otherwise
-        # day.total (from parsed.total) desyncs from the sum of stored rows,
-        # and /streaks' "absent means not stored" invariant breaks.
-        for block, vote in existing_votes.items():
-            if block not in parsed.blocks:
-                await db.delete(vote)
+            votes_result = await db.execute(select(VaultBlockVote).where(VaultBlockVote.vault_day_id == day.id))
+            existing_votes = {v.block: v for v in votes_result.scalars().all()}
+            for block, stars in parsed.blocks.items():
+                if block in existing_votes:
+                    existing_votes[block].stars = stars
+                else:
+                    db.add(VaultBlockVote(vault_day_id=day.id, block=block, stars=stars))
 
-        result.synced_days += 1
+            # A re-sync must remove votes for blocks no longer present in the note
+            # (e.g. mode changed full -> off, or a callout was deleted) — otherwise
+            # day.total (from parsed.total) desyncs from the sum of stored rows,
+            # and /streaks' "absent means not stored" invariant breaks.
+            for block, vote in existing_votes.items():
+                if block not in parsed.blocks:
+                    await db.delete(vote)
 
-    await db.commit()
+            # Commit per day (not once at the end) so that one day's DB-write
+            # failure can be rolled back and reported without discarding every
+            # other day already processed in this run.
+            await db.commit()
+            result.synced_days += 1
+        except Exception as exc:  # a single bad day's write must not abort the whole sync
+            await db.rollback()
+            result.errors.append(f"{note_path.name}: db write failed: {exc}")
+
     return result

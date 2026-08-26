@@ -204,3 +204,38 @@ async def test_sync_skips_malformed_file_and_reports_error(tmp_path, db_session,
     assert result.synced_days == 1
     assert len(result.errors) == 1
     assert "2026-08-21.md" in result.errors[0]
+
+
+@pytest.mark.asyncio
+async def test_db_write_failure_for_one_day_does_not_abort_whole_sync(tmp_path, db_session, monkeypatch):
+    # Belt-and-suspenders test for the DB-write safety net, independent of the
+    # parser-level mode normalization fix: even if a bad ParsedDay slips
+    # through parsing (mode=None violates VaultDay.mode's nullable=False
+    # column), that one day's commit failure must be caught, rolled back, and
+    # reported — not propagate out of sync_vault() and discard every other
+    # already-processed day in this run.
+    gitlab_repo = _make_repo(tmp_path, "gitlab-xarvis", {
+        "2026-08-20.md": DAY_1,
+        "2026-08-21.md": DAY_2,
+    })
+    monkeypatch.setattr(settings, "vault_gitlab_url", gitlab_repo)
+    monkeypatch.setattr(settings, "vault_github_url", str(tmp_path / "unused"))
+
+    real_parse = vault_sync.parse_daily_note
+
+    def _parse_with_broken_mode_for_one_day(content, note_date):
+        parsed = real_parse(content, note_date)
+        if note_date == date(2026, 8, 21):
+            parsed.mode = None  # bypasses the parser's own normalization on purpose
+        return parsed
+
+    monkeypatch.setattr(vault_sync, "parse_daily_note", _parse_with_broken_mode_for_one_day)
+
+    result = await vault_sync.sync_vault(db_session, workdir=str(tmp_path / "work"))
+
+    assert result.synced_days == 1  # 2026-08-20 still made it through
+    assert len(result.errors) == 1
+    assert "2026-08-21.md" in result.errors[0]
+
+    days = (await db_session.execute(VaultDay.__table__.select())).fetchall()
+    assert {d.date for d in days} == {date(2026, 8, 20)}  # the broken day was rolled back, not half-written

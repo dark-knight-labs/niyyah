@@ -93,6 +93,12 @@ def _extract_section(body: str, heading: str) -> str | None:
 def parse_daily_note(content: str, note_date: date) -> ParsedDay:
     frontmatter, body = _split_frontmatter(content)
     mode = frontmatter.get("mode", "full")
+    if not isinstance(mode, str) or not mode:
+        # `mode:` present but empty/null in the YAML yields None here (the
+        # dict .get default only applies when the key is absent). VaultDay.mode
+        # is a non-nullable string column, so an unnormalized None would raise
+        # an IntegrityError at commit time instead of falling back cleanly.
+        mode = "full"
     meta = MODE_META.get(mode, MODE_META["full"])
 
     blocks = _parse_blocks(body)

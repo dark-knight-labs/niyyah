@@ -68,6 +68,14 @@ possible: 21
 > - [ ] ⭐⭐⭐ Slept right after Isha
 """
 
+NULL_MODE_DAY = """---
+mode:
+possible: 21
+---
+> [!soul]+ Soul
+> - [x] ⭐ Prayed 5x Fard
+"""
+
 
 def test_parses_canonical_blocks_and_takes_checked_star_level():
     parsed = parse_daily_note(FULL_DAY, date(2026, 8, 23))
@@ -107,3 +115,12 @@ def test_block_never_mentioned_is_absent_not_zero():
     parsed = parse_daily_note(FULL_DAY, date(2026, 8, 23))
     assert "ops" not in parsed.blocks
     assert "body" not in parsed.blocks
+
+
+def test_null_mode_normalizes_to_full_not_none():
+    # `mode:` present but empty/null in YAML parses to None, not the .get
+    # default. VaultDay.mode is a nullable=False column, so storing None
+    # would blow up the whole sync with an IntegrityError at commit time.
+    parsed = parse_daily_note(NULL_MODE_DAY, date(2026, 8, 24))
+    assert parsed.mode == "full"
+    assert parsed.possible == 21
