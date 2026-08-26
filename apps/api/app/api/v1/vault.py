@@ -1,10 +1,12 @@
+import secrets
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core import database
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -148,9 +150,30 @@ async def trigger_sync(user: User = Depends(get_current_user), db: AsyncSession 
     return VaultSyncResponse(synced_days=result.synced_days, errors=result.errors)
 
 
-@router.post("/sync/webhook", response_model=VaultSyncResponse)
-async def webhook_sync(x_vault_sync_secret: str = Header(...), db: AsyncSession = Depends(get_db)):
-    if x_vault_sync_secret != settings.vault_sync_secret:
+async def _sync_vault_in_background() -> None:
+    # A request-scoped session (Depends(get_db)) is closed by FastAPI's
+    # dependency exit stack before background tasks run, so it must not be
+    # reused here — open a fresh session for the lifetime of this task.
+    # Referenced via the module (not imported by name) so tests can
+    # monkeypatch app.core.database.async_session to point at the test DB.
+    async with database.async_session() as session:
+        await sync_vault(session)
+
+
+@router.post("/sync/webhook", status_code=status.HTTP_202_ACCEPTED)
+async def webhook_sync(
+    background_tasks: BackgroundTasks,
+    x_vault_sync_secret: str | None = Header(default=None),
+    x_gitlab_token: str | None = Header(default=None),
+):
+    # GitLab webhooks send the secret via X-Gitlab-Token, not a custom header;
+    # accept either. Both are optional so a request with no header at all hits
+    # this 401 check instead of a FastAPI 422 validation error.
+    provided = x_vault_sync_secret or x_gitlab_token
+    if not provided or not secrets.compare_digest(provided, settings.vault_sync_secret):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid sync secret")
-    result = await sync_vault(db)
-    return VaultSyncResponse(synced_days=result.synced_days, errors=result.errors)
+
+    # Cold syncs (git clone + parsing every file) can exceed GitLab's ~10s
+    # webhook delivery timeout, so run the sync out-of-band and ack immediately.
+    background_tasks.add_task(_sync_vault_in_background)
+    return {"accepted": True}
