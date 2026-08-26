@@ -1,8 +1,13 @@
 # Niyyah Vault Dashboard — Design Spec
 
 > Date: 2026-08-14
-> Status: Approved
+> Status: Superseded — see `2026-08-26-vault-votes-dashboard-design.md`
 > Scope: Replace niyyah habit tracker with a read-only vault dashboard for xarvis
+
+> **Superseded 2026-08-26.** This spec deleted the existing habit tracker and used a
+> stateless/no-DB direct-filesystem read. The new spec keeps the existing tracker,
+> adds a DB-backed dashboard synced from git (GitLab primary, GitHub fallback), and
+> uses a Datadog-style light+dark theme instead of dark-only. Kept here for history.
 
 ---
 
