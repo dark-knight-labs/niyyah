@@ -1,10 +1,11 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
@@ -15,8 +16,10 @@ from app.schemas.vault import (
     VaultMonthResponse,
     VaultStreakEntry,
     VaultStreaksResponse,
+    VaultSyncResponse,
     VaultWeekResponse,
 )
+from app.services.vault_sync import sync_vault
 
 router = APIRouter(prefix="/vault", tags=["vault"])
 
@@ -137,3 +140,17 @@ async def get_streaks(user: User = Depends(get_current_user), db: AsyncSession =
         for block in longest
     }
     return VaultStreaksResponse(streaks=streaks)
+
+
+@router.post("/sync", response_model=VaultSyncResponse)
+async def trigger_sync(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await sync_vault(db)
+    return VaultSyncResponse(synced_days=result.synced_days, errors=result.errors)
+
+
+@router.post("/sync/webhook", response_model=VaultSyncResponse)
+async def webhook_sync(x_vault_sync_secret: str = Header(...), db: AsyncSession = Depends(get_db)):
+    if x_vault_sync_secret != settings.vault_sync_secret:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid sync secret")
+    result = await sync_vault(db)
+    return VaultSyncResponse(synced_days=result.synced_days, errors=result.errors)
