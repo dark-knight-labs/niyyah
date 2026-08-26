@@ -9,10 +9,10 @@ spec:
       nodeSelector:
         kubernetes.io/arch: amd64
       imagePullSecrets:
-        - name: registry-credentials
+        - name: gitlab-registry-pull
       containers:
         - name: migrate
-          image: gitlab-registry.homelab.alamin.rocks/niyyah/app/api:latest
+          image: gitlab-registry.alamin.rocks/niyyah/app/api:latest
           command: ["alembic", "upgrade", "head"]
           envFrom:
             - secretRef:
