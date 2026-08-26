@@ -21,6 +21,20 @@
   --font-sans: "Manrope Variable", system-ui, -apple-system, sans-serif;
 }
 
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #0a0a0a;
+  --surface: #141414;
+  --foreground: #fafafa;
+  --muted: #1a1a1a;
+  --muted-foreground: #a1a1aa;
+  --border: #262626;
+  --accent: #7c3aed;
+  --accent-fg: #ffffff;
+  --accent-light: #241a35;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);

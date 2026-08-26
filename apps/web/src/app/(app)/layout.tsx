@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { useTheme } from "@/hooks/use-theme";
 import { logout } from "@/lib/auth";
 import {
   LayoutDashboard,
@@ -26,6 +27,7 @@ const nav = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
+  useTheme();
 
   if (loading) {
     return (
