@@ -110,3 +110,21 @@ async def test_blocks_returns_date_aligned_series_and_averages(auth_client: Asyn
 
     assert body["averages"]["soul"] == 2.0
     assert body["averages"]["body"] == 2.0  # average of the single present value, not skewed by Nones
+
+
+@pytest.mark.asyncio
+async def test_blocks_rejects_out_of_range_days(auth_client: AsyncClient):
+    # days=0 and an absurdly large days value must 422 (validation error),
+    # not build a multi-million-element date range.
+    resp = await auth_client.get("/api/v1/vault/blocks?days=0")
+    assert resp.status_code == 422
+
+    resp = await auth_client.get("/api/v1/vault/blocks?days=10000")
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_blocks_accepts_max_bound_days(auth_client: AsyncClient):
+    # 366 (a full leap year) is the generous upper bound and must still work.
+    resp = await auth_client.get("/api/v1/vault/blocks?days=366")
+    assert resp.status_code == 200

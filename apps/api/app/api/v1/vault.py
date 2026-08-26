@@ -2,7 +2,7 @@ import logging
 import secrets
 from datetime import date, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -110,7 +110,11 @@ async def get_month(month: str, user: User = Depends(get_current_user), db: Asyn
 
 
 @router.get("/blocks", response_model=VaultBlocksSeriesResponse)
-async def get_blocks(days: int = 30, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def get_blocks(
+    days: int = Query(30, ge=1, le=366),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     end = date.today()
     start = end - timedelta(days=days - 1)
     day_rows = await _get_days_range(db, start, end)
