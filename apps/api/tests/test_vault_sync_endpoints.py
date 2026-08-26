@@ -38,6 +38,21 @@ async def test_webhook_rejects_wrong_secret(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_webhook_rejects_non_ascii_secret(client: AsyncClient):
+    # secrets.compare_digest raises TypeError on non-ASCII str operands. A
+    # request with a non-ASCII header value must still get a clean 401, not
+    # an unhandled 500.
+    # httpx's Headers coerces str values with strict ascii encoding, so the
+    # non-ASCII byte has to be handed in as raw bytes to reach the server at
+    # all (a real GitLab webhook would send this as a raw header byte too).
+    resp = await client.post(
+        "/api/v1/vault/sync/webhook",
+        headers={"X-Gitlab-Token": "café".encode("utf-8")},
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_webhook_rejects_missing_header(client: AsyncClient):
     # A required Header(...) param would make FastAPI 422 before the handler's
     # own 401 check ever runs. Both headers are optional now, so a request

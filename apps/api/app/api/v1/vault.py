@@ -184,7 +184,9 @@ async def webhook_sync(
     # accept either. Both are optional so a request with no header at all hits
     # this 401 check instead of a FastAPI 422 validation error.
     provided = x_vault_sync_secret or x_gitlab_token
-    if not provided or not secrets.compare_digest(provided, settings.vault_sync_secret):
+    if not provided or not secrets.compare_digest(
+        provided.encode("utf-8"), settings.vault_sync_secret.encode("utf-8")
+    ):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid sync secret")
 
     # Cold syncs (git clone + parsing every file) can exceed GitLab's ~10s
