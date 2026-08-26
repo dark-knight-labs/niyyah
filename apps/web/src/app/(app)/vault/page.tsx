@@ -2,11 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { vaultApi } from "@/lib/vault-api";
-import { VaultDayData, VaultMonthData, VaultWeekData } from "@/lib/vault-types";
+import {
+  VaultBlocksSeriesData,
+  VaultDayData,
+  VaultMonthData,
+  VaultStreaksData,
+  VaultWeekData,
+} from "@/lib/vault-types";
 import { VaultHeader } from "@/components/vault/header";
 import { BlockCards } from "@/components/vault/block-cards";
 import { WeeklyPulse } from "@/components/vault/weekly-pulse";
 import { MonthlyHeatmap } from "@/components/vault/monthly-heatmap";
+import { BlockTrends } from "@/components/vault/block-trends";
+import { FooterStats } from "@/components/vault/footer-stats";
 
 function currentMonth(): string {
   const now = new Date();
@@ -17,6 +25,8 @@ export default function VaultPage() {
   const [today, setToday] = useState<VaultDayData | null>(null);
   const [week, setWeek] = useState<VaultWeekData | null>(null);
   const [month, setMonth] = useState<VaultMonthData | null>(null);
+  const [blocks, setBlocks] = useState<VaultBlocksSeriesData | null>(null);
+  const [streaks, setStreaks] = useState<VaultStreaksData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
@@ -25,11 +35,15 @@ export default function VaultPage() {
       vaultApi.today().catch(() => null),
       vaultApi.week().catch(() => null),
       vaultApi.month(currentMonth()).catch(() => null),
+      vaultApi.blocks(30).catch(() => null),
+      vaultApi.streaks().catch(() => null),
     ])
-      .then(([t, w, m]) => {
+      .then(([t, w, m, b, s]) => {
         setToday(t);
         setWeek(w);
         setMonth(m);
+        setBlocks(b);
+        setStreaks(s);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -52,6 +66,8 @@ export default function VaultPage() {
       <BlockCards today={today} />
       <WeeklyPulse week={week} />
       <MonthlyHeatmap month={month} />
+      <BlockTrends series={blocks} />
+      <FooterStats month={month} streaks={streaks} />
     </div>
   );
 }
