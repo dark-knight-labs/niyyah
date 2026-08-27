@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { vaultApi } from "@/lib/vault-api";
 import { VaultDayData } from "@/lib/vault-types";
-import { MODE_COLORS } from "@/lib/vault-constants";
+import { resolveModeColor } from "@/lib/vault-constants";
 
 interface VaultHeaderProps {
   today: VaultDayData | null;
@@ -36,13 +36,10 @@ export function VaultHeader({ today, onSynced }: VaultHeaderProps) {
     }
   }
 
-  const modeColor = today ? MODE_COLORS[today.mode] ?? "#71717a" : "#71717a";
+  const modeColor = today ? resolveModeColor(today.mode) : "#71717a";
 
   return (
-    <div
-      className="widget border border-[var(--border)] bg-[var(--surface)] rounded px-5 pt-5 pb-4 mb-4"
-      style={{ "--widget-accent": modeColor } as CSSProperties}
-    >
+    <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl px-6 pt-6 pb-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span
@@ -56,8 +53,8 @@ export function VaultHeader({ today, onSynced }: VaultHeaderProps) {
               <h1 className="heading-elegant text-2xl leading-none">Today&rsquo;s Ledger</h1>
               {today && (
                 <span
-                  className="text-[10px] uppercase tracking-[0.18em] px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: `${modeColor}18`, color: modeColor }}
+                  className="text-[10px] uppercase tracking-[0.18em] px-2 py-0.5 rounded-full border"
+                  style={{ borderColor: `${modeColor}55`, color: modeColor }}
                 >
                   {today.mode}
                 </span>

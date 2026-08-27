@@ -79,9 +79,9 @@ export default function VaultPage() {
   }
 
   return (
-    <div>
+    <div className="max-w-4xl mx-auto space-y-5">
       {fetchError && (
-        <div className="border border-[var(--destructive)] bg-[var(--surface)] rounded px-4 py-2 mb-4 text-xs text-[var(--destructive)]">
+        <div className="border border-[var(--destructive)] bg-[var(--surface)] rounded-xl px-4 py-2 text-xs text-[var(--destructive)]">
           {fetchError}
         </div>
       )}

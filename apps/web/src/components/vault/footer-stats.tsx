@@ -1,4 +1,4 @@
-import { BLOCK_COLORS, BLOCK_LABELS, BLOCK_ORDER, MODE_COLORS } from "@/lib/vault-constants";
+import { BLOCK_COLORS, BLOCK_LABELS, BLOCK_ORDER, resolveModeColor } from "@/lib/vault-constants";
 import { VaultMonthData, VaultStreaksData } from "@/lib/vault-types";
 
 interface FooterStatsProps {
@@ -9,7 +9,7 @@ interface FooterStatsProps {
 export function FooterStats({ month, streaks }: FooterStatsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4">
+      <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
         <div className="flex items-baseline justify-between mb-3">
           <p className="heading-elegant text-base">Mode Distribution</p>
           <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">the month in modes</p>
@@ -22,7 +22,7 @@ export function FooterStats({ month, streaks }: FooterStatsProps) {
                   key={mode}
                   style={{
                     width: `${(count / month.days.length) * 100}%`,
-                    backgroundColor: MODE_COLORS[mode] ?? "#71717a",
+                    backgroundColor: resolveModeColor(mode),
                   }}
                   title={`${mode}: ${count}`}
                 />
@@ -31,10 +31,7 @@ export function FooterStats({ month, streaks }: FooterStatsProps) {
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               {Object.entries(month.modes).map(([mode, count]) => (
                 <span key={mode} className="flex items-center gap-1 text-[10px] font-mono text-[var(--muted-foreground)]">
-                  <span
-                    className="w-2 h-2 rounded-sm"
-                    style={{ backgroundColor: MODE_COLORS[mode] ?? "#71717a" }}
-                  />
+                  <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: resolveModeColor(mode) }} />
                   {mode} {count}
                 </span>
               ))}
@@ -45,7 +42,7 @@ export function FooterStats({ month, streaks }: FooterStatsProps) {
         )}
       </div>
 
-      <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4">
+      <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
         <div className="flex items-baseline justify-between mb-3">
           <p className="heading-elegant text-base">Streaks</p>
           <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">current / best</p>

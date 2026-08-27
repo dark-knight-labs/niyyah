@@ -9,8 +9,8 @@ export function BlockTrends({ series }: BlockTrendsProps) {
   if (!series) return null;
 
   return (
-    <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4 mb-4">
-      <div className="flex items-baseline justify-between mb-3">
+    <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
+      <div className="flex items-baseline justify-between mb-4">
         <p className="heading-elegant text-base">Block Trends ({series.range}d)</p>
         <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">the long view</p>
       </div>

@@ -1,14 +1,8 @@
+import { resolveModeColor } from "@/lib/vault-constants";
 import { VaultDayData, VaultMonthData } from "@/lib/vault-types";
 
 interface MonthlyHeatmapProps {
   month: VaultMonthData | null;
-}
-
-function heatColor(pct: number): string {
-  if (pct === 0) return "var(--border)";
-  if (pct < 34) return "#ef4444";
-  if (pct < 67) return "#eab308";
-  return "#059669";
 }
 
 const WEEKDAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -32,34 +26,35 @@ export function MonthlyHeatmap({ month }: MonthlyHeatmapProps) {
   ];
 
   return (
-    <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4 mb-4">
+    <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
       <div className="flex items-baseline justify-between mb-4">
         <p className="heading-elegant text-base">Monthly Heatmap — {month.month}</p>
         <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">habit tracker</p>
       </div>
-      <div className="grid grid-cols-7 gap-2.5">
+      {/* Fixed-width columns (not 1fr) — cells stay small habit-tracker
+          squares instead of stretching to fill the card. Color is the mode's
+          color everywhere on the page, not a separate percent-tier scale. */}
+      <div className="grid grid-cols-[repeat(7,1.75rem)] gap-1">
         {WEEKDAY_LABELS.map((w, i) => (
-          <p key={`h-${i}`} className="text-center text-[10px] uppercase text-[var(--muted-foreground)] font-mono">
+          <p key={`h-${i}`} className="text-center text-[9px] uppercase text-[var(--muted-foreground)] font-mono">
             {w}
           </p>
         ))}
-        {/* Bigger paper-like cells — the fill color is the mark; the date is
-            a quiet corner annotation, not the focal point. */}
         {cells.map((day, i) =>
           day ? (
             <div
               key={day.date}
-              title={`${day.date}: ${day.total}/${day.possible}`}
-              className="aspect-square rounded-lg flex items-start justify-start p-1.5 text-[8px] font-mono tabular-nums"
+              title={`${day.date}: ${day.total}/${day.possible} · ${day.mode}`}
+              className="w-7 h-7 rounded-md flex items-center justify-center text-[8px] font-mono tabular-nums"
               style={{
-                backgroundColor: heatColor(day.pct),
-                color: day.pct > 0 ? "rgba(255,255,255,0.75)" : "var(--muted-foreground)",
+                backgroundColor: resolveModeColor(day.mode),
+                color: "rgba(255,255,255,0.8)",
               }}
             >
               {Number(day.date.slice(-2))}
             </div>
           ) : (
-            <div key={`blank-${i}`} className="aspect-square" />
+            <div key={`blank-${i}`} className="w-7 h-7" />
           )
         )}
       </div>

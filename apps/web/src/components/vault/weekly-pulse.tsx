@@ -1,4 +1,4 @@
-import { MODE_COLORS } from "@/lib/vault-constants";
+import { resolveModeColor } from "@/lib/vault-constants";
 import { VaultWeekData } from "@/lib/vault-types";
 
 interface WeeklyPulseProps {
@@ -9,8 +9,8 @@ export function WeeklyPulse({ week }: WeeklyPulseProps) {
   if (!week) return null;
 
   return (
-    <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4 mb-4">
-      <div className="flex items-baseline justify-between mb-3">
+    <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
+      <div className="flex items-baseline justify-between mb-4">
         <p className="heading-elegant text-base">Weekly Pulse</p>
         <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">this week&rsquo;s spread</p>
       </div>
@@ -21,7 +21,7 @@ export function WeeklyPulse({ week }: WeeklyPulseProps) {
         />
         {week.days.map((day) => {
           const dow = new Date(day.date).toLocaleDateString("en-US", { weekday: "short" });
-          const color = MODE_COLORS[day.mode] ?? "#71717a";
+          const color = resolveModeColor(day.mode);
           return (
             <div key={day.date} className="flex-1 flex flex-col items-center gap-1 relative z-10">
               <div className="w-full flex-1 flex items-end" title={`${day.pct}%`}>

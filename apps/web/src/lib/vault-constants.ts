@@ -30,3 +30,20 @@ export const MODE_COLORS: Record<string, string> = {
   ramadan: "#06b6d4",
   fasting: "#f59e0b",
 };
+
+// Older vault notes (pre-taxonomy) used "green" as a synonym for "full" —
+// the backend parser already falls back to the "full" star ceiling for any
+// unrecognized mode, so the color should agree rather than falling back to
+// a flat gray everywhere this vault's real history is rendered.
+const MODE_ALIASES: Record<string, string> = { green: "full" };
+
+const FALLBACK_MODE_COLOR = "#71717a";
+
+// Single source of truth for "what color is this mode" — every widget that
+// renders a mode (header badge, weekly bars, monthly heatmap, mode
+// distribution) must call this instead of indexing MODE_COLORS directly,
+// so the same mode always reads as the same color everywhere on the page.
+export function resolveModeColor(mode: string): string {
+  const canonical = MODE_ALIASES[mode] ?? mode;
+  return MODE_COLORS[canonical] ?? FALLBACK_MODE_COLOR;
+}
