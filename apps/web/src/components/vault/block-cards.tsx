@@ -16,7 +16,7 @@ export function BlockCards({ today }: BlockCardsProps) {
         return (
           <div
             key={block}
-            className="widget border border-[var(--border)] rounded px-3 pt-3 pb-2"
+            className="widget border border-[var(--border)] rounded px-2.5 pt-2.5 pb-2"
             style={
               {
                 backgroundColor: stars > 0 ? `${color}14` : "var(--surface)",
@@ -24,7 +24,7 @@ export function BlockCards({ today }: BlockCardsProps) {
               } as CSSProperties
             }
           >
-            <p className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color }}>
+            <p className="text-xs font-semibold tracking-tight mb-1.5" style={{ color }}>
               {BLOCK_LABELS[block]}
             </p>
             <div className="flex items-center gap-1">
@@ -34,17 +34,17 @@ export function BlockCards({ today }: BlockCardsProps) {
                 return (
                   <span
                     key={level}
-                    className="w-3 h-3 rounded-[2px] border flex items-center justify-center"
+                    className="w-3.5 h-3.5 rounded-[2px] border flex items-center justify-center"
                     style={{
                       backgroundColor: checked ? color : "transparent",
                       borderColor: checked ? color : "var(--border)",
                     }}
                   >
-                    {checked && <Check size={9} strokeWidth={3} color="var(--accent-fg)" />}
+                    {checked && <Check size={10} strokeWidth={3} color="var(--accent-fg)" />}
                   </span>
                 );
               })}
-              <span className="font-mono text-xs ml-1 tabular-nums text-[var(--muted-foreground)]">{stars}</span>
+              <span className="font-mono text-sm ml-1 tabular-nums text-[var(--muted-foreground)]">{stars}</span>
             </div>
           </div>
         );

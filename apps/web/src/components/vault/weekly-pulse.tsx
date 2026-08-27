@@ -11,7 +11,7 @@ export function WeeklyPulse({ week }: WeeklyPulseProps) {
   return (
     <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4 mb-4">
       <div className="flex items-baseline justify-between mb-3">
-        <p className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">Weekly Pulse</p>
+        <p className="heading-elegant text-base">Weekly Pulse</p>
         <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">this week&rsquo;s spread</p>
       </div>
       <div className="chart-grid flex gap-2 h-24 relative rounded-sm">

@@ -22,12 +22,12 @@ import {
 const NAV_COLLAPSED_KEY = "niyyah-nav-collapsed";
 
 const nav = [
+  { href: "/vault", label: "Vault", icon: Activity },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/personas", label: "Personas", icon: Users },
   { href: "/schedule", label: "Schedule", icon: Calendar },
   { href: "/principles", label: "Principles", icon: Compass },
   { href: "/tracker", label: "Tracker", icon: CheckSquare },
-  { href: "/vault", label: "Vault", icon: Activity },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -72,7 +72,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div>
           <div className="flex items-center justify-between mb-6 gap-2">
             {!collapsed && (
-              <Link href="/dashboard" className="block min-w-0">
+              <Link href="/vault" className="block min-w-0">
                 <h1 className="text-lg font-bold tracking-tight">Niyyah</h1>
                 <p className="text-xs text-[var(--muted-foreground)]" dir="rtl">نِيَّة</p>
               </Link>

@@ -33,27 +33,27 @@ export function MonthlyHeatmap({ month }: MonthlyHeatmapProps) {
 
   return (
     <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4 mb-4">
-      <div className="flex items-baseline justify-between mb-3">
-        <p className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
-          Monthly Heatmap — {month.month}
-        </p>
+      <div className="flex items-baseline justify-between mb-4">
+        <p className="heading-elegant text-base">Monthly Heatmap — {month.month}</p>
         <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">habit tracker</p>
       </div>
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-2.5">
         {WEEKDAY_LABELS.map((w, i) => (
-          <p key={`h-${i}`} className="text-center text-[9px] uppercase text-[var(--muted-foreground)] font-mono">
+          <p key={`h-${i}`} className="text-center text-[10px] uppercase text-[var(--muted-foreground)] font-mono">
             {w}
           </p>
         ))}
+        {/* Bigger paper-like cells — the fill color is the mark; the date is
+            a quiet corner annotation, not the focal point. */}
         {cells.map((day, i) =>
           day ? (
             <div
               key={day.date}
               title={`${day.date}: ${day.total}/${day.possible}`}
-              className="aspect-square rounded-[3px] flex items-center justify-center text-[9px] font-mono tabular-nums"
+              className="aspect-square rounded-lg flex items-start justify-start p-1.5 text-[8px] font-mono tabular-nums"
               style={{
                 backgroundColor: heatColor(day.pct),
-                color: day.pct > 0 ? "#fff" : "var(--muted-foreground)",
+                color: day.pct > 0 ? "rgba(255,255,255,0.75)" : "var(--muted-foreground)",
               }}
             >
               {Number(day.date.slice(-2))}

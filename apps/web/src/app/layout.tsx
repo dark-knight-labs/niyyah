@@ -6,6 +6,10 @@ import "@fontsource-variable/manrope";
 // used: 400 body, 700 for emphasis) — same self-hosting reasoning as above.
 import "@fontsource/caveat/400.css";
 import "@fontsource/caveat/700.css";
+// Elegant display serif for page/section headings (weights used: 300
+// light for body headings, 400 for the odd emphasis case).
+import "@fontsource/fraunces/300.css";
+import "@fontsource/fraunces/400.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

@@ -20,6 +20,7 @@
   --radius: 0.625rem;
   --font-sans: "Manrope Variable", system-ui, -apple-system, sans-serif;
   --font-hand: "Caveat", "Segoe Print", cursive;
+  --font-serif: "Fraunces", Georgia, serif;
   --dot-grid: rgba(0, 0, 0, 0.07);
 }
 
@@ -50,6 +51,7 @@
   --color-destructive: var(--destructive);
   --font-sans: var(--font-sans);
   --font-hand: var(--font-hand);
+  --font-serif: var(--font-serif);
   --radius: var(--radius);
 }
 
@@ -67,6 +69,22 @@ body {
 
 .font-hand {
   font-family: var(--font-hand);
+}
+
+/* Elegant, editorial heading system (retail-boutique register) — a light
+   serif title under a small, wide-tracked eyebrow label, in place of the
+   dense all-caps mono tags used for data chrome elsewhere on the page. */
+.eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.heading-elegant {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
 }
 
 /* Datadog-style widget card: paper surface + a colored top rule that reads

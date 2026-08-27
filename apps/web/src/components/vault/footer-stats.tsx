@@ -11,7 +11,7 @@ export function FooterStats({ month, streaks }: FooterStatsProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4">
         <div className="flex items-baseline justify-between mb-3">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">Mode Distribution</p>
+          <p className="heading-elegant text-base">Mode Distribution</p>
           <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">the month in modes</p>
         </div>
         {month && month.days.length > 0 ? (
@@ -47,7 +47,7 @@ export function FooterStats({ month, streaks }: FooterStatsProps) {
 
       <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4">
         <div className="flex items-baseline justify-between mb-3">
-          <p className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">Streaks</p>
+          <p className="heading-elegant text-base">Streaks</p>
           <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">current / best</p>
         </div>
         <div className="space-y-1.5">

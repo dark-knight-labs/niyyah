@@ -40,7 +40,7 @@ export function VaultHeader({ today, onSynced }: VaultHeaderProps) {
 
   return (
     <div
-      className="widget border border-[var(--border)] bg-[var(--surface)] rounded px-4 pt-4 pb-3 mb-4"
+      className="widget border border-[var(--border)] bg-[var(--surface)] rounded px-5 pt-5 pb-4 mb-4"
       style={{ "--widget-accent": modeColor } as CSSProperties}
     >
       <div className="flex items-center justify-between">
@@ -51,25 +51,23 @@ export function VaultHeader({ today, onSynced }: VaultHeaderProps) {
             title="Live"
           />
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold uppercase tracking-wider">Vault</h1>
+            <p className="eyebrow">Vault</p>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <h1 className="heading-elegant text-2xl leading-none">Today&rsquo;s Ledger</h1>
               {today && (
                 <span
-                  className="text-xs uppercase tracking-wider px-2 py-0.5 rounded font-mono"
-                  style={{ backgroundColor: `${modeColor}22`, color: modeColor }}
+                  className="text-[10px] uppercase tracking-[0.18em] px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: `${modeColor}18`, color: modeColor }}
                 >
                   {today.mode}
                 </span>
               )}
             </div>
-            <p className="font-hand text-lg leading-none text-[var(--muted-foreground)] mt-0.5">
-              today&rsquo;s ledger
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-4">
           {today && (
-            <span className="font-mono text-sm tabular-nums">
+            <span className="font-mono text-sm tabular-nums text-[var(--muted-foreground)]">
               {today.total}/{today.possible} · {today.pct}%
             </span>
           )}

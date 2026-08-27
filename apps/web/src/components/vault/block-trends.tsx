@@ -11,9 +11,7 @@ export function BlockTrends({ series }: BlockTrendsProps) {
   return (
     <div className="widget border border-[var(--border)] bg-[var(--surface)] rounded p-4 mb-4">
       <div className="flex items-baseline justify-between mb-3">
-        <p className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
-          Block Trends ({series.range}d)
-        </p>
+        <p className="heading-elegant text-base">Block Trends ({series.range}d)</p>
         <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">the long view</p>
       </div>
       <div className="space-y-2">
