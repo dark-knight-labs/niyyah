@@ -79,7 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             <button
               onClick={toggleCollapsed}
-              className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] shrink-0"
+              className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] shrink-0 transition-colors active:scale-90"
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
@@ -93,7 +93,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   title={collapsed ? item.label : undefined}
-                  className={`flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 text-sm rounded transition active:scale-[0.98] ${
                     collapsed ? "justify-center" : ""
                   } ${
                     active
@@ -115,7 +115,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <button
             onClick={logout}
             title={collapsed ? "Sign out" : undefined}
-            className={`flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] ${
+            className={`flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors active:scale-95 ${
               collapsed ? "justify-center w-full" : ""
             }`}
           >

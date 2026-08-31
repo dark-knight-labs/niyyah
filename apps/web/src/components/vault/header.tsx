@@ -71,7 +71,7 @@ export function VaultHeader({ today, onSynced }: VaultHeaderProps) {
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-50 transition-colors active:scale-95"
           >
             <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
             Sync

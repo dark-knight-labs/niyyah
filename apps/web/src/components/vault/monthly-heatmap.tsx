@@ -45,7 +45,7 @@ export function MonthlyHeatmap({ month }: MonthlyHeatmapProps) {
             <div
               key={day.date}
               title={`${day.date}: ${day.total}/${day.possible} · ${day.mode}`}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-[8px] font-mono tabular-nums"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-[8px] font-mono tabular-nums relative transition-transform duration-150 hover:scale-125 hover:z-10"
               style={{
                 backgroundColor: resolveModeColor(day.mode),
                 color: "rgba(255,255,255,0.8)",
