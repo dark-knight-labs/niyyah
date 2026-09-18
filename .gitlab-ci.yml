@@ -39,8 +39,12 @@ deploy:
   tags: [homelab]
   needs: ["build:api", "build:web"]
   script:
-    - kubectl rollout restart deployment/niyyah-api -n niyyah
-    - kubectl rollout restart deployment/niyyah-web -n niyyah
+    # Pin to the immutable sha tag just pushed above, instead of restarting
+    # onto :latest — a registry outage during a pod reschedule can no longer
+    # strand a deploy (see imagePullPolicy: IfNotPresent in the k8s manifest,
+    # burak repo).
+    - kubectl set image deployment/niyyah-api api=$REGISTRY/api:$CI_COMMIT_SHORT_SHA -n niyyah
+    - kubectl set image deployment/niyyah-web web=$REGISTRY/web:$CI_COMMIT_SHORT_SHA -n niyyah
     - kubectl rollout status deployment/niyyah-api -n niyyah --timeout=120s
     - kubectl rollout status deployment/niyyah-web -n niyyah --timeout=120s
   rules:
