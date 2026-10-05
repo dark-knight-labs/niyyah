@@ -1,12 +1,7 @@
-FROM python:3.12-slim
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Needs BASE_IMAGE (api-base:<hash>, built from Dockerfile.base). CI passes it; locally:
+#   docker build -f Dockerfile.base -t api-base . && docker build --build-arg BASE_IMAGE=api-base .
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 
 COPY . .
 

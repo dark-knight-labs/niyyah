@@ -21,17 +21,30 @@ variables:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
-build:api:
+# Builds the dependency base once per hash of its dependency files (self-healing: if the tag is missing in the
+# registry it is built and pushed here), then builds the app on top of it. A code-only change reuses the base.
+.build_on_base:
   extends: .build
   script:
-    - docker build --network host -t $REGISTRY/api:latest -t $REGISTRY/api:$CI_COMMIT_SHORT_SHA apps/api/
-    - docker push $REGISTRY/api --all-tags
+    - DEPS_HASH=$(cat $DEPS_FILES $CONTEXT/Dockerfile.base | sha256sum | cut -c1-12)
+    - BASE=$REGISTRY/$IMAGE-base:$DEPS_HASH
+    - docker pull -q $BASE || { docker build --network host -f $CONTEXT/Dockerfile.base -t $BASE $CONTEXT && docker push $BASE; }
+    - docker build --network host --build-arg BASE_IMAGE=$BASE -t $REGISTRY/$IMAGE:latest -t $REGISTRY/$IMAGE:$CI_COMMIT_SHORT_SHA $CONTEXT
+    - docker push $REGISTRY/$IMAGE --all-tags
+
+build:api:
+  extends: .build_on_base
+  variables:
+    IMAGE: api
+    CONTEXT: apps/api
+    DEPS_FILES: apps/api/requirements.txt
 
 build:web:
-  extends: .build
-  script:
-    - docker build --network host -t $REGISTRY/web:latest -t $REGISTRY/web:$CI_COMMIT_SHORT_SHA apps/web/
-    - docker push $REGISTRY/web --all-tags
+  extends: .build_on_base
+  variables:
+    IMAGE: web
+    CONTEXT: apps/web
+    DEPS_FILES: apps/web/package.json
 
 deploy:
   stage: deploy
