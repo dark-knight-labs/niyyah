@@ -23,6 +23,7 @@ from app.schemas.vault import (
     EditResponse,
     ModeIn,
     NoteIn,
+    TaskIn,
     TaskResponse,
     TaskToggleIn,
     VoteIn,
@@ -39,7 +40,7 @@ from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_schedule import parse_schedule
 from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault
-from app.services.vault_tasks import find_tasks, set_task_done, task_file
+from app.services.vault_tasks import add_task, find_tasks, set_task_done, task_file
 from app.services.vault_write import add_log_note, new_daily_note, set_mode, set_vote
 
 router = APIRouter(prefix="/vault", tags=["vault"])
@@ -346,3 +347,9 @@ async def put_task(data: TaskToggleIn, user: User = Depends(require_editor), db:
         raise HTTPException(status_code=502, detail=str(exc))
     await sync_vault(db)
     return EditResponse(commit=commit, day=None)
+
+
+@router.post("/day/{day}/tasks", response_model=EditResponse)
+async def post_task(day: date, data: TaskIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    _check_day(day)
+    return await _save(day, lambda c: add_task(c, data.text, day.isoformat()), f"Niyyah: {day} add task", db)

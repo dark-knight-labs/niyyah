@@ -80,3 +80,20 @@ def task_file(root: Path, rel: str) -> Path:
     if not inside or _SKIP_DIRS.intersection(path.relative_to(root.resolve()).parts):
         raise ValueError("not a vault note")
     return path
+
+
+def add_task(content: str, text: str, day: str) -> str:
+    """Add '- [ ] text ⏳ day' at the end of the note's '## Tasks' section (after its query block)."""
+    label = " ".join(text.split())
+    if not label or len(label) > 300:
+        raise ValueError("task must be 1-300 characters")
+    entry = f"- [ ] {label} ⏳ {day}"
+    lines = content.split("\n")
+    at = next((i for i, l in enumerate(lines) if l.strip() == "## Tasks"), None)
+    if at is None:
+        return content.rstrip("\n") + f"\n\n## Tasks\n{entry}\n"
+    end = next((i for i in range(at + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    body = lines[at + 1:end]
+    while body and not body[-1].strip():
+        body.pop()
+    return "\n".join([*lines[:at + 1], *body, entry, "", *lines[end:]])

@@ -23,6 +23,7 @@ export const vaultApi = {
   setVote: (day: string, block: string, stars: number) => api.put<VaultEditData>(`/vault/day/${day}/vote`, { block, stars }),
   addNote: (day: string, section: string, span: string, text: string) => api.post<VaultEditData>(`/vault/day/${day}/notes`, { section, span, text }),
   tasks: (day: string) => api.get<VaultTaskData[]>(`/vault/day/${day}/tasks`),
+  addTask: (day: string, text: string) => api.post<VaultEditData>(`/vault/day/${day}/tasks`, { text }),
   setTask: (task: VaultTaskData, done: boolean) => api.put<VaultEditData>("/vault/tasks", { path: task.path, line: task.line, hash: task.hash, done }),
   sync: () => api.post<VaultSyncData>("/vault/sync", {}),
 };

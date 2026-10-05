@@ -121,7 +121,7 @@ export default function RoutinePage() {
           city={schedule.meta.city}
         />
       )}
-      {canEdit && <TaskList tasks={tasks} onChanged={loadTasks} />}
+      {canEdit && dayKey && <TaskList day={dayKey} tasks={tasks} onChanged={loadTasks} />}
       {canEdit && schedule && resolved?.day && (
         <DayEditor open={editing} onClose={() => setEditing(false)} day={dateInTz(now, schedule.meta.tz)} today={today} blocks={resolved.day.blocks} onSaved={setToday} />
       )}

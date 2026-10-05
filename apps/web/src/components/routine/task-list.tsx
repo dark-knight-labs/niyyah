@@ -5,15 +5,18 @@ import { vaultApi } from "@/lib/vault-api";
 import { VaultTaskData } from "@/lib/vault-types";
 
 interface Props {
+  /** "YYYY-MM-DD" the list is for; new tasks are scheduled on it. */
+  day: string;
   tasks: VaultTaskData[];
   /** Called after a change is saved so the page reloads the list (line hashes change when a task is ticked). */
   onChanged: () => void;
 }
 
 /** The day's Obsidian tasks as a checklist. Ticking one writes it into the vault note it lives in. */
-export function TaskList({ tasks, onChanged }: Props) {
+export function TaskList({ day, tasks, onChanged }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [text, setText] = useState("");
 
   async function toggle(task: VaultTaskData) {
     setBusy(`${task.path}:${task.line}`);
@@ -24,6 +27,22 @@ export function TaskList({ tasks, onChanged }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
       onChanged();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    setBusy("new");
+    setError(null);
+    try {
+      await vaultApi.addTask(day, text);
+      setText("");
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save");
     } finally {
       setBusy(null);
     }
@@ -52,6 +71,10 @@ export function TaskList({ tasks, onChanged }: Props) {
           })}
         </ul>
       )}
+      <form onSubmit={add} className="mt-3 flex gap-2">
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Add a task for today" maxLength={300} className="min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-transparent px-3 py-1.5 text-sm" />
+        <button type="submit" disabled={busy === "new" || !text.trim()} className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--muted)] disabled:opacity-50">Add</button>
+      </form>
     </section>
   );
 }

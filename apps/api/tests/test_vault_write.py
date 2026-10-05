@@ -228,3 +228,13 @@ async def test_endpoint_lists_and_ticks_a_task(auth_client: AsyncClient, vault):
 
     stale = await auth_client.put("/api/v1/vault/tasks", json={**{k: task[k] for k in ("path", "line", "hash")}, "done": True})
     assert stale.status_code == 422  # the line changed since the page loaded
+
+
+def test_add_task_goes_after_the_query_block():
+    from app.services.vault_tasks import add_task
+    note = "## Tasks\n\n```tasks\nnot done\n```\n\n## Log\n-\n"
+    out = add_task(note, "Call bank", "2026-10-05")
+    assert "```\n- [ ] Call bank ⏳ 2026-10-05\n\n## Log" in out
+    assert "## Tasks\n- [ ] Call bank" in add_task("# x\n", "Call bank", "2026-10-05")
+    with pytest.raises(ValueError):
+        add_task(note, "  ", "2026-10-05")

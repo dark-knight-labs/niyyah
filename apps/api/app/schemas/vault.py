@@ -100,3 +100,7 @@ class TaskToggleIn(BaseModel):
     line: int
     hash: str
     done: bool
+
+
+class TaskIn(BaseModel):
+    text: str
