@@ -22,7 +22,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(email, password);
-      router.push("/vault");
+      router.push("/routine");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

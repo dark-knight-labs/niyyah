@@ -7,9 +7,11 @@ by the client, so this module needs no astronomy.
 import re
 from dataclasses import dataclass, field
 
-from app.services.vault_parser import CANONICAL_BLOCKS, _split_frontmatter
+from app.services.vault_parser import _split_frontmatter
 
-DAY_TYPES = ("weekday", "friday", "saturday")
+# Scheduling blocks, not vote blocks: ONE Thing and OPS are merged into "ot".
+SCHEDULE_BLOCKS = ("soul", "body", "ot", "planning", "distribution", "fnf", "sleep")
+DAY_TYPES = ("weekday", "weekend")
 ANCHORS = ("fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha")
 
 _TIME_RE = re.compile(rf"^(?:(\d{{1,2}}):(\d{{2}})|({'|'.join(ANCHORS)})(?:([+-])(\d+))?)$")
@@ -75,7 +77,7 @@ def parse_schedule(content: str) -> ParsedSchedule:
 
         block, start, end, what = cells
         block = block.lower()
-        if block not in CANONICAL_BLOCKS:
+        if block not in SCHEDULE_BLOCKS:
             result.errors.append(f"{section}: unknown block '{block}'")
             continue
         bad = [v for v in (start, end) if not _valid_time(v.lower())]

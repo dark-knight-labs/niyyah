@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { api } from "@/lib/api-client";
+import { isAuthenticated } from "@/lib/auth";
 
 interface ThemeSetting {
   theme: string;
@@ -20,6 +21,12 @@ function applyResolvedTheme(theme: string) {
 export function useTheme() {
   useEffect(() => {
     let cancelled = false;
+
+    // Public pages have no session, so there are no saved settings to fetch.
+    if (!isAuthenticated()) {
+      applyResolvedTheme("light");
+      return;
+    }
 
     api
       .get<ThemeSetting>("/settings")

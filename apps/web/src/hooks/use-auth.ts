@@ -12,7 +12,8 @@ interface User {
   subscription_tier: string;
 }
 
-export function useAuth() {
+/** `required: false` lets public pages load without a session (no redirect to /login). */
+export function useAuth(required = true) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -21,14 +22,16 @@ export function useAuth() {
     const token = localStorage.getItem("access_token");
     if (!token) {
       setLoading(false);
-      router.push("/login");
+      if (required) router.push("/login");
       return;
     }
     api.get<User>("/auth/me")
       .then(setUser)
-      .catch(() => router.push("/login"))
+      .catch(() => {
+        if (required) router.push("/login");
+      })
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, required]);
 
   return { user, loading };
 }

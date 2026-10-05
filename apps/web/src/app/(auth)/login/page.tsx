@@ -18,7 +18,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.push("/vault");
+      router.push("/routine");
     } catch {
       setError("Invalid email or password");
     } finally {

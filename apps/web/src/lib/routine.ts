@@ -1,5 +1,5 @@
 import { CalculationMethod, Coordinates, Madhab, PrayerTimes } from "adhan";
-import { Block } from "@/lib/vault-constants";
+import { BLOCK_COLORS } from "@/lib/vault-constants";
 
 export interface ScheduleBlockData {
   block: string;
@@ -25,10 +25,23 @@ export interface VaultScheduleData {
 
 export const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"] as const;
 export type Prayer = (typeof PRAYERS)[number];
-export type DayType = "weekday" | "friday" | "saturday";
+export type DayType = "weekday" | "weekend";
+
+// Scheduling blocks: ONE Thing and OPS are merged into "ot", and the weekend
+// Planning/Reflection slot is its own block. Colours reuse the vote palette.
+export const ROUTINE_BLOCKS = {
+  soul: { label: "Soul", color: BLOCK_COLORS.soul },
+  body: { label: "Body", color: BLOCK_COLORS.body },
+  ot: { label: "OT", color: BLOCK_COLORS.ops },
+  planning: { label: "Planning", color: BLOCK_COLORS.onething },
+  distribution: { label: "Distribution", color: BLOCK_COLORS.distribution },
+  fnf: { label: "FnF", color: BLOCK_COLORS.fnf },
+  sleep: { label: "Sleep", color: BLOCK_COLORS.sleep },
+} as const;
+export type RoutineBlock = keyof typeof ROUTINE_BLOCKS;
 
 export interface ResolvedBlock {
-  block: Block;
+  block: RoutineBlock;
   startMin: number; // 0..1439
   endMin: number; // startMin < endMin <= startMin + 1440 (may exceed 1440 when crossing midnight)
   what: string;
@@ -79,9 +92,7 @@ function ymdInTz(date: Date, tz: string): [number, number, number] {
 
 export function dayTypeFor(date: Date, tz: string): DayType {
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(date);
-  if (weekday === "Friday") return "friday";
-  if (weekday === "Saturday") return "saturday";
-  return "weekday";
+  return weekday === "Friday" || weekday === "Saturday" ? "weekend" : "weekday";
 }
 
 export function computePrayerMinutes(meta: ScheduleMeta, date: Date) {
@@ -141,7 +152,8 @@ export function resolveDay(schedule: VaultScheduleData, date: Date): ResolvedDay
       const startMin = resolveTime(row.start, anchors);
       let endMin = resolveTime(row.end, anchors);
       if (endMin <= startMin) endMin += 1440; // crosses midnight
-      blocks.push({ block: row.block as Block, startMin, endMin, what: row.what });
+      if (!(row.block in ROUTINE_BLOCKS)) throw new Error(`unknown block '${row.block}'`);
+      blocks.push({ block: row.block as RoutineBlock, startMin, endMin, what: row.what });
     } catch (err) {
       warnings.push(`${row.block}: ${(err as Error).message}`);
     }

@@ -169,7 +169,8 @@ async def get_streaks(user: User = Depends(get_current_user), db: AsyncSession =
 
 
 @router.get("/schedule", response_model=VaultScheduleResponse)
-async def get_schedule(user: User = Depends(get_current_user)):
+async def get_schedule():
+    # Public by design: the routine ring is a shareable page. Read-only, no user data.
     note = Path(settings.vault_workdir) / "Calendar" / "Schedule.md"
     if not note.exists():
         raise HTTPException(status_code=404, detail="Calendar/Schedule.md not found in vault checkout")

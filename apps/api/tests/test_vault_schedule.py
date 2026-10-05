@@ -21,7 +21,7 @@ madhab: hanafi
 | soul | 03:30 | fajr | Tahajjud |
 | sleep | isha+30 | 03:30 | Bed |
 
-## friday
+## weekend
 
 | block | start | end | what |
 |---|---|---|---|
@@ -36,7 +36,7 @@ def test_parses_meta_and_day_types():
     assert parsed.meta["method"] == "karachi"
     assert [b.block for b in parsed.days["weekday"]] == ["soul", "sleep"]
     assert parsed.days["weekday"][1].start == "isha+30"
-    assert parsed.days["friday"][0].start == "maghrib-10"
+    assert parsed.days["weekend"][0].start == "maghrib-10"
 
 
 def test_unknown_block_is_reported_not_dropped_silently():
@@ -57,7 +57,7 @@ def test_missing_frontmatter_key_reported():
 
 
 def test_missing_weekday_section_reported():
-    parsed = parse_schedule("---\nlat: 1\nlon: 1\ntz: UTC\nmethod: karachi\nmadhab: hanafi\n---\n## friday\n")
+    parsed = parse_schedule("---\nlat: 1\nlon: 1\ntz: UTC\nmethod: karachi\nmadhab: hanafi\n---\n## weekend\n")
     assert "missing or empty '## weekday' section" in parsed.errors
 
 
@@ -78,6 +78,16 @@ async def test_schedule_endpoint_reads_vault_checkout(auth_client: AsyncClient, 
     assert body["meta"]["city"] == "Dhaka"
     assert body["days"]["weekday"][0] == {"block": "soul", "start": "03:30", "end": "fajr", "what": "Tahajjud"}
     assert body["errors"] == []
+
+
+@pytest.mark.asyncio
+async def test_schedule_endpoint_is_public(client: AsyncClient, tmp_path, monkeypatch):
+    (tmp_path / "Calendar").mkdir()
+    (tmp_path / "Calendar" / "Schedule.md").write_text(NOTE, encoding="utf-8")
+    monkeypatch.setattr(settings, "vault_workdir", str(tmp_path))
+
+    resp = await client.get("/api/v1/vault/schedule")  # no Authorization header
+    assert resp.status_code == 200
 
 
 @pytest.mark.asyncio

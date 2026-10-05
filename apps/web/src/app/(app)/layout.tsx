@@ -22,9 +22,12 @@ import {
 
 const NAV_COLLAPSED_KEY = "niyyah-nav-collapsed";
 
+// Readable without signing in; every other page in this group requires a session.
+const PUBLIC_PATHS = ["/routine"];
+
 const nav = [
-  { href: "/vault", label: "Vault", icon: Activity },
   { href: "/routine", label: "Routine", icon: Clock },
+  { href: "/vault", label: "Vault", icon: Activity },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/personas", label: "Personas", icon: Users },
   { href: "/schedule", label: "Schedule", icon: Calendar },
@@ -34,8 +37,9 @@ const nav = [
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
   const pathname = usePathname();
+  const isPublic = PUBLIC_PATHS.includes(pathname);
+  const { user, loading } = useAuth(!isPublic);
   useTheme();
 
   // Defaults to collapsed; a stored preference (from a prior toggle) wins.
@@ -58,6 +62,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user && isPublic) {
+    return (
+      <div className="min-h-screen">
+        <header className="flex items-center justify-between px-6 py-4">
+          <h1 className="text-lg font-bold tracking-tight">Niyyah <span className="text-xs font-normal text-[var(--muted-foreground)]" dir="rtl">نِيَّة</span></h1>
+          <Link href="/login" className="text-sm text-[var(--accent)] hover:underline">Sign in</Link>
+        </header>
+        <main className="px-6 pb-6">{children}</main>
       </div>
     );
   }

@@ -1,7 +1,6 @@
 "use client";
 
-import { BLOCK_COLORS, BLOCK_LABELS } from "@/lib/vault-constants";
-import { PRAYERS, ResolvedDay, formatMinutes } from "@/lib/routine";
+import { PRAYERS, ROUTINE_BLOCKS, ResolvedDay, formatMinutes } from "@/lib/routine";
 
 const W = 1200;
 const H = 880;
@@ -84,7 +83,7 @@ export function RoutineRing({ day, nowMin, dateLabel, mode, modeColor, city }: R
           key={`${b.block}-${b.startMin}`}
           d={arcPath(b.startMin, b.endMin)}
           fill="none"
-          stroke={BLOCK_COLORS[b.block]}
+          stroke={ROUTINE_BLOCKS[b.block].color}
           strokeWidth={THICK}
           opacity={current === b ? 1 : 0.8}
         />
@@ -95,12 +94,12 @@ export function RoutineRing({ day, nowMin, dateLabel, mode, modeColor, city }: R
         const colX = right ? CX + R_OUT + 90 : CX - R_OUT - 90;
         const tx = right ? colX + 8 : colX - 8;
         const anchor = right ? "start" : "end";
-        const color = BLOCK_COLORS[b.block];
+        const color = ROUTINE_BLOCKS[b.block].color;
         return (
           <g key={`l-${b.block}-${b.startMin}`}>
             <polyline points={`${ax},${ay} ${colX},${y} ${colX + (right ? 4 : -4)},${y}`} fill="none" stroke={color} strokeWidth={1.5} />
             <text x={tx} y={y - 14} textAnchor={anchor} fontSize={15} fontWeight={800} letterSpacing={1} fill={color}>
-              {BLOCK_LABELS[b.block].toUpperCase()}
+              {ROUTINE_BLOCKS[b.block].label.toUpperCase()}
             </text>
             <text x={tx} y={y + 4} textAnchor={anchor} fontSize={13} fill="var(--muted-foreground)">
               {formatMinutes(b.startMin)} – {formatMinutes(b.endMin)}
@@ -116,12 +115,14 @@ export function RoutineRing({ day, nowMin, dateLabel, mode, modeColor, city }: R
       {PRAYERS.map((p) => {
         const min = day.prayers[p];
         const [x, y] = point(R_MID, min);
+        // Pill sits perpendicular to the ring (long axis along the radius), text
+        // reading outward; flipped on the left half so it is never upside down.
         const deg = (min / 1440) * 360;
-        const flip = deg > 90 && deg < 270 ? 180 : 0;
+        const rotation = deg - 90 + (deg > 180 ? 180 : 0);
         const [tx, ty] = point(R_IN - 30, min);
         return (
           <g key={p}>
-            <g transform={`translate(${x} ${y}) rotate(${deg + flip})`}>
+            <g transform={`translate(${x} ${y}) rotate(${rotation})`}>
               <rect x={-34} y={-11} width={68} height={22} rx={11} fill="#f59e0b" stroke="var(--background)" strokeWidth={2} />
               <text textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={800} fill="#fff" letterSpacing={0.5}>
                 {p.toUpperCase()}
@@ -161,8 +162,8 @@ export function RoutineRing({ day, nowMin, dateLabel, mode, modeColor, city }: R
           </text>
         </g>
       )}
-      <text x={CX} y={CY + 40} textAnchor="middle" fontSize={15} fontWeight={700} fill={current ? BLOCK_COLORS[current.block] : "var(--muted-foreground)"}>
-        {current ? `Now: ${BLOCK_LABELS[current.block]}` : "Now: unscheduled"}
+      <text x={CX} y={CY + 40} textAnchor="middle" fontSize={15} fontWeight={700} fill={current ? ROUTINE_BLOCKS[current.block].color : "var(--muted-foreground)"}>
+        {current ? `Now: ${ROUTINE_BLOCKS[current.block].label}` : "Now: unscheduled"}
       </text>
       <text x={CX} y={CY + 62} textAnchor="middle" fontSize={13} fill="var(--muted-foreground)">
         {next.p.toUpperCase()} in {Math.floor(untilNext / 60)}h {String(untilNext % 60).padStart(2, "0")}m

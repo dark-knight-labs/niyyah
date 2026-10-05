@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
+import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
 import { VaultDayData } from "@/lib/vault-types";
 import { resolveDay, nowMinutes, VaultScheduleData } from "@/lib/routine";
@@ -34,8 +35,9 @@ export default function RoutinePage() {
       })
       .finally(() => setLoading(false));
 
-    // Mode is decoration; 404 just means no daily note synced yet.
-    vaultApi.today().then(setToday).catch(() => setToday(null));
+    // Mode is private decoration: only fetched with a session. 404 just means
+    // no daily note synced yet.
+    if (isAuthenticated()) vaultApi.today().then(setToday).catch(() => setToday(null));
   }, []);
 
   useEffect(() => {
