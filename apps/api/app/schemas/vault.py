@@ -45,6 +45,19 @@ class VaultStreaksResponse(BaseModel):
     streaks: dict[str, VaultStreakEntry]
 
 
+class ScheduleBlockResponse(BaseModel):
+    block: str
+    start: str
+    end: str
+    what: str
+
+
+class VaultScheduleResponse(BaseModel):
+    meta: dict
+    days: dict[str, list[ScheduleBlockResponse]]
+    errors: list[str]
+
+
 class VaultSyncResponse(BaseModel):
     synced_days: int
     errors: list[str]

@@ -13,6 +13,7 @@ import {
   Compass,
   CheckSquare,
   Activity,
+  Clock,
   Settings,
   LogOut,
   PanelLeftClose,
@@ -23,6 +24,7 @@ const NAV_COLLAPSED_KEY = "niyyah-nav-collapsed";
 
 const nav = [
   { href: "/vault", label: "Vault", icon: Activity },
+  { href: "/routine", label: "Routine", icon: Clock },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/personas", label: "Personas", icon: Users },
   { href: "/schedule", label: "Schedule", icon: Calendar },

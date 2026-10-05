@@ -1,6 +1,8 @@
 import logging
 import secrets
+from dataclasses import asdict
 from datetime import date, timedelta
+from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
 from sqlalchemy import select
@@ -17,12 +19,14 @@ from app.schemas.vault import (
     VaultBlocksSeriesResponse,
     VaultDayResponse,
     VaultMonthResponse,
+    VaultScheduleResponse,
     VaultStreakEntry,
     VaultStreaksResponse,
     VaultSyncResponse,
     VaultWeekResponse,
 )
 from app.services.vault_parser import CANONICAL_BLOCKS
+from app.services.vault_schedule import parse_schedule
 from app.services.vault_sync import sync_vault
 
 router = APIRouter(prefix="/vault", tags=["vault"])
@@ -162,6 +166,19 @@ async def get_streaks(user: User = Depends(get_current_user), db: AsyncSession =
         for block in longest
     }
     return VaultStreaksResponse(streaks=streaks)
+
+
+@router.get("/schedule", response_model=VaultScheduleResponse)
+async def get_schedule(user: User = Depends(get_current_user)):
+    note = Path(settings.vault_workdir) / "Calendar" / "Schedule.md"
+    if not note.exists():
+        raise HTTPException(status_code=404, detail="Calendar/Schedule.md not found in vault checkout")
+    parsed = parse_schedule(note.read_text(encoding="utf-8"))
+    return VaultScheduleResponse(
+        meta=parsed.meta,
+        days={name: [asdict(b) for b in blocks] for name, blocks in parsed.days.items()},
+        errors=parsed.errors,
+    )
 
 
 @router.post("/sync", response_model=VaultSyncResponse)

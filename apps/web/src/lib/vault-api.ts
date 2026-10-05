@@ -1,4 +1,5 @@
 import { api } from "@/lib/api-client";
+import { VaultScheduleData } from "@/lib/routine";
 import {
   VaultBlocksSeriesData,
   VaultDayData,
@@ -14,5 +15,6 @@ export const vaultApi = {
   month: (month: string) => api.get<VaultMonthData>(`/vault/month?month=${month}`),
   blocks: (days: number = 30) => api.get<VaultBlocksSeriesData>(`/vault/blocks?days=${days}`),
   streaks: () => api.get<VaultStreaksData>("/vault/streaks"),
+  schedule: () => api.get<VaultScheduleData>("/vault/schedule"),
   sync: () => api.post<VaultSyncData>("/vault/sync", {}),
 };
