@@ -90,6 +90,12 @@ function ymdInTz(date: Date, tz: string): [number, number, number] {
   return [get("year"), get("month"), get("day")];
 }
 
+/** "YYYY-MM-DD" of `date` as seen in `tz`. */
+export function dateInTz(date: Date, tz: string): string {
+  const [y, m, d] = ymdInTz(date, tz);
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 export function dayTypeFor(date: Date, tz: string): DayType {
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(date);
   return weekday === "Friday" || weekday === "Saturday" ? "weekend" : "weekday";

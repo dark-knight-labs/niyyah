@@ -1,7 +1,10 @@
+import asyncio
 import logging
+import re
 import secrets
 from dataclasses import asdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
@@ -16,6 +19,11 @@ from app.core.deps import get_current_user
 from app.models.user import User
 from app.models.vault import VaultDay
 from app.schemas.vault import (
+    EditAccessResponse,
+    EditResponse,
+    ModeIn,
+    NoteIn,
+    VoteIn,
     VaultBlocksSeriesResponse,
     VaultDayResponse,
     VaultMonthResponse,
@@ -27,7 +35,9 @@ from app.schemas.vault import (
 )
 from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_schedule import parse_schedule
+from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault
+from app.services.vault_write import add_log_note, new_daily_note, set_mode, set_vote
 
 router = APIRouter(prefix="/vault", tags=["vault"])
 logger = logging.getLogger(__name__)
@@ -226,3 +236,81 @@ async def webhook_sync(
     # webhook delivery timeout, so run the sync out-of-band and ack immediately.
     background_tasks.add_task(_sync_vault_in_background)
     return {"accepted": True}
+
+
+# --- Writing to the vault (owner only) -------------------------------------------------------------------------
+
+EDIT_WINDOW_DAYS = 7
+
+
+def _can_edit(user: User) -> bool:
+    allowed = {e.strip().lower() for e in settings.vault_write_emails.split(",") if e.strip()}
+    return user.email.lower() in allowed
+
+
+def require_editor(user: User = Depends(get_current_user)) -> User:
+    if not _can_edit(user):
+        raise HTTPException(status_code=403, detail="Not allowed to edit the vault")
+    return user
+
+
+def _local_now() -> datetime:
+    return datetime.now(ZoneInfo(settings.vault_tz))
+
+
+def _check_day(day: date) -> None:
+    today = _local_now().date()
+    if not today - timedelta(days=EDIT_WINDOW_DAYS) <= day <= today:
+        raise HTTPException(status_code=422, detail=f"Only the last {EDIT_WINDOW_DAYS} days can be edited")
+
+
+def _fresh_note(day: date) -> str:
+    """Today's note does not exist yet: copy the layout of the latest one."""
+    daily = Path(settings.vault_workdir) / "Calendar" / "Daily"
+    notes = sorted(p for p in daily.glob("*.md") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", p.stem))
+    if not notes:
+        raise VaultWriteError("there is no daily note to copy the layout from")
+    base = notes[-1]
+    return new_daily_note(base.read_text(encoding="utf-8"), date.fromisoformat(base.stem), day)
+
+
+def _day_edit(day: date, apply) -> dict[str, Edit]:
+    def edit(content: str | None) -> str:
+        return apply(content if content is not None else _fresh_note(day))
+    return {f"Calendar/Daily/{day.isoformat()}.md": edit}
+
+
+async def _save(day: date, apply, message: str, db: AsyncSession) -> EditResponse:
+    try:
+        commit = await asyncio.to_thread(commit_edits, _day_edit(day, apply), message)
+    except ValueError as exc:  # bad mode / block / note text
+        raise HTTPException(status_code=422, detail=str(exc))
+    except VaultWriteError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    await sync_vault(db)  # refresh the DB copy so /vault/today shows the change at once
+    found = await _get_day(db, day)
+    return EditResponse(commit=commit, day=_day_to_response(found) if found else None)
+
+
+@router.get("/edit-access", response_model=EditAccessResponse)
+async def edit_access(user: User = Depends(get_current_user)):
+    return EditAccessResponse(allowed=_can_edit(user))
+
+
+@router.put("/day/{day}/mode", response_model=EditResponse)
+async def put_mode(day: date, data: ModeIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    _check_day(day)
+    return await _save(day, lambda c: set_mode(c, data.mode), f"Niyyah: set {day} mode to {data.mode}", db)
+
+
+@router.put("/day/{day}/vote", response_model=EditResponse)
+async def put_vote(day: date, data: VoteIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    _check_day(day)
+    return await _save(day, lambda c: set_vote(c, data.block, data.stars), f"Niyyah: {day} {data.block} vote {data.stars}", db)
+
+
+@router.post("/day/{day}/notes", response_model=EditResponse)
+async def post_note(day: date, data: NoteIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    _check_day(day)
+    clock = _local_now().strftime("%H:%M")
+    return await _save(day, lambda c: add_log_note(c, clock, data.section, data.span, data.text), f"Niyyah: {day} note on {data.section}", db)

@@ -55,6 +55,11 @@ export function RoutineRing({ day, nowMin, dateLabel, mode, modeColor, city }: R
   const next = upcoming ?? { p: "fajr" as const, min: day.prayers.fajr + 1440 };
   const untilNext = next.min - nowMin;
 
+  // After Isha the day's mode gives way to the sleep block's own mode (by default "Reads books to sleep").
+  const badge = current?.block === "sleep"
+    ? { text: current.what, color: ROUTINE_BLOCKS.sleep.color, width: Math.max(92, current.what.length * 9 + 30) }
+    : mode ? { text: mode, color: modeColor, width: 92 } : null;
+
   const labels = day.blocks.map((b) => {
     const mid = (b.startMin + b.endMin) / 2;
     const [ax, ay] = point(R_OUT + 4, mid);
@@ -154,11 +159,11 @@ export function RoutineRing({ day, nowMin, dateLabel, mode, modeColor, city }: R
       <text x={CX} y={CY - 28} textAnchor="middle" fontSize={26} fontWeight={600} fontFamily="var(--font-serif)" fill="var(--foreground)">
         {dateLabel}
       </text>
-      {mode && (
+      {badge && (
         <g transform={`translate(${CX} ${CY + 2})`}>
-          <rect x={-46} y={-12} width={92} height={24} rx={12} fill={modeColor} opacity={0.18} />
-          <text textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={800} letterSpacing={1} fill={modeColor}>
-            {mode.toUpperCase()}
+          <rect x={-badge.width / 2} y={-12} width={badge.width} height={24} rx={12} fill={badge.color} opacity={0.18} />
+          <text textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={800} letterSpacing={1} fill={badge.color}>
+            {badge.text.toUpperCase()}
           </text>
         </g>
       )}

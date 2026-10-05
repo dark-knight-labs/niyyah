@@ -61,3 +61,27 @@ class VaultScheduleResponse(BaseModel):
 class VaultSyncResponse(BaseModel):
     synced_days: int
     errors: list[str]
+
+
+class ModeIn(BaseModel):
+    mode: str
+
+
+class VoteIn(BaseModel):
+    block: str
+    stars: int
+
+
+class NoteIn(BaseModel):
+    section: str  # e.g. "OT"
+    span: str  # e.g. "06:00-16:03"
+    text: str
+
+
+class EditAccessResponse(BaseModel):
+    allowed: bool
+
+
+class EditResponse(BaseModel):
+    commit: str
+    day: VaultDayResponse | None

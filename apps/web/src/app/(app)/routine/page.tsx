@@ -1,13 +1,15 @@
 "use client";
 
+import { Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
 import { VaultDayData } from "@/lib/vault-types";
-import { resolveDay, nowMinutes, VaultScheduleData } from "@/lib/routine";
+import { dateInTz, resolveDay, nowMinutes, VaultScheduleData } from "@/lib/routine";
 import { resolveModeColor } from "@/lib/vault-constants";
 import { useNow } from "@/hooks/use-now";
+import { DayEditor } from "@/components/routine/day-editor";
 import { RoutineRing } from "@/components/routine/routine-ring";
 
 const REFRESH_MS = 60_000;
@@ -17,6 +19,8 @@ export default function RoutinePage() {
   const [today, setToday] = useState<VaultDayData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [canEdit, setCanEdit] = useState(false);
+  const [editing, setEditing] = useState(false);
   const now = useNow(30_000);
 
   const load = useCallback(() => {
@@ -37,7 +41,10 @@ export default function RoutinePage() {
 
     // Mode is private decoration: only fetched with a session. 404 just means
     // no daily note synced yet.
-    if (isAuthenticated()) vaultApi.today().then(setToday).catch(() => setToday(null));
+    if (isAuthenticated()) {
+      vaultApi.today().then(setToday).catch(() => setToday(null));
+      vaultApi.editAccess().then((a) => setCanEdit(a.allowed)).catch(() => setCanEdit(false));
+    }
   }, []);
 
   useEffect(() => {
@@ -83,6 +90,13 @@ export default function RoutinePage() {
           ))}
         </div>
       )}
+      {canEdit && schedule && resolved?.day && (
+        <div className="flex justify-end">
+          <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--muted)]">
+            <Pencil size={14} /> Edit
+          </button>
+        </div>
+      )}
       {schedule && resolved?.day && (
         <RoutineRing
           day={resolved.day}
@@ -92,6 +106,9 @@ export default function RoutinePage() {
           modeColor={resolveModeColor(today?.mode ?? "")}
           city={schedule.meta.city}
         />
+      )}
+      {canEdit && schedule && resolved?.day && (
+        <DayEditor open={editing} onClose={() => setEditing(false)} day={dateInTz(now, schedule.meta.tz)} today={today} blocks={resolved.day.blocks} onSaved={setToday} />
       )}
     </div>
   );

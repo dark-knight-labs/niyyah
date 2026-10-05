@@ -67,6 +67,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body }),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body }),
   delete: (path: string) => request<void>(path, { method: "DELETE" }),

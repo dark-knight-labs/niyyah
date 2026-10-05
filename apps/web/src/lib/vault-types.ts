@@ -9,6 +9,11 @@ export interface VaultDayData {
   log: string | null;
 }
 
+export interface VaultEditData {
+  commit: string;
+  day: VaultDayData | null;
+}
+
 export interface VaultWeekData {
   days: VaultDayData[];
   totals: Record<string, number>;

@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     vault_github_url: str = "https://github.com/dark-knight-labs/xarvis.git"
     vault_sync_secret: str = "change-me-in-production"
     vault_workdir: str = "/app/data/vault-sync"
+    # Who may write to the vault from the app (registration is open, so this must be explicit). Empty = nobody.
+    vault_write_emails: str = ""
+    vault_git_name: str = "Niyyah"
+    vault_git_email: str = "niyyah@burak.bd"
+    vault_tz: str = "Asia/Dhaka"
 
     # For tests, swap asyncpg → aiosqlite
     test_database_url: str = "sqlite+aiosqlite:///./test.db"
