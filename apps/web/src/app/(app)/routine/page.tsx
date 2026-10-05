@@ -5,11 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { VaultDayData } from "@/lib/vault-types";
+import { VaultDayData, VaultTaskData } from "@/lib/vault-types";
 import { dateInTz, resolveDay, nowMinutes, VaultScheduleData } from "@/lib/routine";
 import { resolveModeColor } from "@/lib/vault-constants";
 import { useNow } from "@/hooks/use-now";
 import { DayEditor } from "@/components/routine/day-editor";
+import { TaskList } from "@/components/routine/task-list";
 import { RoutineRing } from "@/components/routine/routine-ring";
 
 const REFRESH_MS = 60_000;
@@ -21,6 +22,7 @@ export default function RoutinePage() {
   const [loading, setLoading] = useState(true);
   const [canEdit, setCanEdit] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [tasks, setTasks] = useState<VaultTaskData[]>([]);
   const now = useNow(30_000);
 
   const load = useCallback(() => {
@@ -61,6 +63,18 @@ export default function RoutinePage() {
       return { day: null, failure: (err as Error).message };
     }
   }, [schedule, now]);
+
+  // Tasks are private note text: only the vault owner's session can read them.
+  const dayKey = schedule ? dateInTz(now, schedule.meta.tz) : null;
+  const loadTasks = useCallback(() => {
+    if (canEdit && dayKey) vaultApi.tasks(dayKey).then(setTasks).catch(() => setTasks([]));
+  }, [canEdit, dayKey]);
+
+  useEffect(() => {
+    loadTasks();
+    const id = setInterval(loadTasks, REFRESH_MS);
+    return () => clearInterval(id);
+  }, [loadTasks]);
 
   if (loading) {
     return (
@@ -107,6 +121,7 @@ export default function RoutinePage() {
           city={schedule.meta.city}
         />
       )}
+      {canEdit && <TaskList tasks={tasks} onChanged={loadTasks} />}
       {canEdit && schedule && resolved?.day && (
         <DayEditor open={editing} onClose={() => setEditing(false)} day={dateInTz(now, schedule.meta.tz)} today={today} blocks={resolved.day.blocks} onSaved={setToday} />
       )}

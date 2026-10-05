@@ -49,3 +49,11 @@ export interface VaultSyncData {
   synced_days: number;
   errors: string[];
 }
+
+export interface VaultTaskData {
+  path: string;
+  line: number;
+  hash: string;
+  text: string;
+  done: boolean;
+}

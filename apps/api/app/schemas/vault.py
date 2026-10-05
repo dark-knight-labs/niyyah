@@ -85,3 +85,18 @@ class EditAccessResponse(BaseModel):
 class EditResponse(BaseModel):
     commit: str
     day: VaultDayResponse | None
+
+
+class TaskResponse(BaseModel):
+    path: str
+    line: int
+    hash: str
+    text: str
+    done: bool
+
+
+class TaskToggleIn(BaseModel):
+    path: str
+    line: int
+    hash: str
+    done: bool

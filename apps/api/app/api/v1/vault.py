@@ -23,6 +23,8 @@ from app.schemas.vault import (
     EditResponse,
     ModeIn,
     NoteIn,
+    TaskResponse,
+    TaskToggleIn,
     VoteIn,
     VaultBlocksSeriesResponse,
     VaultDayResponse,
@@ -37,6 +39,7 @@ from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_schedule import parse_schedule
 from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault
+from app.services.vault_tasks import find_tasks, set_task_done, task_file
 from app.services.vault_write import add_log_note, new_daily_note, set_mode, set_vote
 
 router = APIRouter(prefix="/vault", tags=["vault"])
@@ -314,3 +317,32 @@ async def post_note(day: date, data: NoteIn, user: User = Depends(require_editor
     _check_day(day)
     clock = _local_now().strftime("%H:%M")
     return await _save(day, lambda c: add_log_note(c, clock, data.section, data.span, data.text), f"Niyyah: {day} note on {data.section}", db)
+
+
+@router.get("/day/{day}/tasks", response_model=list[TaskResponse])
+async def get_day_tasks(day: date, user: User = Depends(require_editor)):
+    """Tasks (Obsidian Tasks syntax) due or scheduled on `day`. Private note text, so owner only."""
+    root = Path(settings.vault_workdir)
+    return await asyncio.to_thread(lambda: [asdict(t) for t in find_tasks(root, day.isoformat())])
+
+
+@router.put("/tasks", response_model=EditResponse)
+async def put_task(data: TaskToggleIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    root = Path(settings.vault_workdir)
+    today = _local_now().date().isoformat()
+    try:
+        rel = task_file(root, data.path).relative_to(root.resolve()).as_posix()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    def edit(content: str | None) -> str:
+        return set_task_done(content or "", data.line, data.hash, data.done, today)
+
+    try:
+        commit = await asyncio.to_thread(commit_edits, {rel: edit}, f"Niyyah: {'done' if data.done else 'reopen'} task in {rel}")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except VaultWriteError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    await sync_vault(db)
+    return EditResponse(commit=commit, day=None)

@@ -167,3 +167,64 @@ async def test_endpoint_refuses_non_owners_and_old_days_and_bad_input(auth_clien
     monkeypatch.setattr(settings, "vault_write_emails", "")
     assert (await auth_client.get("/api/v1/vault/edit-access")).json() == {"allowed": False}
     assert (await auth_client.put(f"/api/v1/vault/day/{today}/mode", json={"mode": "full"})).status_code == 403
+
+
+# --- tasks -----------------------------------------------------------------------------------------------------
+
+from app.services.vault_tasks import find_tasks, line_hash, set_task_done, task_file  # noqa: E402
+
+TASKS = """# Tasks
+- [ ] Land Registry ⏳ 2026-10-05
+- [x] Birth Certificate ⏳ 2026-10-05 ✅ 2026-10-05
+- [ ] Other day 📅 2026-10-06
+- [ ] ⭐ vote line ⏳ 2026-10-05
+- [ ] no date
+"""
+
+
+def test_find_tasks_matches_day_and_skips_votes(tmp_path):
+    (tmp_path / "Calendar").mkdir()
+    (tmp_path / "Calendar" / "Tasks.md").write_text(TASKS, encoding="utf-8")
+    (tmp_path / ".obsidian").mkdir()
+    (tmp_path / ".obsidian" / "x.md").write_text("- [ ] hidden ⏳ 2026-10-05", encoding="utf-8")
+    found = find_tasks(tmp_path, "2026-10-05")
+    assert [(t.text, t.done, t.line) for t in found] == [("Land Registry", False, 2), ("Birth Certificate", True, 3)]
+
+
+def test_set_task_done_ticks_and_unticks():
+    line = TASKS.split("\n")[1]
+    ticked = set_task_done(TASKS, 2, line_hash(line), True, "2026-10-05")
+    assert ticked.split("\n")[1] == "- [x] Land Registry ⏳ 2026-10-05 ✅ 2026-10-05"
+    again = set_task_done(ticked, 2, line_hash(ticked.split("\n")[1]), False, "2026-10-05")
+    assert again == TASKS
+
+
+def test_set_task_done_refuses_changed_line():
+    with pytest.raises(ValueError, match="changed"):
+        set_task_done(TASKS, 2, "deadbeef00", True, "2026-10-05")
+
+
+def test_task_file_stays_inside_vault(tmp_path):
+    (tmp_path / "a.md").write_text("x", encoding="utf-8")
+    assert task_file(tmp_path, "a.md") == (tmp_path / "a.md").resolve()
+    for bad in ("../a.md", "/etc/passwd", "missing.md"):
+        with pytest.raises(ValueError):
+            task_file(tmp_path, bad)
+
+
+@pytest.mark.asyncio
+async def test_endpoint_lists_and_ticks_a_task(auth_client: AsyncClient, vault):
+    remote, _ = vault
+    vault_git.commit_edits({"Calendar/Tasks.md": lambda _: TASKS}, "seed tasks")
+
+    listed = await auth_client.get("/api/v1/vault/day/2026-10-05/tasks")
+    assert listed.status_code == 200, listed.text
+    task = next(t for t in listed.json() if t["text"] == "Land Registry")
+    assert task["done"] is False
+
+    r = await auth_client.put("/api/v1/vault/tasks", json={**{k: task[k] for k in ("path", "line", "hash")}, "done": True})
+    assert r.status_code == 200, r.text
+    assert "- [x] Land Registry ⏳ 2026-10-05 ✅" in _remote_file(remote, "Calendar/Tasks.md")
+
+    stale = await auth_client.put("/api/v1/vault/tasks", json={**{k: task[k] for k in ("path", "line", "hash")}, "done": True})
+    assert stale.status_code == 422  # the line changed since the page loaded
