@@ -71,7 +71,7 @@ export default function WeekPage() {
             <li key={d} className="min-w-0 rounded-xl border border-[var(--border)] px-1 py-2.5 text-center sm:py-3"
               style={{ borderTop: `3px solid ${dayOwner.color}`, background: isToday ? "var(--accent-light)" : "var(--surface)", outline: isToday ? "2px solid var(--accent)" : undefined, outlineOffset: 1 }}>
               <span className="block text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)] sm:text-[11px]">{fmt(d, { weekday: "short" })}</span>
-              <b className="block text-base tabular-nums sm:text-xl">{fmt(d, { day: "numeric" })}</b>
+              <b className="block text-[15px] tabular-nums">{fmt(d, { day: "numeric" })}</b>
               <span className="mt-0.5 block truncate text-[10px] font-bold sm:text-xs" style={{ color: dayOwner.color }}>{dayOwner.label === "Alisha Noor" ? "Alisha" : dayOwner.label}</span>
             </li>
           );
@@ -124,8 +124,8 @@ export default function WeekPage() {
           <section aria-label="Today" className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5 sm:p-6" style={{ borderLeft: `3px solid ${slot.color}` }}>
             <p className="eyebrow">{fmt(today, { weekday: "long", day: "numeric", month: "short" })} · OT slot</p>
             <div className="mt-2 flex items-center gap-3">
-              <StreamIcon stream={slot} size={40} />
-              <h2 className="heading-elegant text-3xl" style={{ color: slot.color }}>{slot.label}</h2>
+              <StreamIcon stream={slot} size={36} />
+              <h2 className="text-lg font-extrabold" style={{ color: slot.color }}>{slot.label}</h2>
             </div>
             <ul className="mt-4 divide-y divide-[var(--border)]">
               {slotNow.length === 0 && <li className="py-3 text-sm text-[var(--muted-foreground)]">Nothing in Now. Promote an item in the pipeline.</li>}
@@ -144,7 +144,7 @@ export default function WeekPage() {
           </section>
 
           <section aria-label="The focusing question" className="rounded-2xl bg-[var(--accent-light)] p-5 sm:p-6">
-            <p className="font-hand text-[26px] leading-[1.15]">{focusingQuestion(slot)}</p>
+            <p className="font-hand text-[23px] leading-[1.2]">{focusingQuestion(slot)}</p>
             <p className="mt-3 text-[11px] text-[var(--muted-foreground)]">The focusing question, from The ONE Thing by Gary Keller with Jay Papasan.</p>
           </section>
         </aside>
