@@ -75,3 +75,19 @@ export interface VaultObjectivesData {
   period: string;
   items: VaultObjective[];
 }
+
+export interface VaultEvent {
+  title: string;
+  calendar: string;
+  color: string | null;
+  all_day: boolean;
+  location: string | null;
+  /** Minutes since local midnight; null for all-day events. */
+  start_min: number | null;
+  end_min: number | null;
+}
+
+export interface VaultEventsData {
+  events: VaultEvent[];
+  errors: string[];
+}

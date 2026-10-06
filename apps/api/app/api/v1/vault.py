@@ -20,6 +20,7 @@ from app.models.user import User
 from app.models.vault import VaultDay
 from app.schemas.vault import (
     EditAccessResponse,
+    CalendarEventsResponse,
     EditResponse,
     LogEntryIn,
     LogEntryRemoveIn,
@@ -45,6 +46,7 @@ from app.schemas.vault import (
 )
 from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_schedule import parse_schedule
+from app.services.vault_calendar import events_for_day
 from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
@@ -334,6 +336,14 @@ async def post_note(day: date, data: NoteIn, user: User = Depends(require_editor
     _check_day(day)
     clock = _local_now().strftime("%H:%M")
     return await _save(day, lambda c: add_log_note(c, clock, data.section, data.span, data.text), f"Niyyah: {day} note on {data.section}", db)
+
+
+@router.get("/day/{day}/events", response_model=CalendarEventsResponse)
+async def get_day_events(day: date, user: User = Depends(require_editor)):
+    """The day's events from the calendars configured in the vault (Day Planner iCal feeds). Private, owner only."""
+    root = Path(settings.vault_workdir)
+    events, errors = await asyncio.to_thread(events_for_day, root, day, settings.vault_tz)
+    return {"events": events, "errors": errors}
 
 
 @router.get("/day/{day}/tasks", response_model=list[TaskResponse])

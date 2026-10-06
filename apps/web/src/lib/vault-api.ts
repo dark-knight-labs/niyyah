@@ -3,6 +3,7 @@ import { VaultScheduleData } from "@/lib/routine";
 import {
   VaultBlocksSeriesData,
   VaultDayData,
+  VaultEventsData,
   VaultLogEntry,
   VaultObjectivesData,
   VaultMonthData,
@@ -29,6 +30,7 @@ export const vaultApi = {
   setTask: (task: VaultTaskData, done: boolean) => api.put<VaultEditData>("/vault/tasks", { path: task.path, line: task.line, hash: task.hash, done }),
   editTask: (task: VaultTaskData, text: string) => api.put<VaultEditData>("/vault/tasks/text", { path: task.path, line: task.line, hash: task.hash, text }),
   removeTask: (task: VaultTaskData) => api.post<VaultEditData>("/vault/tasks/remove", { path: task.path, line: task.line, hash: task.hash }),
+  events: (day: string) => api.get<VaultEventsData>(`/vault/day/${day}/events`),
   log: (day: string) => api.get<VaultLogEntry[]>(`/vault/day/${day}/log`),
   editLog: (day: string, entry: VaultLogEntry, text: string) => api.put<VaultEditData>(`/vault/day/${day}/log`, { index: entry.index, hash: entry.hash, text }),
   removeLog: (day: string, entry: VaultLogEntry) => api.post<VaultEditData>(`/vault/day/${day}/log/remove`, { index: entry.index, hash: entry.hash }),

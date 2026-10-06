@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { VaultDayData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
+import { VaultDayData, VaultEventsData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
 import { ROUTINE_BLOCKS, dateInTz, formatMinutes, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
@@ -27,6 +27,7 @@ export default function RoutinePage() {
   const [canEdit, setCanEdit] = useState(false);
   const [tasks, setTasks] = useState<VaultTaskData[]>([]);
   const [log, setLog] = useState<VaultLogEntry[]>([]);
+  const [events, setEvents] = useState<VaultEventsData | null>(null);
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const now = useNow(30_000);
 
@@ -75,6 +76,7 @@ export default function RoutinePage() {
     if (!canEdit || !dayKey) return;
     vaultApi.tasks(dayKey).then(setTasks).catch(() => setTasks([]));
     vaultApi.log(dayKey).then(setLog).catch(() => setLog([]));
+    vaultApi.events(dayKey).then(setEvents).catch(() => setEvents(null));
     vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
@@ -123,7 +125,7 @@ export default function RoutinePage() {
           {owner ? (
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
               <div>
-                <RoutineRing day={day} nowMin={nowMin} />
+                <RoutineRing day={day} nowMin={nowMin} events={events?.events} />
                 <div className="mt-6">
                   <TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} />
                   <LogList day={dayKey} entries={log} onChanged={loadPrivate}
@@ -135,7 +137,7 @@ export default function RoutinePage() {
                 <WeekObjectives data={objectives} onChanged={setObjectives} />
                 <NowCard day={day} nowMin={nowMin} />
                 <VotesPanel day={dayKey} today={today} onSaved={setToday} />
-                <CalendarCard />
+                <CalendarCard data={events} />
               </div>
             </div>
           ) : (

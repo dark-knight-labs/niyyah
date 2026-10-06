@@ -1,6 +1,7 @@
 "use client";
 
 import { PRAYERS, ROUTINE_BLOCKS, ResolvedDay, formatMinutes } from "@/lib/routine";
+import { VaultEvent } from "@/lib/vault-types";
 import {
   RING_NAMES, currentBlock, duration, formatDuration, isPast, nameFits, nextPrayer, onBottomHalf, ringGeometry,
 } from "@/lib/ring";
@@ -28,6 +29,8 @@ export interface RingGraphicProps {
   /** Full-screen mode: every block labelled beside the ring, one detail per line. */
   sideLabels: boolean;
   idPrefix: string;
+  /** Timed calendar events, drawn on the inner lane (owner only). */
+  events?: VaultEvent[];
 }
 
 /** The 24h ring: slices, names on the slices, now marker, clock. Meant to sit inside an <svg>. */
@@ -78,7 +81,15 @@ export function RingGraphic(p: RingGraphicProps) {
         return <text key={h} x={x} y={y + 4} textAnchor="middle" fontSize={p.sideLabels ? 12 : 10} fill="var(--muted-foreground)">{String(h).padStart(2, "0")}</text>;
       })}
       {/* reserved inner lane for calendar events */}
-      <circle cx={cx} cy={cy} r={r - t / 2 - 26} fill="none" stroke="var(--border)" strokeDasharray="2 5" />
+      <circle cx={cx} cy={cy} r={r - t / 2 - 34} fill="none" stroke="var(--border)" strokeDasharray="2 5" />
+      {(p.events ?? []).filter((e) => e.start_min !== null && e.end_min !== null && e.end_min > e.start_min).map((e, i) => {
+        const lane = ringGeometry(cx, cy, r - t / 2 - 24);
+        return (
+          <path key={`e-${i}`} d={lane.arc(e.start_min as number, e.end_min as number)} fill="none" stroke={e.color ?? "var(--muted-foreground)"} strokeWidth={6} strokeLinecap="round" opacity={0.9}>
+            <title>{`${e.title} ${formatMinutes(e.start_min as number)}–${formatMinutes(e.end_min as number)}`}</title>
+          </path>
+        );
+      })}
 
       {p.prayers && PRAYERS.map((name) => {
         const min = day.prayers[name];

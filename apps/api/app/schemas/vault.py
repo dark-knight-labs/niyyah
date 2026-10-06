@@ -163,3 +163,18 @@ class ObjectiveIn(BaseModel):
         if self.text is None and self.done is None:
             raise ValueError("give text and/or done")
         return self
+
+
+class CalendarEventResponse(BaseModel):
+    title: str
+    calendar: str
+    color: str | None
+    all_day: bool
+    location: str | None
+    start_min: int | None  # minutes since local midnight; None for all-day events
+    end_min: int | None
+
+
+class CalendarEventsResponse(BaseModel):
+    events: list[CalendarEventResponse]
+    errors: list[str]

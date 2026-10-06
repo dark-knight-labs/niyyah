@@ -3,6 +3,7 @@
 import { Maximize2 } from "lucide-react";
 import { useState } from "react";
 import { ROUTINE_BLOCKS, ResolvedDay, formatMinutes } from "@/lib/routine";
+import { VaultEvent } from "@/lib/vault-types";
 import { duration, formatDuration } from "@/lib/ring";
 import { FullScreenClock } from "@/components/routine/fullscreen-clock";
 import { RingGraphic } from "@/components/routine/ring-graphic";
@@ -10,10 +11,12 @@ import { RingGraphic } from "@/components/routine/ring-graphic";
 export interface RoutineRingProps {
   day: ResolvedDay;
   nowMin: number;
+  /** Today's calendar events (owner only); drawn on the ring's inner lane. */
+  events?: VaultEvent[];
 }
 
 /** The 24h ring with a hover card per block and a button that opens the full-screen clock. */
-export function RoutineRing({ day, nowMin }: RoutineRingProps) {
+export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
   const [hover, setHover] = useState<number | null>(null);
   const [at, setAt] = useState({ x: 0, y: 0 });
   const [full, setFull] = useState(false);
@@ -27,7 +30,7 @@ export function RoutineRing({ day, nowMin }: RoutineRingProps) {
       </button>
       <svg viewBox="0 0 540 400" className="block h-auto w-full select-none" role="group" aria-label="24-hour routine ring">
         <RingGraphic day={day} nowMin={nowMin} cx={270} cy={200} r={146} t={32} height={400} nameSize={11} clockSize={40} pop={1.13}
-          hover={hover} onHover={(i, p) => { setHover(i); if (p) setAt(p); }} prayers sideLabels={false} idPrefix="ring" />
+          hover={hover} onHover={(i, p) => { setHover(i); if (p) setAt(p); }} prayers sideLabels={false} idPrefix="ring" events={events} />
       </svg>
 
       {block && (
@@ -43,7 +46,7 @@ export function RoutineRing({ day, nowMin }: RoutineRingProps) {
         </div>
       )}
 
-      {full && <FullScreenClock day={day} nowMin={nowMin} onClose={() => setFull(false)} />}
+      {full && <FullScreenClock day={day} nowMin={nowMin} onClose={() => setFull(false)} events={events} />}
     </div>
   );
 }

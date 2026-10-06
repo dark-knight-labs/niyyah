@@ -4,16 +4,18 @@ import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ROUTINE_BLOCKS, ResolvedDay, formatMinutes } from "@/lib/routine";
 import { duration, formatDuration } from "@/lib/ring";
+import { VaultEvent } from "@/lib/vault-types";
 import { RingGraphic } from "@/components/routine/ring-graphic";
 
 interface Props {
   day: ResolvedDay;
   nowMin: number;
   onClose: () => void;
+  events?: VaultEvent[];
 }
 
 /** Only the clock, filling the screen, every block labelled beside it. Esc or the button leaves. */
-export function FullScreenClock({ day, nowMin, onClose }: Props) {
+export function FullScreenClock({ day, nowMin, onClose, events }: Props) {
   const [hover, setHover] = useState<number | null>(null);
   const [portrait, setPortrait] = useState(false);
   const close = useRef(onClose);
@@ -47,7 +49,7 @@ export function FullScreenClock({ day, nowMin, onClose }: Props) {
         <>
           <svg viewBox="0 0 760 700" className="mx-auto block h-auto w-full max-w-[760px] select-none" aria-label="24-hour routine ring">
             <RingGraphic day={day} nowMin={nowMin} cx={380} cy={350} r={250} t={44} height={700} nameSize={14} clockSize={72} pop={1.1}
-              hover={hover} onHover={setHover} prayers={false} sideLabels={false} idPrefix="fsp" />
+              hover={hover} onHover={setHover} prayers={false} sideLabels={false} idPrefix="fsp" events={events} />
           </svg>
           <ul className="mx-auto grid w-full max-w-md gap-4 pb-6">
             {day.blocks.map((b) => (
@@ -63,7 +65,7 @@ export function FullScreenClock({ day, nowMin, onClose }: Props) {
       ) : (
         <svg viewBox="0 0 1240 800" className="m-auto block h-full max-h-screen w-full select-none" aria-label="24-hour routine ring">
           <RingGraphic day={day} nowMin={nowMin} cx={620} cy={400} r={262} t={48} height={800} nameSize={14} clockSize={76} pop={1.1}
-            hover={hover} onHover={setHover} prayers={false} sideLabels idPrefix="fs" />
+            hover={hover} onHover={setHover} prayers={false} sideLabels idPrefix="fs" events={events} />
         </svg>
       )}
     </div>
