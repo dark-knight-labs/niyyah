@@ -13,6 +13,7 @@ from pathlib import Path
 _TASK = re.compile(r"^(\s*(?:[-*]|\d+\.)\s*\[)([ xX])(\]\s*)(.*)$")
 _DATE_MARK = re.compile(r"[📅⏳🛫]\s*(\d{4}-\d{2}-\d{2})")
 _DONE_MARK = re.compile(r"\s*✅\s*\d{4}-\d{2}-\d{2}")
+_TAIL_MARK = re.compile(r"[📅⏳🛫✅]")
 _SKIP_DIRS = {".git", ".obsidian", ".trash", "Templates"}
 
 
@@ -70,6 +71,36 @@ def set_task_done(content: str, line: int, expected_hash: str, done: bool, today
         lines[line - 1] = f"{m.group(1)}x{m.group(3)}{body} ✅ {today}"
     else:
         lines[line - 1] = f"{m.group(1)} {m.group(3)}{body}"
+    return "\n".join(lines)
+
+
+def _task_line(content: str, line: int, expected_hash: str) -> tuple[list[str], "re.Match[str]"]:
+    lines = content.split("\n")
+    if not 1 <= line <= len(lines) or line_hash(lines[line - 1]) != expected_hash:
+        raise ValueError("this task changed in the vault; reload and try again")
+    m = _TASK.match(lines[line - 1])
+    if not m:
+        raise ValueError("this line is no longer a task")
+    return lines, m
+
+
+def set_task_text(content: str, line: int, expected_hash: str, text: str) -> str:
+    """Rename the task on 1-based `line`, keeping its date marks, ✅ date and anything after them."""
+    label = " ".join(text.split())
+    if not label or len(label) > 300:
+        raise ValueError("task must be 1-300 characters")
+    lines, m = _task_line(content, line, expected_hash)
+    body = m.group(4)
+    mark = _TAIL_MARK.search(body)
+    tail = f" {body[mark.start():]}" if mark else ""
+    lines[line - 1] = f"{m.group(1)}{m.group(2)}{m.group(3)}{label}{tail}"
+    return "\n".join(lines)
+
+
+def remove_task(content: str, line: int, expected_hash: str) -> str:
+    """Delete the task on 1-based `line`."""
+    lines, _ = _task_line(content, line, expected_hash)
+    del lines[line - 1]
     return "\n".join(lines)
 
 

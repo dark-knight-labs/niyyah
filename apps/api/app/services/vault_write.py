@@ -7,6 +7,7 @@ import re
 from datetime import date
 
 from app.services.vault_parser import BLOCK_ALIASES, CANONICAL_BLOCKS, MODE_META
+from app.services.vault_tasks import line_hash
 
 MAX_NOTE_CHARS = 500
 _FM_END = re.compile(r"^---\s*$", re.M)
@@ -93,6 +94,57 @@ def add_log_note(content: str, clock: str, section: str, span: str, text: str) -
         body.pop()
     block = [*body, entry, ""]
     return "\n".join([*lines[:at + 1], *block, *lines[end:]])
+
+
+_LOG_ENTRY = re.compile(r"^(\s*[-*])\s+(\S.*)$")
+
+
+def _log_bounds(lines: list[str]) -> tuple[int, int] | None:
+    """(first, end) line indexes of the body under '## Log', or None when the note has no Log."""
+    at = next((i for i, l in enumerate(lines) if l.strip() == "## Log"), None)
+    if at is None:
+        return None
+    return at + 1, next((i for i in range(at + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+
+
+def _log_positions(lines: list[str]) -> list[int]:
+    bounds = _log_bounds(lines)
+    if bounds is None:
+        return []
+    return [i for i in range(*bounds) if _LOG_ENTRY.match(lines[i])]
+
+
+def log_entries(content: str) -> list[dict]:
+    """Entries under '## Log' (bullets with text) as {index, hash, text}; the empty placeholder bullet is skipped."""
+    lines = content.split("\n")
+    return [
+        {"index": n, "hash": line_hash(lines[i]), "text": _LOG_ENTRY.match(lines[i]).group(2).strip()}
+        for n, i in enumerate(_log_positions(lines))
+    ]
+
+
+def _log_line(content: str, index: int, expected_hash: str) -> tuple[list[str], int]:
+    lines = content.split("\n")
+    positions = _log_positions(lines)
+    if not 0 <= index < len(positions) or line_hash(lines[positions[index]]) != expected_hash:
+        raise ValueError("this log entry changed in the vault; reload and try again")
+    return lines, positions[index]
+
+
+def edit_log_entry(content: str, index: int, expected_hash: str, text: str) -> str:
+    """Replace the text of log entry `index`, keeping its bullet."""
+    body = _one_line(text)
+    lines, at = _log_line(content, index, expected_hash)
+    lines[at] = f"{_LOG_ENTRY.match(lines[at]).group(1)} {body}"
+    return "\n".join(lines)
+
+
+def remove_log_entry(content: str, index: int, expected_hash: str) -> str:
+    """Delete log entry `index`; an emptied Log keeps one '-' placeholder bullet."""
+    lines, at = _log_line(content, index, expected_hash)
+    first, end = _log_bounds(lines)
+    lines[at] = "-" if not any(l.strip() for i, l in enumerate(lines[first:end], start=first) if i != at) else None
+    return "\n".join(l for l in lines if l is not None)
 
 
 def _ordinal(n: int) -> str:

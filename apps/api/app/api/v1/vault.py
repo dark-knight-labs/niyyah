@@ -21,10 +21,17 @@ from app.models.vault import VaultDay
 from app.schemas.vault import (
     EditAccessResponse,
     EditResponse,
+    LogEntryIn,
+    LogEntryRemoveIn,
+    LogEntryResponse,
     ModeIn,
     NoteIn,
+    ObjectiveIn,
+    ObjectivesResponse,
     TaskIn,
+    TaskRemoveIn,
     TaskResponse,
+    TaskTextIn,
     TaskToggleIn,
     VoteIn,
     VaultBlocksSeriesResponse,
@@ -40,8 +47,17 @@ from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_schedule import parse_schedule
 from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault
-from app.services.vault_tasks import add_task, find_tasks, set_task_done, task_file
-from app.services.vault_write import add_log_note, new_daily_note, set_mode, set_vote
+from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
+from app.services.vault_tasks import add_task, find_tasks, remove_task, set_task_done, set_task_text, task_file
+from app.services.vault_write import (
+    add_log_note,
+    edit_log_entry,
+    log_entries,
+    new_daily_note,
+    remove_log_entry,
+    set_mode,
+    set_vote,
+)
 
 router = APIRouter(prefix="/vault", tags=["vault"])
 logger = logging.getLogger(__name__)
@@ -327,20 +343,14 @@ async def get_day_tasks(day: date, user: User = Depends(require_editor)):
     return await asyncio.to_thread(lambda: [asdict(t) for t in find_tasks(root, day.isoformat())])
 
 
-@router.put("/tasks", response_model=EditResponse)
-async def put_task(data: TaskToggleIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def _save_task(path: str, apply, message: str, db: AsyncSession) -> EditResponse:
     root = Path(settings.vault_workdir)
-    today = _local_now().date().isoformat()
     try:
-        rel = task_file(root, data.path).relative_to(root.resolve()).as_posix()
+        rel = task_file(root, path).relative_to(root.resolve()).as_posix()
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-
-    def edit(content: str | None) -> str:
-        return set_task_done(content or "", data.line, data.hash, data.done, today)
-
     try:
-        commit = await asyncio.to_thread(commit_edits, {rel: edit}, f"Niyyah: {'done' if data.done else 'reopen'} task in {rel}")
+        commit = await asyncio.to_thread(commit_edits, {rel: lambda c: apply(c or "")}, message.format(rel=rel))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     except VaultWriteError as exc:
@@ -349,7 +359,74 @@ async def put_task(data: TaskToggleIn, user: User = Depends(require_editor), db:
     return EditResponse(commit=commit, day=None)
 
 
+@router.put("/tasks", response_model=EditResponse)
+async def put_task(data: TaskToggleIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date().isoformat()
+    message = f"Niyyah: {'done' if data.done else 'reopen'} task in {{rel}}"
+    return await _save_task(data.path, lambda c: set_task_done(c, data.line, data.hash, data.done, today), message, db)
+
+
+@router.put("/tasks/text", response_model=EditResponse)
+async def put_task_text(data: TaskTextIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    return await _save_task(data.path, lambda c: set_task_text(c, data.line, data.hash, data.text), "Niyyah: edit task in {rel}", db)
+
+
+@router.post("/tasks/remove", response_model=EditResponse)
+async def post_task_remove(data: TaskRemoveIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    return await _save_task(data.path, lambda c: remove_task(c, data.line, data.hash), "Niyyah: remove task in {rel}", db)
+
+
 @router.post("/day/{day}/tasks", response_model=EditResponse)
 async def post_task(day: date, data: TaskIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
     _check_day(day)
     return await _save(day, lambda c: add_task(c, data.text, day.isoformat()), f"Niyyah: {day} add task", db)
+
+
+@router.get("/day/{day}/log", response_model=list[LogEntryResponse])
+async def get_day_log(day: date, user: User = Depends(require_editor)):
+    """Entries under the day's '## Log'. Private note text, so owner only."""
+    _check_day(day)
+    note = Path(settings.vault_workdir) / "Calendar" / "Daily" / f"{day.isoformat()}.md"
+    if not note.is_file():
+        return []
+    return log_entries(await asyncio.to_thread(note.read_text, encoding="utf-8"))
+
+
+@router.put("/day/{day}/log", response_model=EditResponse)
+async def put_log_entry(day: date, data: LogEntryIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    _check_day(day)
+    return await _save(day, lambda c: edit_log_entry(c, data.index, data.hash, data.text), f"Niyyah: {day} edit log entry", db)
+
+
+@router.post("/day/{day}/log/remove", response_model=EditResponse)
+async def post_log_remove(day: date, data: LogEntryRemoveIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    _check_day(day)
+    return await _save(day, lambda c: remove_log_entry(c, data.index, data.hash), f"Niyyah: {day} remove log entry", db)
+
+
+# --- Weekly objectives (owner only) -----------------------------------------------------------------------------
+
+def _objectives_response(today: date) -> ObjectivesResponse:
+    start, end, label = week_for(today)
+    note = Path(settings.vault_workdir) / objectives_path(label)
+    content = note.read_text(encoding="utf-8") if note.is_file() else None
+    return ObjectivesResponse(week=label, period=f"{start.isoformat()}/{end.isoformat()}", items=parse_objectives(content))
+
+
+@router.get("/objectives", response_model=ObjectivesResponse)
+async def get_objectives(user: User = Depends(require_editor)):
+    return await asyncio.to_thread(_objectives_response, _local_now().date())
+
+
+@router.put("/objectives", response_model=ObjectivesResponse)
+async def put_objective(data: ObjectiveIn, user: User = Depends(require_editor)):
+    today = _local_now().date()
+    label = week_for(today)[2]
+    edit = lambda c: update_objective(c, today, data.block, data.text, data.done)  # noqa: E731
+    try:
+        await asyncio.to_thread(commit_edits, {objectives_path(label): edit}, f"Niyyah: W{label[-2:]} {data.block} objective")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except VaultWriteError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return await asyncio.to_thread(_objectives_response, today)

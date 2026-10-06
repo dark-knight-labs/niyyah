@@ -7,8 +7,9 @@ from httpx import AsyncClient
 
 from app.core.config import settings
 from app.services import vault_git
+from app.services.vault_tasks import line_hash
 from app.services.vault_parser import parse_daily_note
-from app.services.vault_write import add_log_note, new_daily_note, set_mode, set_vote
+from app.services.vault_write import add_log_note, log_entries, new_daily_note, set_mode, set_vote
 
 NOTE = """---
 id: 20260923-daily
@@ -238,3 +239,165 @@ def test_add_task_goes_after_the_query_block():
     assert "## Tasks\n- [ ] Call bank" in add_task("# x\n", "Call bank", "2026-10-05")
     with pytest.raises(ValueError):
         add_task(note, "  ", "2026-10-05")
+
+
+# --- task text edit / remove -----------------------------------------------------------------------------------
+
+def test_set_task_text_keeps_dates_and_done_mark():
+    from app.services.vault_tasks import set_task_text
+    done = "- [x] Birth Certificate 📅 2026-10-04 ⏳ 2026-10-05 ✅ 2026-10-05"
+    out = set_task_text(f"# T\n{done}\n", 2, line_hash(done), "  Passport\n renewal ")
+    assert out == "# T\n- [x] Passport renewal 📅 2026-10-04 ⏳ 2026-10-05 ✅ 2026-10-05\n"
+    plain = set_task_text("- [ ] a\n", 1, line_hash("- [ ] a"), "b")
+    assert plain == "- [ ] b\n"
+
+
+def test_set_task_text_refuses_stale_and_bad_text():
+    from app.services.vault_tasks import set_task_text
+    line = TASKS.split("\n")[1]
+    with pytest.raises(ValueError, match="changed"):
+        set_task_text(TASKS, 2, "deadbeef00", "x")
+    for bad in ("   ", "a" * 301):
+        with pytest.raises(ValueError):
+            set_task_text(TASKS, 2, line_hash(line), bad)
+
+
+def test_remove_task_deletes_the_line():
+    from app.services.vault_tasks import remove_task
+    line = TASKS.split("\n")[1]
+    out = remove_task(TASKS, 2, line_hash(line))
+    assert out == TASKS.replace(line + "\n", "")
+    with pytest.raises(ValueError, match="changed"):
+        remove_task(TASKS, 2, "deadbeef00")
+
+
+@pytest.mark.asyncio
+async def test_endpoint_edits_and_removes_a_task(auth_client: AsyncClient, vault):
+    remote, _ = vault
+    vault_git.commit_edits({"Calendar/Tasks.md": lambda _: TASKS}, "seed tasks")
+    task = next(t for t in (await auth_client.get("/api/v1/vault/day/2026-10-05/tasks")).json() if t["text"] == "Land Registry")
+    ident = {k: task[k] for k in ("path", "line", "hash")}
+
+    r = await auth_client.put("/api/v1/vault/tasks/text", json={**ident, "text": "Land Registry visit"})
+    assert r.status_code == 200, r.text
+    assert "- [ ] Land Registry visit ⏳ 2026-10-05" in _remote_file(remote, "Calendar/Tasks.md")
+    assert (await auth_client.put("/api/v1/vault/tasks/text", json={**ident, "text": "again"})).status_code == 422  # stale
+
+    task = next(t for t in (await auth_client.get("/api/v1/vault/day/2026-10-05/tasks")).json() if t["text"] == "Land Registry visit")
+    ident = {k: task[k] for k in ("path", "line", "hash")}
+    assert (await auth_client.post("/api/v1/vault/tasks/remove", json=ident)).status_code == 200
+    assert "Land Registry" not in _remote_file(remote, "Calendar/Tasks.md")
+    assert (await auth_client.post("/api/v1/vault/tasks/remove", json=ident)).status_code == 422
+
+
+# --- log entries -----------------------------------------------------------------------------------------------
+
+LOGGED = NOTE.replace("## Log\n-\n", "## Log\n- 14:05 · OT (06:00-16:03): Shipped\n* plain\n-\n")
+
+
+def test_log_entries_skips_the_placeholder():
+    assert log_entries(NOTE) == []
+    got = log_entries(LOGGED)
+    assert [(e["index"], e["text"]) for e in got] == [(0, "14:05 · OT (06:00-16:03): Shipped"), (1, "plain")]
+    assert got[1]["hash"] == line_hash("* plain")
+
+
+def test_edit_log_entry_replaces_text_and_keeps_bullet():
+    from app.services.vault_write import edit_log_entry
+    entry = log_entries(LOGGED)[1]
+    out = edit_log_entry(LOGGED, 1, entry["hash"], " better\n text ")
+    assert "\n* better text\n" in out and out.count("\n") == LOGGED.count("\n")
+    with pytest.raises(ValueError, match="changed"):
+        edit_log_entry(LOGGED, 1, "deadbeef00", "x")
+    with pytest.raises(ValueError):
+        edit_log_entry(LOGGED, 1, entry["hash"], "a" * 501)
+
+
+def test_remove_log_entry_leaves_placeholder_when_emptied():
+    from app.services.vault_write import remove_log_entry
+    once = add_log_note(NOTE, "14:05", "OT", "06:00-16:03", "Only one")
+    out = remove_log_entry(once, 0, log_entries(once)[0]["hash"])
+    assert "## Log\n-\n\n## Captured" in out
+    out = remove_log_entry(LOGGED, 0, log_entries(LOGGED)[0]["hash"])
+    assert log_entries(out) == [{"index": 0, "hash": line_hash("* plain"), "text": "plain"}]
+    with pytest.raises(ValueError, match="changed"):
+        remove_log_entry(LOGGED, 5, "deadbeef00")
+
+
+@pytest.mark.asyncio
+async def test_endpoint_lists_edits_and_removes_log_entries(auth_client: AsyncClient, vault, monkeypatch):
+    import datetime as dt
+    remote, _ = vault
+    monkeypatch.setattr("app.api.v1.vault._local_now", lambda: dt.datetime(2026, 9, 24, 9, 0))
+    day = "2026-09-23"
+    assert (await auth_client.get(f"/api/v1/vault/day/{day}/log")).json() == []
+    await auth_client.post(f"/api/v1/vault/day/{day}/notes", json={"section": "OT", "span": "06:00-16:03", "text": "Deep session"})
+
+    entries = (await auth_client.get(f"/api/v1/vault/day/{day}/log")).json()
+    assert [e["text"] for e in entries] == [f"{entries[0]['text'][:5]} · OT (06:00-16:03): Deep session"]
+    first = {k: entries[0][k] for k in ("index", "hash")}
+
+    r = await auth_client.put(f"/api/v1/vault/day/{day}/log", json={**first, "text": "Edited"})
+    assert r.status_code == 200, r.text
+    assert "## Log\n- Edited\n" in _remote_file(remote, f"Calendar/Daily/{day}.md")
+    assert (await auth_client.put(f"/api/v1/vault/day/{day}/log", json={**first, "text": "x"})).status_code == 422  # stale
+
+    fresh = (await auth_client.get(f"/api/v1/vault/day/{day}/log")).json()[0]
+    assert (await auth_client.post(f"/api/v1/vault/day/{day}/log/remove", json={"index": 0, "hash": fresh["hash"]})).status_code == 200
+    assert "## Log\n-\n" in _remote_file(remote, f"Calendar/Daily/{day}.md")
+    assert (await auth_client.get("/api/v1/vault/day/2020-01-01/log")).status_code == 422
+
+
+# --- weekly objectives -----------------------------------------------------------------------------------------
+
+def test_week_for_runs_saturday_to_friday():
+    from app.services.vault_objectives import week_for
+    for d in (date(2026, 10, 3), date(2026, 10, 6), date(2026, 10, 9)):
+        assert week_for(d) == (date(2026, 10, 3), date(2026, 10, 9), "2026-W41")
+    assert week_for(date(2026, 10, 2))[2] == "2026-W40"  # matches Calendar/Weekly/2026-W40.md
+    assert week_for(date(2026, 12, 31))[2] == "2026-W53"  # Sat Dec 26 + 3 days = Tue Dec 29
+
+
+def test_update_objective_renders_and_round_trips():
+    from app.services.vault_objectives import parse_objectives, update_objective
+    day = date(2026, 10, 6)
+    empty = parse_objectives(None)
+    assert [i["block"] for i in empty] == ["soul", "body", "ot", "distribution", "fnf", "sleep"]
+    assert not any(i["text"] or i["done"] for i in empty)
+
+    out = update_objective(None, day, "soul", "Read daily", None)
+    assert out.startswith("---\ntype: weekly-objectives\nweek: 41\nperiod: 2026-10-03/2026-10-09\n---\n# Objectives — W41\n\n- **Soul**: Read daily\n- **Body**:\n")
+    out = update_objective(out, day, "body", None, True)
+    out = update_objective(out, day, "soul", "", None)
+    got = {i["block"]: i for i in parse_objectives(out)}
+    assert got["body"] == {"block": "body", "text": "", "done": True}
+    assert got["soul"]["text"] == "" and "- **Body** ✓:\n" in out
+
+
+def test_update_objective_rejects_bad_input():
+    from app.services.vault_objectives import update_objective
+    day = date(2026, 10, 6)
+    for args in (("nope", "x", None), ("soul", None, None), ("soul", "a" * 201, None)):
+        with pytest.raises(ValueError):
+            update_objective(None, day, *args)
+
+
+@pytest.mark.asyncio
+async def test_endpoint_objectives_get_and_put(auth_client: AsyncClient, vault, monkeypatch):
+    import datetime as dt
+    remote, work = vault
+    monkeypatch.setattr("app.api.v1.vault._local_now", lambda: dt.datetime(2026, 10, 6, 9, 0))
+    r = await auth_client.get("/api/v1/vault/objectives")
+    assert r.status_code == 200
+    assert r.json()["week"] == "2026-W41" and r.json()["period"] == "2026-10-03/2026-10-09"
+    assert [i["block"] for i in r.json()["items"]] == ["soul", "body", "ot", "distribution", "fnf", "sleep"]
+    assert not (work / "Calendar" / "Weekly" / "Objectives").exists()  # GET never creates the file
+
+    r = await auth_client.put("/api/v1/vault/objectives", json={"block": "ot", "text": "Ship Niyyah", "done": True})
+    assert r.status_code == 200, r.text
+    assert {"block": "ot", "text": "Ship Niyyah", "done": True} in r.json()["items"]
+    assert "- **OT** ✓: Ship Niyyah" in _remote_file(remote, "Calendar/Weekly/Objectives/2026-W41.md")
+
+    assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "ot"})).status_code == 422
+    assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "nope", "text": "x"})).status_code == 422
+    assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "ot", "text": "a" * 201})).status_code == 422

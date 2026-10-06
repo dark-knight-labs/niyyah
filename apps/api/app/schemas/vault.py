@@ -1,6 +1,8 @@
 from datetime import date
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, model_validator
 
 
 class VaultDayResponse(BaseModel):
@@ -104,3 +106,60 @@ class TaskToggleIn(BaseModel):
 
 class TaskIn(BaseModel):
     text: str
+
+
+class TaskTextIn(BaseModel):
+    path: str
+    line: int
+    hash: str
+    text: str
+
+
+class TaskRemoveIn(BaseModel):
+    path: str
+    line: int
+    hash: str
+
+
+class LogEntryResponse(BaseModel):
+    index: int
+    hash: str
+    text: str
+
+
+class LogEntryIn(BaseModel):
+    index: int
+    hash: str
+    text: str
+
+
+class LogEntryRemoveIn(BaseModel):
+    index: int
+    hash: str
+
+
+ObjectiveBlock = Literal["soul", "body", "ot", "distribution", "fnf", "sleep"]
+
+
+class ObjectiveItem(BaseModel):
+    block: ObjectiveBlock
+    text: str
+    done: bool
+
+
+class ObjectivesResponse(BaseModel):
+    week: str  # "2026-W41"
+    period: str  # "2026-10-03/2026-10-09"
+    items: list[ObjectiveItem]
+
+
+class ObjectiveIn(BaseModel):
+    block: ObjectiveBlock
+    text: str | None = None
+    done: bool | None = None
+
+    @model_validator(mode="after")
+    def _something_to_change(self):
+        if self.text is None and self.done is None:
+            raise ValueError("give text and/or done")
+        return self
