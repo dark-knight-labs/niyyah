@@ -7,11 +7,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { logout } from "@/lib/auth";
 import {
-  LayoutDashboard,
-  Users,
-  Calendar,
-  Compass,
-  CheckSquare,
   Activity,
   Clock,
   CalendarDays,
@@ -34,11 +29,6 @@ const nav = [
   { href: "/quarter", label: "Quarter", icon: Target },
   { href: "/pipelines", label: "Pipelines", icon: Layers3 },
   { href: "/vault", label: "Vault", icon: Activity },
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/personas", label: "Personas", icon: Users },
-  { href: "/schedule", label: "Schedule", icon: Calendar },
-  { href: "/principles", label: "Principles", icon: Compass },
-  { href: "/tracker", label: "Tracker", icon: CheckSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
