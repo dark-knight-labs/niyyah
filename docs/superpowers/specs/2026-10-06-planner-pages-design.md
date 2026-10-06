@@ -8,7 +8,7 @@ Date: 2026-10-06. The vault stays the single source of truth; Niyyah reads it an
 Super Objective
  └ Quarter goal        one per stream, December northstar        (big domino)
     └ Month checkpoint   Oct / Nov / Dec
-       └ Week objective    one per stream, Saturday-Friday       (smallest domino)
+       └ Week objective    one per stream, Sunday-Saturday       (smallest domino)
           └ Today          Now lane of the stream that owns the OT slot
 Pipeline: Backlog -> Next -> Now -> Done   (the supply of dominoes)
 ```
@@ -44,7 +44,7 @@ Streams (not blocks) carry goals. Streams are data: every `## <id>` section of t
 
 ## Pages (full width, responsive)
 
-- Sidebar: Routine, Week, Quarter, Pipelines, Vault (votes), Dashboard, Personas, Schedule, Principles, Tracker, Settings. Dashboard, Personas, Schedule, Tracker stay until each is replaced (Reviews and Principles-as-vault come later). Mobile gets a bottom tab bar (the sidebar was hidden below md).
+- Sidebar: Routine, Week, Quarter, Pipelines, Vault (votes), Settings. The old Dashboard, Personas, Schedule, Principles and Tracker pages were removed in v0.10.1. Mobile gets a bottom tab bar (the sidebar was hidden below md).
 - Quarter, Week, Pipelines as in the approved mock; each page shows the chain breadcrumb.
 - Visual system: existing tokens plus per-stream colours (light and dark), Fraunces for page titles, Manrope for UI, Caveat for the focusing question, lucide icons per stream and a custom domino-chain SVG.
 
