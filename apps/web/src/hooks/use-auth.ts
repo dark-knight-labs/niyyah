@@ -27,8 +27,9 @@ export function useAuth(required = true) {
     }
     api.get<User>("/auth/me")
       .then(setUser)
-      .catch(() => {
-        if (required) router.push("/login");
+      .catch((err: { status?: number }) => {
+        // Only a rejected session sends the owner to /login; a server hiccup keeps the stored tokens.
+        if (required && (err.status === 401 || !localStorage.getItem("access_token"))) router.push("/login");
       })
       .finally(() => setLoading(false));
   }, [router, required]);

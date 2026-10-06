@@ -14,6 +14,39 @@ function httpError(message: string, status?: number): ApiError {
   return err;
 }
 
+// One refresh at a time: parallel requests that all hit an expired access token share it.
+let refreshing: Promise<string | null> | null = null;
+
+function refreshSession(): Promise<string | null> {
+  refreshing ??= (async () => {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken) return null;
+    try {
+      const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (res.status === 401) {
+        // The refresh token itself is expired or revoked: only now does the owner have to sign in again.
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        return null;
+      }
+      if (!res.ok) return null; // server trouble: keep the tokens, report the failure
+      const data = await res.json();
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("refresh_token", data.refresh_token);
+      return data.access_token as string;
+    } catch {
+      return null; // network blip: keep the tokens
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+}
+
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   const headers: Record<string, string> = {
@@ -29,32 +62,25 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   });
 
   if (res.status === 401 && token) {
-    const refreshToken = localStorage.getItem("refresh_token");
-    if (refreshToken) {
-      const refreshRes = await fetch(`${API_URL}/api/v1/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+    // Another request (or tab) may already have renewed the session while this one was in flight.
+    const stored = localStorage.getItem("access_token");
+    const renewed = stored && stored !== token ? stored : await refreshSession();
+    if (renewed) {
+      headers["Authorization"] = `Bearer ${renewed}`;
+      const retry = await fetch(`${API_URL}/api/v1${path}`, {
+        method: opts.method || "GET",
+        headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
       });
-      if (refreshRes.ok) {
-        const data = await refreshRes.json();
-        localStorage.setItem("access_token", data.access_token);
-        localStorage.setItem("refresh_token", data.refresh_token);
-        headers["Authorization"] = `Bearer ${data.access_token}`;
-        const retry = await fetch(`${API_URL}/api/v1${path}`, {
-          method: opts.method || "GET",
-          headers,
-          body: opts.body ? JSON.stringify(opts.body) : undefined,
-        });
-        if (!retry.ok) throw httpError(`API error: ${retry.status}`, retry.status);
-        if (retry.status === 204) return undefined as T;
-        return retry.json();
-      }
+      if (!retry.ok) throw httpError(`API error: ${retry.status}`, retry.status);
+      if (retry.status === 204) return undefined as T;
+      return retry.json();
     }
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    window.location.href = "/login";
-    throw httpError("Session expired", 401);
+    if (!localStorage.getItem("refresh_token")) {
+      window.location.href = "/login";
+      throw httpError("Session expired", 401);
+    }
+    throw httpError("Could not reach the server, try again", 503);
   }
 
   if (!res.ok) {

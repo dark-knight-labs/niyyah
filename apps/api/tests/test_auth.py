@@ -58,3 +58,12 @@ async def test_logout(client: AsyncClient):
     refresh_token = reg.json()["refresh_token"]
     resp = await client.post("/api/v1/auth/logout", json={"refresh_token": refresh_token})
     assert resp.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_survives_concurrent_use(client: AsyncClient):
+    reg = await client.post("/api/v1/auth/register", json={"email": "twice@niyyah.app", "password": "pass"})
+    refresh_token = reg.json()["refresh_token"]
+    first = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    second = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert first.status_code == 200 and second.status_code == 200

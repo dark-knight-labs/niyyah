@@ -57,9 +57,11 @@ async def refresh_tokens(db: AsyncSession, raw_refresh: str) -> dict | None:
     user = user_result.scalar_one_or_none()
     if not user:
         return None
-    await db.delete(rt)
+    # The refresh token is not rotated: several requests refreshing at once (or two tabs) must all succeed,
+    # and rotation made the loser of that race sign the owner out. Each use slides its expiry forward.
+    rt.expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
     await db.commit()
-    return await create_tokens(db, user)
+    return {"access_token": create_access_token(user.id), "token_type": "bearer", "refresh_token": raw_refresh}
 
 
 async def revoke_refresh_token(db: AsyncSession, raw_refresh: str) -> None:

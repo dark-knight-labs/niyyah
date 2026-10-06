@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 15
-    refresh_token_expire_days: int = 7
+    refresh_token_expire_days: int = 30
     cors_origins: str = "http://localhost:3000"
 
     vault_gitlab_url: str = "ssh://git@gitlab.alamin.rocks:2222/pkm/xarvis.git"
