@@ -57,3 +57,21 @@ export interface VaultTaskData {
   text: string;
   done: boolean;
 }
+
+export interface VaultLogEntry {
+  index: number;
+  hash: string;
+  text: string;
+}
+
+export interface VaultObjective {
+  block: string;
+  text: string;
+  done: boolean;
+}
+
+export interface VaultObjectivesData {
+  week: string;
+  period: string;
+  items: VaultObjective[];
+}

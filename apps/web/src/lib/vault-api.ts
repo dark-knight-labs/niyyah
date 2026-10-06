@@ -3,6 +3,8 @@ import { VaultScheduleData } from "@/lib/routine";
 import {
   VaultBlocksSeriesData,
   VaultDayData,
+  VaultLogEntry,
+  VaultObjectivesData,
   VaultMonthData,
   VaultEditData,
   VaultStreaksData,
@@ -25,5 +27,12 @@ export const vaultApi = {
   tasks: (day: string) => api.get<VaultTaskData[]>(`/vault/day/${day}/tasks`),
   addTask: (day: string, text: string) => api.post<VaultEditData>(`/vault/day/${day}/tasks`, { text }),
   setTask: (task: VaultTaskData, done: boolean) => api.put<VaultEditData>("/vault/tasks", { path: task.path, line: task.line, hash: task.hash, done }),
+  editTask: (task: VaultTaskData, text: string) => api.put<VaultEditData>("/vault/tasks/text", { path: task.path, line: task.line, hash: task.hash, text }),
+  removeTask: (task: VaultTaskData) => api.post<VaultEditData>("/vault/tasks/remove", { path: task.path, line: task.line, hash: task.hash }),
+  log: (day: string) => api.get<VaultLogEntry[]>(`/vault/day/${day}/log`),
+  editLog: (day: string, entry: VaultLogEntry, text: string) => api.put<VaultEditData>(`/vault/day/${day}/log`, { index: entry.index, hash: entry.hash, text }),
+  removeLog: (day: string, entry: VaultLogEntry) => api.post<VaultEditData>(`/vault/day/${day}/log/remove`, { index: entry.index, hash: entry.hash }),
+  objectives: () => api.get<VaultObjectivesData>("/vault/objectives"),
+  setObjective: (block: string, change: { text?: string; done?: boolean }) => api.put<VaultObjectivesData>("/vault/objectives", { block, ...change }),
   sync: () => api.post<VaultSyncData>("/vault/sync", {}),
 };
