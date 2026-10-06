@@ -96,17 +96,17 @@ export function DayEditor({ open, onClose, day, today, blocks, onSaved }: Props)
         </section>
 
         <section>
-          <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Note for a part of the day</h3>
+          <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--muted-foreground)]">Log</h3>
           <select value={section} onChange={(e) => setSection(Number(e.target.value))} className="mb-2 w-full rounded border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm">
             {blocks.map((b, i) => (
               <option key={`${b.block}-${b.startMin}`} value={i}>{ROUTINE_BLOCKS[b.block].label} · {formatMinutes(b.startMin)}–{formatMinutes(b.endMin)}</option>
             ))}
           </select>
-          <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={500} rows={3} placeholder="What happened in this part of the day?"
+          <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={500} rows={3} placeholder="Log what happened in this part of the day"
             className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm" />
           <button disabled={busy || !text.trim() || !target} className="mt-2 rounded bg-[var(--accent)] px-4 py-2 text-sm text-white disabled:opacity-50"
             onClick={() => run(() => vaultApi.addNote(day, ROUTINE_BLOCKS[target.block].label, `${formatMinutes(target.startMin)}-${formatMinutes(target.endMin)}`, text), () => setText(""))}>
-            Add note
+            Add to log
           </button>
           <ul className="mt-4 space-y-1.5 text-sm">
             {logLines(today?.log ?? null).map((line) => <li key={line} className="text-[var(--muted-foreground)]">{line.slice(2)}</li>)}
