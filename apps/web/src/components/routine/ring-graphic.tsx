@@ -29,6 +29,9 @@ export interface RingGraphicProps {
   idPrefix: string;
   /** Timed calendar events, drawn on the inner lane (owner only). */
   events?: VaultEvent[];
+  /** Hovering an event arc on the inner lane; index into the timed events. */
+  hoverEvent?: number | null;
+  onHoverEvent?: (index: number | null, at?: { x: number; y: number }) => void;
 }
 
 /** The 24h ring: slices, names on the slices, now marker, clock. Meant to sit inside an <svg>. */
@@ -80,12 +83,12 @@ export function RingGraphic(p: RingGraphicProps) {
       })}
       {/* reserved inner lane for calendar events */}
       <circle cx={cx} cy={cy} r={r - t / 2 - 34} fill="none" stroke="var(--border)" strokeDasharray="2 5" />
-      {(p.events ?? []).filter((e) => e.start_min !== null && e.end_min !== null && e.end_min > e.start_min).map((e, i) => {
+      {timedEvents(p.events).map((e, i) => {
         const lane = ringGeometry(cx, cy, r - t / 2 - 24);
+        const on = p.hoverEvent === i;
         return (
-          <path key={`e-${i}`} d={lane.arc(e.start_min as number, e.end_min as number)} fill="none" stroke={e.color ?? "var(--muted-foreground)"} strokeWidth={6} strokeLinecap="round" opacity={0.9}>
-            <title>{`${e.title} ${formatMinutes(e.start_min as number)}–${formatMinutes(e.end_min as number)}`}</title>
-          </path>
+          <path key={`e-${i}`} d={lane.arc(e.start_min as number, e.end_min as number)} fill="none" stroke={e.color ?? "var(--muted-foreground)"} strokeLinecap="round"
+            style={{ strokeWidth: on ? 10 : 6, opacity: p.hoverEvent != null && !on ? 0.4 : 0.95, transition: "stroke-width .3s ease, opacity .3s ease", pointerEvents: "none" }} />
         );
       })}
 
@@ -126,6 +129,18 @@ export function RingGraphic(p: RingGraphicProps) {
           onClick={(e) => p.onHover(i, { x: e.clientX, y: e.clientY })} />
       ))}
 
+      {/* hit areas for the calendar events on the inner lane */}
+      {p.onHoverEvent && timedEvents(p.events).map((e, i) => (
+        <path key={`eh-${i}`} d={ringGeometry(cx, cy, r - t / 2 - 24).arc(e.start_min as number, e.end_min as number)} fill="none" stroke="transparent" strokeWidth={18}
+          pointerEvents="stroke" tabIndex={0} role="img" aria-label={`${e.title}, ${formatMinutes(e.start_min as number)} to ${formatMinutes(e.end_min as number)}`}
+          style={{ cursor: "pointer", outline: "none" }}
+          onPointerMove={(ev) => p.onHoverEvent?.(i, { x: ev.clientX, y: ev.clientY })}
+          onPointerLeave={() => p.onHoverEvent?.(null)}
+          onFocus={(ev) => { const rect = ev.currentTarget.getBoundingClientRect(); p.onHoverEvent?.(i, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }); }}
+          onBlur={() => p.onHoverEvent?.(null)}
+          onClick={(ev) => p.onHoverEvent?.(i, { x: ev.clientX, y: ev.clientY })} />
+      ))}
+
       {/* now marker */}
       <g pointerEvents="none">
         <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--background)" strokeWidth={6} strokeLinecap="round" />
@@ -138,6 +153,10 @@ export function RingGraphic(p: RingGraphicProps) {
     </>
   );
 }
+
+/** Events that have a start and end on this day (all-day ones have no place on the ring). */
+export const timedEvents = (events?: VaultEvent[]) =>
+  (events ?? []).filter((e) => e.start_min !== null && e.end_min !== null && e.end_min > e.start_min);
 
 function SideLabels(p: RingGraphicProps & { g: ReturnType<typeof ringGeometry> }) {
   const { day, cx, r, t, g } = p;
