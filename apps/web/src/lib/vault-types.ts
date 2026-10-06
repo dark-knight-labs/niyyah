@@ -64,10 +64,14 @@ export interface VaultLogEntry {
   text: string;
 }
 
+export type MonthKey = "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
+export type Lane = "now" | "next" | "backlog" | "done";
+
 export interface VaultObjective {
-  block: string;
+  stream: string;
   text: string;
   done: boolean;
+  checkpoint: MonthKey | null;
 }
 
 export interface VaultObjectivesData {
@@ -104,4 +108,48 @@ export interface NewEvent {
 export interface VaultEventsData {
   events: VaultEvent[];
   errors: string[];
+}
+
+export interface QuarterStreamData {
+  stream: string;
+  goal: string;
+  status: string;
+  checkpoints: { month: MonthKey; text: string }[];
+}
+
+export interface QuarterData {
+  quarter: string;
+  starts: string | null;
+  ends: string | null;
+  objective: string;
+  objective_ar: string;
+  week_of_quarter: number;
+  weeks_in_quarter: number;
+  current_month: MonthKey;
+  streams: QuarterStreamData[];
+}
+
+export interface PipelineItemData {
+  line: number;
+  hash: string;
+  text: string;
+  lane: Lane;
+  checkpoint: MonthKey | null;
+  added: string | null;
+  done_on: string | null;
+  done: boolean;
+  age_days: number;
+  stale: boolean;
+}
+
+export interface PipelineStreamData {
+  stream: string;
+  path: string;
+  items: PipelineItemData[];
+}
+
+export interface PipelinesData {
+  now_limit: number;
+  stale_days: number;
+  streams: PipelineStreamData[];
 }

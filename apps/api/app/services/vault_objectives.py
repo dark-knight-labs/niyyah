@@ -1,15 +1,18 @@
-"""Weekly objectives: one line per block, one file per week (Saturday to Friday).
+"""Weekly objectives: one line per stream, one file per week (Saturday to Friday).
 
 Calendar/Weekly/Objectives/2026-W41.md. Pure functions (string in, string out);
-vault_git.py does the committing. A missing file reads as six empty objectives.
+vault_git.py does the committing. A missing file reads as seven empty objectives.
+A line may end in a month tag (#nov): the checkpoint this objective topples.
 """
 import re
 from datetime import date, timedelta
 
-BLOCKS = ("soul", "body", "ot", "distribution", "fnf", "sleep")
-LABELS = {"soul": "Soul", "body": "Body", "ot": "OT", "distribution": "Distribution", "fnf": "FnF", "sleep": "Sleep"}
+from app.services.vault_streams import LABELS, MONTHS, OBJECTIVE_STREAMS, split_month_tag
+
+STREAMS = OBJECTIVE_STREAMS
 MAX_OBJECTIVE_CHARS = 200
 _ITEM = re.compile(r"^- \*\*(\w+)\*\*( ✓)?:[ \t]*(.*)$")
+_LEGACY = {"ot": "kahf"}  # before streams, Kahf and Alisha shared one OT line
 
 
 def week_for(day: date) -> tuple[date, date, str]:
@@ -24,24 +27,32 @@ def objectives_path(label: str) -> str:
 
 
 def parse_objectives(content: str | None) -> list[dict]:
-    """The six blocks in order as {block, text, done}; blocks missing from the file come back empty."""
+    """The seven streams in order as {stream, text, done, checkpoint}; missing streams come back empty."""
+    by_label = {LABELS[s].lower(): s for s in STREAMS}
     found: dict[str, dict] = {}
     for line in (content or "").split("\n"):
         m = _ITEM.match(line)
-        block = m and next((b for b in BLOCKS if LABELS[b].lower() == m.group(1).lower()), None)
-        if block:
-            found[block] = {"block": block, "text": m.group(3).strip(), "done": bool(m.group(2))}
-    return [found.get(b, {"block": b, "text": "", "done": False}) for b in BLOCKS]
+        if not m:
+            continue
+        name = m.group(1).lower()
+        stream = by_label.get(name) or _LEGACY.get(name)
+        if stream and (stream not in found or name in by_label):
+            text, checkpoint = split_month_tag(m.group(3))
+            found[stream] = {"stream": stream, "text": text, "done": bool(m.group(2)), "checkpoint": checkpoint}
+    return [found.get(s, {"stream": s, "text": "", "done": False, "checkpoint": None}) for s in STREAMS]
 
 
-def update_objective(content: str | None, day: date, block: str, text: str | None, done: bool | None) -> str:
-    """Set the text and/or done flag of one block (creating the file) and render the whole note."""
-    if block not in BLOCKS:
-        raise ValueError(f"unknown block '{block}'")
-    if text is None and done is None:
+def update_objective(content: str | None, day: date, stream: str, text: str | None, done: bool | None,
+                     checkpoint: str | None = None) -> str:
+    """Set the text, done flag and/or checkpoint of one stream ('' clears the checkpoint); render the whole note."""
+    if stream not in STREAMS:
+        raise ValueError(f"unknown stream '{stream}'")
+    if text is None and done is None and checkpoint is None:
         raise ValueError("nothing to change")
+    if checkpoint and checkpoint not in MONTHS:
+        raise ValueError(f"unknown month '{checkpoint}'")
     items = parse_objectives(content)
-    item = items[BLOCKS.index(block)]
+    item = items[STREAMS.index(stream)]
     if text is not None:
         cleaned = " ".join(text.split())
         if len(cleaned) > MAX_OBJECTIVE_CHARS:
@@ -49,9 +60,16 @@ def update_objective(content: str | None, day: date, block: str, text: str | Non
         item["text"] = cleaned
     if done is not None:
         item["done"] = done
+    if checkpoint is not None:
+        item["checkpoint"] = checkpoint or None
     start, end, label = week_for(day)
     number = label.split("-W")[1]
-    rows = [f"- **{LABELS[i['block']]}**{' ✓' if i['done'] else ''}:{' ' + i['text'] if i['text'] else ''}" for i in items]
+    rows = []
+    for i in items:
+        tail = f" {i['text']}" if i["text"] else ""
+        if i["text"] and i["checkpoint"]:
+            tail += f" #{i['checkpoint']}"
+        rows.append(f"- **{LABELS[i['stream']]}**{' ✓' if i['done'] else ''}:{tail}")
     head = [
         "---", "type: weekly-objectives", f"week: {int(number)}", f"period: {start.isoformat()}/{end.isoformat()}", "---",
         f"# Objectives — W{number}", "",

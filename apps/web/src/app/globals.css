@@ -18,6 +18,18 @@
   --destructive: #dc2626;
 
   --radius: 0.625rem;
+  /* One colour per stream (a goal and its pipeline), used for rails, chips and icons. */
+  --stream-soul: #059669;
+  --stream-body: #d97706;
+  --stream-kahf: #7c3aed;
+  --stream-alisha: #c026d3;
+  --stream-distribution: #0891b2;
+  --stream-fnf: #e11d48;
+  --stream-finance: #475569;
+  --stream-sleep: #64748b;
+  --warn: #b45309;
+  --warn-light: #fdf1dc;
+
   --font-sans: "Manrope Variable", system-ui, -apple-system, sans-serif;
   --font-hand: "Caveat", "Segoe Print", cursive;
   --font-serif: "Fraunces", Georgia, serif;
@@ -35,6 +47,16 @@
   --accent: #7c3aed;
   --accent-fg: #ffffff;
   --accent-light: #241a35;
+  --stream-soul: #34d399;
+  --stream-body: #fbbf24;
+  --stream-kahf: #a78bfa;
+  --stream-alisha: #e879f9;
+  --stream-distribution: #22d3ee;
+  --stream-fnf: #fb7185;
+  --stream-finance: #94a3b8;
+  --stream-sleep: #94a3b8;
+  --warn: #f0b35a;
+  --warn-light: #362a12;
 }
 
 @theme inline {

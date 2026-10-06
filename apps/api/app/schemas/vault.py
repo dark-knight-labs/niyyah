@@ -138,13 +138,17 @@ class LogEntryRemoveIn(BaseModel):
     hash: str
 
 
-ObjectiveBlock = Literal["soul", "body", "ot", "distribution", "fnf", "sleep"]
+ObjectiveStream = Literal["soul", "body", "kahf", "alisha", "distribution", "fnf", "sleep"]
+PipelineStream = Literal["soul", "body", "kahf", "alisha", "distribution", "fnf", "finance"]
+Month = Literal["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+Lane = Literal["now", "next", "backlog", "done"]
 
 
 class ObjectiveItem(BaseModel):
-    block: ObjectiveBlock
+    stream: ObjectiveStream
     text: str
     done: bool
+    checkpoint: Month | None = None
 
 
 class ObjectivesResponse(BaseModel):
@@ -154,15 +158,86 @@ class ObjectivesResponse(BaseModel):
 
 
 class ObjectiveIn(BaseModel):
-    block: ObjectiveBlock
+    stream: ObjectiveStream
     text: str | None = None
     done: bool | None = None
+    checkpoint: Month | Literal[""] | None = None  # "" clears it
 
     @model_validator(mode="after")
     def _something_to_change(self):
-        if self.text is None and self.done is None:
-            raise ValueError("give text and/or done")
+        if self.text is None and self.done is None and self.checkpoint is None:
+            raise ValueError("give text, done and/or checkpoint")
         return self
+
+
+# --- Quarter and pipelines ---------------------------------------------------------------------------------------
+
+class QuarterCheckpoint(BaseModel):
+    month: Month
+    text: str
+
+
+class QuarterStream(BaseModel):
+    stream: PipelineStream
+    goal: str
+    status: str
+    checkpoints: list[QuarterCheckpoint]
+
+
+class QuarterResponse(BaseModel):
+    quarter: str  # "2026-Q4"
+    starts: str | None
+    ends: str | None
+    objective: str
+    objective_ar: str
+    week_of_quarter: int
+    weeks_in_quarter: int
+    current_month: Month
+    streams: list[QuarterStream]
+
+
+class PipelineItem(BaseModel):
+    line: int
+    hash: str
+    text: str
+    lane: Lane
+    checkpoint: Month | None
+    added: str | None
+    done_on: str | None
+    done: bool
+    age_days: int
+    stale: bool
+
+
+class PipelineStreamData(BaseModel):
+    stream: PipelineStream
+    path: str
+    items: list[PipelineItem]
+
+
+class PipelinesResponse(BaseModel):
+    now_limit: int
+    stale_days: int
+    streams: list[PipelineStreamData]
+
+
+class PipelineAddIn(BaseModel):
+    texts: list[str]
+    lane: Lane = "backlog"
+
+
+class PipelineRefIn(BaseModel):
+    stream: PipelineStream
+    line: int
+    hash: str
+
+
+class PipelineMoveIn(PipelineRefIn):
+    lane: Lane
+
+
+class PipelineCheckpointIn(PipelineRefIn):
+    checkpoint: Month | Literal[""]
 
 
 class CalendarEventResponse(BaseModel):

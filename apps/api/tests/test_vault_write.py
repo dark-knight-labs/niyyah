@@ -362,15 +362,15 @@ def test_update_objective_renders_and_round_trips():
     from app.services.vault_objectives import parse_objectives, update_objective
     day = date(2026, 10, 6)
     empty = parse_objectives(None)
-    assert [i["block"] for i in empty] == ["soul", "body", "ot", "distribution", "fnf", "sleep"]
+    assert [i["stream"] for i in empty] == ["soul", "body", "kahf", "alisha", "distribution", "fnf", "sleep"]
     assert not any(i["text"] or i["done"] for i in empty)
 
     out = update_objective(None, day, "soul", "Read daily", None)
-    assert out.startswith("---\ntype: weekly-objectives\nweek: 41\nperiod: 2026-10-03/2026-10-09\n---\n# Objectives — W41\n\n- **Soul**: Read daily\n- **Body**:\n")
+    assert out.startswith("---\ntype: weekly-objectives\nweek: 41\nperiod: 2026-10-03/2026-10-09\n---\n# Objectives — W41\n\n- **Soul**: Read daily\n- **Body**:\n- **Kahf**:\n- **Alisha**:\n")
     out = update_objective(out, day, "body", None, True)
     out = update_objective(out, day, "soul", "", None)
-    got = {i["block"]: i for i in parse_objectives(out)}
-    assert got["body"] == {"block": "body", "text": "", "done": True}
+    got = {i["stream"]: i for i in parse_objectives(out)}
+    assert got["body"] == {"stream": "body", "text": "", "done": True, "checkpoint": None}
     assert got["soul"]["text"] == "" and "- **Body** ✓:\n" in out
 
 
@@ -390,17 +390,17 @@ async def test_endpoint_objectives_get_and_put(auth_client: AsyncClient, vault, 
     r = await auth_client.get("/api/v1/vault/objectives")
     assert r.status_code == 200
     assert r.json()["week"] == "2026-W41" and r.json()["period"] == "2026-10-03/2026-10-09"
-    assert [i["block"] for i in r.json()["items"]] == ["soul", "body", "ot", "distribution", "fnf", "sleep"]
+    assert [i["stream"] for i in r.json()["items"]] == ["soul", "body", "kahf", "alisha", "distribution", "fnf", "sleep"]
     assert not (work / "Calendar" / "Weekly" / "Objectives").exists()  # GET never creates the file
 
-    r = await auth_client.put("/api/v1/vault/objectives", json={"block": "ot", "text": "Ship Niyyah", "done": True})
+    r = await auth_client.put("/api/v1/vault/objectives", json={"stream": "kahf", "text": "Ship Niyyah", "done": True, "checkpoint": "nov"})
     assert r.status_code == 200, r.text
-    assert {"block": "ot", "text": "Ship Niyyah", "done": True} in r.json()["items"]
-    assert "- **OT** ✓: Ship Niyyah" in _remote_file(remote, "Calendar/Weekly/Objectives/2026-W41.md")
+    assert {"stream": "kahf", "text": "Ship Niyyah", "done": True, "checkpoint": "nov"} in r.json()["items"]
+    assert "- **Kahf** ✓: Ship Niyyah #nov" in _remote_file(remote, "Calendar/Weekly/Objectives/2026-W41.md")
 
-    assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "ot"})).status_code == 422
-    assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "nope", "text": "x"})).status_code == 422
-    assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "ot", "text": "a" * 201})).status_code == 422
+    assert (await auth_client.put("/api/v1/vault/objectives", json={"stream": "kahf"})).status_code == 422
+    assert (await auth_client.put("/api/v1/vault/objectives", json={"stream": "nope", "text": "x"})).status_code == 422
+    assert (await auth_client.put("/api/v1/vault/objectives", json={"stream": "kahf", "text": "a" * 201})).status_code == 422
 
 
 def test_set_vote_works_on_merged_ot_block():
@@ -409,3 +409,123 @@ def test_set_vote_works_on_merged_ot_block():
     parsed = parse_daily_note(out, date(2026, 10, 7))
     assert parsed.blocks["ot"] == 3
     assert parsed.possible == 18
+
+
+def test_legacy_ot_objective_reads_as_kahf():
+    from app.services.vault_objectives import parse_objectives
+    got = {i["stream"]: i for i in parse_objectives("- **OT**: AI Harness Research\n- **Soul** ✓: Fajr #oct\n")}
+    assert got["kahf"]["text"] == "AI Harness Research" and got["alisha"]["text"] == ""
+    assert got["soul"] == {"stream": "soul", "text": "Fajr", "done": True, "checkpoint": "oct"}
+
+
+# --- planner: pipelines and quarter ----------------------------------------------------------------------------
+
+TODAY = date(2026, 10, 6)
+
+
+def test_add_items_builds_the_note_and_parses_back():
+    from app.services.vault_pipeline import add_items, parse_pipeline
+    out = add_items(None, "kahf", ["Ship the dashboard [Nov]", "  ", "Map each system #dec"], "backlog", TODAY)
+    assert out.startswith("---\ntype: pipeline\nstream: kahf\n---\n# Kahf pipeline\n")
+    assert "- [ ] Ship the dashboard #nov ➕ 2026-10-06" in out
+    items = parse_pipeline(out, TODAY)
+    assert [(i["text"], i["lane"], i["checkpoint"]) for i in items] == [("Ship the dashboard", "backlog", "nov"), ("Map each system", "backlog", "dec")]
+    assert out.index("## Backlog") < out.index("- [ ] Ship") < out.index("## Done")
+
+
+def test_move_done_and_reopen_stamp_dates_and_keep_tags():
+    from app.services.vault_pipeline import add_items, move_item, parse_pipeline
+    out = add_items(None, "kahf", ["A #nov", "B"], "next", TODAY)
+    a = parse_pipeline(out, TODAY)[0]
+    out = move_item(out, a["line"], a["hash"], "now", TODAY)
+    assert [i["lane"] for i in parse_pipeline(out, TODAY)] == ["now", "next"]
+    now = [i for i in parse_pipeline(out, TODAY) if i["lane"] == "now"][0]
+    out = move_item(out, now["line"], now["hash"], "done", date(2026, 10, 8))
+    done = [i for i in parse_pipeline(out, TODAY) if i["lane"] == "done"][0]
+    assert done["done"] and done["done_on"] == "2026-10-08" and done["checkpoint"] == "nov" and done["added"] == "2026-10-06"
+    out = move_item(out, done["line"], done["hash"], "next", TODAY)
+    reopened = [i for i in parse_pipeline(out, TODAY) if i["text"] == "A"][0]
+    assert not reopened["done"] and reopened["done_on"] is None and reopened["lane"] == "next"
+
+
+def test_pipeline_edits_refuse_a_changed_line_and_flag_stale_items():
+    from app.services.vault_pipeline import add_items, move_item, parse_pipeline, remove_item, set_checkpoint
+    out = add_items(None, "kahf", ["Old idea", "Fresh #oct"], "backlog", date(2026, 9, 1))
+    items = parse_pipeline(out, TODAY)
+    assert [i["stale"] for i in items] == [True, False] and items[0]["age_days"] == 35
+    with pytest.raises(ValueError):
+        move_item(out, items[0]["line"], "deadbeef00", "now", TODAY)
+    out = set_checkpoint(out, items[0]["line"], items[0]["hash"], "nov")
+    assert parse_pipeline(out, TODAY)[0]["checkpoint"] == "nov" and not parse_pipeline(out, TODAY)[0]["stale"]
+    second = parse_pipeline(out, TODAY)[1]
+    assert "Fresh" not in remove_item(out, second["line"], second["hash"])
+
+
+def test_add_items_rejects_bad_input():
+    from app.services.vault_pipeline import add_items
+    for texts, lane in (([], "now"), (["  "], "now"), (["x"], "done"), (["x"], "nope"), (["a" * 301], "now")):
+        with pytest.raises(ValueError):
+            add_items(None, "kahf", texts, lane, TODAY)
+    with pytest.raises(ValueError):
+        from app.services.vault_pipeline import pipeline_path
+        pipeline_path("sleep")
+
+
+QUARTER = """---
+type: quarter
+quarter: 2026-Q4
+starts: 2026-10-01
+ends: 2026-12-31
+---
+# Earn Jannah through service and knowledge.
+> رضا الله
+
+## kahf
+- goal: 1,000 subscribers
+- status: active
+- oct: 500 subs
+- nov: 750 subs
+- dec: 1,000 subs
+
+## finance
+- goal: Loan balance zero
+- status: committed
+- oct: under 70K
+"""
+
+
+def test_parse_quarter():
+    from app.services.vault_quarter import parse_quarter, quarter_for
+    q = parse_quarter(QUARTER)
+    assert q["quarter"] == "2026-Q4" and q["objective"] == "Earn Jannah through service and knowledge." and q["objective_ar"] == "رضا الله"
+    assert [s["stream"] for s in q["streams"]] == ["kahf", "finance"]
+    assert q["streams"][0]["checkpoints"][1] == {"month": "nov", "text": "750 subs"} and q["streams"][0]["status"] == "active"
+    assert quarter_for(date(2026, 10, 6)) == "2026-Q4" and quarter_for(date(2027, 1, 1)) == "2027-Q1"
+
+
+@pytest.mark.asyncio
+async def test_endpoints_quarter_and_pipelines(auth_client: AsyncClient, vault, monkeypatch):
+    import datetime as dt
+    remote, work = vault
+    monkeypatch.setattr("app.api.v1.vault._local_now", lambda: dt.datetime(2026, 10, 6, 9, 0))
+    assert (await auth_client.get("/api/v1/vault/quarter")).status_code == 404
+    vault_git.commit_edits({"Calendar/Quarterly/2026-Q4.md": lambda c: QUARTER}, "seed quarter")
+    q = (await auth_client.get("/api/v1/vault/quarter")).json()
+    assert q["week_of_quarter"] == 1 and q["weeks_in_quarter"] == 14 and q["current_month"] == "oct"
+    assert q["streams"][0]["stream"] == "kahf"
+
+    r = await auth_client.get("/api/v1/vault/pipelines")
+    assert r.status_code == 200 and r.json()["now_limit"] == 3
+    assert [s["stream"] for s in r.json()["streams"]][:3] == ["soul", "body", "kahf"]
+    assert not (work / "Efforts").exists()  # GET never creates files
+
+    r = await auth_client.post("/api/v1/vault/pipeline/kahf/items", json={"texts": ["Ship dashboard [Nov]", "Template"], "lane": "next"})
+    assert r.status_code == 200, r.text
+    assert "- [ ] Ship dashboard #nov ➕ 2026-10-06" in _remote_file(remote, "Efforts/Pipeline/kahf.md")
+    kahf = [s for s in (await auth_client.get("/api/v1/vault/pipelines")).json()["streams"] if s["stream"] == "kahf"][0]
+    first = kahf["items"][0]
+    ref = {"stream": "kahf", "line": first["line"], "hash": first["hash"]}
+    assert (await auth_client.put("/api/v1/vault/pipeline/move", json={**ref, "lane": "now"})).status_code == 200
+    assert (await auth_client.put("/api/v1/vault/pipeline/move", json={**ref, "lane": "done"})).status_code == 422  # line moved: stale ref
+    assert (await auth_client.put("/api/v1/vault/pipeline/move", json={**ref, "lane": "nope"})).status_code == 422
+    assert (await auth_client.post("/api/v1/vault/pipeline/nope/items", json={"texts": ["x"]})).status_code == 422

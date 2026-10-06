@@ -14,6 +14,9 @@ import {
   CheckSquare,
   Activity,
   Clock,
+  CalendarDays,
+  Layers3,
+  Target,
   Settings,
   LogOut,
   PanelLeftClose,
@@ -27,6 +30,9 @@ const PUBLIC_PATHS = ["/routine"];
 
 const nav = [
   { href: "/routine", label: "Routine", icon: Clock },
+  { href: "/week", label: "Week", icon: CalendarDays },
+  { href: "/quarter", label: "Quarter", icon: Target },
+  { href: "/pipelines", label: "Pipelines", icon: Layers3 },
   { href: "/vault", label: "Vault", icon: Activity },
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/personas", label: "Personas", icon: Users },
@@ -143,9 +149,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="min-w-0 flex-1 overflow-auto px-4 pb-24 pt-6 sm:px-6 md:pb-8 xl:px-10">
         {children}
       </main>
+
+      <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-20 flex gap-1 overflow-x-auto border-t border-[var(--border)] bg-[var(--background)] px-2 pb-[max(env(safe-area-inset-bottom),0.25rem)] pt-1 md:hidden">
+        {nav.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
+              className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[11px] font-semibold ${active ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}>
+              <item.icon size={19} aria-hidden="true" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

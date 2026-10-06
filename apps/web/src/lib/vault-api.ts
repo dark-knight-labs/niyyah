@@ -9,6 +9,11 @@ import {
   VaultEventsData,
   VaultLogEntry,
   VaultObjectivesData,
+  Lane,
+  MonthKey,
+  PipelineItemData,
+  PipelinesData,
+  QuarterData,
   VaultMonthData,
   VaultEditData,
   VaultStreaksData,
@@ -41,6 +46,17 @@ export const vaultApi = {
   editLog: (day: string, entry: VaultLogEntry, text: string) => api.put<VaultEditData>(`/vault/day/${day}/log`, { index: entry.index, hash: entry.hash, text }),
   removeLog: (day: string, entry: VaultLogEntry) => api.post<VaultEditData>(`/vault/day/${day}/log/remove`, { index: entry.index, hash: entry.hash }),
   objectives: () => api.get<VaultObjectivesData>("/vault/objectives"),
-  setObjective: (block: string, change: { text?: string; done?: boolean }) => api.put<VaultObjectivesData>("/vault/objectives", { block, ...change }),
+  setObjective: (stream: string, change: { text?: string; done?: boolean; checkpoint?: MonthKey | "" }) =>
+    api.put<VaultObjectivesData>("/vault/objectives", { stream, ...change }),
+  quarter: () => api.get<QuarterData>("/vault/quarter"),
+  pipelines: () => api.get<PipelinesData>("/vault/pipelines"),
+  addPipelineItems: (stream: string, texts: string[], lane: Lane = "backlog") =>
+    api.post<VaultEditData>(`/vault/pipeline/${stream}/items`, { texts, lane }),
+  movePipelineItem: (stream: string, item: PipelineItemData, lane: Lane) =>
+    api.put<VaultEditData>("/vault/pipeline/move", { stream, line: item.line, hash: item.hash, lane }),
+  tagPipelineItem: (stream: string, item: PipelineItemData, checkpoint: MonthKey | "") =>
+    api.put<VaultEditData>("/vault/pipeline/checkpoint", { stream, line: item.line, hash: item.hash, checkpoint }),
+  removePipelineItem: (stream: string, item: PipelineItemData) =>
+    api.post<VaultEditData>("/vault/pipeline/remove", { stream, line: item.line, hash: item.hash }),
   sync: () => api.post<VaultSyncData>("/vault/sync", {}),
 };
