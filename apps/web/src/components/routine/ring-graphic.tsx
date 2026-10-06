@@ -20,8 +20,6 @@ export interface RingGraphicProps {
   height: number;
   nameSize: number;
   clockSize: number;
-  /** How much the hovered slice grows (scale around the ring centre). */
-  pop: number;
   /** Index of the highlighted block; the others fade back. */
   hover: number | null;
   onHover: (index: number | null, at?: { x: number; y: number }) => void;
@@ -39,10 +37,10 @@ export function RingGraphic(p: RingGraphicProps) {
   const g = ringGeometry(cx, cy, r);
   const current = currentBlock(day, nowMin);
   const nextP = nextPrayer(day, nowMin);
+  // Hover keeps the ring's size: the hovered slice glows and brightens while the others ease back.
   const slice = (i: number): React.CSSProperties => ({
-    transformOrigin: `${cx}px ${cy}px`,
-    transform: hover === i ? `scale(${p.pop})` : undefined,
-    transition: "transform .28s cubic-bezier(.2,.8,.2,1), opacity .2s",
+    filter: hover === i ? `drop-shadow(0 0 7px ${ROUTINE_BLOCKS[day.blocks[i].block].color}aa)` : "none",
+    transition: "opacity .45s ease, filter .45s ease",
     pointerEvents: "none",
   });
   const opacityOf = (i: number) => {
@@ -60,14 +58,14 @@ export function RingGraphic(p: RingGraphicProps) {
 
       {day.blocks.map((b, i) => (
         <path key={`s-${b.block}-${b.startMin}`} d={g.arc(b.startMin, b.endMin)} fill="none" stroke={ROUTINE_BLOCKS[b.block].color}
-          strokeWidth={b === current ? t + 6 : t} opacity={opacityOf(i)} style={slice(i)} />
+          strokeWidth={b === current ? t + 6 : t} style={{ ...slice(i), opacity: opacityOf(i) }} />
       ))}
 
       {day.blocks.map((b, i) => {
         if (!nameFits(b, r, p.nameSize * 0.57)) return null;
         const id = `${p.idPrefix}-n${i}`;
         return (
-          <g key={`n-${b.block}-${b.startMin}`} style={slice(i)} opacity={hover !== null && hover !== i ? 0.45 : 1}>
+          <g key={`n-${b.block}-${b.startMin}`} style={{ transition: "opacity .45s ease", pointerEvents: "none", opacity: hover !== null && hover !== i ? 0.45 : 1 }}>
             <path id={id} d={onBottomHalf(b) ? g.arcBackwards(b.startMin, b.endMin) : g.arc(b.startMin, b.endMin)} fill="none" />
             <text fontSize={p.nameSize} fontWeight={800} letterSpacing=".05em" fill="#fff" style={{ dominantBaseline: "central" }}>
               <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">{RING_NAMES[b.block]}</textPath>
@@ -163,7 +161,7 @@ function SideLabels(p: RingGraphicProps & { g: ReturnType<typeof ringGeometry> }
         const color = ROUTINE_BLOCKS[b.block].color;
         const opacity = p.hover !== null && p.hover !== i ? 0.35 : 1;
         return (
-          <g key={`l-${b.block}-${b.startMin}`} opacity={opacity} style={{ transition: "opacity .2s" }}>
+          <g key={`l-${b.block}-${b.startMin}`} style={{ transition: "opacity .45s ease", opacity }}>
             <polyline points={`${ax},${ay} ${colX + (right ? -28 : 28)},${y - 5} ${colX + (right ? -20 : 20)},${y - 5}`} fill="none" stroke={color} strokeWidth={1.5} opacity={0.7} />
             <text x={colX} y={y} textAnchor={anchor} fontSize={20} fontWeight={800} fill="var(--foreground)">{ROUTINE_BLOCKS[b.block].label}</text>
             <text textAnchor={anchor} fontSize={15} fill="var(--muted-foreground)">
