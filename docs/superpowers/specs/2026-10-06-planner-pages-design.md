@@ -13,7 +13,7 @@ Super Objective
 Pipeline: Backlog -> Next -> Now -> Done   (the supply of dominoes)
 ```
 
-Streams (not blocks) carry goals. OT is one time slot serving two streams: Kahf on Sun-Thu, Alisha Noor on Fri-Sat.
+Streams (not blocks) carry goals. Streams are data: every `## <id>` section of the quarter note is a stream, so a new block (Errands, a second business) is added in the app or by hand, with its own goal, pipeline and weekly objective. The table below lists the built-ins, which only supply defaults. OT is one time slot serving two streams: Kahf on Sun-Thu, Alisha Noor on Fri-Sat.
 
 | Stream | Slot | Quarter goal | Pipeline | Week objective |
 |---|---|---|---|---|
@@ -23,9 +23,9 @@ Streams (not blocks) carry goals. OT is one time slot serving two streams: Kahf 
 
 ## Vault files
 
-- `Calendar/Quarterly/<year>-Q<n>.md`: frontmatter `type: quarter`, then `# <Super Objective>` and one `## <stream>` section per stream with bullets `goal:`, `status:`, `oct:`, `nov:`, `dec:` (month keys follow the quarter). Read-only in the app: reasoning lives in Doctrine and is edited in Obsidian.
+- `Calendar/Quarterly/<year>-Q<n>.md`: frontmatter `type: quarter`, then `# <Super Objective>` and one `## <stream>` section per stream with bullets `goal:`, `status:`, `oct:`, `nov:`, `dec:` (month keys follow the quarter). Editable in the app (goal, checkpoints, status, name, colour, icon, add and archive a block); reasoning still lives in Doctrine. Optional section keys: `name`, `color`, `icon`, `slot`, `weekly: yes|no`. A `status: archived` block is hidden everywhere but its notes stay.
 - `Efforts/Pipeline/<stream>.md`: `## Now`, `## Next`, `## Backlog`, `## Done`, Obsidian Tasks lines `- [ ] text #nov ➕ 2026-10-02` (`#oct|#nov|#dec` ties the item to a month checkpoint; `➕` is the added date, `✅` the done date).
-- `Calendar/Weekly/Objectives/<year>-Wnn.md`: existing note; stream ids replace the old block list (`OT` becomes `Kahf` and `Alisha`); a trailing `#nov` ties the objective to a checkpoint. A legacy `OT` line reads as Kahf.
+- `Calendar/Weekly/Objectives/<year>-Wnn.md`: existing note, one week = Sunday to Saturday (Sun-Thu weekdays, Fri-Sat weekend); stream ids replace the old block list (`OT` becomes `Kahf` and `Alisha`); a trailing `#nov` ties the objective to a checkpoint. A legacy `OT` line reads as Kahf.
 
 ## API (owner only, all under /vault)
 
@@ -50,4 +50,10 @@ Streams (not blocks) carry goals. OT is one time slot serving two streams: Kahf 
 
 ## Not in this slice
 
-Editing quarter goals from the app, Reviews page, retiring the old DB-backed pages, drag-and-drop.
+Reviews page, retiring the old DB-backed pages, drag-and-drop.
+
+## Update 2026-10-07
+
+- Week is Sunday to Saturday (`week_for`); old Sat-Fri weekly notes keep their stored period.
+- Blocks are user-defined: `POST /quarter/stream` adds, `PUT /quarter/stream` edits or archives, `PUT /quarter` edits the Super Objective, `PUT /pipeline/text` renames an item. Colours and icons come from fixed lists the API returns.
+- The OT slot still maps Sun-Thu to `kahf` and Fri-Sat to `alisha`; custom blocks have a free-text slot label only.

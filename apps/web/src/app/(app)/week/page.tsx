@@ -11,7 +11,7 @@ import { ChainCrumbs } from "@/components/planner/chain-crumbs";
 import { Notice, PageTitle, SectionTitle, Spinner } from "@/components/planner/page-title";
 import { MonthTag, StreamIcon } from "@/components/planner/stream-chip";
 import { dateInTz } from "@/lib/routine";
-import { MONTH_LABEL, PLANNER_TZ, WEEKLY_STREAMS, focusingQuestion, otStreamFor, streamMeta } from "@/lib/streams";
+import { MONTH_LABEL, PLANNER_TZ, focusingQuestion, otStreamFor, toMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { PipelineItemData } from "@/lib/vault-types";
 
@@ -23,7 +23,7 @@ function weekDays(period: string): string[] {
 }
 
 export default function WeekPage() {
-  const { loading, owner, quarter, pipelines, objectives, error, reload } = usePlanner();
+  const { loading, owner, quarter, pipelines, objectives, streams, error, reload } = usePlanner();
   const [problem, setProblem] = useState<string | null>(null);
   const now = useNow(60_000);
   const today = dateInTz(now, PLANNER_TZ);
@@ -44,9 +44,9 @@ export default function WeekPage() {
   if (!objectives) return <Notice>{error ?? "Loading the week."}</Notice>;
 
   const itemsOf = (stream: string) => pipelines?.streams.find((s) => s.stream === stream)?.items ?? [];
-  const slot = otStreamFor(now, PLANNER_TZ);
-  const slotNow = itemsOf(slot.id).filter((i) => i.lane === "now");
-  const done = objectives.items.filter((o) => o.done && streamMeta(o.stream).weekly).length;
+  const slot = otStreamFor(now, PLANNER_TZ, streams);
+  const slotNow = slot ? itemsOf(slot.id).filter((i) => i.lane === "now") : [];
+  const done = objectives.items.filter((o) => o.done).length;
   const label = objectives.week.replace(/^\d{4}-/, "");
 
   function pick(stream: string, item: PipelineItemData) {
@@ -61,14 +61,15 @@ export default function WeekPage() {
       <PageTitle
         eyebrow={`${label} · ${days.length ? `${fmt(days[0], { weekday: "short", day: "numeric" })} – ${fmt(days[6], { weekday: "short", day: "numeric", month: "short" })}` : objectives.period}`}
         title="The smallest domino for each stream."
-        sub={<span className="tabular-nums">{done} of {WEEKLY_STREAMS.length} done this week</span>}
+        sub={<span className="tabular-nums">{done} of {objectives.items.length} done this week</span>}
       />
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
       <ol className="mb-10 grid grid-cols-7 gap-1.5 sm:gap-3" aria-label="Days of the week and the stream that owns OT">
         {days.map((d) => {
-          const dayOwner = otStreamFor(new Date(`${d}T12:00:00Z`), "UTC");
+          const dayOwner = otStreamFor(new Date(`${d}T12:00:00Z`), "UTC", streams);
           const isToday = d === today;
+          if (!dayOwner) return null;
           return (
             <li key={d} className="min-w-0 rounded-xl border border-[var(--border)] px-1 py-2.5 text-center sm:py-3"
               style={{ borderTop: `3px solid ${dayOwner.color}`, background: isToday ? "var(--accent-light)" : "var(--surface)", outline: isToday ? "2px solid var(--accent)" : undefined, outlineOffset: 1 }}>
@@ -84,28 +85,28 @@ export default function WeekPage() {
         <section aria-label="Weekly objectives">
           <SectionTitle title="This week" aside="one objective per stream, picked from its pipeline" />
           <ul className="grid gap-3">
-            {WEEKLY_STREAMS.map((meta) => {
-              const item = objectives.items.find((o) => o.stream === meta.id);
-              const goal = quarter?.streams.find((s) => s.stream === meta.id);
-              const pool = itemsOf(meta.id).filter((i) => i.lane !== "done");
+            {objectives.items.map((item) => {
+              const meta = toMeta({ ...item, slot: "", weekly: true, status: "" });
+              const goal = quarter?.streams.find((s) => s.stream === item.stream);
+              const pool = itemsOf(item.stream).filter((i) => i.lane !== "done");
               return (
-                <li key={meta.id} className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4 sm:p-5" style={{ borderLeft: `3px solid ${meta.color}` }}>
+                <li key={item.stream} className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4 sm:p-5" style={{ borderLeft: `3px solid ${meta.color}` }}>
                   <div className="flex items-start gap-3">
                     <StreamIcon stream={meta} size={34} />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-extrabold uppercase tracking-[0.08em]" style={{ color: meta.color }}>{meta.label}</p>
-                      <EditableRow text={item?.text ?? ""} placeholder="Choose the one thing for this week" struck={item?.done} maxLength={200}
-                        lead={<Checkbox checked={!!item?.done} disabled={!item?.text} label={`${meta.label} objective done`}
-                          onChange={() => void run(() => vaultApi.setObjective(meta.id, { done: !item?.done }))} />}
-                        onSave={(text) => run(() => vaultApi.setObjective(meta.id, { text }))} />
-                      {item?.text && meta.goal && goal ? (
+                      <EditableRow text={item.text} placeholder="Choose the one thing for this week" struck={item.done} maxLength={200}
+                        lead={<Checkbox checked={item.done} disabled={!item.text} label={`${meta.label} objective done`}
+                          onChange={() => void run(() => vaultApi.setObjective(item.stream, { done: !item.done }))} />}
+                        onSave={(text) => run(() => vaultApi.setObjective(item.stream, { text }))} />
+                      {item.text && goal ? (
                         <div className="mt-1 pl-0.5"><ChainCrumbs goal={goal} objective={item} color={meta.color} showWeek={false} /></div>
                       ) : (
                         pool.length > 0 && (
                           <label className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
                             <span>Pick from pipeline</span>
                             <select defaultValue="" aria-label={`Pick ${meta.label} objective from its pipeline`}
-                              onChange={(e) => { const it = pool[Number(e.target.value)]; if (it) pick(meta.id, it); }}
+                              onChange={(e) => { const it = pool[Number(e.target.value)]; if (it) pick(item.stream, it); }}
                               className="min-h-9 max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[13px] text-[var(--foreground)]">
                               <option value="" disabled>Now, Next and Backlog…</option>
                               {pool.map((it, idx) => <option key={it.line} value={idx}>{it.lane === "now" ? "★ " : ""}{it.text}</option>)}
@@ -121,6 +122,7 @@ export default function WeekPage() {
           </ul>
         </section>
 
+        {slot && (
         <aside className="grid gap-6 xl:sticky xl:top-6">
           <section aria-label="Today" className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-5 sm:p-6" style={{ borderLeft: `3px solid ${slot.color}` }}>
             <p className="eyebrow">{fmt(today, { weekday: "long", day: "numeric", month: "short" })} · OT slot</p>
@@ -148,6 +150,7 @@ export default function WeekPage() {
             <p className="mt-3 text-[11px] text-[var(--muted-foreground)]">The focusing question, from The ONE Thing by Gary Keller with Jay Papasan.</p>
           </section>
         </aside>
+        )}
       </div>
     </div>
   );

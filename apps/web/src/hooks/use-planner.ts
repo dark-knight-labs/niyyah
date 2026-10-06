@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { vaultApi } from "@/lib/vault-api";
+import { StreamMeta, toMeta } from "@/lib/streams";
 import { PipelinesData, QuarterData, VaultObjectivesData } from "@/lib/vault-types";
 
 const REFRESH_MS = 60_000;
@@ -15,6 +16,8 @@ export interface Planner {
   quarterError: string | null;
   pipelines: PipelinesData | null;
   objectives: VaultObjectivesData | null;
+  /** The live blocks (quarter goal and pipeline), in quarter-note order; archived ones are left out. */
+  streams: StreamMeta[];
   error: string | null;
   reload: () => Promise<void>;
 }
@@ -57,5 +60,7 @@ export function usePlanner(): Planner {
     return () => clearInterval(id);
   }, [reload]);
 
-  return { loading, owner, quarter, quarterError, pipelines, objectives, error, reload };
+  const streams = useMemo(() => (pipelines?.streams ?? []).map(toMeta), [pipelines]);
+
+  return { loading, owner, quarter, quarterError, pipelines, objectives, streams, error, reload };
 }

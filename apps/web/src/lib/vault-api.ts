@@ -14,6 +14,7 @@ import {
   PipelineItemData,
   PipelinesData,
   QuarterData,
+  StreamChange,
   VaultMonthData,
   VaultEditData,
   VaultStreaksData,
@@ -49,6 +50,11 @@ export const vaultApi = {
   setObjective: (stream: string, change: { text?: string; done?: boolean; checkpoint?: MonthKey | "" }) =>
     api.put<VaultObjectivesData>("/vault/objectives", { stream, ...change }),
   quarter: () => api.get<QuarterData>("/vault/quarter"),
+  setSuperObjective: (text: string, arabic?: string) => api.put<QuarterData>("/vault/quarter", { text, arabic }),
+  updateStream: (stream: string, change: StreamChange) => api.put<QuarterData>("/vault/quarter/stream", { stream, ...change }),
+  addStream: (stream: string, change: StreamChange & { name: string }) => api.post<QuarterData>("/vault/quarter/stream", { stream, ...change }),
+  renamePipelineItem: (stream: string, item: PipelineItemData, text: string) =>
+    api.put<VaultEditData>("/vault/pipeline/text", { stream, line: item.line, hash: item.hash, text }),
   pipelines: () => api.get<PipelinesData>("/vault/pipelines"),
   addPipelineItems: (stream: string, texts: string[], lane: Lane = "backlog") =>
     api.post<VaultEditData>(`/vault/pipeline/${stream}/items`, { texts, lane }),

@@ -1,11 +1,12 @@
 /** Eyebrow, serif title and an optional visual on the right; shared by the planner pages. */
-export function PageTitle({ eyebrow, title, sub, visual }: { eyebrow: string; title: string; sub?: React.ReactNode; visual?: React.ReactNode }) {
+export function PageTitle({ eyebrow, title, sub, visual, action }: { eyebrow: string; title: React.ReactNode; sub?: React.ReactNode; visual?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <header className="mb-8 flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
-      <div className="min-w-0 max-w-[46rem]">
+    <header className="mb-8 flex w-full flex-wrap items-end justify-between gap-x-10 gap-y-6">
+      <div className="min-w-0 flex-[1_1_22rem]">
         <p className="eyebrow">{eyebrow}</p>
-        <h1 className="heading-elegant mt-2 text-balance text-3xl leading-[1.15] sm:text-4xl xl:text-5xl">{title}</h1>
+        <h1 className="heading-elegant mt-2 text-[clamp(1.7rem,3.4vw,3.1rem)] leading-[1.15]">{title}</h1>
         {sub && <div className="mt-3 text-sm text-[var(--muted-foreground)]">{sub}</div>}
+        {action && <div className="mt-4">{action}</div>}
       </div>
       {visual}
     </header>

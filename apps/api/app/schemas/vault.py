@@ -138,14 +138,27 @@ class LogEntryRemoveIn(BaseModel):
     hash: str
 
 
-ObjectiveStream = Literal["soul", "body", "kahf", "alisha", "distribution", "fnf", "sleep"]
-PipelineStream = Literal["soul", "body", "kahf", "alisha", "distribution", "fnf", "finance"]
 Month = Literal["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 Lane = Literal["now", "next", "backlog", "done"]
+Status = Literal["active", "committed", "paused", "archived"]
+
+
+class StreamInfo(BaseModel):
+    """What a stream looks like and where its time goes; defined by its section in the quarter note."""
+    stream: str
+    name: str
+    color: str
+    icon: str
+    slot: str
+    weekly: bool
+    status: str
 
 
 class ObjectiveItem(BaseModel):
-    stream: ObjectiveStream
+    stream: str
+    name: str
+    color: str
+    icon: str
     text: str
     done: bool
     checkpoint: Month | None = None
@@ -153,12 +166,12 @@ class ObjectiveItem(BaseModel):
 
 class ObjectivesResponse(BaseModel):
     week: str  # "2026-W41"
-    period: str  # "2026-10-03/2026-10-09"
+    period: str  # "2026-10-04/2026-10-10"
     items: list[ObjectiveItem]
 
 
 class ObjectiveIn(BaseModel):
-    stream: ObjectiveStream
+    stream: str
     text: str | None = None
     done: bool | None = None
     checkpoint: Month | Literal[""] | None = None  # "" clears it
@@ -177,10 +190,8 @@ class QuarterCheckpoint(BaseModel):
     text: str
 
 
-class QuarterStream(BaseModel):
-    stream: PipelineStream
+class QuarterStream(StreamInfo):
     goal: str
-    status: str
     checkpoints: list[QuarterCheckpoint]
 
 
@@ -193,7 +204,32 @@ class QuarterResponse(BaseModel):
     week_of_quarter: int
     weeks_in_quarter: int
     current_month: Month
+    months: list[Month]
+    colors: list[str]
+    icons: list[str]
     streams: list[QuarterStream]
+
+
+class SuperObjectiveIn(BaseModel):
+    text: str
+    arabic: str | None = None
+
+
+class StreamFieldsIn(BaseModel):
+    """Fields of one stream to change; month checkpoints go in `checkpoints` keyed by month."""
+    stream: str
+    name: str | None = None
+    color: str | None = None
+    icon: str | None = None
+    slot: str | None = None
+    weekly: bool | None = None
+    goal: str | None = None
+    status: Status | None = None
+    checkpoints: dict[Month, str] | None = None
+
+
+class StreamAddIn(StreamFieldsIn):
+    name: str
 
 
 class PipelineItem(BaseModel):
@@ -209,8 +245,7 @@ class PipelineItem(BaseModel):
     stale: bool
 
 
-class PipelineStreamData(BaseModel):
-    stream: PipelineStream
+class PipelineStreamData(StreamInfo):
     path: str
     items: list[PipelineItem]
 
@@ -227,7 +262,7 @@ class PipelineAddIn(BaseModel):
 
 
 class PipelineRefIn(BaseModel):
-    stream: PipelineStream
+    stream: str
     line: int
     hash: str
 
@@ -238,6 +273,11 @@ class PipelineMoveIn(PipelineRefIn):
 
 class PipelineCheckpointIn(PipelineRefIn):
     checkpoint: Month | Literal[""]
+
+
+class PipelineTextIn(PipelineRefIn):
+    text: str
+
 
 
 class CalendarEventResponse(BaseModel):

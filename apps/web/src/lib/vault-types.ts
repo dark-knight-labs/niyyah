@@ -1,3 +1,5 @@
+import type { StreamInfo } from "@/lib/streams";
+
 export interface VaultDayData {
   date: string;
   mode: string;
@@ -69,6 +71,9 @@ export type Lane = "now" | "next" | "backlog" | "done";
 
 export interface VaultObjective {
   stream: string;
+  name: string;
+  color: string;
+  icon: string;
   text: string;
   done: boolean;
   checkpoint: MonthKey | null;
@@ -110,10 +115,8 @@ export interface VaultEventsData {
   errors: string[];
 }
 
-export interface QuarterStreamData {
-  stream: string;
+export interface QuarterStreamData extends StreamInfo {
   goal: string;
-  status: string;
   checkpoints: { month: MonthKey; text: string }[];
 }
 
@@ -126,7 +129,24 @@ export interface QuarterData {
   week_of_quarter: number;
   weeks_in_quarter: number;
   current_month: MonthKey;
+  /** The three months of this quarter, in order. */
+  months: MonthKey[];
+  /** Colour and icon keys a stream may use. */
+  colors: string[];
+  icons: string[];
   streams: QuarterStreamData[];
+}
+
+/** Fields of a stream to change (or, when adding, to start with); month checkpoints go in `checkpoints`. */
+export interface StreamChange {
+  name?: string;
+  color?: string;
+  icon?: string;
+  slot?: string;
+  weekly?: boolean;
+  goal?: string;
+  status?: "active" | "committed" | "paused" | "archived";
+  checkpoints?: Partial<Record<MonthKey, string>>;
 }
 
 export interface PipelineItemData {
@@ -142,8 +162,7 @@ export interface PipelineItemData {
   stale: boolean;
 }
 
-export interface PipelineStreamData {
-  stream: string;
+export interface PipelineStreamData extends StreamInfo {
   path: string;
   items: PipelineItemData[];
 }

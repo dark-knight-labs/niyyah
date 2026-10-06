@@ -39,8 +39,12 @@ from app.schemas.vault import (
     PipelineCheckpointIn,
     PipelineMoveIn,
     PipelineRefIn,
+    PipelineTextIn,
     PipelinesResponse,
     QuarterResponse,
+    StreamAddIn,
+    StreamFieldsIn,
+    SuperObjectiveIn,
     TaskIn,
     TaskRemoveIn,
     TaskResponse,
@@ -66,8 +70,10 @@ from app.services.vault_sync import sync_vault
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
 from app.services import vault_pipeline
 from app.services.vault_pipeline import NOW_LIMIT, STALE_DAYS, parse_pipeline, pipeline_path
-from app.services.vault_quarter import parse_quarter, quarter_for, quarter_path
-from app.services.vault_streams import MONTHS, PIPELINE_STREAMS
+from app.services.vault_quarter import (
+    add_stream, load_streams, parse_quarter, quarter_for, quarter_months, quarter_path, set_super_objective, update_stream,
+)
+from app.services.vault_streams import COLORS, ICONS, MONTHS
 from app.services.vault_tasks import add_task, find_tasks, remove_task, set_task_done, set_task_text, task_file
 from app.services.vault_write import (
     add_log_note,
@@ -525,13 +531,34 @@ async def post_log_remove(day: date, data: LogEntryRemoveIn, user: User = Depend
     return await _save(day, lambda c: remove_log_entry(c, data.index, data.hash), f"Niyyah: {day} remove log entry", db)
 
 
-# --- Weekly objectives (owner only) -----------------------------------------------------------------------------
+# --- Quarter, streams, weekly objectives and pipelines (owner only) ----------------------------------------------
+
+def _read(rel: str) -> str | None:
+    note = Path(settings.vault_workdir) / rel
+    return note.read_text(encoding="utf-8") if note.is_file() else None
+
+
+def _streams(today: date):
+    return load_streams(_read(quarter_path(quarter_for(today))))
+
+
+def _info(s) -> dict:
+    return {"stream": s.id, "name": s.name, "color": s.color, "icon": s.icon, "slot": s.slot, "weekly": s.weekly, "status": s.status}
+
+
+def _write_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, VaultWriteError):
+        return HTTPException(status_code=502, detail=str(exc))
+    return HTTPException(status_code=422, detail=str(exc))
+
 
 def _objectives_response(today: date) -> ObjectivesResponse:
     start, end, label = week_for(today)
-    note = Path(settings.vault_workdir) / objectives_path(label)
-    content = note.read_text(encoding="utf-8") if note.is_file() else None
-    return ObjectivesResponse(week=label, period=f"{start.isoformat()}/{end.isoformat()}", items=parse_objectives(content))
+    streams = _streams(today)
+    by_id = {s.id: s for s in streams}
+    items = [{**i, "name": by_id[i["stream"]].name, "color": by_id[i["stream"]].color, "icon": by_id[i["stream"]].icon}
+             for i in parse_objectives(_read(objectives_path(label)), streams)]
+    return ObjectivesResponse(week=label, period=f"{start.isoformat()}/{end.isoformat()}", items=items)
 
 
 @router.get("/objectives", response_model=ObjectivesResponse)
@@ -543,24 +570,21 @@ async def get_objectives(user: User = Depends(require_editor)):
 async def put_objective(data: ObjectiveIn, user: User = Depends(require_editor)):
     today = _local_now().date()
     label = week_for(today)[2]
-    edit = lambda c: update_objective(c, today, data.stream, data.text, data.done, data.checkpoint)  # noqa: E731
+    streams = await asyncio.to_thread(_streams, today)
+    edit = lambda c: update_objective(c, today, data.stream, data.text, data.done, data.checkpoint, streams)  # noqa: E731
     try:
         await asyncio.to_thread(commit_edits, {objectives_path(label): edit}, f"Niyyah: W{label[-2:]} {data.stream} objective")
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except VaultWriteError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    except (ValueError, VaultWriteError) as exc:
+        raise _write_error(exc)
     return await asyncio.to_thread(_objectives_response, today)
 
 
-# --- Quarter (read-only) and pipelines (owner only) --------------------------------------------------------------
-
 def _quarter_response(today: date) -> QuarterResponse:
     label = quarter_for(today)
-    note = Path(settings.vault_workdir) / quarter_path(label)
-    if not note.is_file():
+    content = _read(quarter_path(label))
+    if content is None:
         raise HTTPException(status_code=404, detail=f"{quarter_path(label)} is not in the synced vault yet")
-    data = parse_quarter(note.read_text(encoding="utf-8"))
+    data = parse_quarter(content)
     year, number = int(label[:4]), int(label[-1])
     first = date(year, 3 * number - 2, 1)
     try:
@@ -568,11 +592,13 @@ def _quarter_response(today: date) -> QuarterResponse:
         end = date.fromisoformat(data["ends"]) if data["ends"] else first + timedelta(days=90)
     except ValueError:
         start, end = first, first + timedelta(days=90)
+    streams = [{**_info(s["info"]), "goal": s["goal"], "checkpoints": s["checkpoints"]} for s in data["streams"]]
     return QuarterResponse(
         quarter=data["quarter"] or label, starts=start.isoformat(), ends=end.isoformat(),
         objective=data["objective"], objective_ar=data["objective_ar"],
         week_of_quarter=max(1, (today - start).days // 7 + 1), weeks_in_quarter=((end - start).days + 7) // 7,
-        current_month=MONTHS[today.month - 1], streams=data["streams"],
+        current_month=MONTHS[today.month - 1], months=quarter_months(label), colors=list(COLORS), icons=list(ICONS),
+        streams=streams,
     )
 
 
@@ -582,14 +608,53 @@ async def get_quarter(user: User = Depends(require_editor)):
     return await asyncio.to_thread(_quarter_response, _local_now().date())
 
 
+async def _save_quarter(edit, message: str) -> QuarterResponse:
+    today = _local_now().date()
+    try:
+        await asyncio.to_thread(commit_edits, {quarter_path(quarter_for(today)): edit}, message)
+    except (ValueError, VaultWriteError) as exc:
+        raise _write_error(exc)
+    return await asyncio.to_thread(_quarter_response, today)
+
+
+def _fields(data: StreamFieldsIn) -> dict[str, str]:
+    out = {k: v for k, v in {"name": data.name, "color": data.color, "icon": data.icon, "slot": data.slot,
+                             "goal": data.goal, "status": data.status}.items() if v is not None}
+    if data.weekly is not None:
+        out["weekly"] = "yes" if data.weekly else "no"
+    out.update(data.checkpoints or {})
+    return out
+
+
+@router.put("/quarter", response_model=QuarterResponse)
+async def put_super_objective(data: SuperObjectiveIn, user: User = Depends(require_editor)):
+    label = quarter_for(_local_now().date())
+    return await _save_quarter(lambda c: set_super_objective(c, label, data.text, data.arabic), "Niyyah: edit the Super Objective")
+
+
+@router.put("/quarter/stream", response_model=QuarterResponse)
+async def put_stream(data: StreamFieldsIn, user: User = Depends(require_editor)):
+    label = quarter_for(_local_now().date())
+    fields = _fields(data)
+    if not fields:
+        raise HTTPException(status_code=422, detail="nothing to change")
+    return await _save_quarter(lambda c: update_stream(c, label, data.stream, fields), f"Niyyah: edit {data.stream} in the quarter")
+
+
+@router.post("/quarter/stream", response_model=QuarterResponse)
+async def post_stream(data: StreamAddIn, user: User = Depends(require_editor)):
+    label = quarter_for(_local_now().date())
+    fields = _fields(data)
+    return await _save_quarter(lambda c: add_stream(c, label, data.stream, fields), f"Niyyah: add {data.stream} to the quarter")
+
+
 def _pipelines_response(today: date) -> PipelinesResponse:
-    root = Path(settings.vault_workdir)
     streams = []
-    for stream in PIPELINE_STREAMS:
-        path = pipeline_path(stream)
-        note = root / path
-        content = note.read_text(encoding="utf-8") if note.is_file() else None
-        streams.append({"stream": stream, "path": path, "items": parse_pipeline(content, today)})
+    for s in _streams(today):
+        if not s.goal or s.archived:
+            continue
+        path = pipeline_path(s.id)
+        streams.append({**_info(s), "path": path, "items": parse_pipeline(_read(path), today)})
     return PipelinesResponse(now_limit=NOW_LIMIT, stale_days=STALE_DAYS, streams=streams)
 
 
@@ -599,20 +664,22 @@ async def get_pipelines(user: User = Depends(require_editor)):
 
 
 async def _save_pipeline(stream: str, edit, message: str) -> EditResponse:
+    streams = await asyncio.to_thread(_streams, _local_now().date())
+    if stream not in {s.id for s in streams if s.goal and not s.archived}:
+        raise HTTPException(status_code=422, detail=f"unknown stream '{stream}'")
     try:
         commit = await asyncio.to_thread(commit_edits, {pipeline_path(stream): edit}, message)
-    except ValueError as exc:  # stale line, bad text, bad lane
-        raise HTTPException(status_code=422, detail=str(exc))
-    except VaultWriteError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+    except (ValueError, VaultWriteError) as exc:
+        raise _write_error(exc)
     return EditResponse(commit=commit, day=None)
 
 
 @router.post("/pipeline/{stream}/items", response_model=EditResponse)
 async def post_pipeline_items(stream: str, data: PipelineAddIn, user: User = Depends(require_editor)):
     today = _local_now().date()
+    name = next((s.name for s in await asyncio.to_thread(_streams, today) if s.id == stream), None)
     return await _save_pipeline(
-        stream, lambda c: vault_pipeline.add_items(c, stream, data.texts, data.lane, today),
+        stream, lambda c: vault_pipeline.add_items(c, stream, data.texts, data.lane, today, name),
         f"Niyyah: add {len([t for t in data.texts if t.strip()])} to {stream} pipeline")
 
 
@@ -629,6 +696,13 @@ async def put_pipeline_checkpoint(data: PipelineCheckpointIn, user: User = Depen
     return await _save_pipeline(
         data.stream, lambda c: vault_pipeline.set_checkpoint(c or "", data.line, data.hash, data.checkpoint or None),
         f"Niyyah: {data.stream} pipeline item checkpoint")
+
+
+@router.put("/pipeline/text", response_model=EditResponse)
+async def put_pipeline_text(data: PipelineTextIn, user: User = Depends(require_editor)):
+    return await _save_pipeline(
+        data.stream, lambda c: vault_pipeline.set_text(c or "", data.line, data.hash, data.text),
+        f"Niyyah: rename an item in the {data.stream} pipeline")
 
 
 @router.post("/pipeline/remove", response_model=EditResponse)

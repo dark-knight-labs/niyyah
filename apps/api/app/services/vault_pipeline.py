@@ -11,7 +11,7 @@ Pure functions (string in, string out); vault_git.py does the committing.
 import re
 from datetime import date
 
-from app.services.vault_streams import LABELS, PIPELINE_STREAMS, split_month_tag
+from app.services.vault_streams import SLUG, split_month_tag
 from app.services.vault_tasks import line_hash
 
 LANES = ("now", "next", "backlog", "done")
@@ -26,13 +26,13 @@ _BRACKET_MONTH = re.compile(r"\s*\[(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|
 
 
 def pipeline_path(stream: str) -> str:
-    if stream not in PIPELINE_STREAMS:
+    if not SLUG.match(stream):
         raise ValueError(f"unknown stream '{stream}'")
     return f"Efforts/Pipeline/{stream}.md"
 
 
-def _skeleton(stream: str) -> list[str]:
-    head = ["---", "type: pipeline", f"stream: {stream}", "---", f"# {LABELS[stream]} pipeline", ""]
+def _skeleton(stream: str, name: str | None) -> list[str]:
+    head = ["---", "type: pipeline", f"stream: {stream}", "---", f"# {name or stream.title()} pipeline", ""]
     for lane in LANES:
         head += [f"## {HEADINGS[lane]}", ""]
     return head
@@ -88,8 +88,8 @@ def _clean(text: str) -> tuple[str, str | None]:
     return cleaned, month
 
 
-def _lines(content: str | None, stream: str) -> list[str]:
-    return (content or "\n".join(_skeleton(stream))).split("\n")
+def _lines(content: str | None, stream: str, name: str | None) -> list[str]:
+    return (content or "\n".join(_skeleton(stream, name))).split("\n")
 
 
 def _section_end(lines: list[str], lane: str) -> int:
@@ -109,14 +109,14 @@ def _section_end(lines: list[str], lane: str) -> int:
     return len(lines) - 1
 
 
-def add_items(content: str | None, stream: str, texts: list[str], lane: str, today: date) -> str:
+def add_items(content: str | None, stream: str, texts: list[str], lane: str, today: date, name: str | None = None) -> str:
     """Append one task line per entry of `texts` to the end of `lane` (file and headings created if needed)."""
     if lane not in LANES or lane == "done":
         raise ValueError(f"cannot add to lane '{lane}'")
     cleaned = [_clean(t) for t in texts if t.strip()]
     if not cleaned:
         raise ValueError("nothing to add")
-    lines = _lines(content, stream)
+    lines = _lines(content, stream, name)
     at = _section_end(lines, lane)
     new = [_render(t, m, False, today.isoformat(), None) for t, m in cleaned]
     lines[at:at] = new
@@ -169,4 +169,14 @@ def remove_item(content: str, line: int, expected_hash: str) -> str:
     lines = content.split("\n")
     _find(lines, line, expected_hash)
     del lines[line - 1]
+    return "\n".join(lines)
+
+
+def set_text(content: str, line: int, expected_hash: str, text: str) -> str:
+    """Rename an item in place, keeping its lane, month tag and dates; a #month typed in `text` replaces the tag."""
+    lines = content.split("\n")
+    m = _find(lines, line, expected_hash)
+    _, month, added, done_on = _parts(m.group(2))
+    cleaned, typed = _clean(text)
+    lines[line - 1] = _render(cleaned, typed or month, m.group(1) != " ", added, done_on)
     return "\n".join(lines)

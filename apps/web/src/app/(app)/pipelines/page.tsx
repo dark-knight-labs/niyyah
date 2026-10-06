@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, Star, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, Pencil, Star, Trash2 } from "lucide-react";
 import { usePlanner } from "@/hooks/use-planner";
 import { ChainCrumbs } from "@/components/planner/chain-crumbs";
 import { Notice, PageTitle, SectionTitle, Spinner } from "@/components/planner/page-title";
 import { MonthTag, StreamIcon } from "@/components/planner/stream-chip";
-import { GOAL_STREAMS, MONTH_LABEL, StreamMeta, streamMeta } from "@/lib/streams";
+import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { Lane, MonthKey, PipelineItemData, VaultObjective } from "@/lib/vault-types";
 
@@ -17,15 +17,14 @@ const LANES: { id: Lane; label: string; hint: string }[] = [
 ];
 
 export default function PipelinesPage() {
-  const { loading, owner, quarter, pipelines, objectives, error, reload } = usePlanner();
-  const [stream, setStream] = useState("kahf");
+  const { loading, owner, quarter, pipelines, objectives, streams, error, reload } = usePlanner();
+  const [picked, setPicked] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const wanted = new URLSearchParams(window.location.search).get("stream");
-    if (wanted && GOAL_STREAMS.some((s) => s.id === wanted)) setStream(wanted);
+    setPicked(new URLSearchParams(window.location.search).get("stream"));
   }, []);
 
   async function run(action: () => Promise<unknown>) {
@@ -45,7 +44,9 @@ export default function PipelinesPage() {
   if (!owner) return <Notice>Pipelines are private to the vault owner.</Notice>;
   if (!pipelines) return <Notice>{error ?? "Loading the pipelines."}</Notice>;
 
-  const meta = streamMeta(stream);
+  const meta = streams.find((s) => s.id === picked) ?? streams[0];
+  if (!meta) return <Notice>No blocks yet. Add one on the Quarter page.</Notice>;
+  const stream = meta.id;
   const items = pipelines.streams.find((s) => s.stream === stream)?.items ?? [];
   const objective = objectives?.items.find((o) => o.stream === stream) ?? null;
   const goal = quarter?.streams.find((s) => s.stream === stream);
@@ -68,8 +69,8 @@ export default function PipelinesPage() {
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
       <div role="group" aria-label="Stream" className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-2">
-        {GOAL_STREAMS.map((s) => (
-          <button key={s.id} type="button" aria-pressed={s.id === stream} onClick={() => setStream(s.id)}
+        {streams.map((s) => (
+          <button key={s.id} type="button" aria-pressed={s.id === stream} onClick={() => setPicked(s.id)}
             className="flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-bold transition active:scale-[0.97]"
             style={s.id === stream ? { borderColor: s.color, background: `color-mix(in srgb, ${s.color} 11%, var(--background))` } : { borderColor: "var(--border)" }}>
             <s.icon size={15} style={{ color: s.color }} aria-hidden="true" />
@@ -103,7 +104,8 @@ export default function PipelinesPage() {
                     onMove={(to) => run(() => vaultApi.movePipelineItem(stream, item, to))}
                     onTag={(m) => run(() => vaultApi.tagPipelineItem(stream, item, m))}
                     onRemove={() => run(() => vaultApi.removePipelineItem(stream, item))}
-                    onOne={meta.id === "finance" ? undefined : () => run(async () => {
+                    onRename={(text) => run(() => vaultApi.renamePipelineItem(stream, item, text))}
+                    onOne={!meta.weekly ? undefined : () => run(async () => {
                       await vaultApi.setObjective(stream, { text: item.text, done: false, checkpoint: item.checkpoint ?? "" });
                       if (item.lane !== "now") await vaultApi.movePipelineItem(stream, item, "now");
                     })} />
@@ -160,16 +162,27 @@ interface CardProps {
   onTag: (month: MonthKey | "") => void;
   onRemove: () => void;
   onOne?: () => void;
+  onRename: (text: string) => Promise<unknown>;
 }
 
-function ItemCard({ item, meta, objective, busy, staleDays, onMove, onTag, onRemove, onOne }: CardProps) {
+function ItemCard({ item, meta, objective, busy, staleDays, onMove, onTag, onRemove, onOne, onRename }: CardProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.text);
   const isOne = !!objective?.text && objective.text === item.text;
   const order: Lane[] = ["now", "next", "backlog"];
   const at = order.indexOf(item.lane);
   const btn = "grid h-9 w-9 place-items-center rounded-lg text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
   return (
     <li className="grid gap-2.5 rounded-xl border bg-[var(--background)] p-3" style={{ borderColor: isOne ? meta.color : "var(--border)", boxShadow: isOne ? `inset 0 0 0 1px ${meta.color}` : undefined }}>
-      <p className="break-words text-sm leading-snug">{item.text}</p>
+      {editing ? (
+        <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (draft.trim() && draft.trim() !== item.text) void onRename(draft.trim()).then(() => setEditing(false)); else setEditing(false); }}>
+          <input autoFocus value={draft} maxLength={300} aria-label="Edit item" onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
+            className="min-h-10 min-w-0 flex-1 rounded-lg border border-[var(--accent)] bg-[var(--background)] px-2.5 text-sm" />
+          <button type="submit" aria-label="Save" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-[var(--accent)] hover:bg-[var(--muted)]"><Check size={16} /></button>
+        </form>
+      ) : (
+        <p className="break-words text-sm leading-snug">{item.text}</p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {isOne && <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: meta.color }}><Star size={12} fill="currentColor" aria-hidden="true" /> This week</span>}
@@ -186,6 +199,7 @@ function ItemCard({ item, meta, objective, busy, staleDays, onMove, onTag, onRem
           {item.age_days >= staleDays && item.checkpoint && <MonthTag label={`${item.age_days}d`} muted />}
         </div>
         <div className="-mr-1 flex">
+          <button type="button" className={btn} disabled={busy} aria-label="Edit" title="Edit" onClick={() => { setDraft(item.text); setEditing(true); }}><Pencil size={14} /></button>
           {onOne && item.lane !== "backlog" && !isOne && <button type="button" className={btn} disabled={busy} aria-label="Make this the week's one thing" title="Make this the week's one thing" onClick={onOne}><Star size={15} /></button>}
           {at > 0 && <button type="button" className={btn} disabled={busy} aria-label="Promote" title="Promote" onClick={() => onMove(order[at - 1])}><ArrowUp size={15} /></button>}
           {at < 2 && <button type="button" className={btn} disabled={busy} aria-label="Demote" title="Demote" onClick={() => onMove(order[at + 1])}><ArrowDown size={15} /></button>}

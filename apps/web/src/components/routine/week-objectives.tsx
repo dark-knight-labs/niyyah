@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { streamMeta } from "@/lib/streams";
+import { toMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { VaultObjectivesData } from "@/lib/vault-types";
 import { Checkbox } from "@/components/routine/checkbox";
@@ -33,7 +33,7 @@ export function WeekObjectives({ data, onChanged }: Props) {
     <Section title="This week" aside={`${data.week} · ${done} / ${data.items.length} done`} error={error}>
       <ul className="space-y-2">
         {data.items.map((item) => {
-          const meta = streamMeta(item.stream);
+          const meta = toMeta({ ...item, slot: "", weekly: true, status: "" });
           return (
             <li key={item.stream} className="border-b border-l-[3px] border-b-[var(--border)] pl-3" style={{ borderLeftColor: meta.color }}>
               <EditableRow text={item.text} placeholder="Set this week's one thing" struck={item.done} maxLength={200}
