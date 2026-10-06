@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { VaultDayData, VaultEventsData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
+import { GoogleStatusData, VaultDayData, VaultEventsData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
 import { ROUTINE_BLOCKS, dateInTz, formatMinutes, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
@@ -28,6 +28,13 @@ export default function RoutinePage() {
   const [tasks, setTasks] = useState<VaultTaskData[]>([]);
   const [log, setLog] = useState<VaultLogEntry[]>([]);
   const [events, setEvents] = useState<VaultEventsData | null>(null);
+  const [google, setGoogle] = useState<GoogleStatusData | null>(null);
+  // Back from Google's consent screen: say how it went (a spinner renders first, so no hydration mismatch).
+  const [calendarNote] = useState<string | null>(() => {
+    const result = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("calendar");
+    if (!result) return null;
+    return result === "connected" ? "Google Calendar connected." : "Could not connect Google Calendar. Try again.";
+  });
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const now = useNow(30_000);
 
@@ -77,9 +84,15 @@ export default function RoutinePage() {
     vaultApi.tasks(dayKey).then(setTasks).catch(() => setTasks([]));
     vaultApi.log(dayKey).then(setLog).catch(() => setLog([]));
     vaultApi.events(dayKey).then(setEvents).catch(() => setEvents(null));
+    vaultApi.googleStatus().then(setGoogle).catch(() => setGoogle(null));
     vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
+
+  // Drop the ?calendar= param so a reload does not repeat the note.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("calendar")) window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   useEffect(() => {
     loadPrivate();
@@ -119,6 +132,7 @@ export default function RoutinePage() {
           ))}
         </div>
       )}
+      {calendarNote && <p role="status" className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs">{calendarNote}</p>}
       {schedule && day && (
         <>
           <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
@@ -137,7 +151,7 @@ export default function RoutinePage() {
                 <WeekObjectives data={objectives} onChanged={setObjectives} />
                 <NowCard day={day} nowMin={nowMin} />
                 <VotesPanel day={dayKey} today={today} onSaved={setToday} />
-                <CalendarCard data={events} />
+                <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
               </div>
             </div>
           ) : (

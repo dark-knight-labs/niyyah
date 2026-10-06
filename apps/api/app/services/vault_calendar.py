@@ -2,9 +2,12 @@
 
 The feed URLs live in the vault (.obsidian/plugins/obsidian-day-planner/data.json), so Niyyah needs no
 credentials of its own. They are private links: they never leave the server, and errors name only the calendar.
+When Google is connected, the feed for the connected account is read through the Calendar API instead: Google's
+iCal export lags by hours, so a freshly added event would not show.
 """
 import json
 import time
+from collections.abc import Callable
 from datetime import date, datetime, time as clock, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -21,12 +24,12 @@ _cache: dict[str, tuple[float, bytes]] = {}
 
 
 def sources(root: Path) -> list[dict]:
-    """The calendars configured in Day Planner: [{name, url, color}]."""
+    """The calendars configured in Day Planner: [{name, url, color, email}]."""
     path = root / SETTINGS_PATH
     if not path.is_file():
         return []
     icals = json.loads(path.read_text(encoding="utf-8")).get("icals", [])
-    return [{"name": c.get("name") or "Calendar", "url": c["url"], "color": c.get("color")} for c in icals if c.get("url")]
+    return [{"name": c.get("name") or "Calendar", "url": c["url"], "color": c.get("color"), "email": c.get("email")} for c in icals if c.get("url")]
 
 
 def _download(url: str) -> bytes:
@@ -43,14 +46,55 @@ def _minutes(moment: datetime, day_start: datetime) -> int:
     return max(0, min(1440, round((moment - day_start).total_seconds() / 60)))
 
 
-def events_for_day(root: Path, day: date, tz: str) -> tuple[list[dict], list[str]]:
-    """(events, errors) for `day` in `tz`. A calendar that cannot be read is reported, the others still show."""
+def _google_entry(item: dict, source: dict, zone: ZoneInfo, day_start: datetime) -> dict | None:
+    """A Calendar API event as an entry; None when cancelled."""
+    if item.get("status") == "cancelled":
+        return None
+    start, end = item.get("start", {}), item.get("end", {})
+    all_day = "dateTime" not in start
+    entry = {
+        "title": str(item.get("summary", "")).strip() or "(no title)",
+        "calendar": source["name"],
+        "color": source["color"],
+        "all_day": all_day,
+        "location": str(item.get("location", "")).strip() or None,
+        "start_min": None,
+        "end_min": None,
+    }
+    if not all_day:
+        begin = datetime.fromisoformat(start["dateTime"]).astimezone(zone)
+        finish = datetime.fromisoformat(end.get("dateTime", start["dateTime"])).astimezone(zone)
+        entry["start_min"] = _minutes(begin, day_start)
+        entry["end_min"] = _minutes(finish, day_start)
+    return entry
+
+
+def events_for_day(
+    root: Path,
+    day: date,
+    tz: str,
+    google: tuple[str, Callable[[datetime, datetime], list[dict]]] | None = None,
+) -> tuple[list[dict], list[str]]:
+    """(events, errors) for `day` in `tz`. A calendar that cannot be read is reported, the others still show.
+
+    `google` = (connected account's email, lister(day_start, day_end) -> Calendar API events): the Day Planner
+    calendar with that email is read through it instead of its iCal feed.
+    """
     zone = ZoneInfo(tz)
     day_start = datetime.combine(day, clock.min, zone)
     day_end = day_start + timedelta(days=1)
     events: list[dict] = []
     errors: list[str] = []
     for source in sources(root):
+        if google and source["email"] and source["email"].lower() == google[0].lower():
+            try:
+                items = google[1](day_start, day_end)
+                entries = [e for e in (_google_entry(i, source, zone, day_start) for i in items) if e]
+            except Exception as exc:  # name the calendar, never Google's response
+                errors.append(f"{source['name']}: {type(exc).__name__}")
+                continue
+            events.extend(entries)
+            continue
         try:
             calendar = icalendar.Calendar.from_ical(_download(source["url"]))
             found = recurring_ical_events.of(calendar).between(day_start, day_end)

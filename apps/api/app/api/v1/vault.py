@@ -3,11 +3,12 @@ import logging
 import re
 import secrets
 from dataclasses import asdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as clock, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -16,11 +17,16 @@ from app.core import database
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.models.google import GoogleCredential
 from app.models.user import User
 from app.models.vault import VaultDay
 from app.schemas.vault import (
     EditAccessResponse,
+    CalendarEventIn,
+    CalendarEventResponse,
     CalendarEventsResponse,
+    GoogleConnectResponse,
+    GoogleStatusResponse,
     EditResponse,
     LogEntryIn,
     LogEntryRemoveIn,
@@ -46,6 +52,8 @@ from app.schemas.vault import (
 )
 from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_schedule import parse_schedule
+from app.services import google_calendar
+from app.services.google_calendar import GoogleCalendarError
 from app.services.vault_calendar import events_for_day
 from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault
@@ -338,12 +346,105 @@ async def post_note(day: date, data: NoteIn, user: User = Depends(require_editor
     return await _save(day, lambda c: add_log_note(c, clock, data.section, data.span, data.text), f"Niyyah: {day} note on {data.section}", db)
 
 
+async def _credential(db: AsyncSession, user: User) -> GoogleCredential | None:
+    return (await db.execute(select(GoogleCredential).where(GoogleCredential.user_id == user.id))).scalar_one_or_none()
+
+
 @router.get("/day/{day}/events", response_model=CalendarEventsResponse)
-async def get_day_events(day: date, user: User = Depends(require_editor)):
-    """The day's events from the calendars configured in the vault (Day Planner iCal feeds). Private, owner only."""
+async def get_day_events(day: date, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    """The day's events from the calendars configured in the vault (Day Planner iCal feeds). Private, owner only.
+
+    The calendar matching the connected Google account is read through the Calendar API (fresh), the rest via iCal."""
     root = Path(settings.vault_workdir)
-    events, errors = await asyncio.to_thread(events_for_day, root, day, settings.vault_tz)
+    cred = await _credential(db, user)
+    google = None
+    if cred:
+        refresh = cred.refresh_token
+        google = (cred.email, lambda start, end: google_calendar.list_events(google_calendar.access_token(refresh), start, end))
+    events, errors = await asyncio.to_thread(events_for_day, root, day, settings.vault_tz, google)
     return {"events": events, "errors": errors}
+
+
+# --- Google Calendar: connect once, then add events (owner only, except the OAuth callback) ----------------------
+
+EVENT_AHEAD_DAYS = 60
+GOOGLE_PATH = "/calendar/google"
+
+
+@router.get(f"{GOOGLE_PATH}/status", response_model=GoogleStatusResponse)
+async def google_status(user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    cred = await _credential(db, user)
+    return {"configured": google_calendar.configured(), "connected": cred is not None, "email": cred.email if cred else None}
+
+
+@router.get(f"{GOOGLE_PATH}/connect", response_model=GoogleConnectResponse)
+async def google_connect(user: User = Depends(require_editor)):
+    if not google_calendar.configured():
+        raise HTTPException(status_code=409, detail="Google Calendar is not set up on the server")
+    return {"url": google_calendar.build_auth_url(google_calendar.make_state(user.id))}
+
+
+@router.get(f"{GOOGLE_PATH}/callback", include_in_schema=False)
+async def google_callback(code: str = "", state: str = "", db: AsyncSession = Depends(get_db)):
+    """Google sends the browser here, so there is no auth header: the signed state proves who started the flow."""
+    back = f"{settings.web_public_url.rstrip('/')}/routine?calendar="
+    user_id = google_calendar.read_state(state)
+    if user_id is None or not code or not google_calendar.configured():
+        return RedirectResponse(back + "error", status_code=302)
+    user = await db.get(User, user_id)
+    if user is None or not _can_edit(user):
+        return RedirectResponse(back + "error", status_code=302)
+    try:
+        refresh, email = await asyncio.to_thread(google_calendar.exchange_code, code)
+    except GoogleCalendarError:
+        return RedirectResponse(back + "error", status_code=302)
+    cred = await _credential(db, user)
+    if cred:
+        cred.refresh_token, cred.email = refresh, email
+    else:
+        db.add(GoogleCredential(user_id=user.id, email=email, refresh_token=refresh))
+    await db.commit()
+    return RedirectResponse(back + "connected", status_code=302)
+
+
+@router.post("/day/{day}/events", response_model=CalendarEventResponse)
+async def post_event(day: date, data: CalendarEventIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+    """Add an event to the owner's primary Google calendar. Today and the next 60 days."""
+    today = _local_now().date()
+    if not today <= day <= today + timedelta(days=EVENT_AHEAD_DAYS):
+        raise HTTPException(status_code=422, detail=f"Events can be added for today and the next {EVENT_AHEAD_DAYS} days")
+    title = data.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Title is required")
+    if data.end <= data.start:  # zero-padded HH:MM compares correctly as text
+        raise HTTPException(status_code=422, detail="End must be after start")
+    if not google_calendar.configured():
+        raise HTTPException(status_code=409, detail="Google Calendar is not set up on the server")
+    cred = await _credential(db, user)
+    if not cred:
+        raise HTTPException(status_code=409, detail="Connect Google Calendar first")
+
+    zone = ZoneInfo(settings.vault_tz)
+    start = datetime.combine(day, clock.fromisoformat(data.start), zone)
+    end = datetime.combine(day, clock.fromisoformat(data.end), zone)
+    location = (data.location or "").strip() or None
+    try:
+        def add():
+            token = google_calendar.access_token(cred.refresh_token)
+            return google_calendar.insert_event(token, title, start, end, settings.vault_tz, location)
+        await asyncio.to_thread(add)
+    except GoogleCalendarError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    midnight = datetime.combine(day, clock.min, zone)
+    return {
+        "title": title,
+        "calendar": "Google Calendar",
+        "color": None,
+        "all_day": False,
+        "location": location,
+        "start_min": int((start - midnight).total_seconds() // 60),
+        "end_min": int((end - midnight).total_seconds() // 60),
+    }
 
 
 @router.get("/day/{day}/tasks", response_model=list[TaskResponse])

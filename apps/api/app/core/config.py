@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     vault_git_email: str = "niyyah@burak.bd"
     vault_tz: str = "Asia/Dhaka"
 
+    # Google Calendar (adding events from /routine). Both empty = the feature is off.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    # OAuth redirect URI = {api_public_url}/api/v1/vault/calendar/google/callback; the browser returns to web_public_url.
+    api_public_url: str = "https://niyyah-api.alamin.rocks"
+    web_public_url: str = "https://niyyah.alamin.rocks"
+
     # For tests, swap asyncpg → aiosqlite
     test_database_url: str = "sqlite+aiosqlite:///./test.db"
 

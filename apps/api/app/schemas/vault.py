@@ -2,7 +2,7 @@ from datetime import date
 
 from typing import Literal
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class VaultDayResponse(BaseModel):
@@ -173,6 +173,23 @@ class CalendarEventResponse(BaseModel):
     location: str | None
     start_min: int | None  # minutes since local midnight; None for all-day events
     end_min: int | None
+
+
+class CalendarEventIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    start: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # local HH:MM
+    end: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    location: str | None = Field(default=None, max_length=200)
+
+
+class GoogleStatusResponse(BaseModel):
+    configured: bool
+    connected: bool
+    email: str | None
+
+
+class GoogleConnectResponse(BaseModel):
+    url: str
 
 
 class CalendarEventsResponse(BaseModel):

@@ -87,6 +87,20 @@ export interface VaultEvent {
   end_min: number | null;
 }
 
+export interface GoogleStatusData {
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+}
+
+export interface NewEvent {
+  title: string;
+  /** Local HH:MM. */
+  start: string;
+  end: string;
+  location?: string | null;
+}
+
 export interface VaultEventsData {
   events: VaultEvent[];
   errors: string[];
