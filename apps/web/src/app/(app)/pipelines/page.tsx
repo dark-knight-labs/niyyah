@@ -8,7 +8,7 @@ import { Notice, PageTitle, SectionTitle, Spinner } from "@/components/planner/p
 import { MonthTag, StreamIcon } from "@/components/planner/stream-chip";
 import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
-import { Lane, MonthKey, PipelineItemData, VaultObjective } from "@/lib/vault-types";
+import { Lane, MonthKey, PipelineItemData } from "@/lib/vault-types";
 
 const LANES: { id: Lane; label: string; hint: string }[] = [
   { id: "now", label: "Now", hint: "committed this week" },
@@ -100,15 +100,12 @@ export default function PipelinesPage() {
               <ul className="grid gap-2">
                 {laneItems.length === 0 && <li className="px-1 py-2 text-sm text-[var(--muted-foreground)]">{lane.id === "now" ? "Nothing committed. Promote one from Next." : "Empty."}</li>}
                 {laneItems.map((item) => (
-                  <ItemCard key={item.line} item={item} meta={meta} objective={objective} busy={busy} staleDays={pipelines.stale_days}
+                  <ItemCard key={item.line} item={item} meta={meta} week={pipelines.week} busy={busy} staleDays={pipelines.stale_days}
                     onMove={(to) => run(() => vaultApi.movePipelineItem(stream, item, to))}
                     onTag={(m) => run(() => vaultApi.tagPipelineItem(stream, item, m))}
                     onRemove={() => run(() => vaultApi.removePipelineItem(stream, item))}
                     onRename={(text) => run(() => vaultApi.renamePipelineItem(stream, item, text))}
-                    onOne={!meta.weekly ? undefined : () => run(async () => {
-                      await vaultApi.setObjective(stream, { text: item.text, done: false, checkpoint: item.checkpoint ?? "" });
-                      if (item.lane !== "now") await vaultApi.movePipelineItem(stream, item, "now");
-                    })} />
+                    onOne={!meta.weekly ? undefined : () => run(() => vaultApi.focusPipelineItem(stream, item))} />
                 ))}
               </ul>
             </section>
@@ -155,7 +152,7 @@ const MONTH_ORDER = Object.keys(MONTH_LABEL) as MonthKey[];
 interface CardProps {
   item: PipelineItemData;
   meta: StreamMeta;
-  objective: VaultObjective | null;
+  week: string;
   busy: boolean;
   staleDays: number;
   onMove: (lane: Lane) => void;
@@ -165,10 +162,10 @@ interface CardProps {
   onRename: (text: string) => Promise<unknown>;
 }
 
-function ItemCard({ item, meta, objective, busy, staleDays, onMove, onTag, onRemove, onOne, onRename }: CardProps) {
+function ItemCard({ item, meta, week, busy, staleDays, onMove, onTag, onRemove, onOne, onRename }: CardProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
-  const isOne = !!objective?.text && objective.text === item.text;
+  const isOne = item.focus === week;
   const order: Lane[] = ["now", "next", "backlog"];
   const at = order.indexOf(item.lane);
   const btn = "grid h-9 w-9 place-items-center rounded-lg text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
@@ -200,7 +197,7 @@ function ItemCard({ item, meta, objective, busy, staleDays, onMove, onTag, onRem
         </div>
         <div className="-mr-1 flex">
           <button type="button" className={btn} disabled={busy} aria-label="Edit" title="Edit" onClick={() => { setDraft(item.text); setEditing(true); }}><Pencil size={14} /></button>
-          {onOne && item.lane !== "backlog" && !isOne && <button type="button" className={btn} disabled={busy} aria-label="Make this the week's one thing" title="Make this the week's one thing" onClick={onOne}><Star size={15} /></button>}
+          {onOne && !isOne && <button type="button" className={btn} disabled={busy} aria-label="Make this the week's one thing" title="Make this the week's one thing" onClick={onOne}><Star size={15} /></button>}
           {at > 0 && <button type="button" className={btn} disabled={busy} aria-label="Promote" title="Promote" onClick={() => onMove(order[at - 1])}><ArrowUp size={15} /></button>}
           {at < 2 && <button type="button" className={btn} disabled={busy} aria-label="Demote" title="Demote" onClick={() => onMove(order[at + 1])}><ArrowDown size={15} /></button>}
           <button type="button" className={btn} disabled={busy} aria-label="Mark done" title="Done" onClick={() => onMove("done")}><Check size={16} /></button>

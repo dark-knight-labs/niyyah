@@ -240,6 +240,7 @@ class PipelineItem(BaseModel):
     checkpoint: Month | None
     added: str | None
     done_on: str | None
+    focus: str | None  # week label when this item is that week's small domino
     done: bool
     age_days: int
     stale: bool
@@ -251,6 +252,7 @@ class PipelineStreamData(StreamInfo):
 
 
 class PipelinesResponse(BaseModel):
+    week: str  # the current week, '2026-W41': items with focus == week are this week's small dominoes
     now_limit: int
     stale_days: int
     streams: list[PipelineStreamData]

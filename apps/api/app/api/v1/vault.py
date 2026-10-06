@@ -568,12 +568,22 @@ async def get_objectives(user: User = Depends(require_editor)):
 
 @router.put("/objectives", response_model=ObjectivesResponse)
 async def put_objective(data: ObjectiveIn, user: User = Depends(require_editor)):
+    """Edit a week objective. For blocks with a pipeline the objective is its small-domino item: the item is renamed,
+    created in Now (new text) or moved to Done / back to Now (done flag) in the same commit."""
     today = _local_now().date()
-    label = week_for(today)[2]
+    week_start, _, label = week_for(today)
     streams = await asyncio.to_thread(_streams, today)
-    edit = lambda c: update_objective(c, today, data.stream, data.text, data.done, data.checkpoint, streams)  # noqa: E731
+    edits = {objectives_path(label): lambda c: update_objective(c, today, data.stream, data.text, data.done, data.checkpoint, streams)}
+    block = next((s for s in streams if s.id == data.stream), None)
+    if block and block.goal and not block.archived and (data.text is not None or data.done is not None):
+        path = pipeline_path(block.id)
+
+        def link(c):
+            return vault_pipeline.sync_focus(c, block.id, block.name, label, today, text=data.text, done=data.done) or (c or "")
+
+        edits[path] = link
     try:
-        await asyncio.to_thread(commit_edits, {objectives_path(label): edit}, f"Niyyah: W{label[-2:]} {data.stream} objective")
+        await asyncio.to_thread(commit_edits, edits, f"Niyyah: W{label[-2:]} {data.stream} objective")
     except (ValueError, VaultWriteError) as exc:
         raise _write_error(exc)
     return await asyncio.to_thread(_objectives_response, today)
@@ -655,7 +665,7 @@ def _pipelines_response(today: date) -> PipelinesResponse:
             continue
         path = pipeline_path(s.id)
         streams.append({**_info(s), "path": path, "items": parse_pipeline(_read(path), today)})
-    return PipelinesResponse(now_limit=NOW_LIMIT, stale_days=STALE_DAYS, streams=streams)
+    return PipelinesResponse(week=week_for(today)[2], now_limit=NOW_LIMIT, stale_days=STALE_DAYS, streams=streams)
 
 
 @router.get("/pipelines", response_model=PipelinesResponse)
@@ -683,12 +693,53 @@ async def post_pipeline_items(stream: str, data: PipelineAddIn, user: User = Dep
         f"Niyyah: add {len([t for t in data.texts if t.strip()])} to {stream} pipeline")
 
 
+def _item_at(stream: str, line: int, expected_hash: str, today: date) -> dict | None:
+    return next((i for i in parse_pipeline(_read(pipeline_path(stream)), today) if i["line"] == line and i["hash"] == expected_hash), None)
+
+
+async def _save_pipeline_and_objective(stream: str, edit, objective_edit, message: str) -> EditResponse:
+    """Like _save_pipeline, but the same commit also updates this week's objectives note when `objective_edit` is given."""
+    today = _local_now().date()
+    streams = await asyncio.to_thread(_streams, today)
+    if stream not in {s.id for s in streams if s.goal and not s.archived}:
+        raise HTTPException(status_code=422, detail=f"unknown stream '{stream}'")
+    edits = {pipeline_path(stream): edit}
+    if objective_edit:
+        edits[objectives_path(week_for(today)[2])] = objective_edit(streams)
+    try:
+        commit = await asyncio.to_thread(commit_edits, edits, message)
+    except (ValueError, VaultWriteError) as exc:
+        raise _write_error(exc)
+    return EditResponse(commit=commit, day=None)
+
+
 @router.put("/pipeline/move", response_model=EditResponse)
 async def put_pipeline_move(data: PipelineMoveIn, user: User = Depends(require_editor)):
     today = _local_now().date()
-    return await _save_pipeline(
-        data.stream, lambda c: vault_pipeline.move_item(c or "", data.line, data.hash, data.lane, today),
+    week = week_for(today)[2]
+    item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
+    objective_edit = None
+    if item and item["focus"] == week and (data.lane == "done") != item["done"]:
+        # finishing (or reopening) the small domino ticks (or unticks) the week objective
+        objective_edit = lambda streams: (lambda c: update_objective(c, today, data.stream, None, data.lane == "done", None, streams))  # noqa: E731
+    return await _save_pipeline_and_objective(
+        data.stream, lambda c: vault_pipeline.move_item(c or "", data.line, data.hash, data.lane, today), objective_edit,
         f"Niyyah: {data.stream} pipeline item to {data.lane}")
+
+
+@router.put("/pipeline/focus", response_model=EditResponse)
+async def put_pipeline_focus(data: PipelineRefIn, user: User = Depends(require_editor)):
+    """Make a pipeline item this week's small domino: it goes to Now and the objective line follows."""
+    today = _local_now().date()
+    week = week_for(today)[2]
+    item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
+    if not item:
+        raise HTTPException(status_code=422, detail="that item changed or moved; reload and try again")
+    objective_edit = lambda streams: (lambda c: update_objective(  # noqa: E731
+        c, today, data.stream, item["text"], False, item["checkpoint"] or "", streams))
+    return await _save_pipeline_and_objective(
+        data.stream, lambda c: vault_pipeline.set_focus(c or "", data.line, data.hash, week, today), objective_edit,
+        f"Niyyah: {data.stream} small domino for W{week[-2:]}")
 
 
 @router.put("/pipeline/checkpoint", response_model=EditResponse)
@@ -707,6 +758,11 @@ async def put_pipeline_text(data: PipelineTextIn, user: User = Depends(require_e
 
 @router.post("/pipeline/remove", response_model=EditResponse)
 async def post_pipeline_remove(data: PipelineRefIn, user: User = Depends(require_editor)):
-    return await _save_pipeline(
-        data.stream, lambda c: vault_pipeline.remove_item(c or "", data.line, data.hash),
+    today = _local_now().date()
+    item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
+    objective_edit = None
+    if item and item["focus"] == week_for(today)[2]:
+        objective_edit = lambda streams: (lambda c: update_objective(c, today, data.stream, "", None, "", streams))  # noqa: E731
+    return await _save_pipeline_and_objective(
+        data.stream, lambda c: vault_pipeline.remove_item(c or "", data.line, data.hash), objective_edit,
         f"Niyyah: remove from {data.stream} pipeline")

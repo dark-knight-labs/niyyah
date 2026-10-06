@@ -4,6 +4,7 @@
     - [ ] Ship the DNS dashboard #nov ➕ 2026-10-02
     - [x] Draft the incident template #oct ➕ 2026-09-28 ✅ 2026-10-05
 
+A `🎯 2026-W41` marker makes an item that week's small domino (the weekly objective): one per stream per week.
 Obsidian Tasks lines, so the note reads and queries normally in the vault. An item is identified by
 line number plus a hash of the line, so a moved or changed line is refused instead of mis-edited.
 Pure functions (string in, string out); vault_git.py does the committing.
@@ -22,6 +23,7 @@ MAX_TEXT_CHARS = 300
 _ITEM = re.compile(r"^- \[([ xX])\] (.*)$")
 _ADDED = re.compile(r"\s*➕\s*(\d{4}-\d{2}-\d{2})")
 _DONE = re.compile(r"\s*✅\s*(\d{4}-\d{2}-\d{2})")
+_FOCUS = re.compile(r"\s*🎯\s*(\d{4}-W\d{2})")
 _BRACKET_MONTH = re.compile(r"\s*\[(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\]\s*$", re.IGNORECASE)
 
 
@@ -57,19 +59,21 @@ def parse_pipeline(content: str | None, today: date) -> list[dict]:
         body = m.group(2)
         added = _ADDED.search(body)
         done_on = _DONE.search(body)
-        text, checkpoint = split_month_tag(_DONE.sub("", _ADDED.sub("", body)))
+        focus = _FOCUS.search(body)
+        text, checkpoint = split_month_tag(_FOCUS.sub("", _DONE.sub("", _ADDED.sub("", body))))
         age = (today - date.fromisoformat(added.group(1))).days if added else 0
         items.append({
             "line": number, "hash": line_hash(line), "text": text, "lane": lane, "checkpoint": checkpoint,
             "added": added.group(1) if added else None, "done_on": done_on.group(1) if done_on else None,
-            "done": m.group(1) != " ", "age_days": age,
+            "focus": focus.group(1) if focus else None, "done": m.group(1) != " ", "age_days": age,
             "stale": lane in ("next", "backlog") and checkpoint is None and age >= STALE_DAYS,
         })
     return items
 
 
-def _render(text: str, checkpoint: str | None, done: bool, added: str | None, done_on: str | None) -> str:
+def _render(text: str, checkpoint: str | None, done: bool, added: str | None, done_on: str | None, focus: str | None = None) -> str:
     tail = f" #{checkpoint}" if checkpoint else ""
+    tail += f" 🎯 {focus}" if focus else ""
     tail += f" ➕ {added}" if added else ""
     tail += f" ✅ {done_on}" if done_on else ""
     return f"- [{'x' if done else ' '}] {text}{tail}"
@@ -132,11 +136,13 @@ def _find(lines: list[str], line: int, expected_hash: str) -> re.Match:
     return m
 
 
-def _parts(body: str) -> tuple[str, str | None, str | None, str | None]:
+def _parts(body: str) -> tuple[str, str | None, str | None, str | None, str | None]:
+    """(text, month, added, done_on, focus) of an item body."""
     added = _ADDED.search(body)
     done_on = _DONE.search(body)
-    text, month = split_month_tag(_DONE.sub("", _ADDED.sub("", body)))
-    return text, month, added.group(1) if added else None, done_on.group(1) if done_on else None
+    focus = _FOCUS.search(body)
+    text, month = split_month_tag(_FOCUS.sub("", _DONE.sub("", _ADDED.sub("", body))))
+    return text, month, added.group(1) if added else None, done_on.group(1) if done_on else None, focus.group(1) if focus else None
 
 
 def move_item(content: str, line: int, expected_hash: str, lane: str, today: date) -> str:
@@ -145,10 +151,10 @@ def move_item(content: str, line: int, expected_hash: str, lane: str, today: dat
         raise ValueError(f"unknown lane '{lane}'")
     lines = content.split("\n")
     m = _find(lines, line, expected_hash)
-    text, month, added, done_on = _parts(m.group(2))
+    text, month, added, done_on, focus = _parts(m.group(2))
     del lines[line - 1]
     done = lane == "done"
-    new = _render(text, month, done, added, (done_on or today.isoformat()) if done else None)
+    new = _render(text, month, done, added, (done_on or today.isoformat()) if done else None, focus)
     lines.insert(_section_end(lines, lane), new)
     return "\n".join(lines)
 
@@ -156,12 +162,12 @@ def move_item(content: str, line: int, expected_hash: str, lane: str, today: dat
 def set_checkpoint(content: str, line: int, expected_hash: str, checkpoint: str | None) -> str:
     lines = content.split("\n")
     m = _find(lines, line, expected_hash)
-    text, month, added, done_on = _parts(m.group(2))
+    text, month, added, done_on, focus = _parts(m.group(2))
     if checkpoint:
         _, month = _clean(f"x #{checkpoint}")
     else:
         month = None
-    lines[line - 1] = _render(text, month, m.group(1) != " ", added, done_on)
+    lines[line - 1] = _render(text, month, m.group(1) != " ", added, done_on, focus)
     return "\n".join(lines)
 
 
@@ -176,7 +182,63 @@ def set_text(content: str, line: int, expected_hash: str, text: str) -> str:
     """Rename an item in place, keeping its lane, month tag and dates; a #month typed in `text` replaces the tag."""
     lines = content.split("\n")
     m = _find(lines, line, expected_hash)
-    _, month, added, done_on = _parts(m.group(2))
+    _, month, added, done_on, focus = _parts(m.group(2))
     cleaned, typed = _clean(text)
-    lines[line - 1] = _render(cleaned, typed or month, m.group(1) != " ", added, done_on)
+    lines[line - 1] = _render(cleaned, typed or month, m.group(1) != " ", added, done_on, focus)
     return "\n".join(lines)
+
+
+# --- the week's small domino ------------------------------------------------------------------------------------
+
+def find_focus(content: str | None, week: str, today: date) -> dict | None:
+    """The item marked as `week`'s small domino, if any (items carry the parsed fields of parse_pipeline)."""
+    return next((i for i in parse_pipeline(content, today) if i["focus"] == week), None)
+
+
+def _unfocus(lines: list[str], week: str) -> None:
+    for n, line in enumerate(lines):
+        m = _ITEM.match(line)
+        if m and (f := _FOCUS.search(m.group(2))) and f.group(1) == week:
+            text, month, added, done_on, _ = _parts(m.group(2))
+            lines[n] = _render(text, month, m.group(1) != " ", added, done_on, None)
+
+
+def set_focus(content: str, line: int, expected_hash: str, week: str, today: date) -> str:
+    """Make this item `week`'s small domino: the marker moves off any other item and the item goes to Now (reopened if done)."""
+    lines = content.split("\n")
+    _find(lines, line, expected_hash)
+    _unfocus(lines, week)
+    m = _ITEM.match(lines[line - 1])
+    text, month, added, _, _ = _parts(m.group(2))
+    lines[line - 1] = _render(text, month, False, added, None, week)
+    return move_item("\n".join(lines), line, line_hash(lines[line - 1]), "now", today)
+
+
+def sync_focus(content: str | None, stream: str, name: str | None, week: str, today: date, *,
+               text: str | None = None, done: bool | None = None) -> str | None:
+    """Keep the week's small-domino item in step with its objective line.
+
+    text "" unlinks (the item stays), other text renames the linked item, links an open item with that text, or creates one in Now;
+    done moves the linked item to Done or back to Now. Returns None when there is nothing to change.
+    """
+    item = find_focus(content, week, today)
+    if text is not None:
+        if text.strip() == "":
+            if not item:
+                return None
+            lines = _lines(content, stream, name)
+            _unfocus(lines, week)
+            return "\n".join(lines)
+        if item:
+            return set_text(content or "", item["line"], item["hash"], text)
+        wanted = _clean(text)[0].lower()
+        same = next((i for i in parse_pipeline(content, today) if not i["done"] and i["text"].lower() == wanted), None)
+        if same:  # the objective names an item already in the pipeline: link it instead of adding a twin
+            return set_focus(content or "", same["line"], same["hash"], week, today)
+        out = add_items(content, stream, [text], "now", today, name)
+        added = parse_pipeline(out, today)
+        new = next(i for i in reversed(added) if i["lane"] == "now" and i["focus"] is None and i["text"] == _clean(text)[0])
+        return set_focus(out, new["line"], new["hash"], week, today)
+    if done is not None and item:
+        return move_item(content or "", item["line"], item["hash"], "done" if done else "now", today)
+    return None

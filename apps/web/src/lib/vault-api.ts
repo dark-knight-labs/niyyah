@@ -53,6 +53,8 @@ export const vaultApi = {
   setSuperObjective: (text: string, arabic?: string) => api.put<QuarterData>("/vault/quarter", { text, arabic }),
   updateStream: (stream: string, change: StreamChange) => api.put<QuarterData>("/vault/quarter/stream", { stream, ...change }),
   addStream: (stream: string, change: StreamChange & { name: string }) => api.post<QuarterData>("/vault/quarter/stream", { stream, ...change }),
+  focusPipelineItem: (stream: string, item: PipelineItemData) =>
+    api.put<VaultEditData>("/vault/pipeline/focus", { stream, line: item.line, hash: item.hash }),
   renamePipelineItem: (stream: string, item: PipelineItemData, text: string) =>
     api.put<VaultEditData>("/vault/pipeline/text", { stream, line: item.line, hash: item.hash, text }),
   pipelines: () => api.get<PipelinesData>("/vault/pipelines"),

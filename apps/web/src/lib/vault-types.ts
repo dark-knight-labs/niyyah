@@ -157,6 +157,8 @@ export interface PipelineItemData {
   checkpoint: MonthKey | null;
   added: string | null;
   done_on: string | null;
+  /** Week label ("2026-W41") when this item is that week's small domino. */
+  focus: string | null;
   done: boolean;
   age_days: number;
   stale: boolean;
@@ -168,6 +170,8 @@ export interface PipelineStreamData extends StreamInfo {
 }
 
 export interface PipelinesData {
+  /** The current week; items with focus === week are this week's small dominoes. */
+  week: string;
   now_limit: number;
   stale_days: number;
   streams: PipelineStreamData[];

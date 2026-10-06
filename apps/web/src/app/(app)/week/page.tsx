@@ -45,15 +45,12 @@ export default function WeekPage() {
 
   const itemsOf = (stream: string) => pipelines?.streams.find((s) => s.stream === stream)?.items ?? [];
   const slot = otStreamFor(now, PLANNER_TZ, streams);
-  const slotNow = slot ? itemsOf(slot.id).filter((i) => i.lane === "now") : [];
+  const slotNow = slot ? itemsOf(slot.id).filter((i) => i.lane === "now").sort((a, b) => Number(b.focus === pipelines?.week) - Number(a.focus === pipelines?.week)) : [];
   const done = objectives.items.filter((o) => o.done).length;
   const label = objectives.week.replace(/^\d{4}-/, "");
 
   function pick(stream: string, item: PipelineItemData) {
-    void run(async () => {
-      await vaultApi.setObjective(stream, { text: item.text, done: false, checkpoint: item.checkpoint ?? "" });
-      if (item.lane !== "now") await vaultApi.movePipelineItem(stream, item, "now");
-    });
+    void run(() => vaultApi.focusPipelineItem(stream, item));
   }
 
   return (
@@ -136,6 +133,7 @@ export default function WeekPage() {
                 <li key={it.line} className="flex items-center gap-3 py-1">
                   <Checkbox checked={false} label={`Done: ${it.text}`} onChange={() => void run(() => vaultApi.movePipelineItem(slot.id, it, "done"))} />
                   <span className="min-w-0 flex-1 break-words text-sm">{it.text}</span>
+                  {it.focus === pipelines?.week && <span className="text-[11px] font-bold" style={{ color: slot.color }}>★ this week</span>}
                   {it.checkpoint && <MonthTag label={MONTH_LABEL[it.checkpoint]} color={slot.color} />}
                 </li>
               ))}

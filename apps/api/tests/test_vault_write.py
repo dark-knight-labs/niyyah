@@ -629,3 +629,106 @@ async def test_endpoints_quarter_streams_and_pipelines(auth_client: AsyncClient,
     assert (await auth_client.put("/api/v1/vault/pipeline/move", json={**ref, "lane": "nope"})).status_code == 422
     assert (await auth_client.post("/api/v1/vault/pipeline/nope/items", json={"texts": ["x"]})).status_code == 422
     assert (await auth_client.post("/api/v1/vault/pipeline/sleep/items", json={"texts": ["x"]})).status_code == 422  # objective-only stream
+
+
+# --- the week's small domino is a pipeline item ----------------------------------------------------------------
+
+WEEK = "2026-W41"
+
+
+def test_set_focus_moves_the_marker_and_the_item_to_now():
+    from app.services.vault_pipeline import add_items, parse_pipeline, set_focus
+    out = add_items(None, "kahf", ["A #nov", "B"], "backlog", TODAY)
+    a, b = parse_pipeline(out, TODAY)
+    out = set_focus(out, a["line"], a["hash"], WEEK, TODAY)
+    items = {i["text"]: i for i in parse_pipeline(out, TODAY)}
+    assert items["A"]["lane"] == "now" and items["A"]["focus"] == WEEK and items["A"]["checkpoint"] == "nov"
+    b = items["B"]
+    out = set_focus(out, b["line"], b["hash"], WEEK, TODAY)
+    items = {i["text"]: i for i in parse_pipeline(out, TODAY)}
+    assert items["B"]["focus"] == WEEK and items["B"]["lane"] == "now" and items["A"]["focus"] is None  # one per week
+    assert items["A"]["lane"] == "now"  # the old one keeps its lane, only the marker moves
+
+
+def test_sync_focus_links_an_existing_item_instead_of_adding_a_twin():
+    from app.services.vault_pipeline import add_items, find_focus, parse_pipeline, sync_focus
+    out = add_items(None, "kahf", ["AI Harness Research #oct"], "next", TODAY)
+    out = sync_focus(out, "kahf", "Kahf", WEEK, TODAY, text="ai harness research")
+    items = parse_pipeline(out, TODAY)
+    assert len(items) == 1 and items[0]["focus"] == WEEK and items[0]["lane"] == "now" and items[0]["checkpoint"] == "oct"
+    assert find_focus(out, WEEK, TODAY)["text"] == "AI Harness Research"
+
+
+def test_sync_focus_creates_renames_completes_and_unlinks():
+    from app.services.vault_pipeline import find_focus, parse_pipeline, sync_focus
+    out = sync_focus(None, "kahf", "Kahf", WEEK, TODAY, text="Ship the dashboard #nov")
+    item = find_focus(out, WEEK, TODAY)
+    assert item["text"] == "Ship the dashboard" and item["lane"] == "now" and item["checkpoint"] == "nov"
+    out = sync_focus(out, "kahf", "Kahf", WEEK, TODAY, text="Ship the Grafana dashboard")
+    assert [i["text"] for i in parse_pipeline(out, TODAY)] == ["Ship the Grafana dashboard"]  # renamed, not duplicated
+    out = sync_focus(out, "kahf", "Kahf", WEEK, TODAY, done=True)
+    assert find_focus(out, WEEK, TODAY)["lane"] == "done"
+    out = sync_focus(out, "kahf", "Kahf", WEEK, TODAY, done=False)
+    assert find_focus(out, WEEK, TODAY)["lane"] == "now" and not find_focus(out, WEEK, TODAY)["done"]
+    out = sync_focus(out, "kahf", "Kahf", WEEK, TODAY, text="")
+    assert find_focus(out, WEEK, TODAY) is None and len(parse_pipeline(out, TODAY)) == 1  # unlinked, item kept
+    assert sync_focus(out, "kahf", "Kahf", WEEK, TODAY, done=True) is None  # nothing linked: nothing to do
+
+
+@pytest.mark.asyncio
+async def test_endpoints_small_domino_stays_in_step_with_the_pipeline(auth_client: AsyncClient, vault, monkeypatch):
+    import datetime as dt
+    remote, work = vault
+    monkeypatch.setattr("app.api.v1.vault._local_now", lambda: dt.datetime(2026, 10, 6, 9, 0))
+
+    async def objectives():
+        return {i["stream"]: i for i in (await auth_client.get("/api/v1/vault/objectives")).json()["items"]}
+
+    async def kahf_items():
+        pipes = (await auth_client.get("/api/v1/vault/pipelines")).json()
+        assert pipes["week"] == "2026-W41"
+        return [s for s in pipes["streams"] if s["stream"] == "kahf"][0]["items"]
+
+    # typing an objective creates the pipeline item in Now, marked as the week's small domino
+    r = await auth_client.put("/api/v1/vault/objectives", json={"stream": "kahf", "text": "AI harness research"})
+    assert r.status_code == 200, r.text
+    items = await kahf_items()
+    assert [(i["text"], i["lane"], i["focus"]) for i in items] == [("AI harness research", "now", "2026-W41")]
+    assert "🎯 2026-W41" in _remote_file(remote, "Efforts/Pipeline/kahf.md")
+
+    # renaming the objective renames the item; ticking the objective completes it
+    await auth_client.put("/api/v1/vault/objectives", json={"stream": "kahf", "text": "AI harness research v2"})
+    assert [i["text"] for i in await kahf_items()] == ["AI harness research v2"]
+    await auth_client.put("/api/v1/vault/objectives", json={"stream": "kahf", "done": True})
+    assert (await kahf_items())[0]["lane"] == "done"
+
+    # choosing another pipeline item moves the focus, puts it in Now and rewrites the objective line
+    await auth_client.post("/api/v1/vault/pipeline/kahf/items", json={"texts": ["Ship dashboard #nov"], "lane": "next"})
+    items = await kahf_items()
+    other = [i for i in items if i["text"] == "Ship dashboard"][0]
+    r = await auth_client.put("/api/v1/vault/pipeline/focus", json={"stream": "kahf", "line": other["line"], "hash": other["hash"]})
+    assert r.status_code == 200, r.text
+    items = {i["text"]: i for i in await kahf_items()}
+    assert items["Ship dashboard"]["focus"] == "2026-W41" and items["Ship dashboard"]["lane"] == "now"
+    assert items["AI harness research v2"]["focus"] is None
+    got = (await objectives())["kahf"]
+    assert (got["text"], got["done"], got["checkpoint"]) == ("Ship dashboard", False, "nov")
+
+    # finishing the item in the pipeline ticks the objective; reopening unticks it; removing clears it
+    ref = lambda i: {"stream": "kahf", "line": i["line"], "hash": i["hash"]}  # noqa: E731
+    cur = (await kahf_items())
+    one = [i for i in cur if i["focus"]][0]
+    assert (await auth_client.put("/api/v1/vault/pipeline/move", json={**ref(one), "lane": "done"})).status_code == 200
+    assert (await objectives())["kahf"]["done"] is True
+    one = [i for i in await kahf_items() if i["focus"]][0]
+    assert (await auth_client.put("/api/v1/vault/pipeline/move", json={**ref(one), "lane": "now"})).status_code == 200
+    assert (await objectives())["kahf"]["done"] is False
+    one = [i for i in await kahf_items() if i["focus"]][0]
+    assert (await auth_client.post("/api/v1/vault/pipeline/remove", json=ref(one))).status_code == 200
+    assert (await objectives())["kahf"]["text"] == ""
+
+    # a stale reference is refused
+    assert (await auth_client.put("/api/v1/vault/pipeline/focus", json={"stream": "kahf", "line": 1, "hash": "deadbeef00"})).status_code == 422
+    # objective-only blocks (sleep) have no pipeline: the objective is plain text
+    assert (await auth_client.put("/api/v1/vault/objectives", json={"stream": "sleep", "text": "Bed after Isha"})).status_code == 200
+    assert not (work / "Efforts" / "Pipeline" / "sleep.md").exists()
