@@ -17,6 +17,7 @@ export function BlockTrends({ series }: BlockTrendsProps) {
       <div className="space-y-2">
         {BLOCK_ORDER.map((block) => {
           const values = series.blocks[block] ?? [];
+          if (values.every((v) => v === null)) return null; // e.g. legacy blocks in a post-merge range
           const avg = series.averages[block] ?? 0;
           const color = BLOCK_COLORS[block];
           return (

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { vaultApi } from "@/lib/vault-api";
 import { VaultDayData } from "@/lib/vault-types";
-import { BLOCK_COLORS, BLOCK_LABELS, BLOCK_ORDER } from "@/lib/vault-constants";
+import { BLOCK_COLORS, BLOCK_LABELS, blocksForDay } from "@/lib/vault-constants";
 import { Section } from "@/components/routine/section";
 
 interface Props {
@@ -32,7 +32,7 @@ export function VotesPanel({ day, today, onSaved }: Props) {
   return (
     <Section title="Votes" aside="0–3 per block" error={error}>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(130px,1fr))] gap-2">
-        {BLOCK_ORDER.map((block) => {
+        {blocksForDay(today?.blocks).map((block) => {
           const current = today?.blocks[block] ?? 0;
           return (
             <div key={block} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2.5">

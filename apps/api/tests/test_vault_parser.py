@@ -124,3 +124,21 @@ def test_null_mode_normalizes_to_full_not_none():
     parsed = parse_daily_note(NULL_MODE_DAY, date(2026, 8, 24))
     assert parsed.mode == "full"
     assert parsed.possible == 21
+
+
+def _note(mode, *callouts):
+    body = "".join(f"> [!{c}]+ X\n> - [ ] ⭐ a\n> - [x] ⭐⭐ b\n> - [ ] ⭐⭐⭐ c\n\n" for c in callouts)
+    return f"---\nmode: \"{mode}\"\n---\n{body}"
+
+
+def test_merged_ot_note_scales_possible_to_six_sevenths():
+    for mode, possible in [("full", 18), ("yellow", 12), ("minimal", 10), ("off", 2)]:
+        parsed = parse_daily_note(_note(mode, "soul", "ot", "body"), date(2026, 10, 7))
+        assert parsed.blocks["ot"] == 2
+        assert parsed.possible == possible
+
+
+def test_old_seven_block_note_keeps_full_possible():
+    parsed = parse_daily_note(_note("full", "soul", "onething", "ops"), date(2026, 10, 5))
+    assert parsed.possible == 21
+    assert parsed.total == 6

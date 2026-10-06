@@ -401,3 +401,11 @@ async def test_endpoint_objectives_get_and_put(auth_client: AsyncClient, vault, 
     assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "ot"})).status_code == 422
     assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "nope", "text": "x"})).status_code == 422
     assert (await auth_client.put("/api/v1/vault/objectives", json={"block": "ot", "text": "a" * 201})).status_code == 422
+
+
+def test_set_vote_works_on_merged_ot_block():
+    note = NOTE.replace("> [!body]+ Body", "> [!ot]+ OT\n> - [ ] ⭐ a\n> - [ ] ⭐⭐ b\n> - [ ] ⭐⭐⭐ c\n\n> [!body]+ Body")
+    out = set_vote(note, "ot", 3)
+    parsed = parse_daily_note(out, date(2026, 10, 7))
+    assert parsed.blocks["ot"] == 3
+    assert parsed.possible == 18

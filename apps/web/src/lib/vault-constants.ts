@@ -1,10 +1,21 @@
-export const BLOCK_ORDER = ["soul", "onething", "ops", "body", "distribution", "fnf", "sleep"] as const;
+export const BLOCK_ORDER = ["soul", "onething", "ops", "ot", "body", "distribution", "fnf", "sleep"] as const;
 export type Block = (typeof BLOCK_ORDER)[number];
+
+// 2026-10-06..2026-12-31: ONE Thing + OPS vote as one "OT" block. Old days keep
+// the legacy pair. Delete this and "ot" after the experiment.
+export const LEGACY_MERGED_BLOCKS: readonly Block[] = ["onething", "ops"];
+
+/** Blocks a day actually has, in BLOCK_ORDER; no data -> all but the legacy pair. */
+export function blocksForDay(blocks: Record<string, number> | undefined): Block[] {
+  const present = BLOCK_ORDER.filter((b) => blocks && b in blocks);
+  return present.length > 0 ? present : BLOCK_ORDER.filter((b) => !LEGACY_MERGED_BLOCKS.includes(b));
+}
 
 export const BLOCK_LABELS: Record<Block, string> = {
   soul: "Soul",
   onething: "ONE Thing",
   ops: "OPS",
+  ot: "OT",
   body: "Body",
   distribution: "Distribution",
   fnf: "FnF",
@@ -15,6 +26,7 @@ export const BLOCK_COLORS: Record<Block, string> = {
   soul: "#10b981",
   onething: "#3b82f6",
   ops: "#8b5cf6",
+  ot: "#8b5cf6",
   body: "#f59e0b",
   fnf: "#f43f5e",
   distribution: "#06b6d4",

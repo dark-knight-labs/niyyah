@@ -50,6 +50,7 @@ export function FooterStats({ month, streaks }: FooterStatsProps) {
         <div className="space-y-1.5">
           {BLOCK_ORDER.map((block) => {
             const entry = streaks?.streaks[block];
+            if (streaks && !entry) return null; // block never voted (e.g. legacy or merged)
             const current = entry?.current ?? 0;
             const color = BLOCK_COLORS[block];
             return (

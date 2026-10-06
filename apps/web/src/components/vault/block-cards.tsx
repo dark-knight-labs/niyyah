@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { BLOCK_COLORS, BLOCK_LABELS, BLOCK_ORDER } from "@/lib/vault-constants";
+import { BLOCK_COLORS, BLOCK_LABELS, blocksForDay } from "@/lib/vault-constants";
 import { VaultDayData } from "@/lib/vault-types";
 
 interface BlockCardsProps {
@@ -8,8 +8,8 @@ interface BlockCardsProps {
 
 export function BlockCards({ today }: BlockCardsProps) {
   return (
-    <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
-      {BLOCK_ORDER.map((block) => {
+    <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-7 gap-2">
+      {blocksForDay(today?.blocks).map((block) => {
         const stars = today?.blocks[block] ?? 0;
         const color = BLOCK_COLORS[block];
         return (

@@ -4,7 +4,9 @@ from datetime import date
 
 import yaml
 
-CANONICAL_BLOCKS = ["soul", "onething", "ops", "body", "distribution", "fnf", "sleep"]
+# "ot" = merged ONE Thing + OPS block, used 2026-10-06..2026-12-31 only. The note's
+# own callouts decide; remove "ot" (and OT_SCALE below) after the experiment.
+CANONICAL_BLOCKS = ["soul", "onething", "ops", "ot", "body", "distribution", "fnf", "sleep"]
 
 BLOCK_ALIASES = {
     "mind": "onething",
@@ -22,6 +24,9 @@ MODE_META = {
     "ramadan":    {"possible": 14, "color": "#06b6d4"},
     "fasting":    {"possible": 21, "color": "#f59e0b"},
 }
+
+# Merged note: 6 blocks instead of 7, so the max scales by 6/7.
+OT_SCALE = 6 / 7
 
 _CALLOUT_RE = re.compile(r"^>\s*\[!(\w+)\]")
 _CHECKBOX_RE = re.compile(r"^>\s*-\s*\[( |x)\]\s*(⭐+)")
@@ -103,6 +108,9 @@ def parse_daily_note(content: str, note_date: date) -> ParsedDay:
 
     blocks = _parse_blocks(body)
     total = sum(blocks.values())
+    possible = meta["possible"]
+    if "ot" in blocks and "onething" not in blocks and "ops" not in blocks:
+        possible = round(possible * OT_SCALE)
 
     focus = None
     focus_section = _extract_section(body, "## Focus")
@@ -122,7 +130,7 @@ def parse_daily_note(content: str, note_date: date) -> ParsedDay:
     return ParsedDay(
         date=note_date,
         mode=mode,
-        possible=meta["possible"],
+        possible=possible,
         total=total,
         blocks=blocks,
         focus=focus,
