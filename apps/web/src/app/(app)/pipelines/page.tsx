@@ -78,7 +78,7 @@ export default function PipelinesPage() {
       <PageTitle eyebrow="Backlog feeds the chain" title="Pipelines" sub="Each stream's supply of dominoes. Tag an item with a month to show which checkpoint it pushes." />
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
-      <div role="group" aria-label="Stream" className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-2">
+      <div role="group" aria-label="Stream" className="-mx-1 mb-6 flex gap-2 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {streams.map((s) => (
           <button key={s.id} type="button" aria-pressed={s.id === stream} onClick={() => setPicked(s.id)}
             className="flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-bold transition active:scale-[0.97]"
@@ -96,7 +96,7 @@ export default function PipelinesPage() {
         <ChainCrumbs goal={goal} objective={objective} color={meta.color} />
       </div>
 
-      <div role="tablist" aria-label="Pipeline or notebook" className="mb-5 flex gap-1 overflow-x-auto border-b border-[var(--border)]">
+      <div role="tablist" aria-label="Pipeline or notebook" className="mb-5 flex gap-1 border-b border-[var(--border)]">
         {([["board", "Pipeline", null], ["notebook", "Notebook", entries.length]] as const).map(([id, label, n]) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className="-mb-px min-h-11 shrink-0 border-b-2 border-transparent px-3.5 text-sm font-bold text-[var(--muted-foreground)] aria-selected:border-[var(--accent)] aria-selected:text-[var(--foreground)]">
