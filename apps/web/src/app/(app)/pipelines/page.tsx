@@ -8,6 +8,7 @@ import { Notice, PageTitle, SectionTitle, Spinner } from "@/components/planner/p
 import { Notebook } from "@/components/planner/notebook";
 import { MonthTag, StreamIcon } from "@/components/planner/stream-chip";
 import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
+import { parseDraft } from "@/lib/draft";
 import { vaultApi } from "@/lib/vault-api";
 import { Lane, MonthKey, NotebookEntryData, NotebookKind, PipelineItemData } from "@/lib/vault-types";
 
@@ -63,11 +64,11 @@ export default function PipelinesPage() {
   const openBlockers = blockers.filter((e) => e.open);
   const blocked = (id: string) => notebooks?.streams.find((s) => s.stream === id)?.entries.filter((e) => e.kind === "blocker" && e.open).length ?? 0;
 
-  const lines = draft.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = parseDraft(draft);
   async function add() {
     if (!lines.length) return;
     await run(async () => {
-      await vaultApi.addPipelineItems(stream, lines, "backlog");
+      await vaultApi.addPipelineItems(stream, lines.map((l) => l.text), "backlog", lines.map((l) => l.description));
       setDraft("");
     });
   }
@@ -148,9 +149,9 @@ export default function PipelinesPage() {
       {staleCount > 0 && <p className="mt-3 text-xs text-[var(--warn)]">{staleCount} without a checkpoint for {pipelines.stale_days}+ days. If no month needs it, it may not be a domino.</p>}
 
       <section className="mt-8 max-w-3xl" aria-label="Add to backlog">
-        <SectionTitle title="Add to backlog" aside="one item per line · end a line with #oct #nov or #dec" />
+        <SectionTitle title="Add to backlog" aside="one item per line · indent lines under it for a description · end a line with #oct #nov or #dec" />
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} aria-label="New backlog items"
-          placeholder={"Paste a whole list here.\nShip the DNS dashboard #nov"}
+          placeholder={"PRODUCT - ISSUE|POC|MEETING|FEATURE - Title #nov\n  Description on indented lines under the title.\n  Repro, links, context.\n\nPaste a whole list; each unindented line is one item."}
           className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5 text-sm placeholder:text-[var(--muted-foreground)]" />
         <button type="button" onClick={() => void add()} disabled={busy || lines.length === 0}
           className="mt-2 min-h-11 rounded-xl bg-[var(--accent)] px-5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">

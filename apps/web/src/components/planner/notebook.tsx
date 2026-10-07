@@ -97,7 +97,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all" }: Pr
             <Entry key={`${e.line}-${e.hash}`} entry={e} meta={meta} busy={busy}
               onSave={(t, b) => run(() => vaultApi.editNotebookEntry(stream, e, t, b))}
               onRemove={() => run(() => vaultApi.removeNotebookEntry(stream, e))}
-              onPromote={() => run(() => vaultApi.addPipelineItems(stream, [e.title], "backlog"))} />
+              onPromote={() => run(() => vaultApi.addPipelineItems(stream, [e.title], "backlog", [e.body]))} />
           ))}
         </ul>
       </div>

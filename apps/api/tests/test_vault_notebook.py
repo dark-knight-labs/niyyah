@@ -174,3 +174,14 @@ def test_blocked_by_holds_ids_outside_the_description_and_survives_describing():
         set_blocked_by(out, i["line"], "deadbeef00", ["3fa9c21b"])
     with pytest.raises(ValueError):
         set_blocked_by(out, i["line"], i["hash"], ["Waiting on legal"])  # a title is not an id
+
+
+def test_add_items_can_carry_descriptions():
+    from app.services.vault_pipeline import add_items, parse_pipeline
+    out = add_items(None, "kahf", ["KAHF - ISSUE - Login 500s", "  ", "ALISHA - POC - Eid page"], "backlog", TODAY,
+                    descriptions=["Repro: open /login twice\n\nStack trace in Sentry", "ignored", ""])
+    items = parse_pipeline(out, TODAY)
+    assert [i["text"] for i in items] == ["KAHF - ISSUE - Login 500s", "ALISHA - POC - Eid page"]
+    assert items[0]["description"] == "Repro: open /login twice\n\nStack trace in Sentry" and items[1]["description"] == ""
+    with pytest.raises(ValueError):
+        add_items(None, "kahf", ["a", "b"], "backlog", TODAY, descriptions=["only one"])

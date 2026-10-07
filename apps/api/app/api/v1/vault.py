@@ -696,7 +696,7 @@ async def post_pipeline_items(stream: str, data: PipelineAddIn, user: User = Dep
     today = _local_now().date()
     name = next((s.name for s in await asyncio.to_thread(_streams, today) if s.id == stream), None)
     return await _save_pipeline(
-        stream, lambda c: vault_pipeline.add_items(c, stream, data.texts, data.lane, today, name),
+        stream, lambda c: vault_pipeline.add_items(c, stream, data.texts, data.lane, today, name, data.descriptions),
         f"Niyyah: add {len([t for t in data.texts if t.strip()])} to {stream} pipeline")
 
 

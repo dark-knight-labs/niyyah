@@ -143,16 +143,29 @@ def _section_end(lines: list[str], lane: str) -> int:
     return len(lines) - 1
 
 
-def add_items(content: str | None, stream: str, texts: list[str], lane: str, today: date, name: str | None = None) -> str:
-    """Append one task line per entry of `texts` to the end of `lane` (file and headings created if needed)."""
+def add_items(content: str | None, stream: str, texts: list[str], lane: str, today: date, name: str | None = None,
+              descriptions: list[str] | None = None) -> str:
+    """Append one task line per entry of `texts` to the end of `lane` (file and headings created if needed).
+
+    `descriptions[i]` (optional) becomes item i's notes, the indented lines under its task line.
+    """
     if lane not in LANES or lane == "done":
         raise ValueError(f"cannot add to lane '{lane}'")
-    cleaned = [_clean(t) for t in texts if t.strip()]
+    if descriptions is not None and len(descriptions) != len(texts):
+        raise ValueError("descriptions must line up with texts")
+    notes = descriptions or [""] * len(texts)
+    cleaned = [(*_clean(t), d.strip("\n").rstrip()) for t, d in zip(texts, notes) if t.strip()]
     if not cleaned:
         raise ValueError("nothing to add")
+    if any(len(d) > MAX_DESCRIPTION_CHARS for _, _, d in cleaned):
+        raise ValueError(f"description is longer than {MAX_DESCRIPTION_CHARS} characters")
     lines = _lines(content, stream, name)
     at = _section_end(lines, lane)
-    new = [_render(t, m, False, today.isoformat(), None) for t, m in cleaned]
+    new: list[str] = []
+    for t, m, d in cleaned:
+        new.append(_render(t, m, False, today.isoformat(), None))
+        if d.strip():
+            new += [f"  {l}".rstrip() if l.strip() else "  " for l in d.split("\n")]
     lines[at:at] = new
     return "\n".join(lines)
 

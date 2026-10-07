@@ -65,8 +65,8 @@ export const vaultApi = {
   blockPipelineItem: (stream: string, item: PipelineItemData, ids: string[]) =>
     api.put<VaultEditData>("/vault/pipeline/blocked-by", { stream, line: item.line, hash: item.hash, ids }),
   pipelines: () => api.get<PipelinesData>("/vault/pipelines"),
-  addPipelineItems: (stream: string, texts: string[], lane: Lane = "backlog") =>
-    api.post<VaultEditData>(`/vault/pipeline/${stream}/items`, { texts, lane }),
+  addPipelineItems: (stream: string, texts: string[], lane: Lane = "backlog", descriptions?: string[]) =>
+    api.post<VaultEditData>(`/vault/pipeline/${stream}/items`, { texts, lane, descriptions }),
   movePipelineItem: (stream: string, item: PipelineItemData, lane: Lane) =>
     api.put<VaultEditData>("/vault/pipeline/move", { stream, line: item.line, hash: item.hash, lane }),
   tagPipelineItem: (stream: string, item: PipelineItemData, checkpoint: MonthKey | "") =>

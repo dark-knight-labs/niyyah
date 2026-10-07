@@ -262,6 +262,7 @@ class PipelinesResponse(BaseModel):
 
 class PipelineAddIn(BaseModel):
     texts: list[str]
+    descriptions: list[str] | None = None  # optional notes, one per text
     lane: Lane = "backlog"
 
 
