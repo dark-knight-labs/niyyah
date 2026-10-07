@@ -61,3 +61,10 @@ Reviews page, retiring the old DB-backed pages, drag-and-drop.
 ## Update 2026-10-07 (descriptions)
 
 - A pipeline item can carry a description (details, context, links): the indented lines directly under its task line, so Obsidian shows them as the task's notes. They move and are removed with the item; `PUT /pipeline/description` replaces them (blank clears, max 4000 chars). `GET /pipelines` returns `description` per item. The card shows it (two lines, tap to expand) and a notes button edits it.
+
+## Update 2026-10-07 (block notebook)
+
+- Each block has a notebook for what the lanes cannot hold: ideas, brainstorms, links, meeting notes and blockers. File: `Efforts/Streams/<stream>.md`, one `##` entry per note, newest first, then `[kind:: meeting] [date:: 2026-10-07]` (blockers add `[status:: open|cleared]`) and free markdown. Obsidian reads the fields as Dataview inline fields. A `#`/`##` heading typed in a body is demoted to `###` so it cannot split the entry.
+- API (owner only, under /vault): `GET /notebooks`; `POST /notebook/{stream}/entries {kind,title,body}`; `PUT /notebook/entry` (title, body); `PUT /notebook/blocker {open}`; `POST /notebook/remove`. Entries are identified by heading line plus a hash of the whole entry; a stale reference is refused (422), same as pipeline items. A blank title becomes the first body line, then the kind.
+- Pipelines page: a Pipeline | Notebook tab bar, a red blocker bar above the lanes when the block has open blockers, and an "N blocked" count on the block pills. "Promote to backlog" on an idea, brainstorm or meeting adds its title to the Backlog lane.
+- Not built: a per-card "blocked by" chip (needs a card-to-blocker link; the mock matched by title).

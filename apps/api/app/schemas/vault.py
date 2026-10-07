@@ -317,3 +317,41 @@ class GoogleConnectResponse(BaseModel):
 class CalendarEventsResponse(BaseModel):
     events: list[CalendarEventResponse]
     errors: list[str]
+
+
+NotebookKind = Literal["idea", "brainstorm", "link", "meeting", "blocker"]
+
+
+class NotebookEntry(BaseModel):
+    line: int
+    hash: str
+    kind: NotebookKind
+    title: str
+    date: str | None
+    body: str
+    open: bool | None  # blockers only: True until cleared
+    url: str | None  # links only: the first URL in the body
+
+
+class NotebookStreamData(StreamInfo):
+    path: str
+    entries: list[NotebookEntry]
+
+
+class NotebooksResponse(BaseModel):
+    streams: list[NotebookStreamData]
+
+
+class NotebookAddIn(BaseModel):
+    kind: NotebookKind
+    title: str = ""
+    body: str = ""
+
+
+class NotebookEditIn(PipelineRefIn):
+    title: str
+    body: str
+
+
+class NotebookBlockerIn(PipelineRefIn):
+    open: bool

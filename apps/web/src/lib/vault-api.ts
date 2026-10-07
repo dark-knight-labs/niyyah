@@ -11,6 +11,9 @@ import {
   VaultObjectivesData,
   Lane,
   MonthKey,
+  NotebookEntryData,
+  NotebookKind,
+  NotebooksData,
   PipelineItemData,
   PipelinesData,
   QuarterData,
@@ -68,5 +71,14 @@ export const vaultApi = {
     api.put<VaultEditData>("/vault/pipeline/checkpoint", { stream, line: item.line, hash: item.hash, checkpoint }),
   removePipelineItem: (stream: string, item: PipelineItemData) =>
     api.post<VaultEditData>("/vault/pipeline/remove", { stream, line: item.line, hash: item.hash }),
+  notebooks: () => api.get<NotebooksData>("/vault/notebooks"),
+  addNotebookEntry: (stream: string, kind: NotebookKind, title: string, body: string) =>
+    api.post<VaultEditData>(`/vault/notebook/${stream}/entries`, { kind, title, body }),
+  editNotebookEntry: (stream: string, entry: NotebookEntryData, title: string, body: string) =>
+    api.put<VaultEditData>("/vault/notebook/entry", { stream, line: entry.line, hash: entry.hash, title, body }),
+  setBlocker: (stream: string, entry: NotebookEntryData, open: boolean) =>
+    api.put<VaultEditData>("/vault/notebook/blocker", { stream, line: entry.line, hash: entry.hash, open }),
+  removeNotebookEntry: (stream: string, entry: NotebookEntryData) =>
+    api.post<VaultEditData>("/vault/notebook/remove", { stream, line: entry.line, hash: entry.hash }),
   sync: () => api.post<VaultSyncData>("/vault/sync", {}),
 };

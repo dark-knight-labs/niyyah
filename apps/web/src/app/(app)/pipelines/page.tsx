@@ -5,10 +5,11 @@ import { ArrowDown, ArrowUp, Check, ChevronDown, NotebookPen, Pencil, Star, Tras
 import { usePlanner } from "@/hooks/use-planner";
 import { ChainCrumbs } from "@/components/planner/chain-crumbs";
 import { Notice, PageTitle, SectionTitle, Spinner } from "@/components/planner/page-title";
+import { Notebook } from "@/components/planner/notebook";
 import { MonthTag, StreamIcon } from "@/components/planner/stream-chip";
 import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
-import { Lane, MonthKey, PipelineItemData } from "@/lib/vault-types";
+import { Lane, MonthKey, NotebookKind, PipelineItemData } from "@/lib/vault-types";
 
 const LANES: { id: Lane; label: string; hint: string }[] = [
   { id: "now", label: "Now", hint: "committed this week" },
@@ -17,14 +18,18 @@ const LANES: { id: Lane; label: string; hint: string }[] = [
 ];
 
 export default function PipelinesPage() {
-  const { loading, owner, quarter, pipelines, objectives, streams, error, reload } = usePlanner();
+  const { loading, owner, quarter, pipelines, objectives, notebooks, streams, error, reload } = usePlanner();
   const [picked, setPicked] = useState<string | null>(null);
+  const [tab, setTab] = useState<"board" | "notebook">("board");
+  const [nbFilter, setNbFilter] = useState<NotebookKind | "all">("all");
   const [problem, setProblem] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setPicked(new URLSearchParams(window.location.search).get("stream"));
+    const query = new URLSearchParams(window.location.search);
+    setPicked(query.get("stream"));
+    if (query.get("tab") === "notebook") setTab("notebook");
   }, []);
 
   async function run(action: () => Promise<unknown>) {
@@ -53,6 +58,9 @@ export default function PipelinesPage() {
   const open = (id: string) => pipelines.streams.find((s) => s.stream === id)?.items.filter((i) => i.lane !== "done").length ?? 0;
   const doneItems = items.filter((i) => i.lane === "done").reverse();
   const staleCount = items.filter((i) => i.stale).length;
+  const entries = notebooks?.streams.find((s) => s.stream === stream)?.entries ?? [];
+  const openBlockers = entries.filter((e) => e.kind === "blocker" && e.open);
+  const blocked = (id: string) => notebooks?.streams.find((s) => s.stream === id)?.entries.filter((e) => e.kind === "blocker" && e.open).length ?? 0;
 
   const lines = draft.split("\n").map((l) => l.trim()).filter(Boolean);
   async function add() {
@@ -76,6 +84,7 @@ export default function PipelinesPage() {
             <s.icon size={15} style={{ color: s.color }} aria-hidden="true" />
             {s.label}
             <span className="font-medium tabular-nums text-[var(--muted-foreground)]">{open(s.id)}</span>
+            {blocked(s.id) > 0 && <span className="text-xs font-bold text-[var(--destructive)]">{blocked(s.id)} blocked</span>}
           </button>
         ))}
       </div>
@@ -85,6 +94,26 @@ export default function PipelinesPage() {
         <ChainCrumbs goal={goal} objective={objective} color={meta.color} />
       </div>
 
+      <div role="tablist" aria-label="Pipeline or notebook" className="mb-5 flex gap-1 overflow-x-auto border-b border-[var(--border)]">
+        {([["board", "Pipeline", null], ["notebook", "Notebook", entries.length]] as const).map(([id, label, n]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+            className="-mb-px min-h-11 shrink-0 border-b-2 border-transparent px-3.5 text-sm font-bold text-[var(--muted-foreground)] aria-selected:border-[var(--accent)] aria-selected:text-[var(--foreground)]">
+            {label}{n !== null && <span className="ml-1.5 font-medium tabular-nums">{n}</span>}
+          </button>
+        ))}
+      </div>
+
+      {tab === "notebook" ? (
+        <Notebook key={`${stream}-${nbFilter}`} meta={meta} entries={entries} busy={busy} run={run} initialFilter={nbFilter} />
+      ) : (
+      <>
+      {openBlockers.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-[var(--destructive)] px-3.5 py-2.5 text-sm">
+          <b className="text-[var(--destructive)]">{openBlockers.length} open blocker{openBlockers.length > 1 ? "s" : ""}</b>
+          <span className="min-w-0 break-words text-[var(--muted-foreground)]">{openBlockers.map((b) => b.title).join(" · ")}</span>
+          <button type="button" onClick={() => { setNbFilter("blocker"); setTab("notebook"); }} className="font-bold text-[var(--destructive)] underline underline-offset-2">Open notebook</button>
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-3">
         {LANES.map((lane) => {
           const laneItems = items.filter((i) => i.lane === lane.id);
@@ -143,6 +172,8 @@ export default function PipelinesPage() {
             ))}
           </ul>
         </details>
+      )}
+      </>
       )}
     </div>
   );

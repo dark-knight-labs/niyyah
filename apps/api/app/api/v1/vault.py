@@ -58,6 +58,10 @@ from app.schemas.vault import (
     VaultScheduleResponse,
     VaultStreakEntry,
     VaultStreaksResponse,
+    NotebookAddIn,
+    NotebookBlockerIn,
+    NotebookEditIn,
+    NotebooksResponse,
     VaultSyncResponse,
     VaultWeekResponse,
 )
@@ -69,7 +73,8 @@ from app.services.vault_calendar import events_for_day
 from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
-from app.services import vault_pipeline
+from app.services import vault_notebook, vault_pipeline
+from app.services.vault_notebook import notebook_path, parse_notebook
 from app.services.vault_pipeline import NOW_LIMIT, STALE_DAYS, parse_pipeline, pipeline_path
 from app.services.vault_quarter import (
     add_stream, load_streams, parse_quarter, quarter_for, quarter_months, quarter_path, set_super_objective, update_stream,
@@ -774,3 +779,61 @@ async def post_pipeline_remove(data: PipelineRefIn, user: User = Depends(require
     return await _save_pipeline_and_objective(
         data.stream, lambda c: vault_pipeline.remove_item(c or "", data.line, data.hash), objective_edit,
         f"Niyyah: remove from {data.stream} pipeline")
+
+
+# --- stream notebooks: ideas, brainstorms, links, meetings, blockers (owner only) ---------------------------------
+
+def _notebooks_response(today: date) -> NotebooksResponse:
+    streams = []
+    for s in _streams(today):
+        if not s.goal or s.archived:
+            continue
+        path = notebook_path(s.id)
+        streams.append({**_info(s), "path": path, "entries": parse_notebook(_read(path))})
+    return NotebooksResponse(streams=streams)
+
+
+@router.get("/notebooks", response_model=NotebooksResponse)
+async def get_notebooks(user: User = Depends(require_editor)):
+    return await asyncio.to_thread(_notebooks_response, _local_now().date())
+
+
+async def _save_notebook(stream: str, edit, message: str) -> EditResponse:
+    streams = await asyncio.to_thread(_streams, _local_now().date())
+    if stream not in {s.id for s in streams if s.goal and not s.archived}:
+        raise HTTPException(status_code=422, detail=f"unknown stream '{stream}'")
+    try:
+        commit = await asyncio.to_thread(commit_edits, {notebook_path(stream): edit}, message)
+    except (ValueError, VaultWriteError) as exc:
+        raise _write_error(exc)
+    return EditResponse(commit=commit, day=None)
+
+
+@router.post("/notebook/{stream}/entries", response_model=EditResponse)
+async def post_notebook_entry(stream: str, data: NotebookAddIn, user: User = Depends(require_editor)):
+    today = _local_now().date()
+    name = next((s.name for s in await asyncio.to_thread(_streams, today) if s.id == stream), None)
+    return await _save_notebook(
+        stream, lambda c: vault_notebook.add_entry(c, stream, name, data.kind, data.title, data.body, today),
+        f"Niyyah: add a {data.kind} to the {stream} notebook")
+
+
+@router.put("/notebook/entry", response_model=EditResponse)
+async def put_notebook_entry(data: NotebookEditIn, user: User = Depends(require_editor)):
+    return await _save_notebook(
+        data.stream, lambda c: vault_notebook.set_entry(c or "", data.line, data.hash, data.title, data.body),
+        f"Niyyah: edit an entry in the {data.stream} notebook")
+
+
+@router.put("/notebook/blocker", response_model=EditResponse)
+async def put_notebook_blocker(data: NotebookBlockerIn, user: User = Depends(require_editor)):
+    return await _save_notebook(
+        data.stream, lambda c: vault_notebook.set_blocker(c or "", data.line, data.hash, data.open),
+        f"Niyyah: {'reopen' if data.open else 'clear'} a blocker in the {data.stream} notebook")
+
+
+@router.post("/notebook/remove", response_model=EditResponse)
+async def post_notebook_remove(data: PipelineRefIn, user: User = Depends(require_editor)):
+    return await _save_notebook(
+        data.stream, lambda c: vault_notebook.remove_entry(c or "", data.line, data.hash),
+        f"Niyyah: remove an entry from the {data.stream} notebook")

@@ -178,3 +178,27 @@ export interface PipelinesData {
   stale_days: number;
   streams: PipelineStreamData[];
 }
+
+export type NotebookKind = "idea" | "brainstorm" | "link" | "meeting" | "blocker";
+
+export interface NotebookEntryData {
+  line: number;
+  hash: string;
+  kind: NotebookKind;
+  title: string;
+  date: string | null;
+  body: string;
+  /** Blockers only: true until cleared. */
+  open: boolean | null;
+  /** Links only: the first URL in the body. */
+  url: string | null;
+}
+
+export interface NotebookStreamData extends StreamInfo {
+  path: string;
+  entries: NotebookEntryData[];
+}
+
+export interface NotebooksData {
+  streams: NotebookStreamData[];
+}
