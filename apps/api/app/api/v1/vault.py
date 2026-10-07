@@ -773,7 +773,7 @@ async def put_pipeline_description(data: PipelineDescriptionIn, user: User = Dep
 @router.put("/pipeline/blocked-by", response_model=EditResponse)
 async def put_pipeline_blocked_by(data: PipelineBlockedByIn, user: User = Depends(require_editor)):
     return await _save_pipeline(
-        data.stream, lambda c: vault_pipeline.set_blocked_by(c or "", data.line, data.hash, data.titles),
+        data.stream, lambda c: vault_pipeline.set_blocked_by(c or "", data.line, data.hash, data.ids),
         f"Niyyah: set what an item in the {data.stream} pipeline waits on")
 
 

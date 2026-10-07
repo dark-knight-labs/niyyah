@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 import pytest
@@ -102,7 +103,7 @@ async def test_endpoints_notebook(auth_client: AsyncClient, vault, monkeypatch):
 
     r = await auth_client.post(f"{base}/notebook/kahf/entries", json={"kind": "blocker", "title": "Waiting on legal", "body": "owner: legal"})
     assert r.status_code == 200, r.text
-    assert "[kind:: blocker] [date:: 2026-10-07] [status:: open]" in _remote_file(remote, "Efforts/Streams/kahf.md")
+    assert re.search(r"\[kind:: blocker\] \[date:: 2026-10-07\] \[id:: [0-9a-f]{8}\] \[status:: open\]", _remote_file(remote, "Efforts/Streams/kahf.md"))
     await auth_client.post(f"{base}/notebook/kahf/entries", json={"kind": "idea", "title": "Passkeys", "body": ""})
 
     data = (await auth_client.get(f"{base}/notebooks")).json()
@@ -130,23 +131,46 @@ async def test_endpoints_notebook(auth_client: AsyncClient, vault, monkeypatch):
     assert (await auth_client.post(f"{base}/notebook/nope/entries", json={"kind": "idea", "title": "x", "body": "y"})).status_code == 422
 
 
-# --- pipeline items blocked by a notebook blocker ---------------------------------------------------------------
+# --- ids and pipeline items blocked by a notebook blocker --------------------------------------------------------
 
-def test_blocked_by_is_kept_out_of_the_description_and_survives_describing():
+def test_entries_get_a_stable_id_that_survives_edits_and_renames():
+    out = add_entry(None, "kahf", "Kahf", "blocker", "Waiting on legal", "", TODAY)
+    out = add_entry(out, "kahf", "Kahf", "idea", "Other", "", TODAY)
+    ids = {e["title"]: e["id"] for e in parse_notebook(out)}
+    assert all(i and len(i) == 8 for i in ids.values()) and len(set(ids.values())) == 2
+    b = [e for e in parse_notebook(out) if e["title"] == "Waiting on legal"][0]
+    out = set_entry(out, b["line"], b["hash"], "Legal review of the DPA", "x")
+    b = [e for e in parse_notebook(out) if e["title"] == "Legal review of the DPA"][0]
+    out = set_blocker(out, b["line"], b["hash"], False)
+    assert [e["id"] for e in parse_notebook(out) if e["kind"] == "blocker"] == [ids["Waiting on legal"]]
+
+
+def test_hand_written_entries_are_given_an_id_on_the_next_write():
+    note = "---\ntype: stream-notes\nstream: kahf\n---\n# Kahf notebook\n\n## Typed in Obsidian\n[kind:: idea] [date:: 2026-10-01]\nbody\n\n## No meta line\nbare\n"
+    assert [e["id"] for e in parse_notebook(note)] == [None, None]
+    out = add_entry(note, "kahf", "Kahf", "idea", "New", "", TODAY)
+    got = parse_notebook(out)
+    assert [e["title"] for e in got] == ["New", "Typed in Obsidian", "No meta line"] and all(e["id"] for e in got)
+    assert got[1]["body"] == "body" and got[2]["body"] == "bare"
+
+
+def test_blocked_by_holds_ids_outside_the_description_and_survives_describing():
     from app.services.vault_pipeline import add_items, parse_pipeline, set_blocked_by, set_description
     out = add_items(None, "kahf", ["SSO login"], "next", TODAY)
     i = parse_pipeline(out, TODAY)[0]
     out = set_description(out, i["line"], i["hash"], "needs the DPA")
     i = parse_pipeline(out, TODAY)[0]
-    out = set_blocked_by(out, i["line"], i["hash"], ["Waiting on legal", " Waiting  on legal ", "Cloudflare token"])
+    out = set_blocked_by(out, i["line"], i["hash"], ["3fa9c21b", "3fa9c21b", "77aa01cd"])
     i = parse_pipeline(out, TODAY)[0]
-    assert i["blocked_by"] == ["Waiting on legal", "Cloudflare token"] and i["description"] == "needs the DPA"
-    assert "  blocked-by:: Waiting on legal\n  blocked-by:: Cloudflare token\n  needs the DPA" in out
+    assert i["blocked_by"] == ["3fa9c21b", "77aa01cd"] and i["description"] == "needs the DPA"
+    assert "  blocked-by:: 3fa9c21b\n  blocked-by:: 77aa01cd\n  needs the DPA" in out
     out = set_description(out, i["line"], i["hash"], "")  # clearing the description keeps the links
     i = parse_pipeline(out, TODAY)[0]
-    assert i["blocked_by"] == ["Waiting on legal", "Cloudflare token"] and i["description"] == ""
+    assert i["blocked_by"] == ["3fa9c21b", "77aa01cd"] and i["description"] == ""
     out = set_blocked_by(out, i["line"], i["hash"], [])
     i = parse_pipeline(out, TODAY)[0]
     assert i["blocked_by"] == [] and "blocked-by" not in out
     with pytest.raises(ValueError):
-        set_blocked_by(out, i["line"], "deadbeef00", ["x"])
+        set_blocked_by(out, i["line"], "deadbeef00", ["3fa9c21b"])
+    with pytest.raises(ValueError):
+        set_blocked_by(out, i["line"], i["hash"], ["Waiting on legal"])  # a title is not an id

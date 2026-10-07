@@ -155,7 +155,7 @@ export interface PipelineItemData {
   text: string;
   /** Free notes (details, context) kept as indented lines under the task. */
   description: string;
-  /** Titles of notebook blockers this item waits on. */
+  /** Ids of the notebook blockers this item waits on. */
   blocked_by: string[];
   lane: Lane;
   checkpoint: MonthKey | null;
@@ -185,6 +185,8 @@ export type NotebookKind = "idea" | "brainstorm" | "link" | "meeting" | "blocker
 
 export interface NotebookEntryData {
   line: number;
+  /** Stable across renames; null only until the note is next written. */
+  id: string | null;
   hash: string;
   kind: NotebookKind;
   title: string;

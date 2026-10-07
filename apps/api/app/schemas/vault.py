@@ -237,7 +237,7 @@ class PipelineItem(BaseModel):
     hash: str
     text: str
     description: str = ""  # free notes kept as indented lines under the task
-    blocked_by: list[str] = []  # titles of notebook blockers this item waits on
+    blocked_by: list[str] = []  # ids of notebook blockers this item waits on
     lane: Lane
     checkpoint: Month | None
     added: str | None
@@ -325,6 +325,7 @@ NotebookKind = Literal["idea", "brainstorm", "link", "meeting", "blocker"]
 
 class NotebookEntry(BaseModel):
     line: int
+    id: str | None  # stable across renames; None only until the note is next written
     hash: str
     kind: NotebookKind
     title: str
@@ -359,4 +360,4 @@ class NotebookBlockerIn(PipelineRefIn):
 
 
 class PipelineBlockedByIn(PipelineRefIn):
-    titles: list[str]
+    ids: list[str]

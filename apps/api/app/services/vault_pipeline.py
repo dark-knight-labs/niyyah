@@ -22,7 +22,8 @@ NOW_LIMIT = 3
 STALE_DAYS = 14
 MAX_TEXT_CHARS = 300
 MAX_DESCRIPTION_CHARS = 4000
-BLOCKED_BY = "blocked-by:: "  # a note line naming a notebook blocker by title; kept out of the description
+BLOCKED_BY = "blocked-by:: "  # a note line naming a notebook blocker by its id; kept out of the description
+_BLOCKER_ID = re.compile(r"^[a-z0-9]{4,16}$")
 _ITEM = re.compile(r"^- \[([ xX])\] (.*)$")
 _ADDED = re.compile(r"\s*➕\s*(\d{4}-\d{2}-\d{2})")
 _DONE = re.compile(r"\s*✅\s*(\d{4}-\d{2}-\d{2})")
@@ -222,19 +223,18 @@ def set_description(content: str, line: int, expected_hash: str, text: str) -> s
     return "\n".join(lines)
 
 
-def set_blocked_by(content: str, line: int, expected_hash: str, titles: list[str]) -> str:
-    """Replace the notebook blockers an item waits on (matched by title); the description stays."""
+def set_blocked_by(content: str, line: int, expected_hash: str, ids: list[str]) -> str:
+    """Replace the notebook blockers (by entry id) an item waits on; the description stays."""
     lines = content.split("\n")
     _find(lines, line, expected_hash)
-    clean = []
-    for t in titles:
-        t = " ".join(t.split())
-        if t and t not in clean:
-            if len(t) > MAX_TEXT_CHARS:
-                raise ValueError(f"blocker title is longer than {MAX_TEXT_CHARS} characters")
-            clean.append(t)
+    clean: list[str] = []
+    for i in ids:
+        if not _BLOCKER_ID.match(i):
+            raise ValueError(f"'{i}' is not a blocker id")
+        if i not in clean:
+            clean.append(i)
     desc = _description(lines, line - 1)
-    notes = [f"  {BLOCKED_BY}{t}" for t in clean] + ([f"  {l}".rstrip() if l.strip() else "  " for l in desc.split("\n")] if desc.strip() else [])
+    notes = [f"  {BLOCKED_BY}{i}" for i in clean] + ([f"  {l}".rstrip() if l.strip() else "  " for l in desc.split("\n")] if desc.strip() else [])
     lines[line:_note_end(lines, line - 1)] = notes
     return "\n".join(lines)
 

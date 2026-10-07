@@ -131,7 +131,7 @@ export default function PipelinesPage() {
                 {laneItems.length === 0 && <li className="px-1 py-2 text-sm text-[var(--muted-foreground)]">{lane.id === "now" ? "Nothing committed. Promote one from Next." : "Empty."}</li>}
                 {laneItems.map((item) => (
                   <ItemCard key={item.line} item={item} meta={meta} week={pipelines.week} busy={busy} staleDays={pipelines.stale_days} blockers={blockers}
-                    onBlock={(titles) => run(() => vaultApi.blockPipelineItem(stream, item, titles))}
+                    onBlock={(ids) => run(() => vaultApi.blockPipelineItem(stream, item, ids))}
                     onMove={(to) => run(() => vaultApi.movePipelineItem(stream, item, to))}
                     onTag={(m) => run(() => vaultApi.tagPipelineItem(stream, item, m))}
                     onRemove={() => run(() => vaultApi.removePipelineItem(stream, item))}
@@ -191,7 +191,7 @@ interface CardProps {
   staleDays: number;
   /** The block's notebook blockers, which this item can wait on. */
   blockers: NotebookEntryData[];
-  onBlock: (titles: string[]) => void;
+  onBlock: (ids: string[]) => void;
   onMove: (lane: Lane) => void;
   onTag: (month: MonthKey | "") => void;
   onRemove: () => void;
@@ -207,8 +207,7 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
   const [notes, setNotes] = useState(item.description);
   const [open, setOpen] = useState(false);
   const [linking, setLinking] = useState(false);
-  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-  const waiting = item.lane === "done" ? [] : item.blocked_by.map((title) => ({ title, found: blockers.find((b) => same(b.title, title)) })).filter((w) => !w.found || w.found.open);
+  const waiting = item.lane === "done" ? [] : item.blocked_by.map((id) => ({ id, found: blockers.find((b) => b.id === id) })).filter((w) => !w.found || w.found.open);
   const isOne = item.focus === week;
   const order: Lane[] = ["now", "next", "backlog"];
   const at = order.indexOf(item.lane);
@@ -243,10 +242,10 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
       {waiting.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {waiting.map((w) => (
-            <span key={w.title} className="inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-px text-[11px] font-bold"
+            <span key={w.id} className="inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-px text-[11px] font-bold"
               style={w.found ? { color: "var(--destructive)", background: "color-mix(in srgb, var(--destructive) 12%, var(--background))" } : { color: "var(--muted-foreground)", background: "var(--muted)" }}>
               <OctagonAlert size={11} className="shrink-0" aria-hidden="true" />
-              <span className="min-w-0 break-words">{w.found ? w.title : `blocker missing: ${w.title}`}</span>
+              <span className="min-w-0 break-words">{w.found ? w.found.title : "blocker deleted"}</span>
             </span>
           ))}
         </div>
@@ -257,9 +256,9 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
           {blockers.length === 0 && <p className="text-xs text-[var(--muted-foreground)]">No blockers yet. Add one in the Notebook.</p>}
           {blockers.map((b) => (
             <label key={`${b.line}-${b.hash}`} className="flex items-start gap-2 text-xs">
-              <input type="checkbox" disabled={busy} className="mt-0.5 accent-[var(--accent)]" checked={item.blocked_by.some((t) => same(t, b.title))}
-                onChange={(e) => onBlock(e.target.checked ? [...item.blocked_by, b.title] : item.blocked_by.filter((t) => !same(t, b.title)))} />
-              <span className={`min-w-0 break-words ${b.open ? "" : "text-[var(--muted-foreground)] line-through"}`}>{b.title}</span>
+              <input type="checkbox" disabled={busy || !b.id} className="mt-0.5 accent-[var(--accent)]" checked={!!b.id && item.blocked_by.includes(b.id)}
+                onChange={(e) => b.id && onBlock(e.target.checked ? [...item.blocked_by, b.id] : item.blocked_by.filter((i) => i !== b.id))} />
+              <span className={`min-w-0 break-words ${b.open ? "" : "text-[var(--muted-foreground)] line-through"}`}>{b.title}{!b.id && " (save any change in the Notebook to link it)"}</span>
             </label>
           ))}
           <button type="button" onClick={() => setLinking(false)} className="justify-self-start text-[11px] font-bold text-[var(--accent)]">Done</button>

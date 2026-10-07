@@ -6,12 +6,14 @@
     - [ ] Send the spec
 
 An entry is a `##` heading, one Dataview-style inline-field line (kind, date, and status for blockers),
-then free markdown. Kinds: idea, brainstorm, link, meeting, blocker (status:: open or cleared).
+then free markdown. Every entry carries a stable `[id:: 3fa9c21b]` (assigned on creation, backfilled on any write)
+so other notes, like a pipeline item's `blocked-by::`, can point at it and survive a rename. Kinds: idea, brainstorm, link, meeting, blocker (status:: open or cleared).
 Newest entries sit first. An entry is identified by its heading line number plus a hash of its whole text,
 so a moved or changed entry is refused instead of mis-edited. Pure functions (string in, string out);
 vault_git.py does the committing.
 """
 import re
+import uuid
 from datetime import date
 
 from app.services.vault_streams import SLUG
@@ -51,7 +53,7 @@ def _blocks(lines: list[str]) -> list[tuple[int, int]]:
 
 
 def parse_notebook(content: str | None) -> list[dict]:
-    """Entries in file order: {line, hash, kind, title, date, body, open, url}. `open` is None unless kind is blocker."""
+    """Entries in file order: {line, hash, id, kind, title, date, body, open, url}. `open` is None unless kind is blocker."""
     lines = (content or "").split("\n")
     entries = []
     for s, end in _blocks(lines):
@@ -64,7 +66,7 @@ def parse_notebook(content: str | None) -> list[dict]:
         body = "\n".join(lines[body_from:end])
         url = _URL.search(body) if kind == "link" else None
         entries.append({
-            "line": s + 1, "hash": line_hash("\n".join(lines[s:end])), "kind": kind if kind in KINDS else "idea",
+            "line": s + 1, "id": fields.get("id"), "hash": line_hash("\n".join(lines[s:end])), "kind": kind if kind in KINDS else "idea",
             "title": lines[s][3:].strip(), "date": fields.get("date"), "body": body,
             "open": (fields.get("status") != "cleared") if kind == "blocker" else None,
             "url": url.group(0) if url else None,
@@ -89,8 +91,8 @@ def _clean(kind: str, title: str, body: str) -> tuple[str, str]:
     return title, body
 
 
-def _render(kind: str, title: str, body: str, day: str, status: str | None) -> list[str]:
-    meta = f"[kind:: {kind}] [date:: {day}]" + (f" [status:: {status}]" if status else "")
+def _render(kind: str, title: str, body: str, day: str, status: str | None, entry_id: str) -> list[str]:
+    meta = f"[kind:: {kind}] [date:: {day}] [id:: {entry_id}]" + (f" [status:: {status}]" if status else "")
     return [f"## {title}", meta, *([body] if body else []), ""]
 
 
@@ -103,7 +105,25 @@ def add_entry(content: str | None, stream: str, name: str | None, kind: str, tit
     if first is None and lines and lines[-1] != "":
         lines.append("")
         at = len(lines)
-    lines[at:at] = _render(kind, title, body, today.isoformat(), "open" if kind == "blocker" else None)
+    lines[at:at] = _render(kind, title, body, today.isoformat(), "open" if kind == "blocker" else None, _new_id())
+    return _with_ids("\n".join(lines))
+
+
+def _new_id() -> str:
+    return uuid.uuid4().hex[:8]
+
+
+def _with_ids(content: str) -> str:
+    """Give every entry that lacks an id one (hand-written or older entries), keeping all else as is."""
+    lines = content.split("\n")
+    for s, end in reversed(_blocks(lines)):
+        has_meta = s + 1 < end and _FIELD.match(lines[s + 1])
+        if has_meta and "[id:: " in lines[s + 1]:
+            continue
+        if has_meta:
+            lines[s + 1] += f" [id:: {_new_id()}]"
+        else:
+            lines.insert(s + 1, f"[kind:: idea] [id:: {_new_id()}]")
     return "\n".join(lines)
 
 
@@ -121,8 +141,8 @@ def set_entry(content: str, line: int, expected_hash: str, title: str, body: str
     entry = next(e for e in parse_notebook(content) if e["line"] == line)
     title, body = _clean(entry["kind"], title, body)
     status = None if entry["open"] is None else ("open" if entry["open"] else "cleared")
-    lines[s:end] = _render(entry["kind"], title, body, entry["date"] or "", status)[:-1]
-    return "\n".join(lines)
+    lines[s:end] = _render(entry["kind"], title, body, entry["date"] or "", status, entry["id"] or _new_id())[:-1]
+    return _with_ids("\n".join(lines))
 
 
 def set_blocker(content: str, line: int, expected_hash: str, open_: bool) -> str:
@@ -131,8 +151,8 @@ def set_blocker(content: str, line: int, expected_hash: str, open_: bool) -> str
     entry = next(e for e in parse_notebook(content) if e["line"] == line)
     if entry["kind"] != "blocker":
         raise ValueError("only a blocker can be opened or cleared")
-    lines[s:end] = _render("blocker", entry["title"], entry["body"], entry["date"] or "", "open" if open_ else "cleared")[:-1]
-    return "\n".join(lines)
+    lines[s:end] = _render("blocker", entry["title"], entry["body"], entry["date"] or "", "open" if open_ else "cleared", entry["id"] or _new_id())[:-1]
+    return _with_ids("\n".join(lines))
 
 
 def remove_entry(content: str, line: int, expected_hash: str) -> str:
@@ -141,4 +161,4 @@ def remove_entry(content: str, line: int, expected_hash: str) -> str:
     del lines[s:end]
     if s < len(lines) and lines[s] == "" and (s == 0 or lines[s - 1] == ""):
         del lines[s]
-    return "\n".join(lines)
+    return _with_ids("\n".join(lines))
