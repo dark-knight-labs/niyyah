@@ -155,6 +155,8 @@ export interface PipelineItemData {
   text: string;
   /** Free notes (details, context) kept as indented lines under the task. */
   description: string;
+  /** Titles of notebook blockers this item waits on. */
+  blocked_by: string[];
   lane: Lane;
   checkpoint: MonthKey | null;
   added: string | null;

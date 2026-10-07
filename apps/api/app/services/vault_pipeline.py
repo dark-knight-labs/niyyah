@@ -22,6 +22,7 @@ NOW_LIMIT = 3
 STALE_DAYS = 14
 MAX_TEXT_CHARS = 300
 MAX_DESCRIPTION_CHARS = 4000
+BLOCKED_BY = "blocked-by:: "  # a note line naming a notebook blocker by title; kept out of the description
 _ITEM = re.compile(r"^- \[([ xX])\] (.*)$")
 _ADDED = re.compile(r"\s*➕\s*(\d{4}-\d{2}-\d{2})")
 _DONE = re.compile(r"\s*✅\s*(\d{4}-\d{2}-\d{2})")
@@ -59,8 +60,16 @@ def _note_end(lines: list[str], at: int) -> int:
     return end
 
 
+def _note_lines(lines: list[str], at: int) -> list[str]:
+    return [l[2:] if l.startswith("  ") else l.lstrip("\t") for l in lines[at + 1:_note_end(lines, at)]]
+
+
 def _description(lines: list[str], at: int) -> str:
-    return "\n".join(l[2:] if l.startswith("  ") else l.lstrip("\t") for l in lines[at + 1:_note_end(lines, at)])
+    return "\n".join(l for l in _note_lines(lines, at) if not l.startswith(BLOCKED_BY))
+
+
+def _blocked_by(lines: list[str], at: int) -> list[str]:
+    return [l[len(BLOCKED_BY):].strip() for l in _note_lines(lines, at) if l.startswith(BLOCKED_BY) and l[len(BLOCKED_BY):].strip()]
 
 
 def parse_pipeline(content: str | None, today: date) -> list[dict]:
@@ -85,7 +94,7 @@ def parse_pipeline(content: str | None, today: date) -> list[dict]:
             "line": number, "hash": line_hash(line), "text": text, "lane": lane, "checkpoint": checkpoint,
             "added": added.group(1) if added else None, "done_on": done_on.group(1) if done_on else None,
             "focus": focus.group(1) if focus else None, "done": m.group(1) != " ", "age_days": age,
-            "description": _description(all_lines, number - 1),
+            "description": _description(all_lines, number - 1), "blocked_by": _blocked_by(all_lines, number - 1),
             "stale": lane in ("next", "backlog") and checkpoint is None and age >= STALE_DAYS,
         })
     return items
@@ -207,7 +216,25 @@ def set_description(content: str, line: int, expected_hash: str, text: str) -> s
     text = text.strip("\n").rstrip()
     if len(text) > MAX_DESCRIPTION_CHARS:
         raise ValueError(f"description is longer than {MAX_DESCRIPTION_CHARS} characters")
-    notes = [f"  {l}".rstrip() if l.strip() else "  " for l in text.split("\n")] if text.strip() else []
+    kept = [f"{BLOCKED_BY}{t}" for t in _blocked_by(lines, line - 1)]
+    notes = [f"  {l}".rstrip() if l.strip() else "  " for l in [*kept, *text.split("\n")]] if text.strip() or kept else []
+    lines[line:_note_end(lines, line - 1)] = notes
+    return "\n".join(lines)
+
+
+def set_blocked_by(content: str, line: int, expected_hash: str, titles: list[str]) -> str:
+    """Replace the notebook blockers an item waits on (matched by title); the description stays."""
+    lines = content.split("\n")
+    _find(lines, line, expected_hash)
+    clean = []
+    for t in titles:
+        t = " ".join(t.split())
+        if t and t not in clean:
+            if len(t) > MAX_TEXT_CHARS:
+                raise ValueError(f"blocker title is longer than {MAX_TEXT_CHARS} characters")
+            clean.append(t)
+    desc = _description(lines, line - 1)
+    notes = [f"  {BLOCKED_BY}{t}" for t in clean] + ([f"  {l}".rstrip() if l.strip() else "  " for l in desc.split("\n")] if desc.strip() else [])
     lines[line:_note_end(lines, line - 1)] = notes
     return "\n".join(lines)
 

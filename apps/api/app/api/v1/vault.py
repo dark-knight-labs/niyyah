@@ -59,6 +59,7 @@ from app.schemas.vault import (
     VaultStreakEntry,
     VaultStreaksResponse,
     NotebookAddIn,
+    PipelineBlockedByIn,
     NotebookBlockerIn,
     NotebookEditIn,
     NotebooksResponse,
@@ -767,6 +768,13 @@ async def put_pipeline_description(data: PipelineDescriptionIn, user: User = Dep
     return await _save_pipeline(
         data.stream, lambda c: vault_pipeline.set_description(c or "", data.line, data.hash, data.description),
         f"Niyyah: describe an item in the {data.stream} pipeline")
+
+
+@router.put("/pipeline/blocked-by", response_model=EditResponse)
+async def put_pipeline_blocked_by(data: PipelineBlockedByIn, user: User = Depends(require_editor)):
+    return await _save_pipeline(
+        data.stream, lambda c: vault_pipeline.set_blocked_by(c or "", data.line, data.hash, data.titles),
+        f"Niyyah: set what an item in the {data.stream} pipeline waits on")
 
 
 @router.post("/pipeline/remove", response_model=EditResponse)

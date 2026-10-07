@@ -237,6 +237,7 @@ class PipelineItem(BaseModel):
     hash: str
     text: str
     description: str = ""  # free notes kept as indented lines under the task
+    blocked_by: list[str] = []  # titles of notebook blockers this item waits on
     lane: Lane
     checkpoint: Month | None
     added: str | None
@@ -355,3 +356,7 @@ class NotebookEditIn(PipelineRefIn):
 
 class NotebookBlockerIn(PipelineRefIn):
     open: bool
+
+
+class PipelineBlockedByIn(PipelineRefIn):
+    titles: list[str]

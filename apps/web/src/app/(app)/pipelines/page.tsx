@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, NotebookPen, Pencil, Star, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, NotebookPen, OctagonAlert, Pencil, Star, Trash2 } from "lucide-react";
 import { usePlanner } from "@/hooks/use-planner";
 import { ChainCrumbs } from "@/components/planner/chain-crumbs";
 import { Notice, PageTitle, SectionTitle, Spinner } from "@/components/planner/page-title";
@@ -9,7 +9,7 @@ import { Notebook } from "@/components/planner/notebook";
 import { MonthTag, StreamIcon } from "@/components/planner/stream-chip";
 import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
-import { Lane, MonthKey, NotebookKind, PipelineItemData } from "@/lib/vault-types";
+import { Lane, MonthKey, NotebookEntryData, NotebookKind, PipelineItemData } from "@/lib/vault-types";
 
 const LANES: { id: Lane; label: string; hint: string }[] = [
   { id: "now", label: "Now", hint: "committed this week" },
@@ -59,7 +59,8 @@ export default function PipelinesPage() {
   const doneItems = items.filter((i) => i.lane === "done").reverse();
   const staleCount = items.filter((i) => i.stale).length;
   const entries = notebooks?.streams.find((s) => s.stream === stream)?.entries ?? [];
-  const openBlockers = entries.filter((e) => e.kind === "blocker" && e.open);
+  const blockers = entries.filter((e) => e.kind === "blocker");
+  const openBlockers = blockers.filter((e) => e.open);
   const blocked = (id: string) => notebooks?.streams.find((s) => s.stream === id)?.entries.filter((e) => e.kind === "blocker" && e.open).length ?? 0;
 
   const lines = draft.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -129,7 +130,8 @@ export default function PipelinesPage() {
               <ul className="grid gap-2">
                 {laneItems.length === 0 && <li className="px-1 py-2 text-sm text-[var(--muted-foreground)]">{lane.id === "now" ? "Nothing committed. Promote one from Next." : "Empty."}</li>}
                 {laneItems.map((item) => (
-                  <ItemCard key={item.line} item={item} meta={meta} week={pipelines.week} busy={busy} staleDays={pipelines.stale_days}
+                  <ItemCard key={item.line} item={item} meta={meta} week={pipelines.week} busy={busy} staleDays={pipelines.stale_days} blockers={blockers}
+                    onBlock={(titles) => run(() => vaultApi.blockPipelineItem(stream, item, titles))}
                     onMove={(to) => run(() => vaultApi.movePipelineItem(stream, item, to))}
                     onTag={(m) => run(() => vaultApi.tagPipelineItem(stream, item, m))}
                     onRemove={() => run(() => vaultApi.removePipelineItem(stream, item))}
@@ -187,6 +189,9 @@ interface CardProps {
   week: string;
   busy: boolean;
   staleDays: number;
+  /** The block's notebook blockers, which this item can wait on. */
+  blockers: NotebookEntryData[];
+  onBlock: (titles: string[]) => void;
   onMove: (lane: Lane) => void;
   onTag: (month: MonthKey | "") => void;
   onRemove: () => void;
@@ -195,12 +200,15 @@ interface CardProps {
   onDescribe: (description: string) => Promise<unknown>;
 }
 
-function ItemCard({ item, meta, week, busy, staleDays, onMove, onTag, onRemove, onOne, onRename, onDescribe }: CardProps) {
+function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove, onTag, onRemove, onOne, onRename, onDescribe }: CardProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
   const [noting, setNoting] = useState(false);
   const [notes, setNotes] = useState(item.description);
   const [open, setOpen] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const waiting = item.lane === "done" ? [] : item.blocked_by.map((title) => ({ title, found: blockers.find((b) => same(b.title, title)) })).filter((w) => !w.found || w.found.open);
   const isOne = item.focus === week;
   const order: Lane[] = ["now", "next", "backlog"];
   const at = order.indexOf(item.lane);
@@ -232,6 +240,31 @@ function ItemCard({ item, meta, week, busy, staleDays, onMove, onTag, onRemove, 
           {item.description}
         </button>
       ) : null}
+      {waiting.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {waiting.map((w) => (
+            <span key={w.title} className="inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-px text-[11px] font-bold"
+              style={w.found ? { color: "var(--destructive)", background: "color-mix(in srgb, var(--destructive) 12%, var(--background))" } : { color: "var(--muted-foreground)", background: "var(--muted)" }}>
+              <OctagonAlert size={11} className="shrink-0" aria-hidden="true" />
+              <span className="min-w-0 break-words">{w.found ? w.title : `blocker missing: ${w.title}`}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      {linking && (
+        <fieldset className="grid gap-1.5 rounded-lg border border-[var(--border)] p-2.5">
+          <legend className="px-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">Waiting on</legend>
+          {blockers.length === 0 && <p className="text-xs text-[var(--muted-foreground)]">No blockers yet. Add one in the Notebook.</p>}
+          {blockers.map((b) => (
+            <label key={`${b.line}-${b.hash}`} className="flex items-start gap-2 text-xs">
+              <input type="checkbox" disabled={busy} className="mt-0.5 accent-[var(--accent)]" checked={item.blocked_by.some((t) => same(t, b.title))}
+                onChange={(e) => onBlock(e.target.checked ? [...item.blocked_by, b.title] : item.blocked_by.filter((t) => !same(t, b.title)))} />
+              <span className={`min-w-0 break-words ${b.open ? "" : "text-[var(--muted-foreground)] line-through"}`}>{b.title}</span>
+            </label>
+          ))}
+          <button type="button" onClick={() => setLinking(false)} className="justify-self-start text-[11px] font-bold text-[var(--accent)]">Done</button>
+        </fieldset>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {isOne && <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: meta.color }}><Star size={12} fill="currentColor" aria-hidden="true" /> This week</span>}
@@ -252,6 +285,11 @@ function ItemCard({ item, meta, week, busy, staleDays, onMove, onTag, onRemove, 
             onClick={() => { setNotes(item.description); setNoting(true); }}>
             <NotebookPen size={14} style={item.description ? { color: meta.color } : undefined} />
           </button>
+          {item.lane !== "done" && (blockers.length > 0 || item.blocked_by.length > 0) && (
+            <button type="button" className={btn} disabled={busy} aria-label="Waiting on a blocker" title="Waiting on a blocker" aria-expanded={linking} onClick={() => setLinking(!linking)}>
+              <OctagonAlert size={14} style={item.blocked_by.length ? { color: "var(--destructive)" } : undefined} />
+            </button>
+          )}
           <button type="button" className={btn} disabled={busy} aria-label="Edit" title="Edit" onClick={() => { setDraft(item.text); setEditing(true); }}><Pencil size={14} /></button>
           {onOne && !isOne && <button type="button" className={btn} disabled={busy} aria-label="Make this the week's one thing" title="Make this the week's one thing" onClick={onOne}><Star size={15} /></button>}
           {at > 0 && <button type="button" className={btn} disabled={busy} aria-label="Promote" title="Promote" onClick={() => onMove(order[at - 1])}><ArrowUp size={15} /></button>}

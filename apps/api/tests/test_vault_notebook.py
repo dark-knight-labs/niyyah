@@ -128,3 +128,25 @@ async def test_endpoints_notebook(auth_client: AsyncClient, vault, monkeypatch):
 
     assert (await auth_client.post(f"{base}/notebook/kahf/entries", json={"kind": "gossip", "title": "x", "body": "y"})).status_code == 422
     assert (await auth_client.post(f"{base}/notebook/nope/entries", json={"kind": "idea", "title": "x", "body": "y"})).status_code == 422
+
+
+# --- pipeline items blocked by a notebook blocker ---------------------------------------------------------------
+
+def test_blocked_by_is_kept_out_of_the_description_and_survives_describing():
+    from app.services.vault_pipeline import add_items, parse_pipeline, set_blocked_by, set_description
+    out = add_items(None, "kahf", ["SSO login"], "next", TODAY)
+    i = parse_pipeline(out, TODAY)[0]
+    out = set_description(out, i["line"], i["hash"], "needs the DPA")
+    i = parse_pipeline(out, TODAY)[0]
+    out = set_blocked_by(out, i["line"], i["hash"], ["Waiting on legal", " Waiting  on legal ", "Cloudflare token"])
+    i = parse_pipeline(out, TODAY)[0]
+    assert i["blocked_by"] == ["Waiting on legal", "Cloudflare token"] and i["description"] == "needs the DPA"
+    assert "  blocked-by:: Waiting on legal\n  blocked-by:: Cloudflare token\n  needs the DPA" in out
+    out = set_description(out, i["line"], i["hash"], "")  # clearing the description keeps the links
+    i = parse_pipeline(out, TODAY)[0]
+    assert i["blocked_by"] == ["Waiting on legal", "Cloudflare token"] and i["description"] == ""
+    out = set_blocked_by(out, i["line"], i["hash"], [])
+    i = parse_pipeline(out, TODAY)[0]
+    assert i["blocked_by"] == [] and "blocked-by" not in out
+    with pytest.raises(ValueError):
+        set_blocked_by(out, i["line"], "deadbeef00", ["x"])
