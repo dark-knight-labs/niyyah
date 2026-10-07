@@ -37,6 +37,7 @@ from app.schemas.vault import (
     ObjectivesResponse,
     PipelineAddIn,
     PipelineCheckpointIn,
+    PipelineDescriptionIn,
     PipelineMoveIn,
     PipelineRefIn,
     PipelineTextIn,
@@ -754,6 +755,13 @@ async def put_pipeline_text(data: PipelineTextIn, user: User = Depends(require_e
     return await _save_pipeline(
         data.stream, lambda c: vault_pipeline.set_text(c or "", data.line, data.hash, data.text),
         f"Niyyah: rename an item in the {data.stream} pipeline")
+
+
+@router.put("/pipeline/description", response_model=EditResponse)
+async def put_pipeline_description(data: PipelineDescriptionIn, user: User = Depends(require_editor)):
+    return await _save_pipeline(
+        data.stream, lambda c: vault_pipeline.set_description(c or "", data.line, data.hash, data.description),
+        f"Niyyah: describe an item in the {data.stream} pipeline")
 
 
 @router.post("/pipeline/remove", response_model=EditResponse)

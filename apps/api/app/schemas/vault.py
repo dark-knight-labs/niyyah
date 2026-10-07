@@ -236,6 +236,7 @@ class PipelineItem(BaseModel):
     line: int
     hash: str
     text: str
+    description: str = ""  # free notes kept as indented lines under the task
     lane: Lane
     checkpoint: Month | None
     added: str | None
@@ -279,6 +280,10 @@ class PipelineCheckpointIn(PipelineRefIn):
 
 class PipelineTextIn(PipelineRefIn):
     text: str
+
+
+class PipelineDescriptionIn(PipelineRefIn):
+    description: str
 
 
 

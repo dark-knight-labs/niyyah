@@ -153,6 +153,8 @@ export interface PipelineItemData {
   line: number;
   hash: string;
   text: string;
+  /** Free notes (details, context) kept as indented lines under the task. */
+  description: string;
   lane: Lane;
   checkpoint: MonthKey | null;
   added: string | null;

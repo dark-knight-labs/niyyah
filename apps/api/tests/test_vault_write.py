@@ -732,3 +732,29 @@ async def test_endpoints_small_domino_stays_in_step_with_the_pipeline(auth_clien
     # objective-only blocks (sleep) have no pipeline: the objective is plain text
     assert (await auth_client.put("/api/v1/vault/objectives", json={"stream": "sleep", "text": "Bed after Isha"})).status_code == 200
     assert not (work / "Efforts" / "Pipeline" / "sleep.md").exists()
+
+
+def test_pipeline_item_description_is_kept_under_the_task_and_travels_with_it():
+    from app.services import vault_pipeline as vp
+
+    today = date(2026, 10, 7)
+    content = vp.add_items(None, "kahf", ["Ship DNS", "Other"], "backlog", today)
+    first = vp.parse_pipeline(content, today)[0]
+    content = vp.set_description(content, first["line"], first["hash"], "Why: unblock infra\n\nLink: https://x.test\n")
+    items = vp.parse_pipeline(content, today)
+    assert items[0]["description"] == "Why: unblock infra\n\nLink: https://x.test"
+    assert items[1]["text"] == "Other" and items[1]["description"] == ""
+    assert "\n  Why: unblock infra\n  \n  Link: https://x.test\n" in content
+
+    moved = vp.move_item(content, items[0]["line"], items[0]["hash"], "now", today)
+    now = next(i for i in vp.parse_pipeline(moved, today) if i["lane"] == "now")
+    assert now["text"] == "Ship DNS" and now["description"].startswith("Why: unblock infra")
+    assert next(i for i in vp.parse_pipeline(moved, today) if i["text"] == "Other")["description"] == ""
+
+    renamed = vp.set_text(moved, now["line"], now["hash"], "Ship DNS v2")
+    assert next(i for i in vp.parse_pipeline(renamed, today) if i["lane"] == "now")["description"].startswith("Why:")
+
+    cleared = vp.set_description(moved, now["line"], now["hash"], "  ")
+    assert "Why" not in cleared
+    removed = vp.remove_item(moved, now["line"], now["hash"])
+    assert "Why" not in removed and "Other" in removed

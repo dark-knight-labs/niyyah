@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, Pencil, Star, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, NotebookPen, Pencil, Star, Trash2 } from "lucide-react";
 import { usePlanner } from "@/hooks/use-planner";
 import { ChainCrumbs } from "@/components/planner/chain-crumbs";
 import { Notice, PageTitle, SectionTitle, Spinner } from "@/components/planner/page-title";
@@ -105,6 +105,7 @@ export default function PipelinesPage() {
                     onTag={(m) => run(() => vaultApi.tagPipelineItem(stream, item, m))}
                     onRemove={() => run(() => vaultApi.removePipelineItem(stream, item))}
                     onRename={(text) => run(() => vaultApi.renamePipelineItem(stream, item, text))}
+                    onDescribe={(text) => run(() => vaultApi.describePipelineItem(stream, item, text))}
                     onOne={!meta.weekly ? undefined : () => run(() => vaultApi.focusPipelineItem(stream, item))} />
                 ))}
               </ul>
@@ -160,11 +161,15 @@ interface CardProps {
   onRemove: () => void;
   onOne?: () => void;
   onRename: (text: string) => Promise<unknown>;
+  onDescribe: (description: string) => Promise<unknown>;
 }
 
-function ItemCard({ item, meta, week, busy, staleDays, onMove, onTag, onRemove, onOne, onRename }: CardProps) {
+function ItemCard({ item, meta, week, busy, staleDays, onMove, onTag, onRemove, onOne, onRename, onDescribe }: CardProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
+  const [noting, setNoting] = useState(false);
+  const [notes, setNotes] = useState(item.description);
+  const [open, setOpen] = useState(false);
   const isOne = item.focus === week;
   const order: Lane[] = ["now", "next", "backlog"];
   const at = order.indexOf(item.lane);
@@ -180,6 +185,22 @@ function ItemCard({ item, meta, week, busy, staleDays, onMove, onTag, onRemove, 
       ) : (
         <p className="break-words text-sm leading-snug">{item.text}</p>
       )}
+      {noting ? (
+        <form className="grid gap-1.5" onSubmit={(e) => { e.preventDefault(); void onDescribe(notes).then(() => setNoting(false)); }}>
+          <textarea autoFocus value={notes} rows={5} maxLength={4000} aria-label="Details" placeholder="Details, context, links…" onChange={(e) => setNotes(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setNoting(false)}
+            className="w-full rounded-lg border border-[var(--accent)] bg-[var(--background)] p-2.5 text-sm leading-relaxed" />
+          <div className="flex gap-1.5">
+            <button type="submit" disabled={busy} className="min-h-9 rounded-lg bg-[var(--accent)] px-3 text-xs font-bold text-[var(--accent-fg)] disabled:opacity-50">Save details</button>
+            <button type="button" onClick={() => setNoting(false)} className="min-h-9 rounded-lg px-3 text-xs font-bold text-[var(--muted-foreground)] hover:bg-[var(--muted)]">Cancel</button>
+          </div>
+        </form>
+      ) : item.description ? (
+        <button type="button" aria-expanded={open} aria-label="Show details" onClick={() => setOpen(!open)}
+          className={`whitespace-pre-wrap break-words text-left text-[13px] leading-relaxed text-[var(--muted-foreground)] ${open ? "" : "line-clamp-2"}`}>
+          {item.description}
+        </button>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {isOne && <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: meta.color }}><Star size={12} fill="currentColor" aria-hidden="true" /> This week</span>}
@@ -196,6 +217,10 @@ function ItemCard({ item, meta, week, busy, staleDays, onMove, onTag, onRemove, 
           {item.age_days >= staleDays && item.checkpoint && <MonthTag label={`${item.age_days}d`} muted />}
         </div>
         <div className="-mr-1 flex">
+          <button type="button" className={btn} disabled={busy} aria-label={item.description ? "Edit details" : "Add details"} title={item.description ? "Edit details" : "Add details"}
+            onClick={() => { setNotes(item.description); setNoting(true); }}>
+            <NotebookPen size={14} style={item.description ? { color: meta.color } : undefined} />
+          </button>
           <button type="button" className={btn} disabled={busy} aria-label="Edit" title="Edit" onClick={() => { setDraft(item.text); setEditing(true); }}><Pencil size={14} /></button>
           {onOne && !isOne && <button type="button" className={btn} disabled={busy} aria-label="Make this the week's one thing" title="Make this the week's one thing" onClick={onOne}><Star size={15} /></button>}
           {at > 0 && <button type="button" className={btn} disabled={busy} aria-label="Promote" title="Promote" onClick={() => onMove(order[at - 1])}><ArrowUp size={15} /></button>}

@@ -57,3 +57,7 @@ Reviews page, retiring the old DB-backed pages, drag-and-drop.
 - Week is Sunday to Saturday (`week_for`); old Sat-Fri weekly notes keep their stored period.
 - Blocks are user-defined: `POST /quarter/stream` adds, `PUT /quarter/stream` edits or archives, `PUT /quarter` edits the Super Objective, `PUT /pipeline/text` renames an item. Colours and icons come from fixed lists the API returns.
 - The OT slot still maps Sun-Thu to `kahf` and Fri-Sat to `alisha`; custom blocks have a free-text slot label only.
+
+## Update 2026-10-07 (descriptions)
+
+- A pipeline item can carry a description (details, context, links): the indented lines directly under its task line, so Obsidian shows them as the task's notes. They move and are removed with the item; `PUT /pipeline/description` replaces them (blank clears, max 4000 chars). `GET /pipelines` returns `description` per item. The card shows it (two lines, tap to expand) and a notes button edits it.

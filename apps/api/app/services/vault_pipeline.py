@@ -4,6 +4,7 @@
     - [ ] Ship the DNS dashboard #nov ➕ 2026-10-02
     - [x] Draft the incident template #oct ➕ 2026-09-28 ✅ 2026-10-05
 
+An item may carry a description: the indented lines right under it (Obsidian shows them as the task's notes).
 A `🎯 2026-W41` marker makes an item that week's small domino (the weekly objective): one per stream per week.
 Obsidian Tasks lines, so the note reads and queries normally in the vault. An item is identified by
 line number plus a hash of the line, so a moved or changed line is refused instead of mis-edited.
@@ -20,6 +21,7 @@ HEADINGS = {"now": "Now", "next": "Next", "backlog": "Backlog", "done": "Done"}
 NOW_LIMIT = 3
 STALE_DAYS = 14
 MAX_TEXT_CHARS = 300
+MAX_DESCRIPTION_CHARS = 4000
 _ITEM = re.compile(r"^- \[([ xX])\] (.*)$")
 _ADDED = re.compile(r"\s*➕\s*(\d{4}-\d{2}-\d{2})")
 _DONE = re.compile(r"\s*✅\s*(\d{4}-\d{2}-\d{2})")
@@ -45,11 +47,28 @@ def _lane_of(heading: str) -> str | None:
     return name if name in LANES else None
 
 
+def _note_end(lines: list[str], at: int) -> int:
+    """Index just past the item at `at` and its description (the indented lines below it, trailing blanks excluded)."""
+    end = at + 1
+    for j in range(at + 1, len(lines)):
+        if lines[j].startswith(("  ", "\t")):
+            if lines[j].strip():
+                end = j + 1
+        else:
+            break
+    return end
+
+
+def _description(lines: list[str], at: int) -> str:
+    return "\n".join(l[2:] if l.startswith("  ") else l.lstrip("\t") for l in lines[at + 1:_note_end(lines, at)])
+
+
 def parse_pipeline(content: str | None, today: date) -> list[dict]:
-    """Items in file order: {line, hash, text, lane, checkpoint, added, done_on, done, age_days, stale}."""
+    """Items in file order: {line, hash, text, description, lane, checkpoint, added, done_on, done, age_days, stale}."""
     items: list[dict] = []
     lane = None
-    for number, line in enumerate((content or "").split("\n"), start=1):
+    all_lines = (content or "").split("\n")
+    for number, line in enumerate(all_lines, start=1):
         if line.startswith("## "):
             lane = _lane_of(line)
             continue
@@ -66,6 +85,7 @@ def parse_pipeline(content: str | None, today: date) -> list[dict]:
             "line": number, "hash": line_hash(line), "text": text, "lane": lane, "checkpoint": checkpoint,
             "added": added.group(1) if added else None, "done_on": done_on.group(1) if done_on else None,
             "focus": focus.group(1) if focus else None, "done": m.group(1) != " ", "age_days": age,
+            "description": _description(all_lines, number - 1),
             "stale": lane in ("next", "backlog") and checkpoint is None and age >= STALE_DAYS,
         })
     return items
@@ -152,10 +172,12 @@ def move_item(content: str, line: int, expected_hash: str, lane: str, today: dat
     lines = content.split("\n")
     m = _find(lines, line, expected_hash)
     text, month, added, done_on, focus = _parts(m.group(2))
-    del lines[line - 1]
+    notes = lines[line:_note_end(lines, line - 1)]
+    del lines[line - 1:line + len(notes)]
     done = lane == "done"
     new = _render(text, month, done, added, (done_on or today.isoformat()) if done else None, focus)
-    lines.insert(_section_end(lines, lane), new)
+    at = _section_end(lines, lane)
+    lines[at:at] = [new, *notes]
     return "\n".join(lines)
 
 
@@ -174,7 +196,19 @@ def set_checkpoint(content: str, line: int, expected_hash: str, checkpoint: str 
 def remove_item(content: str, line: int, expected_hash: str) -> str:
     lines = content.split("\n")
     _find(lines, line, expected_hash)
-    del lines[line - 1]
+    del lines[line - 1:_note_end(lines, line - 1)]
+    return "\n".join(lines)
+
+
+def set_description(content: str, line: int, expected_hash: str, text: str) -> str:
+    """Replace an item's description (indented lines under it); blank text clears it."""
+    lines = content.split("\n")
+    _find(lines, line, expected_hash)
+    text = text.strip("\n").rstrip()
+    if len(text) > MAX_DESCRIPTION_CHARS:
+        raise ValueError(f"description is longer than {MAX_DESCRIPTION_CHARS} characters")
+    notes = [f"  {l}".rstrip() if l.strip() else "  " for l in text.split("\n")] if text.strip() else []
+    lines[line:_note_end(lines, line - 1)] = notes
     return "\n".join(lines)
 
 
