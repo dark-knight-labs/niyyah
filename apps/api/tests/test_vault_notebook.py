@@ -37,11 +37,19 @@ def test_blocker_starts_open_and_toggles():
     assert parse_notebook(out)[0]["open"] is True
 
 
-def test_link_entry_exposes_its_url():
-    out = add_entry(None, "kahf", "Kahf", "link", "WebAuthn guide", "https://webauthn.guide good recovery section", TODAY)
+def test_any_entry_exposes_the_first_url_in_its_body():
+    out = add_entry(None, "kahf", "Kahf", "idea", "WebAuthn guide", "https://webauthn.guide good recovery section", TODAY)
     assert parse_notebook(out)[0]["url"] == "https://webauthn.guide"
-    out = add_entry(out, "kahf", "Kahf", "idea", "x", "see https://a.b", TODAY)
+    out = add_entry(out, "kahf", "Kahf", "idea", "x", "no link here", TODAY)
     assert parse_notebook(out)[0]["url"] is None
+
+
+def test_older_kinds_read_as_ideas_and_cannot_be_written():
+    note = "# Kahf notebook\n\n## Old brainstorm\n[kind:: brainstorm] [date:: 2026-10-01]\nbody\n\n## Old link\n[kind:: link] [date:: 2026-10-01]\nhttps://a.b\n"
+    assert [e["kind"] for e in parse_notebook(note)] == ["idea", "idea"]
+    for kind in ("brainstorm", "link"):
+        with pytest.raises(ValueError):
+            add_entry(None, "kahf", "Kahf", kind, "x", "y", TODAY)
 
 
 def test_blank_title_falls_back_to_the_first_body_line_then_the_kind():
@@ -51,7 +59,7 @@ def test_blank_title_falls_back_to_the_first_body_line_then_the_kind():
 
 
 def test_body_headings_are_demoted_so_they_cannot_split_the_entry():
-    out = add_entry(None, "kahf", "Kahf", "brainstorm", "Shape", "# top\n## sub\nplain", TODAY)
+    out = add_entry(None, "kahf", "Kahf", "idea", "Shape", "# top\n## sub\nplain", TODAY)
     entries = parse_notebook(out)
     assert len(entries) == 1 and entries[0]["body"] == "### top\n### sub\nplain"
 

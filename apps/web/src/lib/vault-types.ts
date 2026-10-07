@@ -181,7 +181,7 @@ export interface PipelinesData {
   streams: PipelineStreamData[];
 }
 
-export type NotebookKind = "idea" | "brainstorm" | "link" | "meeting" | "blocker";
+export type NotebookKind = "idea" | "meeting" | "blocker";
 
 export interface NotebookEntryData {
   line: number;
@@ -194,7 +194,7 @@ export interface NotebookEntryData {
   body: string;
   /** Blockers only: true until cleared. */
   open: boolean | null;
-  /** Links only: the first URL in the body. */
+  /** The first URL in the body, if any. */
   url: string | null;
 }
 

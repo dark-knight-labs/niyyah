@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Brain, Check, Lightbulb, Link2, OctagonAlert, Pencil, Trash2, Users, type LucideIcon } from "lucide-react";
+import { Check, Lightbulb, OctagonAlert, Pencil, Trash2, Users, type LucideIcon } from "lucide-react";
 import { SectionTitle } from "@/components/planner/page-title";
 import { StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { NotebookEntryData, NotebookKind } from "@/lib/vault-types";
 
 export const KINDS: { id: NotebookKind; label: string; icon: LucideIcon; hint: string }[] = [
-  { id: "idea", label: "Idea", icon: Lightbulb, hint: "One line is fine. Promote it to the backlog when it earns a slot." },
-  { id: "brainstorm", label: "Brainstorm", icon: Brain, hint: "Messy thinking. Bullets welcome, no structure needed." },
-  { id: "link", label: "Link", icon: Link2, hint: "Paste a URL, then say why it matters." },
+  { id: "idea", label: "Idea", icon: Lightbulb, hint: "Thinking, a link, a rough plan. One line is fine; promote it to the backlog when it earns a slot." },
   { id: "meeting", label: "Meeting", icon: Users, hint: "Who, what was agreed, then actions as '- [ ] text'." },
   { id: "blocker", label: "Blocker", icon: OctagonAlert, hint: "What you wait on and who owns it. Tick it when cleared." },
 ];
@@ -45,7 +43,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all" }: Pr
   const [filter, setFilter] = useState<NotebookKind | "all">(initialFilter);
   const shown = entries.filter((e) => filter === "all" || e.kind === filter);
   const blockers = entries.filter((e) => e.kind === "blocker");
-  const links = entries.filter((e) => e.kind === "link" && e.url);
+  const links = entries.filter((e) => e.url);
 
   async function add() {
     if (!title.trim() && !body.trim()) return;
@@ -122,7 +120,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all" }: Pr
         </section>
         <section aria-label="Links" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 sm:p-4">
           <SectionTitle title="Links" />
-          {links.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">Saved links appear here.</p>}
+          {links.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">Links from your notes appear here.</p>}
           <ul className="grid gap-2">
             {links.map((l) => (
               <li key={`${l.line}-${l.hash}`} className="min-w-0 text-sm">
@@ -147,7 +145,7 @@ function Entry({ entry, meta, busy, onSave, onRemove, onPromote }: {
   const [body, setBody] = useState(entry.body);
   const [promoted, setPromoted] = useState(false);
   const btn = "grid h-9 w-9 place-items-center rounded-lg text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
-  const promotable = entry.kind === "idea" || entry.kind === "brainstorm" || entry.kind === "meeting";
+  const promotable = entry.kind === "idea" || entry.kind === "meeting";
   return (
     <li className="grid gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 sm:p-4" style={{ borderLeft: `3px solid ${color}` }}>
       <div className="flex items-center justify-between gap-2">

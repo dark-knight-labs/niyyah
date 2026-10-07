@@ -7,7 +7,7 @@
 
 An entry is a `##` heading, one Dataview-style inline-field line (kind, date, and status for blockers),
 then free markdown. Every entry carries a stable `[id:: 3fa9c21b]` (assigned on creation, backfilled on any write)
-so other notes, like a pipeline item's `blocked-by::`, can point at it and survive a rename. Kinds: idea, brainstorm, link, meeting, blocker (status:: open or cleared).
+so other notes, like a pipeline item's `blocked-by::`, can point at it and survive a rename. Kinds: idea (thinking, links, rough plans), meeting, blocker (status:: open or cleared).
 Newest entries sit first. An entry is identified by its heading line number plus a hash of its whole text,
 so a moved or changed entry is refused instead of mis-edited. Pure functions (string in, string out);
 vault_git.py does the committing.
@@ -19,8 +19,8 @@ from datetime import date
 from app.services.vault_streams import SLUG
 from app.services.vault_tasks import line_hash
 
-KINDS = ("idea", "brainstorm", "link", "meeting", "blocker")
-LABELS = {"idea": "Idea", "brainstorm": "Brainstorm", "link": "Link", "meeting": "Meeting", "blocker": "Blocker"}
+KINDS = ("idea", "meeting", "blocker")  # brainstorms and links are ideas; an older kind in a note reads as idea
+LABELS = {"idea": "Idea", "meeting": "Meeting", "blocker": "Blocker"}
 MAX_TITLE_CHARS = 200
 MAX_BODY_CHARS = 8000
 _FIELD = re.compile(r"\[(\w+):: ([^\]]*)\]")
@@ -64,7 +64,7 @@ def parse_notebook(content: str | None) -> list[dict]:
             body_from += 1
         kind = fields.get("kind", "idea")
         body = "\n".join(lines[body_from:end])
-        url = _URL.search(body) if kind == "link" else None
+        url = _URL.search(body)
         entries.append({
             "line": s + 1, "id": fields.get("id"), "hash": line_hash("\n".join(lines[s:end])), "kind": kind if kind in KINDS else "idea",
             "title": lines[s][3:].strip(), "date": fields.get("date"), "body": body,

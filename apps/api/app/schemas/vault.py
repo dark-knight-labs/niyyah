@@ -321,7 +321,7 @@ class CalendarEventsResponse(BaseModel):
     errors: list[str]
 
 
-NotebookKind = Literal["idea", "brainstorm", "link", "meeting", "blocker"]
+NotebookKind = Literal["idea", "meeting", "blocker"]
 
 
 class NotebookEntry(BaseModel):
@@ -333,7 +333,7 @@ class NotebookEntry(BaseModel):
     date: str | None
     body: str
     open: bool | None  # blockers only: True until cleared
-    url: str | None  # links only: the first URL in the body
+    url: str | None  # the first URL in the body, if any
 
 
 class NotebookStreamData(StreamInfo):

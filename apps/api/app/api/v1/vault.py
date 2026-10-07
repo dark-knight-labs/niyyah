@@ -789,7 +789,7 @@ async def post_pipeline_remove(data: PipelineRefIn, user: User = Depends(require
         f"Niyyah: remove from {data.stream} pipeline")
 
 
-# --- stream notebooks: ideas, brainstorms, links, meetings, blockers (owner only) ---------------------------------
+# --- stream notebooks: ideas, meetings, blockers (owner only) ---------------------------------
 
 def _notebooks_response(today: date) -> NotebooksResponse:
     streams = []

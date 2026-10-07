@@ -69,3 +69,7 @@ Reviews page, retiring the old DB-backed pages, drag-and-drop.
 - Pipelines page: a Pipeline | Notebook tab bar, a red blocker bar above the lanes when the block has open blockers, and an "N blocked" count on the block pills. "Promote to backlog" on an idea, brainstorm or meeting adds its title to the Backlog lane.
 - Notebook entries carry a stable `[id:: 3fa9c21b]` in their field line, assigned on creation and backfilled on any write (hand-typed entries get one at the next save). `GET /notebooks` returns it as `id`.
 - Blocked by: a pipeline item can wait on notebook blockers by id. The link is a note line `blocked-by:: <id>` under the task (kept out of `description`, returned as `blocked_by`; `PUT /pipeline/blocked-by {ids}` replaces them, `PUT /pipeline/description` keeps them). The card shows a red chip per open blocker; a cleared blocker hides its chip, a deleted one shows a grey "blocker deleted" chip. Renaming a blocker keeps its links. The card's blocker icon opens a checklist of the block's blockers; one without an id yet is disabled until the note is next written.
+
+## Update 2026-10-07 (notebook kinds)
+
+- Kinds are idea, meeting, blocker. Brainstorms and links are ideas (a link is an idea with a URL); an older `kind:: brainstorm|link` in a note reads as idea and the API refuses to write them. `url` is now the first URL in any entry's body, and the Links panel lists every entry that has one. Promote to backlog is on ideas and meetings.
