@@ -24,7 +24,7 @@ const NAV_COLLAPSED_KEY = "niyyah-nav-collapsed";
 const PUBLIC_PATHS = ["/routine"];
 
 const nav = [
-  { href: "/routine", label: "Routine", icon: Clock },
+  { href: "/routine", label: "Overview", icon: Clock },
   { href: "/week", label: "Week", icon: CalendarDays },
   { href: "/quarter", label: "Quarter", icon: Target },
   { href: "/pipelines", label: "Pipelines", icon: Layers3 },

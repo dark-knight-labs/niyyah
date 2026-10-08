@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { GoogleStatusData, VaultDayData, VaultEventsData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
+import { GoogleStatusData, NotebooksData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
 import { ROUTINE_BLOCKS, dateInTz, formatMinutes, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
+import { PLANNER_TZ, focusingQuestion, otStreamFor, toMeta } from "@/lib/streams";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
 import { CalendarCard } from "@/components/routine/calendar-card";
@@ -16,9 +17,11 @@ import { RoutineRing } from "@/components/routine/routine-ring";
 import { TaskList } from "@/components/routine/task-list";
 import { VotesPanel } from "@/components/routine/votes-panel";
 import { WeekObjectives } from "@/components/routine/week-objectives";
+import { WorkLanes } from "@/components/routine/work-lanes";
 
 const REFRESH_MS = 60_000;
 
+/** Overview: the day's clock, lists and votes, with Now / Next / Someday across every block at the end. (The route is still /routine: Google's return link points at it.) */
 export default function RoutinePage() {
   const [schedule, setSchedule] = useState<VaultScheduleData | null>(null);
   const [today, setToday] = useState<VaultDayData | null>(null);
@@ -36,6 +39,8 @@ export default function RoutinePage() {
     return result === "connected" ? "Google Calendar connected." : "Could not connect Google Calendar. Try again.";
   });
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
+  const [pipelines, setPipelines] = useState<PipelinesData | null>(null);
+  const [notebooks, setNotebooks] = useState<NotebooksData | null>(null);
   const now = useNow(30_000);
 
   const load = useCallback(() => {
@@ -86,6 +91,8 @@ export default function RoutinePage() {
     vaultApi.events(dayKey).then(setEvents).catch(() => setEvents(null));
     vaultApi.googleStatus().then(setGoogle).catch(() => setGoogle(null));
     vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
+    vaultApi.pipelines().then(setPipelines).catch(() => setPipelines(null));
+    vaultApi.notebooks().then(setNotebooks).catch(() => setNotebooks(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
 
@@ -122,6 +129,7 @@ export default function RoutinePage() {
   const nowMin = schedule ? nowMinutes(now, schedule.meta.tz) : 0;
   const block = day ? currentBlock(day, nowMin) : undefined;
   const owner = canEdit && !!dayKey && !!day;
+  const slot = pipelines ? otStreamFor(now, PLANNER_TZ, pipelines.streams.map(toMeta)) : undefined;
 
   return (
     <div className="mx-auto w-full max-w-[1120px]">
@@ -137,23 +145,27 @@ export default function RoutinePage() {
         <>
           <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
           {owner ? (
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
-              <div>
-                <RoutineRing day={day} nowMin={nowMin} events={events?.events} />
-                <div className="mt-6">
-                  <TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} />
-                  <LogList day={dayKey} entries={log} onChanged={loadPrivate}
-                    section={block ? ROUTINE_BLOCKS[block.block].label : "Day"}
-                    span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
+            <>
+              <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
+                <div>
+                  <RoutineRing day={day} nowMin={nowMin} events={events?.events} />
+                  <div className="mt-6">
+                    <TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} />
+                    <LogList day={dayKey} entries={log} onChanged={loadPrivate}
+                      section={block ? ROUTINE_BLOCKS[block.block].label : "Day"}
+                      span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
+                  </div>
+                </div>
+                <div>
+                  <WeekObjectives data={objectives} onChanged={setObjectives} />
+                  {objectives && slot && <p className="-mt-4 mb-6 text-xs leading-snug text-[var(--muted-foreground)]">{focusingQuestion(slot)}</p>}
+                  <NowCard day={day} nowMin={nowMin} />
+                  <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
+                  <VotesPanel day={dayKey} today={today} onSaved={setToday} />
                 </div>
               </div>
-              <div className="lg:sticky lg:top-6">
-                <WeekObjectives data={objectives} onChanged={setObjectives} />
-                <NowCard day={day} nowMin={nowMin} />
-                <VotesPanel day={dayKey} today={today} onSaved={setToday} />
-                <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
-              </div>
-            </div>
+              {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slot?.id} onChanged={loadPrivate} />}
+            </>
           ) : (
             <div className="mx-auto max-w-xl">
               <RoutineRing day={day} nowMin={nowMin} />

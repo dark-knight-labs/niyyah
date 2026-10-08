@@ -73,3 +73,19 @@ Reviews page, retiring the old DB-backed pages, drag-and-drop.
 ## Update 2026-10-07 (notebook kinds)
 
 - Kinds are idea, meeting, blocker. Brainstorms and links are ideas (a link is an idea with a URL); an older `kind:: brainstorm|link` in a note reads as idea and the API refuses to write them. `url` is now the first URL in any entry's body, and the Links panel lists every entry that has one. Promote to backlog is on ideas and meetings.
+
+## Addendum 2026-10-08: Overview and Plan
+
+Seven pages become four: Overview, Plan, Vault, Settings. Vault and Settings are untouched.
+
+- **Overview** is the old Routine page, tightened (layout A): clock, tasks and log on the left; this week, Now card, calendar and votes on the right; Now / Next / Someday across all blocks at the end. Someday is the pipeline Backlog lane under another name; the vault file keeps `## Backlog`. Items in Now list the OT stream's first, then this week's small dominoes. The route stays `/routine` until the nav switch, because Google's OAuth return link and its tests point at it.
+- **Plan** (phase 2) merges Quarter, Week and Pipelines with the notebook: Super Objective and quarter ring on top, a collapsible side rail of blocks, and the selected block's goal, checkpoints, small domino, pipeline and notebook beside it. Chosen arrangement: side rail (B).
+- No dates on items. A month tag and the "this week" star are enough.
+
+### Kept exactly as it works today (Overview must not lose these)
+
+Clock: 24h ring, current block thicker, past blocks faded, block names on slices, hour marks, prayer dots with names and times, pulsing now marker, centre time with next-prayer countdown, hover/focus/click card per block, calendar events on the dashed inner lane (owner only, timed events only, hover card), full-screen clock (overlay plus browser full screen, side labels, portrait list, Esc). Around it: Now card, Google calendar card and its connected/failed note, day mode picker and star total, votes (tap the same number to clear), tasks and log (add, edit, tick, delete), this week's objective per block, 60 s refresh, public view (ring and Now card only), schedule error notices. The ring, full-screen clock, Now card, calendar card and votes components are moved, not rewritten.
+
+### Phases
+
+1. Overview (this release). 2. Plan page. 3. Nav to four items and redirects from the old routes, including the Google return link. 4. Phone layout, keyboard, polish.

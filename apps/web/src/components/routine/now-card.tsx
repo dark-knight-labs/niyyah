@@ -12,7 +12,7 @@ export function NowCard({ day, nowMin }: { day: ResolvedDay; nowMin: number }) {
   const minutesToNext = next ? (((next.startMin - nowMin) % 1440) + 1440) % 1440 : 0;
 
   return (
-    <section className="mb-7 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4" aria-label="Now">
+    <section className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4" aria-label="Now">
       <div className="flex gap-3">
         <div className="w-1 self-stretch rounded" style={{ background: color }} />
         <div className="min-w-0 flex-1">

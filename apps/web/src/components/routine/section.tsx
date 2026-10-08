@@ -6,7 +6,7 @@ import { useState } from "react";
 /** A titled block of the routine page: small caps title, a quiet note on the right, an error line. */
 export function Section({ title, aside, error, children }: { title: string; aside?: string; error?: string | null; children: React.ReactNode }) {
   return (
-    <section className="mb-7" aria-label={title}>
+    <section className="mb-6" aria-label={title}>
       <h2 className="mb-2.5 flex items-baseline justify-between text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
         {title}
         {aside && <span className="text-xs font-medium normal-case tracking-normal">{aside}</span>}
