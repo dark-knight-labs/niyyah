@@ -149,8 +149,8 @@ export default function OverviewPage() {
           {owner ? (
             <>
               <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
-              <div className="mb-8 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,480px)_minmax(0,1fr)_minmax(0,320px)] xl:gap-9 md:items-start">
-                <div className="md:col-span-2 xl:col-span-1 xl:border-r xl:border-[var(--border)] xl:pr-9">
+              <div className="mb-8 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[repeat(3,minmax(0,1fr))] xl:gap-10 md:items-start">
+                <div className="md:col-span-2 xl:col-span-1">
                   <RoutineRing day={day} nowMin={nowMin} events={events?.events} />
                   <NowCard day={day} nowMin={nowMin} />
                 </div>

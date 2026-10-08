@@ -34,6 +34,8 @@ export interface RingGraphicProps {
   onHoverEvent?: (index: number | null, at?: { x: number; y: number }) => void;
   /** What sits under the time: the next prayer (default) or the current block and how long is left in it. */
   centre?: "prayer" | "block";
+  /** Font size of the hour numbers and prayer labels, in viewBox units (default 11). */
+  labelSize?: number;
 }
 
 /** The 24h ring: slices, names on the slices, now marker, clock. Meant to sit inside an <svg>. */
@@ -86,7 +88,7 @@ export function RingGraphic(p: RingGraphicProps) {
 
       {[0, 6, 12, 18].map((h) => {
         const [x, y] = g.point(r - t / 2 - 12 - (p.sideLabels ? 4 : 0), h * 60);
-        return <text key={h} x={x} y={y + 4} textAnchor="middle" fontSize={p.sideLabels ? 12 : 10} fill="var(--muted-foreground)">{String(h).padStart(2, "0")}</text>;
+        return <text key={h} x={x} y={y + 4} textAnchor="middle" fontSize={p.sideLabels ? 12 : (p.labelSize ?? 11) - 1} fill="var(--muted-foreground)">{String(h).padStart(2, "0")}</text>;
       })}
       {/* reserved inner lane for calendar events */}
       <circle cx={cx} cy={cy} r={r - t / 2 - 34} fill="none" stroke="var(--border)" strokeDasharray="2 5" />
@@ -109,7 +111,7 @@ export function RingGraphic(p: RingGraphicProps) {
         return (
           <g key={name} pointerEvents="none">
             <circle cx={x} cy={y} r={3.5} fill="var(--foreground)" />
-            <text x={lx} y={ly + dy} textAnchor={anchor} fontSize={11} fontWeight={700} fill="var(--foreground)" style={{ textTransform: "capitalize" }}>
+            <text x={lx} y={ly + dy} textAnchor={anchor} fontSize={p.labelSize ?? 11} fontWeight={700} fill="var(--foreground)" style={{ textTransform: "capitalize" }}>
               {name}<tspan fontWeight={500} fill="var(--muted-foreground)"> {formatMinutes(min)}</tspan>
             </text>
           </g>

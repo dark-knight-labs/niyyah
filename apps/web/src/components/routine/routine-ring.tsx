@@ -25,13 +25,13 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
   const event = hoverEvent === null ? null : timedEvents(events)[hoverEvent];
 
   return (
-    <div className="relative mx-auto w-full max-w-[600px]">
+    <div className="relative mx-auto w-full max-w-[640px]">
       <button onClick={() => setFull(true)} aria-label="Full screen clock"
         className="absolute right-0 top-0 z-10 flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--background)] px-3.5 text-[13px] font-semibold hover:bg-[var(--muted)]">
         <Maximize2 size={14} /> Full screen
       </button>
-      <svg viewBox="0 0 540 400" className="block h-auto w-full select-none" role="group" aria-label="24-hour routine ring">
-        <RingGraphic day={day} nowMin={nowMin} cx={270} cy={200} r={146} t={32} height={400} nameSize={11} clockSize={40}
+      <svg viewBox="0 0 640 440" className="block h-auto w-full select-none" role="group" aria-label="24-hour routine ring">
+        <RingGraphic day={day} nowMin={nowMin} cx={320} cy={220} r={148} t={36} height={440} nameSize={16} clockSize={60} labelSize={16}
           hover={hover} onHover={(i, p) => { setHover(i); if (p) setAt(p); }} prayers sideLabels={false} centre="block" idPrefix="ring" events={events}
           hoverEvent={hoverEvent} onHoverEvent={(i, p) => { setHoverEvent(i); if (p) setAt(p); }} />
       </svg>
