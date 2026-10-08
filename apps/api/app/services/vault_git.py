@@ -28,9 +28,13 @@ def _git(args: list[str], cwd: Path) -> str:
 
 
 @contextmanager
-def _locked(workdir: Path) -> Iterator[None]:
-    """One writer at a time, across API pods that share the checkout volume."""
-    with open(workdir / ".git" / "niyyah-write.lock", "w") as lock:
+def vault_lock(workdir: Path) -> Iterator[None]:
+    """One writer or syncer at a time, across API pods that share the checkout volume.
+
+    The lock file sits beside the checkout, not inside it, so it survives the checkout being wiped and re-cloned.
+    """
+    workdir.parent.mkdir(parents=True, exist_ok=True)
+    with open(workdir.parent / f".{workdir.name}.lock", "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         try:
             yield
@@ -45,7 +49,7 @@ def commit_edits(edits: dict[str, Edit], message: str, workdir: str | None = Non
         raise VaultWriteError("the vault checkout is not ready yet; sync it first")
 
     last_error = ""
-    with _locked(root):
+    with vault_lock(root):
         for _ in range(ATTEMPTS):
             try:
                 _git(["fetch", "origin", "main"], root)

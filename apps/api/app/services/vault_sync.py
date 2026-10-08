@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.vault import VaultBlockVote, VaultDay
+from app.services.vault_git import vault_lock
 from app.services.vault_parser import parse_daily_note
 
 
@@ -25,20 +26,23 @@ def _run_git(args: list[str], cwd: str | None = None) -> None:
 
 def _ensure_repo(workdir: str) -> None:
     path = Path(workdir)
-    if (path / ".git").exists():
+    with vault_lock(path):
+        if (path / ".git").exists():
+            try:
+                _run_git(["pull", "--ff-only"], cwd=workdir)
+                return
+            except subprocess.CalledProcessError:
+                pass  # stale/broken checkout: wipe and re-clone below
+        # `git clone` refuses a non-empty directory, so clear whatever is there, including a
+        # half-deleted checkout that has lost its .git.
+        shutil.rmtree(path, ignore_errors=True)
+        path.mkdir(parents=True, exist_ok=True)
         try:
-            _run_git(["pull", "--ff-only"], cwd=workdir)
-            return
+            _run_git(["clone", settings.vault_gitlab_url, workdir])
         except subprocess.CalledProcessError:
-            # Stale/broken checkout — wipe it so `git clone` (which refuses to
-            # clone into a non-empty directory) can actually recover below.
             shutil.rmtree(path, ignore_errors=True)
-
-    path.mkdir(parents=True, exist_ok=True)
-    try:
-        _run_git(["clone", settings.vault_gitlab_url, workdir])
-    except subprocess.CalledProcessError:
-        _run_git(["clone", settings.vault_github_url, workdir])
+            path.mkdir(parents=True, exist_ok=True)
+            _run_git(["clone", settings.vault_github_url, workdir])
 
 
 async def sync_vault(db: AsyncSession, workdir: str | None = None) -> SyncResult:

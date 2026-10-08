@@ -191,6 +191,24 @@ async def test_sync_recovers_from_broken_checkout_by_reclone(tmp_path, db_sessio
 
 
 @pytest.mark.asyncio
+async def test_sync_recovers_from_checkout_that_lost_its_git_dir(tmp_path, db_session, monkeypatch):
+    gitlab_repo = _make_repo(tmp_path, "gitlab-xarvis", {"2026-08-20.md": DAY_1})
+    monkeypatch.setattr(settings, "vault_gitlab_url", gitlab_repo)
+    monkeypatch.setattr(settings, "vault_github_url", str(tmp_path / "unused"))
+
+    # Half-deleted checkout: files remain, .git is gone. Pull is skipped and a plain clone fails.
+    workdir = tmp_path / "work"
+    workdir.mkdir()
+    (workdir / "CLAUDE.md").symlink_to("Agents.md")  # dangling
+
+    result = await vault_sync.sync_vault(db_session, workdir=str(workdir))
+
+    assert result.errors == []
+    assert result.synced_days == 1
+    assert (workdir / ".git").exists()
+
+
+@pytest.mark.asyncio
 async def test_sync_skips_malformed_file_and_reports_error(tmp_path, db_session, monkeypatch):
     gitlab_repo = _make_repo(tmp_path, "gitlab-xarvis", {
         "2026-08-20.md": DAY_1,
