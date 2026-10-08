@@ -267,7 +267,7 @@ async def trigger_sync(user: User = Depends(get_current_user), db: AsyncSession 
 async def sync_status(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Where the vault checkout is and how many days are in the database, for the Vault page's status line."""
     state = await asyncio.to_thread(vault_status, settings.vault_workdir)
-    days = (await db.execute(select(func.count()).select_from(VaultDay))).scalar_one()
+    days = (await db.execute(_owned(select(func.count()).select_from(VaultDay), user))).scalar_one()
     return VaultSyncStatus(**state, days=days)
 
 

@@ -92,3 +92,18 @@ async def test_a_second_user_sees_none_of_the_first_users_data(auth_client: Asyn
 async def test_schedule_needs_a_login_in_db_mode(client: AsyncClient, monkeypatch):
     monkeypatch.setattr(settings, "storage_backend", "db")
     assert (await client.get("/api/v1/vault/schedule")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_sync_status_counts_only_the_callers_days(auth_client: AsyncClient, tmp_path, monkeypatch):
+    today = _local_now().date()
+    build_vault(tmp_path, today)
+    async with TestSession() as db:
+        owner_id = (await db.execute(select(User.id))).scalar_one()
+        await import_vault(db, owner_id, tmp_path, today)
+    await auth_client.post("/api/v1/auth/register", json={"email": "other@niyyah.app", "password": "otherpass123"})
+    login = await auth_client.post("/api/v1/auth/login", json={"email": "other@niyyah.app", "password": "otherpass123"})
+    other = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    monkeypatch.setattr(settings, "storage_backend", "db")
+    assert (await _get(auth_client, "/api/v1/vault/sync/status"))["days"] == 2
+    assert (await _get(auth_client, "/api/v1/vault/sync/status", other))["days"] == 0
