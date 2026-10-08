@@ -140,7 +140,7 @@ async def test_post_event_creates_and_returns_entry(auth_client: AsyncClient, mo
     monkeypatch.setattr(google_calendar, "insert_event", lambda *a: seen.setdefault("args", a))
     r = await auth_client.post(f"{API}/day/{_today()}/events", json={"title": " Dentist ", "start": "14:00", "end": "15:30", "location": "Clinic"})
     assert r.status_code == 200, r.text
-    assert r.json() == {"title": "Dentist", "calendar": "Google Calendar", "color": None, "all_day": False, "location": "Clinic", "start_min": 840, "end_min": 930}
+    assert r.json() == {"title": "Dentist", "calendar": "Google Calendar", "color": None, "all_day": False, "location": "Clinic", "meeting_url": None, "start_min": 840, "end_min": 930}
     token, title, start, end, tz, location = seen["args"]
     assert (token, title, tz, location) == ("at", "Dentist", "Asia/Dhaka", "Clinic")
     assert start.hour == 14 and end.minute == 30 and start.tzinfo is not None

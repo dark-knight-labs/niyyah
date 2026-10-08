@@ -4,19 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { GoogleStatusData, NotebooksData, VaultGoalsData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
+import { GoogleStatusData, NotebooksData, VaultGoalsData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultTaskData } from "@/lib/vault-types";
 import { ROUTINE_BLOCKS, dateInTz, formatMinutes, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
-import { PLANNER_TZ, focusingQuestion, otStreamFor, toMeta } from "@/lib/streams";
+import { PLANNER_TZ, otStreamFor, toMeta } from "@/lib/streams";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
 import { CalendarCard } from "@/components/routine/calendar-card";
 import { DayHeader } from "@/components/routine/day-header";
 import { GoalCards } from "@/components/routine/goal-cards";
+import { LogList } from "@/components/routine/log-list";
 import { NowCard } from "@/components/routine/now-card";
 import { RoutineRing } from "@/components/routine/routine-ring";
-import { TodayList } from "@/components/routine/today-list";
+import { TaskList } from "@/components/routine/task-list";
 import { VotesPanel } from "@/components/routine/votes-panel";
-import { WeekObjectives } from "@/components/routine/week-objectives";
 import { WorkLanes } from "@/components/routine/work-lanes";
 
 const REFRESH_MS = 60_000;
@@ -38,7 +38,6 @@ export default function OverviewPage() {
     if (!result) return null;
     return result === "connected" ? "Google Calendar connected." : "Could not connect Google Calendar. Try again.";
   });
-  const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const [pipelines, setPipelines] = useState<PipelinesData | null>(null);
   const [notebooks, setNotebooks] = useState<NotebooksData | null>(null);
   const [goals, setGoals] = useState<VaultGoalsData | null>(null);
@@ -91,7 +90,6 @@ export default function OverviewPage() {
     vaultApi.log(dayKey).then(setLog).catch(() => setLog([]));
     vaultApi.events(dayKey).then(setEvents).catch(() => setEvents(null));
     vaultApi.googleStatus().then(setGoogle).catch(() => setGoogle(null));
-    vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
     vaultApi.pipelines().then(setPipelines).catch(() => setPipelines(null));
     vaultApi.notebooks().then(setNotebooks).catch(() => setNotebooks(null));
     vaultApi.goals().then(setGoals).catch(() => setGoals(null));
@@ -151,19 +149,18 @@ export default function OverviewPage() {
           {owner ? (
             <>
               <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
-              <div className="grid gap-8 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)_minmax(0,320px)] xl:gap-10 md:items-start">
-                <div>
+              <div className="mb-8 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,480px)_minmax(0,1fr)_minmax(0,320px)] xl:gap-9 md:items-start">
+                <div className="md:col-span-2 xl:col-span-1 xl:border-r xl:border-[var(--border)] xl:pr-9">
                   <RoutineRing day={day} nowMin={nowMin} events={events?.events} />
                   <NowCard day={day} nowMin={nowMin} />
                 </div>
                 <div>
-                  <TodayList day={dayKey} tasks={tasks} entries={log} onChanged={loadPrivate}
+                  <TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} />
+                  <LogList day={dayKey} entries={log} onChanged={loadPrivate}
                     section={block ? ROUTINE_BLOCKS[block.block].label : "Day"}
                     span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
                 </div>
                 <div className="md:col-span-2 xl:col-span-1">
-                  <WeekObjectives data={objectives} onChanged={setObjectives} />
-                  {objectives && slot && <p className="-mt-4 mb-6 text-xs leading-snug text-[var(--muted-foreground)]">{focusingQuestion(slot)}</p>}
                   <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
                 </div>
               </div>

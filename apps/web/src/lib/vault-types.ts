@@ -103,6 +103,8 @@ export interface VaultEvent {
   color: string | null;
   all_day: boolean;
   location: string | null;
+  /** An https Zoom / Google Meet / Teams link found on the event. */
+  meeting_url?: string | null;
   /** Minutes since local midnight; null for all-day events. */
   start_min: number | null;
   end_min: number | null;
@@ -175,6 +177,8 @@ export interface PipelineItemData {
   done_on: string | null;
   /** Week label ("2026-W41") when this item is that week's small domino. */
   focus: string | null;
+  /** The part of the block this item belongs to; most blocks have none. */
+  product?: string | null;
   done: boolean;
   age_days: number;
   stale: boolean;

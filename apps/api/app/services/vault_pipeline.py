@@ -5,6 +5,7 @@
     - [x] Draft the incident template #oct ➕ 2026-09-28 ✅ 2026-10-05
 
 An item may carry a description: the indented lines right under it (Obsidian shows them as the task's notes).
+A `[product:: DNS]` field names the part of the block an item belongs to (optional; most blocks have none).
 A `🎯 2026-W41` marker makes an item that week's small domino (the weekly objective): one per stream per week.
 Obsidian Tasks lines, so the note reads and queries normally in the vault. An item is identified by
 line number plus a hash of the line, so a moved or changed line is refused instead of mis-edited.
@@ -28,6 +29,7 @@ _ITEM = re.compile(r"^- \[([ xX])\] (.*)$")
 _ADDED = re.compile(r"\s*➕\s*(\d{4}-\d{2}-\d{2})")
 _DONE = re.compile(r"\s*✅\s*(\d{4}-\d{2}-\d{2})")
 _FOCUS = re.compile(r"\s*🎯\s*(\d{4}-W\d{2})")
+_PRODUCT = re.compile(r"\s*\[product::\s*([^\]]*?)\s*\]")
 _BRACKET_MONTH = re.compile(r"\s*\[(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\]\s*$", re.IGNORECASE)
 
 
@@ -91,7 +93,10 @@ def parse_pipeline(content: str | None, today: date) -> list[dict]:
         focus = _FOCUS.search(body)
         text, checkpoint = split_month_tag(_FOCUS.sub("", _DONE.sub("", _ADDED.sub("", body))))
         age = (today - date.fromisoformat(added.group(1))).days if added else 0
+        product = _PRODUCT.search(text)
+        text = _PRODUCT.sub("", text).strip()
         items.append({
+            "product": (product.group(1) or None) if product else None,
             "line": number, "hash": line_hash(line), "text": text, "lane": lane, "checkpoint": checkpoint,
             "added": added.group(1) if added else None, "done_on": done_on.group(1) if done_on else None,
             "focus": focus.group(1) if focus else None, "done": m.group(1) != " ", "age_days": age,
@@ -258,6 +263,9 @@ def set_text(content: str, line: int, expected_hash: str, text: str) -> str:
     m = _find(lines, line, expected_hash)
     _, month, added, done_on, focus = _parts(m.group(2))
     cleaned, typed = _clean(text)
+    kept = _PRODUCT.search(m.group(2))
+    if kept and not _PRODUCT.search(cleaned):  # renaming keeps the item's product
+        cleaned += f" [product:: {kept.group(1)}]"
     lines[line - 1] = _render(cleaned, typed or month, m.group(1) != " ", added, done_on, focus)
     return "\n".join(lines)
 

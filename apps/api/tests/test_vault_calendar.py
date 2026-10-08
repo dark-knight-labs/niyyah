@@ -74,3 +74,25 @@ def test_one_broken_calendar_is_reported_without_its_url(tmp_path, monkeypatch):
 
 def test_no_day_planner_settings_means_no_calendars(tmp_path):
     assert vault_calendar.events_for_day(tmp_path, date(2026, 10, 6), "Asia/Dhaka") == ([], [])
+
+
+def test_meeting_url_finds_only_known_https_meeting_hosts():
+    assert vault_calendar.meeting_url(None, "Join https://us02web.zoom.us/j/123?pwd=abc.") == "https://us02web.zoom.us/j/123?pwd=abc"
+    assert vault_calendar.meeting_url("https://meet.google.com/abc-defg-hij") == "https://meet.google.com/abc-defg-hij"
+    assert vault_calendar.meeting_url("http://zoom.us/j/1") is None  # not https
+    assert vault_calendar.meeting_url("https://evil.example/zoom.us/j/1", "javascript:alert(1)") is None
+    assert vault_calendar.meeting_url(None, "") is None
+
+
+def test_google_event_carries_its_meet_link_and_a_zoom_link_from_the_description():
+    from datetime import datetime, time as clock
+    from zoneinfo import ZoneInfo
+    zone = ZoneInfo("Asia/Dhaka")
+    day_start = datetime.combine(date(2026, 10, 6), clock.min, zone)
+    source = {"name": "Me", "color": None}
+    base = {"summary": "Standup", "start": {"dateTime": "2026-10-06T09:30:00+06:00"}, "end": {"dateTime": "2026-10-06T10:00:00+06:00"}}
+    meet = vault_calendar._google_entry({**base, "hangoutLink": "https://meet.google.com/abc-defg-hij"}, source, zone, day_start)
+    assert meet["meeting_url"] == "https://meet.google.com/abc-defg-hij"
+    zoom = vault_calendar._google_entry({**base, "description": "Link: https://zoom.us/j/99"}, source, zone, day_start)
+    assert zoom["meeting_url"] == "https://zoom.us/j/99"
+    assert vault_calendar._google_entry(base, source, zone, day_start)["meeting_url"] is None

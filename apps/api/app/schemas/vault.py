@@ -254,6 +254,7 @@ class PipelineItem(BaseModel):
     added: str | None
     done_on: str | None
     focus: str | None  # week label when this item is that week's small domino
+    product: str | None = None  # the part of the block it belongs to, from a [product:: X] field in the note
     done: bool
     age_days: int
     stale: bool
@@ -306,6 +307,7 @@ class CalendarEventResponse(BaseModel):
     color: str | None
     all_day: bool
     location: str | None
+    meeting_url: str | None = None  # https Zoom / Meet / Teams link found on the event
     start_min: int | None  # minutes since local midnight; None for all-day events
     end_min: int | None
 

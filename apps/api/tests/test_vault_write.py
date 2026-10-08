@@ -758,3 +758,18 @@ def test_pipeline_item_description_is_kept_under_the_task_and_travels_with_it():
     assert "Why" not in cleared
     removed = vp.remove_item(moved, now["line"], now["hash"])
     assert "Why" not in removed and "Other" in removed
+
+
+def test_pipeline_product_field_is_parsed_and_survives_move_and_rename():
+    from app.services import vault_pipeline as vp
+    today = date(2026, 10, 8)
+    note = "## Now\n- [ ] Flash firmware [product:: Router] #nov ➕ 2026-10-01\n- [ ] Plain item ➕ 2026-10-01\n## Next\n"
+    items = vp.parse_pipeline(note, today)
+    assert items[0]["product"] == "Router" and items[0]["text"] == "Flash firmware" and items[0]["checkpoint"] == "nov"
+    assert items[1]["product"] is None
+    moved = vp.move_item(note, items[0]["line"], items[0]["hash"], "next", today)
+    after = next(i for i in vp.parse_pipeline(moved, today) if i["text"] == "Flash firmware")
+    assert after["product"] == "Router" and after["lane"] == "next"
+    renamed = vp.set_text(moved, after["line"], after["hash"], "Flash the new firmware")
+    final = next(i for i in vp.parse_pipeline(renamed, today) if i["text"] == "Flash the new firmware")
+    assert final["product"] == "Router"

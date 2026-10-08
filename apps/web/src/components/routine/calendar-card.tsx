@@ -81,6 +81,15 @@ function ConnectButton() {
   );
 }
 
+/** "Meet", "Zoom" or "Teams" for a meeting link, else "call". */
+function meetingName(url: string): string {
+  const host = new URL(url).hostname;
+  if (host.endsWith("meet.google.com")) return "Meet";
+  if (host.includes("zoom")) return "Zoom";
+  if (host.includes("teams")) return "Teams";
+  return "call";
+}
+
 /** Today's events from the calendars set up in Obsidian (Day Planner's iCal feeds); new ones go to Google Calendar. */
 export function CalendarCard({ day, data, status, onChanged }: { day: string | null; data: VaultEventsData | null; status: GoogleStatusData | null; onChanged: () => void }) {
   if (!data) return null;
@@ -104,6 +113,12 @@ export function CalendarCard({ day, data, status, onChanged }: { day: string | n
                   {e.location ? ` · ${e.location}` : ""}
                 </span>
               </span>
+              {e.meeting_url && (
+                <a href={e.meeting_url} target="_blank" rel="noopener noreferrer" aria-label={`Join: ${e.title}`}
+                  className="inline-flex min-h-8 shrink-0 items-center self-start whitespace-nowrap rounded-[5px] border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">
+                  Join {meetingName(e.meeting_url)}
+                </a>
+              )}
             </li>
           ))}
         </ul>

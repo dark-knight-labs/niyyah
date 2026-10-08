@@ -6,6 +6,7 @@ When Google is connected, the feed for the connected account is read through the
 iCal export lags by hours, so a freshly added event would not show.
 """
 import json
+import re
 import time
 from collections.abc import Callable
 from datetime import date, datetime, time as clock, timedelta
@@ -21,6 +22,18 @@ CACHE_SECONDS = 300
 FETCH_TIMEOUT = 10.0
 
 _cache: dict[str, tuple[float, bytes]] = {}
+
+# Only https links to the common meeting hosts become a Join link: nothing else from an event is ever made clickable.
+_MEETING = re.compile(r"https://(?:[\w-]+\.)*(?:zoom\.us|zoomgov\.com|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com)/[^\s<>\"')]+", re.IGNORECASE)
+
+
+def meeting_url(*candidates: object) -> str | None:
+    """The first Zoom / Google Meet / Teams link found in the given texts (a link field, location, description)."""
+    for text in candidates:
+        found = _MEETING.search(str(text or ""))
+        if found:
+            return found.group(0).rstrip(".,;")
+    return None
 
 
 def sources(root: Path) -> list[dict]:
@@ -58,6 +71,11 @@ def _google_entry(item: dict, source: dict, zone: ZoneInfo, day_start: datetime)
         "color": source["color"],
         "all_day": all_day,
         "location": str(item.get("location", "")).strip() or None,
+        "meeting_url": meeting_url(
+            item.get("hangoutLink"),
+            *(p.get("uri") for p in item.get("conferenceData", {}).get("entryPoints", []) if p.get("entryPointType") == "video"),
+            item.get("location"), item.get("description"),
+        ),
         "start_min": None,
         "end_min": None,
     }
@@ -112,6 +130,7 @@ def events_for_day(
                 "color": source["color"],
                 "all_day": all_day,
                 "location": str(item.get("LOCATION", "")).strip() or None,
+                "meeting_url": meeting_url(item.get("X-GOOGLE-CONFERENCE"), item.get("URL"), item.get("LOCATION"), item.get("DESCRIPTION")),
                 "start_min": None,
                 "end_min": None,
             }

@@ -25,7 +25,7 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
   const event = hoverEvent === null ? null : timedEvents(events)[hoverEvent];
 
   return (
-    <div className="relative mx-auto w-full max-w-[560px]">
+    <div className="relative mx-auto w-full max-w-[600px]">
       <button onClick={() => setFull(true)} aria-label="Full screen clock"
         className="absolute right-0 top-0 z-10 flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--background)] px-3.5 text-[13px] font-semibold hover:bg-[var(--muted)]">
         <Maximize2 size={14} /> Full screen
