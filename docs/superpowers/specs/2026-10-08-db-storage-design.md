@@ -1,6 +1,6 @@
 # Niyyah: database storage instead of the Obsidian vault
 
-Date: 2026-10-08. Status: design approved by the owner, implementation plan not yet written.
+Date: 2026-10-08. Status: design approved by the owner. Phases 1 and 2 built on branch `feature/db-storage` (plan: `docs/superpowers/plans/2026-10-08-db-storage-phases-1-2.md`); phases 3 to 6 not started.
 
 ## Goal
 
@@ -89,3 +89,15 @@ Each phase ships on its own. Production keeps running on the vault until phase 5
 ## Out of scope
 
 Hosted-service features, live two-way vault sync, mobile apps, and any change to the visual design.
+
+## Amendments (found while building phases 1 and 2)
+
+1. No separate `streams` table. A stream's name, colour, icon, slot, status, goal and month checkpoints are defined per quarter in the vault, so they live in `planner_quarter_streams` (one row per user, quarter and stream). Phase 4 adds editors on top.
+2. `blocked_by` is a JSON list of blocker ids on `planner_pipeline_items`, not an `item_blockers` table: a blocker's id is its notebook entry's `ext_id`, so a link table would hold the same strings with no useful foreign key.
+3. Config tables are `planner_schedule_settings` (one JSON `meta` row per user) and `planner_schedule_blocks`. The user-defined `blocks` table is deferred to phase 4.
+4. New tables are prefixed `planner_` (a `schedule_blocks` table already exists); the legacy `vault_days` rows keep `user_id NULL` and belong to `STORAGE_BACKEND=vault`.
+5. In `db` mode `line` carries the row id and `hash` is empty until phase 3 moves the frontend to ids. Vault-backed writes answer 501 in `db` mode.
+
+## Phase 2 result on the owner's real vault (2026-10-08)
+
+Imported 85 days, 57 log entries, 15 dated tasks, 3 goals, 1 quarter (8 streams), 6 objectives, 40 pipeline items, 4 notebook entries and 11 schedule blocks with 0 errors. Tasks, log (for today), goals, objectives, quarter, pipelines, notebooks and schedule returned identical JSON from the vault path and the database path once `line` and `hash` were removed. Not yet compared: day aggregates (week, month, streaks), which are asserted against fixture values only, and tasks or log for days other than today.

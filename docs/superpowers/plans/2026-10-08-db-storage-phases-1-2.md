@@ -1798,7 +1798,7 @@ The fixture proves the mechanism; this proves it on the owner's real vault befor
 - [ ] **Step 1:** Clone the vault read-only to a scratch path: `git clone ssh://git@gitlab.alamin.rocks:2222/pkm/xarvis.git /tmp/xarvis-parity` (use `GIT_SSH_COMMAND="ssh -o IdentityAgent=none -o BatchMode=yes"`).
 - [ ] **Step 2:** Start the API locally against a scratch SQLite or Postgres database with `VAULT_WORKDIR=/tmp/xarvis-parity`, `VAULT_WRITE_EMAILS=<owner email>`, register the owner, then run `python -m app.cli import-vault /tmp/xarvis-parity --user <owner email> --replace`.
 - [ ] **Step 3:** For each URL in `_endpoints()` of `tests/test_db_reads.py`, fetch it with `STORAGE_BACKEND=vault`, then again with `STORAGE_BACKEND=db` (and `VAULT_WORKDIR` pointing at an empty directory), and diff the JSON after removing `line` and `hash`. Save both outputs under the scratchpad and diff them with `diff <(jq -S . a.json) <(jq -S . b.json)`.
-- [ ] **Step 4:** Record the outcome in `WORK_LOG.md` of the burak repo: counts imported, endpoints compared, every difference and its cause. Fix any real mismatch in the importer or store with a regression test in `tests/vault_fixture.py` first.
+- [ ] **Step 4:** Record the outcome in the spec's "Phase 2 result" section: counts imported, endpoints compared, every difference and its cause. Fix any real mismatch in the importer or store with a regression test in `tests/vault_fixture.py` first.
 
 Do not deploy `STORAGE_BACKEND=db` anywhere. Production stays on `vault` until phase 5.
 
