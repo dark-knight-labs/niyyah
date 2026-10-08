@@ -132,7 +132,7 @@ export default function OverviewPage() {
   const slot = pipelines ? otStreamFor(now, PLANNER_TZ, pipelines.streams.map(toMeta)) : undefined;
 
   return (
-    <div className="mx-auto w-full max-w-[1760px]">
+    <div className="mx-auto w-full max-w-[110rem]">
       {problems.length > 0 && (
         <div className="mb-4 space-y-0.5 rounded-xl border border-[var(--destructive)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--destructive)]">
           {problems.map((p) => (

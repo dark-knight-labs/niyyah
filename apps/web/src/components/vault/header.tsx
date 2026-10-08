@@ -60,7 +60,7 @@ export function VaultHeader({ today, status, onSynced }: VaultHeaderProps) {
             <div className="mt-0.5 flex items-baseline gap-2">
               <h1 className="heading-elegant text-xl leading-none">Today&rsquo;s Ledger</h1>
               {today && (
-                <span className="rounded-full border px-2 py-px text-[10px] uppercase tracking-[0.18em]" style={{ borderColor: `${modeColor}55`, color: modeColor }}>
+                <span className="rounded-full border px-2 py-px text-[0.625rem] uppercase tracking-[0.18em]" style={{ borderColor: `${modeColor}55`, color: modeColor }}>
                   {today.mode}
                 </span>
               )}
@@ -75,7 +75,7 @@ export function VaultHeader({ today, status, onSynced }: VaultHeaderProps) {
             </span>
           )}
           <button onClick={handleSync} disabled={syncing}
-            className="flex min-h-8 items-center gap-1.5 rounded-[5px] border border-[var(--border)] px-2.5 text-[11px] font-semibold text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50">
+            className="flex min-h-8 items-center gap-1.5 rounded-[0.3125rem] border border-[var(--border)] px-2.5 text-[0.6875rem] font-semibold text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50">
             <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
             {syncing ? "Syncing" : "Sync now"}
           </button>

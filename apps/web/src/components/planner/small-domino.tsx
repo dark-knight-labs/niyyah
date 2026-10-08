@@ -30,7 +30,7 @@ export function SmallDomino({ meta, objective, pool, run, onPick }: Props) {
           <span>Pick from pipeline</span>
           <select defaultValue="" aria-label={`Pick ${meta.label} objective from its pipeline`}
             onChange={(e) => { const it = pool[Number(e.target.value)]; if (it) onPick(it); }}
-            className="min-h-9 max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[13px] text-[var(--foreground)]">
+            className="min-h-9 max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-[0.8125rem] text-[var(--foreground)]">
             <option value="" disabled>Now, Next and Someday…</option>
             {pool.map((it, idx) => <option key={it.line} value={idx}>{it.lane === "now" ? "★ " : ""}{it.text}</option>)}
           </select>

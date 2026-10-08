@@ -13,7 +13,7 @@ export function NowCard({ day, nowMin }: { day: ResolvedDay; nowMin: number }) {
   const mono = "font-mono text-sm font-medium tabular-nums";
 
   return (
-    <section className="mx-auto mt-3 grid w-full max-w-[560px] gap-2" aria-label="Now">
+    <section className="mx-auto mt-3 grid w-full max-w-[35rem] gap-2" aria-label="Now">
       {current ? (
         <>
           <div className="flex items-baseline justify-between gap-3 text-sm">
@@ -35,7 +35,7 @@ export function NowCard({ day, nowMin }: { day: ResolvedDay; nowMin: number }) {
       )}
       {next && (
         <div className="flex justify-between gap-3 border-t border-[var(--border)] pt-2 text-sm">
-          <span><span className="mr-1 text-[11px] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Next</span><b>{ROUTINE_BLOCKS[next.block].label}</b> <span className={`${mono} text-[var(--muted-foreground)]`}>{formatMinutes(next.startMin)}</span></span>
+          <span><span className="mr-1 text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Next</span><b>{ROUTINE_BLOCKS[next.block].label}</b> <span className={`${mono} text-[var(--muted-foreground)]`}>{formatMinutes(next.startMin)}</span></span>
           <span className="whitespace-nowrap text-[var(--muted-foreground)]">in {formatDuration(minutesToNext)}</span>
         </div>
       )}

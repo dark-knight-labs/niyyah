@@ -30,7 +30,7 @@ export function WeeklyPulse({ week }: WeeklyPulseProps) {
                   style={{ height: `${Math.max(day.pct, 2)}%`, backgroundColor: color }}
                 />
               </div>
-              <span className="text-[10px] uppercase text-[var(--muted-foreground)] font-mono">{dow}</span>
+              <span className="text-[0.625rem] uppercase text-[var(--muted-foreground)] font-mono">{dow}</span>
             </div>
           );
         })}

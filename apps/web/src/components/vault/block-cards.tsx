@@ -28,7 +28,7 @@ export function BlockCards({ today }: BlockCardsProps) {
                 return (
                   <span
                     key={level}
-                    className="w-3.5 h-3.5 rounded-[2px] border flex items-center justify-center"
+                    className="w-3.5 h-3.5 rounded-[0.125rem] border flex items-center justify-center"
                     style={{
                       backgroundColor: checked ? color : "transparent",
                       borderColor: checked ? color : "var(--border)",

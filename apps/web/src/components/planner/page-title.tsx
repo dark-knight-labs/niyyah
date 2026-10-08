@@ -4,7 +4,7 @@ export function PageTitle({ eyebrow, title, sub, visual, action }: { eyebrow: st
     <header className="mb-8 flex w-full flex-wrap items-end justify-between gap-x-10 gap-y-6">
       <div className="min-w-0 flex-[1_1_22rem]">
         <p className="eyebrow">{eyebrow}</p>
-        <h1 className="heading-elegant mt-2 text-[24px] leading-[1.25] min-[620px]:text-[30px]">{title}</h1>
+        <h1 className="heading-elegant mt-2 text-[1.5rem] leading-[1.25] min-[620px]:text-[1.875rem]">{title}</h1>
         {sub && <div className="mt-3 text-sm text-[var(--muted-foreground)]">{sub}</div>}
         {action && <div className="mt-4">{action}</div>}
       </div>

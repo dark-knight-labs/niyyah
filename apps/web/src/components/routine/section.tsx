@@ -7,7 +7,7 @@ import { useState } from "react";
 export function Section({ title, aside, error, children }: { title: string; aside?: string; error?: string | null; children: React.ReactNode }) {
   return (
     <section className="mb-4" aria-label={title}>
-      <h2 className="mb-1.5 flex items-baseline justify-between text-[11px] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
+      <h2 className="mb-1.5 flex items-baseline justify-between text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
         {title}
         {aside && <span className="text-xs font-medium normal-case tracking-normal">{aside}</span>}
       </h2>
@@ -37,8 +37,8 @@ export function AddForm({ placeholder, button, onAdd }: { placeholder: string; b
   return (
     <form onSubmit={submit} className="mt-1.5 flex gap-1.5">
       <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} maxLength={300} aria-label={placeholder}
-        className="min-h-9 min-w-0 flex-1 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm placeholder:text-[var(--muted-foreground)]" />
-      <button type="submit" disabled={busy || !text.trim()} className="min-h-9 rounded-[6px] bg-[var(--accent)] px-3.5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">{button}</button>
+        className="min-h-9 min-w-0 flex-1 rounded-[0.375rem] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm placeholder:text-[var(--muted-foreground)]" />
+      <button type="submit" disabled={busy || !text.trim()} className="min-h-9 rounded-[0.375rem] bg-[var(--accent)] px-3.5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">{button}</button>
     </form>
   );
 }

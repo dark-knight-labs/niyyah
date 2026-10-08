@@ -32,7 +32,7 @@ export function VotesPanel({ day, today, onSaved, current }: Props) {
 
   return (
     <section aria-label="Votes" className="flex flex-wrap items-center gap-x-5 gap-y-1 border-y border-[var(--border)] py-1.5">
-      <h2 className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Votes</h2>
+      <h2 className="text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Votes</h2>
       {blocksForDay(today?.blocks).map((block) => {
         const stars = today?.blocks[block] ?? 0;
         return (
@@ -42,7 +42,7 @@ export function VotesPanel({ day, today, onSaved, current }: Props) {
               {[1, 2, 3].map((n) => (
                 <button key={n} disabled={busy} aria-pressed={stars === n} aria-label={`${BLOCK_LABELS[block]} ${n} stars`}
                   onClick={() => void vote(block, stars === n ? 0 : n)}
-                  className="grid h-7 w-7 place-items-center rounded-md bg-[var(--muted)] text-[10px] font-bold text-[var(--muted-foreground)] transition disabled:opacity-60 aria-pressed:text-white"
+                  className="grid h-7 w-7 place-items-center rounded-md bg-[var(--muted)] text-[0.625rem] font-bold text-[var(--muted-foreground)] transition disabled:opacity-60 aria-pressed:text-white"
                   style={stars === n ? { background: BLOCK_COLORS[block] } : undefined}>
                   {n}
                 </button>

@@ -87,7 +87,7 @@ export default function PlanPage() {
       <div className={`grid gap-6 lg:items-start ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[13rem_minmax(0,1fr)]"}`}>
         <nav aria-label="Blocks" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:p-0 [&::-webkit-scrollbar]:hidden">
           <button type="button" onClick={toggleRail} aria-expanded={!collapsed} aria-label={collapsed ? "Expand the block list" : "Collapse the block list"}
-            className="hidden min-h-10 items-center gap-2 rounded-lg px-2.5 text-[11px] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)] hover:bg-[var(--muted)] lg:flex">
+            className="hidden min-h-10 items-center gap-2 rounded-lg px-2.5 text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)] hover:bg-[var(--muted)] lg:flex">
             {collapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <><PanelLeftClose size={16} aria-hidden="true" /> Blocks</>}
           </button>
           {streams.map((s) => {
@@ -100,7 +100,7 @@ export default function PlanPage() {
                 <s.icon size={16} style={{ color: s.color }} aria-hidden="true" className="shrink-0" />
                 <span className={collapsed ? "lg:sr-only" : "min-w-0 flex-1 truncate"}>{s.label}</span>
                 {!collapsed && (
-                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-[var(--muted-foreground)]">
+                  <span className="shrink-0 text-[0.6875rem] font-medium tabular-nums text-[var(--muted-foreground)]">
                     {blocked > 0 && <span className="mr-1.5 font-bold text-[var(--destructive)]">{blocked} blocked</span>}{openCount(s.id)}
                   </span>
                 )}
@@ -137,11 +137,11 @@ export default function PlanPage() {
 
               <section aria-label="Goal and small domino" className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-10">
                 <div className="grid gap-4">
-                  <p className={`text-[15px] font-semibold leading-snug ${goal?.goal ? "" : "text-[var(--muted-foreground)]"}`}>{goal?.goal || "No goal yet. Edit the block to set one."}</p>
+                  <p className={`text-[0.9375rem] font-semibold leading-snug ${goal?.goal ? "" : "text-[var(--muted-foreground)]"}`}>{goal?.goal || "No goal yet. Edit the block to set one."}</p>
                   {goal && <MonthTrack checkpoints={goal.checkpoints} current={quarter.current_month} color={meta.color} />}
                 </div>
                 <div>
-                  <p className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Small domino · this week</p>
+                  <p className="mb-1 text-[0.625rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Small domino · this week</p>
                   <SmallDomino meta={meta} objective={objective} pool={items.filter((i) => i.lane !== "done")} run={run}
                     onPick={(item) => void run(() => vaultApi.focusPipelineItem(meta.id, item))} />
                 </div>

@@ -41,19 +41,19 @@ function Item({ r, to, toLabel, tick, week, busy, onMove }: ItemProps) {
       ) : (
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.meta.color }} aria-hidden="true" />
       )}
-      <span className="min-w-0 flex-1 break-words text-[13px] leading-snug">{r.item.text}</span>
-      {r.item.product && <span className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">{r.item.product}</span>}
-      {r.item.focus === week && <span className="text-[11px] font-bold" style={{ color: r.meta.color }} title="This week's focus">★</span>}
-      {r.blocked && <span className="text-[10px] font-bold uppercase text-[var(--destructive)]">blocked</span>}
+      <span className="min-w-0 flex-1 break-words text-[0.8125rem] leading-snug">{r.item.text}</span>
+      {r.item.product && <span className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">{r.item.product}</span>}
+      {r.item.focus === week && <span className="text-[0.6875rem] font-bold" style={{ color: r.meta.color }} title="This week's focus">★</span>}
+      {r.blocked && <span className="text-[0.625rem] font-bold uppercase text-[var(--destructive)]">blocked</span>}
       <button type="button" disabled={busy} onClick={() => void onMove(r, to)} aria-label={`Move to ${toLabel}: ${r.item.text}`}
-        className="min-h-8 shrink-0 whitespace-nowrap rounded px-1.5 text-[11px] font-semibold text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--foreground)] disabled:opacity-50 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100">
+        className="min-h-8 shrink-0 whitespace-nowrap rounded px-1.5 text-[0.6875rem] font-semibold text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--foreground)] disabled:opacity-50 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100">
         → {toLabel}
       </button>
     </li>
   );
 }
 
-const TH = "px-2.5 py-1.5 text-left text-[10px] font-extrabold uppercase tracking-[0.09em] text-[var(--muted-foreground)]";
+const TH = "px-2.5 py-1.5 text-left text-[0.625rem] font-extrabold uppercase tracking-[0.09em] text-[var(--muted-foreground)]";
 const TD = "border-t border-[var(--border)] px-2.5 py-1.5 align-top";
 
 /** Now, Next and Someday for every block, one table row per block. Someday is the pipeline's Backlog lane under another name. */
@@ -107,7 +107,7 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
   return (
     <Section title="Work" aside={otLabel ? `by block · ${otLabel} has OT today` : "by block"} error={error}>
       <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
-        <table className="w-full min-w-[760px] table-fixed border-collapse">
+        <table className="w-full min-w-[47.5rem] table-fixed border-collapse">
           <thead>
             <tr>
               <th className={`${TH} w-36`}>Block</th>
@@ -127,12 +127,12 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
                 <tr key={id} className={id === ot ? "bg-[var(--accent-light)]" : ""}>
                   <th scope="row" className={`${TD} text-left text-xs font-bold`}>
                     <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: meta.color }} aria-hidden="true" />{meta.label}
-                    {id === ot && <span className="mt-1 block w-fit rounded bg-[var(--surface)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.05em] text-[var(--accent)]">OT today</span>}
+                    {id === ot && <span className="mt-1 block w-fit rounded bg-[var(--surface)] px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.05em] text-[var(--accent)]">OT today</span>}
                     {products.length > 0 && (
                       <span className="mt-1.5 flex flex-wrap gap-1" role="group" aria-label={`${meta.label} products`}>
                         {products.map((p) => (
                           <button key={p} type="button" aria-pressed={picked === p} onClick={() => setProduct((cur) => ({ ...cur, [id]: picked === p ? null : p }))}
-                            className="min-h-6 rounded-full border border-[var(--border)] px-2 text-[10px] font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
+                            className="min-h-6 rounded-full border border-[var(--border)] px-2 text-[0.625rem] font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
                             {p}
                           </button>
                         ))}

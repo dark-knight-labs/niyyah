@@ -32,7 +32,7 @@ export function FooterStats({ stacked, month, streaks }: FooterStatsProps) {
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               {Object.entries(month.modes).map(([mode, count]) => (
-                <span key={mode} className="flex items-center gap-1 text-[10px] font-mono text-[var(--muted-foreground)]">
+                <span key={mode} className="flex items-center gap-1 text-[0.625rem] font-mono text-[var(--muted-foreground)]">
                   <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: resolveModeColor(mode) }} />
                   {mode} {count}
                 </span>

@@ -25,9 +25,9 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
   const event = hoverEvent === null ? null : timedEvents(events)[hoverEvent];
 
   return (
-    <div className="relative mx-auto w-full max-w-[640px]">
+    <div className="relative mx-auto w-full max-w-[40rem]">
       <button onClick={() => setFull(true)} aria-label="Full screen clock"
-        className="absolute right-0 top-0 z-10 flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--background)] px-3.5 text-[13px] font-semibold hover:bg-[var(--muted)]">
+        className="absolute right-0 top-0 z-10 flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--background)] px-3.5 text-[0.8125rem] font-semibold hover:bg-[var(--muted)]">
         <Maximize2 size={14} /> Full screen
       </button>
       <svg viewBox="0 0 640 440" className="block h-auto w-full select-none" role="group" aria-label="24-hour routine ring">
@@ -37,7 +37,7 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
       </svg>
 
       {block && (
-        <div role="tooltip" className="pointer-events-none fixed z-50 w-56 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-3 text-[13px] shadow-xl"
+        <div role="tooltip" className="pointer-events-none fixed z-50 w-56 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-3 text-[0.8125rem] shadow-xl"
           style={{ left: Math.min(at.x + 14, (typeof window === "undefined" ? 9999 : window.innerWidth) - 240), top: at.y + 14 }}>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full" style={{ background: ROUTINE_BLOCKS[block.block].color }} />
@@ -50,7 +50,7 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
       )}
 
       {event && event.start_min !== null && event.end_min !== null && (
-        <div role="tooltip" className="pointer-events-none fixed z-50 w-60 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-3 text-[13px] shadow-xl"
+        <div role="tooltip" className="pointer-events-none fixed z-50 w-60 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-3 text-[0.8125rem] shadow-xl"
           style={{ left: Math.min(at.x + 14, (typeof window === "undefined" ? 9999 : window.innerWidth) - 256), top: at.y + 14 }}>
           <div className="flex items-start gap-2">
             <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: event.color ?? "var(--muted-foreground)" }} />

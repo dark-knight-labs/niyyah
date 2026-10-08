@@ -98,8 +98,8 @@ export function PipelineBoard({ stream, meta, pipelines, blockers, busy, run, st
               <li key={i.line} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-[var(--muted-foreground)]">
                 <Check size={14} className="shrink-0 text-[var(--accent)]" aria-hidden="true" />
                 <span className="min-w-0 flex-1 break-words line-through">{i.text}</span>
-                <span className="shrink-0 text-[11px] tabular-nums">{i.done_on?.slice(5)}</span>
-                <button type="button" aria-label={`Reopen ${i.text}`} className="shrink-0 text-[11px] font-bold text-[var(--accent)]" onClick={() => void run(() => vaultApi.movePipelineItem(stream, i, "next"))}>Reopen</button>
+                <span className="shrink-0 text-[0.6875rem] tabular-nums">{i.done_on?.slice(5)}</span>
+                <button type="button" aria-label={`Reopen ${i.text}`} className="shrink-0 text-[0.6875rem] font-bold text-[var(--accent)]" onClick={() => void run(() => vaultApi.movePipelineItem(stream, i, "next"))}>Reopen</button>
               </li>
             ))}
           </ul>
@@ -163,14 +163,14 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
         </form>
       ) : item.description ? (
         <button type="button" aria-expanded={open} aria-label="Show details" onClick={() => setOpen(!open)}
-          className={`whitespace-pre-wrap break-words text-left text-[13px] leading-relaxed text-[var(--muted-foreground)] ${open ? "" : "line-clamp-2"}`}>
+          className={`whitespace-pre-wrap break-words text-left text-[0.8125rem] leading-relaxed text-[var(--muted-foreground)] ${open ? "" : "line-clamp-2"}`}>
           {item.description}
         </button>
       ) : null}
       {waiting.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {waiting.map((w) => (
-            <span key={w.id} className="inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-px text-[11px] font-bold"
+            <span key={w.id} className="inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-px text-[0.6875rem] font-bold"
               style={w.found ? { color: "var(--destructive)", background: "color-mix(in srgb, var(--destructive) 12%, var(--background))" } : { color: "var(--muted-foreground)", background: "var(--muted)" }}>
               <OctagonAlert size={11} className="shrink-0" aria-hidden="true" />
               <span className="min-w-0 break-words">{w.found ? w.found.title : "blocker deleted"}</span>
@@ -180,7 +180,7 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
       )}
       {linking && (
         <fieldset className="grid gap-1.5 rounded-lg border border-[var(--border)] p-2.5">
-          <legend className="px-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">Waiting on</legend>
+          <legend className="px-1 text-[0.6875rem] font-extrabold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">Waiting on</legend>
           {blockers.length === 0 && <p className="text-xs text-[var(--muted-foreground)]">No blockers yet. Add one in the Notebook.</p>}
           {blockers.map((b) => (
             <label key={`${b.line}-${b.hash}`} className="flex items-start gap-2 text-xs">
@@ -189,16 +189,16 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
               <span className={`min-w-0 break-words ${b.open ? "" : "text-[var(--muted-foreground)] line-through"}`}>{b.title}{!b.id && " (save any change in the Notebook to link it)"}</span>
             </label>
           ))}
-          <button type="button" onClick={() => setLinking(false)} className="justify-self-start text-[11px] font-bold text-[var(--accent)]">Done</button>
+          <button type="button" onClick={() => setLinking(false)} className="justify-self-start text-[0.6875rem] font-bold text-[var(--accent)]">Done</button>
         </fieldset>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          {isOne && <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: meta.color }}><Star size={12} fill="currentColor" aria-hidden="true" /> This week</span>}
+          {isOne && <span className="inline-flex items-center gap-1 text-[0.6875rem] font-bold" style={{ color: meta.color }}><Star size={12} fill="currentColor" aria-hidden="true" /> This week</span>}
           <label className="relative">
             <span className="sr-only">Checkpoint</span>
             <select value={item.checkpoint ?? ""} disabled={busy} onChange={(e) => onTag(e.target.value as MonthKey | "")}
-              className="appearance-none rounded-md px-1.5 py-px text-[11px] font-bold tabular-nums [field-sizing:content]"
+              className="appearance-none rounded-md px-1.5 py-px text-[0.6875rem] font-bold tabular-nums [field-sizing:content]"
               style={item.checkpoint ? { color: meta.color, background: `color-mix(in srgb, ${meta.color} 14%, var(--background))` }
                 : item.stale ? { color: "var(--warn)", background: "var(--warn-light)" } : { color: "var(--muted-foreground)", background: "var(--muted)" }}>
               <option value="">{item.stale ? `no checkpoint · ${item.age_days}d` : "no checkpoint"}</option>

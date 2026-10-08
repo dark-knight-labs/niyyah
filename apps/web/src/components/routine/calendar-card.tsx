@@ -7,7 +7,7 @@ import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, VaultEventsData } from "@/lib/vault-types";
 import { Section } from "@/components/routine/section";
 
-const INPUT = "min-h-9 min-w-0 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm placeholder:text-[var(--muted-foreground)]";
+const INPUT = "min-h-9 min-w-0 rounded-[0.375rem] border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm placeholder:text-[var(--muted-foreground)]";
 
 /** The next half hour as HH:MM, for the new event's default start (capped so +1h stays on the same day). */
 function nextHalfHour(): string {
@@ -55,7 +55,7 @@ function AddEventForm({ day, onChanged }: { day: string; onChanged: () => void }
         <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="End time" className={`${INPUT} flex-1`} />
       </div>
       <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (optional)" maxLength={200} aria-label="Location" className={`${INPUT} w-full`} />
-      <button type="submit" disabled={busy || !title.trim() || !start || !end} className="min-h-9 rounded-[6px] bg-[var(--accent)] px-3.5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">Add event</button>
+      <button type="submit" disabled={busy || !title.trim() || !start || !end} className="min-h-9 rounded-[0.375rem] bg-[var(--accent)] px-3.5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">Add event</button>
       {error && <p role="alert" className="text-xs text-[var(--destructive)]">{error}</p>}
     </form>
   );
@@ -101,8 +101,8 @@ export function CalendarCard({ day, data, status, onChanged }: { day: string | n
       ) : (
         <ul>
           {data.events.map((e, i) => (
-            <li key={`${e.calendar}-${e.title}-${i}`} className="flex gap-3 border-b border-[var(--border)] py-1.5 text-[13px]" style={{ borderLeft: `3px solid ${e.color ?? "var(--border)"}`, paddingLeft: 10 }}>
-              <span className="w-[104px] shrink-0 tabular-nums text-[var(--muted-foreground)]">
+            <li key={`${e.calendar}-${e.title}-${i}`} className="flex gap-3 border-b border-[var(--border)] py-1.5 text-[0.8125rem]" style={{ borderLeft: `3px solid ${e.color ?? "var(--border)"}`, paddingLeft: 10 }}>
+              <span className="w-[6.5rem] shrink-0 tabular-nums text-[var(--muted-foreground)]">
                 {e.all_day || e.start_min === null || e.end_min === null ? "All day" : `${formatMinutes(e.start_min)}–${formatMinutes(e.end_min)}`}
               </span>
               <span className="min-w-0 flex-1">
@@ -115,7 +115,7 @@ export function CalendarCard({ day, data, status, onChanged }: { day: string | n
               </span>
               {e.meeting_url && (
                 <a href={e.meeting_url} target="_blank" rel="noopener noreferrer" aria-label={`Join: ${e.title}`}
-                  className="inline-flex min-h-8 shrink-0 items-center self-start whitespace-nowrap rounded-[5px] border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">
+                  className="inline-flex min-h-8 shrink-0 items-center self-start whitespace-nowrap rounded-[0.3125rem] border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">
                   Join {meetingName(e.meeting_url)}
                 </a>
               )}

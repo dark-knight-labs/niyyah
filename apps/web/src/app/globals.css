@@ -86,6 +86,19 @@
   --radius: var(--radius);
 }
 
+/* Fluid type scale: every rem-based size (Tailwind text, spacing, widths) follows the screen.
+   16px on phones, about 18px at 1440 wide, 20px at 1920, capped at 22px. */
+html {
+  font-size: clamp(16px, 0.5vw + 11px, 22px);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

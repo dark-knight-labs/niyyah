@@ -144,7 +144,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           const active = pathname === item.href;
           return (
             <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
-              className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[11px] font-semibold ${active ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}>
+              className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[0.6875rem] font-semibold ${active ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}>
               <item.icon size={19} aria-hidden="true" />
               {item.label}
             </Link>
