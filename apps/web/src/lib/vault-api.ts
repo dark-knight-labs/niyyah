@@ -8,6 +8,7 @@ import {
   VaultEvent,
   VaultEventsData,
   VaultLogEntry,
+  VaultGoalsData,
   VaultObjectivesData,
   Lane,
   MonthKey,
@@ -49,6 +50,7 @@ export const vaultApi = {
   log: (day: string) => api.get<VaultLogEntry[]>(`/vault/day/${day}/log`),
   editLog: (day: string, entry: VaultLogEntry, text: string) => api.put<VaultEditData>(`/vault/day/${day}/log`, { index: entry.index, hash: entry.hash, text }),
   removeLog: (day: string, entry: VaultLogEntry) => api.post<VaultEditData>(`/vault/day/${day}/log/remove`, { index: entry.index, hash: entry.hash }),
+  goals: () => api.get<VaultGoalsData>("/vault/goals"),
   objectives: () => api.get<VaultObjectivesData>("/vault/objectives"),
   setObjective: (stream: string, change: { text?: string; done?: boolean; checkpoint?: MonthKey | "" }) =>
     api.put<VaultObjectivesData>("/vault/objectives", { stream, ...change }),

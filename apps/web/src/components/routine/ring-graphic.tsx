@@ -32,6 +32,8 @@ export interface RingGraphicProps {
   /** Hovering an event arc on the inner lane; index into the timed events. */
   hoverEvent?: number | null;
   onHoverEvent?: (index: number | null, at?: { x: number; y: number }) => void;
+  /** What sits under the time: the next prayer (default) or the current block and how long is left in it. */
+  centre?: "prayer" | "block";
 }
 
 /** The 24h ring: slices, names on the slices, now marker, clock. Meant to sit inside an <svg>. */
@@ -40,6 +42,7 @@ export function RingGraphic(p: RingGraphicProps) {
   const g = ringGeometry(cx, cy, r);
   const current = currentBlock(day, nowMin);
   const nextP = nextPrayer(day, nowMin);
+  const elapsed = current ? (((nowMin - current.startMin) % 1440) + 1440) % 1440 : 0;
   // Hover keeps the ring's size: the hovered slice glows and brightens while the others ease back.
   const slice = (i: number): React.CSSProperties => ({
     filter: hover === i ? `drop-shadow(0 0 7px ${ROUTINE_BLOCKS[day.blocks[i].block].color}aa)` : "none",
@@ -61,8 +64,12 @@ export function RingGraphic(p: RingGraphicProps) {
 
       {day.blocks.map((b, i) => (
         <path key={`s-${b.block}-${b.startMin}`} d={g.arc(b.startMin, b.endMin)} fill="none" stroke={ROUTINE_BLOCKS[b.block].color}
-          strokeWidth={b === current ? t + 6 : t} style={{ ...slice(i), opacity: opacityOf(i) }} />
+          strokeWidth={b === current ? t + 6 : t} style={{ ...slice(i), opacity: b === current && hover === null ? 0.3 : opacityOf(i) }} />
       ))}
+      {/* the part of the current slice already passed is solid; the rest stays faded */}
+      {current && hover === null && elapsed > 0 && (
+        <path d={g.arc(current.startMin, current.startMin + elapsed)} fill="none" stroke={ROUTINE_BLOCKS[current.block].color} strokeWidth={t + 6} style={{ pointerEvents: "none" }} />
+      )}
 
       {day.blocks.map((b, i) => {
         if (!nameFits(b, r, p.nameSize * 0.57)) return null;
@@ -113,9 +120,20 @@ export function RingGraphic(p: RingGraphicProps) {
 
       {/* centre clock */}
       <text x={cx} y={cy + p.clockSize * 0.18} textAnchor="middle" fontSize={p.clockSize} fontFamily="var(--font-serif)" fill="var(--foreground)">{formatMinutes(nowMin)}</text>
-      <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.42} textAnchor="middle" fontSize={p.clockSize * 0.27} letterSpacing=".08em" fill="var(--muted-foreground)" style={{ textTransform: "uppercase" }}>
-        {nextP.name} in {formatDuration(nextP.in)}
-      </text>
+      {p.centre === "block" && current ? (
+        <>
+          <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.42} textAnchor="middle" fontSize={p.clockSize * 0.3} fontWeight={800} fill="var(--foreground)">
+            {ROUTINE_BLOCKS[current.block].label}
+          </text>
+          <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.78} textAnchor="middle" fontSize={p.clockSize * 0.25} fill="var(--muted-foreground)">
+            {formatDuration(duration(current) - elapsed)} left
+          </text>
+        </>
+      ) : (
+        <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.42} textAnchor="middle" fontSize={p.clockSize * 0.27} letterSpacing=".08em" fill="var(--muted-foreground)" style={{ textTransform: "uppercase" }}>
+          {nextP.name} in {formatDuration(nextP.in)}
+        </text>
+      )}
 
       {/* fixed hit areas: the slices move when hovered, so hover must not depend on them */}
       {day.blocks.map((b, i) => (

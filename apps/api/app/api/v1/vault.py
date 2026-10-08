@@ -65,6 +65,7 @@ from app.schemas.vault import (
     NotebooksResponse,
     VaultSyncResponse,
     VaultWeekResponse,
+    GoalsResponse,
 )
 from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_schedule import parse_schedule
@@ -73,6 +74,7 @@ from app.services.google_calendar import GoogleCalendarError
 from app.services.vault_calendar import events_for_day
 from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault
+from app.services.vault_goals import GOALS_PATH, parse_goals
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
 from app.services import vault_notebook, vault_pipeline
 from app.services.vault_notebook import notebook_path, parse_notebook
@@ -594,6 +596,12 @@ async def put_objective(data: ObjectiveIn, user: User = Depends(require_editor))
     except (ValueError, VaultWriteError) as exc:
         raise _write_error(exc)
     return await asyncio.to_thread(_objectives_response, today)
+
+
+@router.get("/goals", response_model=GoalsResponse)
+async def get_goals(user: User = Depends(require_editor)):
+    """Goal cards for the Overview header, read from Calendar/Goals.md (edited in Obsidian)."""
+    return GoalsResponse(items=parse_goals(await asyncio.to_thread(_read, GOALS_PATH)))
 
 
 def _quarter_response(today: date) -> QuarterResponse:

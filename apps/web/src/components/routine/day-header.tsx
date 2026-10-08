@@ -17,10 +17,12 @@ interface Props {
   editDay: string | null;
   today: VaultDayData | null;
   onSaved: (day: VaultDayData | null) => void;
+  /** Goal cards, shown between the date and the mode. */
+  children?: React.ReactNode;
 }
 
 /** Date, the day's mode (a picker for the owner) and today's star total. */
-export function DayHeader({ dateLabel, city, editDay, today, onSaved }: Props) {
+export function DayHeader({ dateLabel, city, editDay, today, onSaved, children }: Props) {
   const [error, setError] = useState<string | null>(null);
   const mode = today?.mode ?? null;
 
@@ -35,20 +37,21 @@ export function DayHeader({ dateLabel, city, editDay, today, onSaved }: Props) {
   }
 
   return (
-    <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <header className="mb-4 grid items-center gap-x-6 gap-y-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
       <div>
         <h1 className="font-serif text-[26px] font-medium leading-tight">{dateLabel}</h1>
         {city && <p className="text-[13px] text-[var(--muted-foreground)]">{city}</p>}
       </div>
+      {children ?? <div />}
       {today && (
         <div className="flex items-center gap-3">
-          <label className="flex min-h-11 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] pl-3.5 pr-2 text-sm font-semibold">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: resolveModeColor(mode ?? "") }} />
+          <label className="flex min-h-8 items-center gap-1.5 rounded-[5px] border border-[var(--border)] bg-[var(--surface)] pl-2.5 pr-1 text-xs font-semibold">
+            <span className="h-2 w-2 rounded-full" style={{ background: resolveModeColor(mode ?? "") }} />
             {editDay ? (
-              <select value={mode ?? "full"} onChange={(e) => void setMode(e.target.value)} aria-label="Day mode" className="bg-transparent py-2 capitalize outline-none">
+              <select value={mode ?? "full"} onChange={(e) => void setMode(e.target.value)} aria-label="Day mode" className="bg-transparent py-1 text-xs font-semibold capitalize outline-none">
                 {MODES.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
-            ) : <span className="py-2 capitalize">{mode}</span>}
+            ) : <span className="py-1 capitalize">{mode}</span>}
           </label>
           <div className="min-w-24">
             <p className="text-[13px] font-extrabold">{today.total}<span className="font-medium text-[var(--muted-foreground)]"> / {today.possible} stars</span></p>

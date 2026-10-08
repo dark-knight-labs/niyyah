@@ -4,17 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { GoogleStatusData, NotebooksData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
+import { GoogleStatusData, NotebooksData, VaultGoalsData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultObjectivesData, VaultTaskData } from "@/lib/vault-types";
 import { ROUTINE_BLOCKS, dateInTz, formatMinutes, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
 import { PLANNER_TZ, focusingQuestion, otStreamFor, toMeta } from "@/lib/streams";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
 import { CalendarCard } from "@/components/routine/calendar-card";
 import { DayHeader } from "@/components/routine/day-header";
-import { LogList } from "@/components/routine/log-list";
+import { GoalCards } from "@/components/routine/goal-cards";
 import { NowCard } from "@/components/routine/now-card";
 import { RoutineRing } from "@/components/routine/routine-ring";
-import { TaskList } from "@/components/routine/task-list";
+import { TodayList } from "@/components/routine/today-list";
 import { VotesPanel } from "@/components/routine/votes-panel";
 import { WeekObjectives } from "@/components/routine/week-objectives";
 import { WorkLanes } from "@/components/routine/work-lanes";
@@ -41,6 +41,7 @@ export default function OverviewPage() {
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const [pipelines, setPipelines] = useState<PipelinesData | null>(null);
   const [notebooks, setNotebooks] = useState<NotebooksData | null>(null);
+  const [goals, setGoals] = useState<VaultGoalsData | null>(null);
   const now = useNow(30_000);
 
   const load = useCallback(() => {
@@ -93,6 +94,7 @@ export default function OverviewPage() {
     vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
     vaultApi.pipelines().then(setPipelines).catch(() => setPipelines(null));
     vaultApi.notebooks().then(setNotebooks).catch(() => setNotebooks(null));
+    vaultApi.goals().then(setGoals).catch(() => setGoals(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
 
@@ -132,7 +134,7 @@ export default function OverviewPage() {
   const slot = pipelines ? otStreamFor(now, PLANNER_TZ, pipelines.streams.map(toMeta)) : undefined;
 
   return (
-    <div className="mx-auto w-full max-w-[1120px]">
+    <div className="mx-auto w-full max-w-[1760px]">
       {problems.length > 0 && (
         <div className="mb-4 space-y-0.5 rounded-xl border border-[var(--destructive)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--destructive)]">
           {problems.map((p) => (
@@ -143,25 +145,26 @@ export default function OverviewPage() {
       {calendarNote && <p role="status" className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs">{calendarNote}</p>}
       {schedule && day && (
         <>
-          <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
+          <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday}>
+            {owner && goals && <GoalCards data={goals} />}
+          </DayHeader>
           {owner ? (
             <>
-              <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
+              <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
+              <div className="grid gap-8 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,340px)_minmax(0,1fr)_minmax(0,320px)] xl:gap-10 md:items-start">
                 <div>
                   <RoutineRing day={day} nowMin={nowMin} events={events?.events} />
-                  <div className="mt-6">
-                    <TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} />
-                    <LogList day={dayKey} entries={log} onChanged={loadPrivate}
-                      section={block ? ROUTINE_BLOCKS[block.block].label : "Day"}
-                      span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
-                  </div>
+                  <NowCard day={day} nowMin={nowMin} />
                 </div>
                 <div>
+                  <TodayList day={dayKey} tasks={tasks} entries={log} onChanged={loadPrivate}
+                    section={block ? ROUTINE_BLOCKS[block.block].label : "Day"}
+                    span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
+                </div>
+                <div className="md:col-span-2 xl:col-span-1">
                   <WeekObjectives data={objectives} onChanged={setObjectives} />
                   {objectives && slot && <p className="-mt-4 mb-6 text-xs leading-snug text-[var(--muted-foreground)]">{focusingQuestion(slot)}</p>}
-                  <NowCard day={day} nowMin={nowMin} />
                   <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
-                  <VotesPanel day={dayKey} today={today} onSaved={setToday} />
                 </div>
               </div>
               {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slot?.id} onChanged={loadPrivate} />}

@@ -170,6 +170,17 @@ class ObjectivesResponse(BaseModel):
     items: list[ObjectiveItem]
 
 
+class GoalItem(BaseModel):
+    title: str
+    value: str
+    caption: str
+    progress: int | None  # 0-100, None when the line has none
+
+
+class GoalsResponse(BaseModel):
+    items: list[GoalItem]
+
+
 class ObjectiveIn(BaseModel):
     stream: str
     text: str | None = None

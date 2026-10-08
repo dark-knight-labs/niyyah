@@ -128,3 +128,40 @@ async def test_blocks_accepts_max_bound_days(auth_client: AsyncClient):
     # 366 (a full leap year) is the generous upper bound and must still work.
     resp = await auth_client.get("/api/v1/vault/blocks?days=366")
     assert resp.status_code == 200
+
+
+GOALS_NOTE = """---
+type: goals
+---
+# Goals
+
+- **Zero debt**: 62% paid | the one number to bring to zero | 62
+- **Life simple**: Fewer commitments
+Some prose that is not a goal.
+- **Allah's pleasure**: Pray on time | | 140
+"""
+
+
+def test_parse_goals_reads_value_caption_and_progress():
+    from app.services.vault_goals import parse_goals
+    goals = parse_goals(GOALS_NOTE)
+    assert [g["title"] for g in goals] == ["Zero debt", "Life simple", "Allah's pleasure"]
+    assert goals[0] == {"title": "Zero debt", "value": "62% paid", "caption": "the one number to bring to zero", "progress": 62}
+    assert goals[1]["caption"] == "" and goals[1]["progress"] is None
+    assert goals[2]["progress"] == 100  # clamped
+
+
+def test_parse_goals_missing_file_is_empty():
+    from app.services.vault_goals import parse_goals
+    assert parse_goals(None) == []
+
+
+@pytest.mark.asyncio
+async def test_goals_endpoint_reads_the_vault_note(auth_client: AsyncClient, monkeypatch):
+    from app.api.v1 import vault
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "vault_write_emails", "test@niyyah.app")
+    monkeypatch.setattr(vault, "_read", lambda rel: GOALS_NOTE if rel == "Calendar/Goals.md" else None)
+    resp = await auth_client.get("/api/v1/vault/goals")
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["title"] == "Zero debt"

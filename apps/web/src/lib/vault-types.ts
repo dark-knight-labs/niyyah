@@ -79,6 +79,18 @@ export interface VaultObjective {
   checkpoint: MonthKey | null;
 }
 
+export interface VaultGoal {
+  title: string;
+  value: string;
+  caption: string;
+  /** 0-100, null when the vault line has none. */
+  progress: number | null;
+}
+
+export interface VaultGoalsData {
+  items: VaultGoal[];
+}
+
 export interface VaultObjectivesData {
   week: string;
   period: string;
