@@ -77,7 +77,7 @@ from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault, vault_status
 from app.services.vault_goals import GOALS_PATH, parse_goals
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
-from app.services import planner_store, vault_notebook, vault_pipeline
+from app.services import planner_day, planner_store, vault_notebook, vault_pipeline
 from app.services.vault_notebook import notebook_path, parse_notebook
 from app.services.vault_pipeline import NOW_LIMIT, STALE_DAYS, parse_pipeline, pipeline_path
 from app.services.vault_quarter import (
@@ -343,6 +343,12 @@ async def _db_run(db: AsyncSession, work):
         raise HTTPException(status_code=422, detail=str(exc))
 
 
+async def _db_day_write(db: AsyncSession, work) -> EditResponse:
+    """A db-mode write: `work()` returns the day row (or None); the response carries the day like the vault path does."""
+    row = await _db_run(db, work)
+    return EditResponse(commit="db", day=_day_to_response(row) if row is not None else None)
+
+
 def require_editor(user: User = Depends(get_current_user)) -> User:
     if _db_mode():
         raise HTTPException(status_code=501, detail="Writes are not available with STORAGE_BACKEND=db yet")
@@ -395,21 +401,27 @@ async def edit_access(user: User = Depends(get_current_user)):
 
 
 @router.put("/day/{day}/mode", response_model=EditResponse)
-async def put_mode(day: date, data: ModeIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def put_mode(day: date, data: ModeIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     _check_day(day)
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.set_mode(db, user.id, day, data.mode))
     return await _save(day, lambda c: set_mode(c, data.mode), f"Niyyah: set {day} mode to {data.mode}", db)
 
 
 @router.put("/day/{day}/vote", response_model=EditResponse)
-async def put_vote(day: date, data: VoteIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def put_vote(day: date, data: VoteIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     _check_day(day)
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.set_vote(db, user.id, day, data.block, data.stars))
     return await _save(day, lambda c: set_vote(c, data.block, data.stars), f"Niyyah: {day} {data.block} vote {data.stars}", db)
 
 
 @router.post("/day/{day}/notes", response_model=EditResponse)
-async def post_note(day: date, data: NoteIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def post_note(day: date, data: NoteIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     _check_day(day)
     clock = _local_now().strftime("%H:%M")
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.add_note(db, user.id, day, clock, data.section, data.span, data.text))
     return await _save(day, lambda c: add_log_note(c, clock, data.section, data.span, data.text), f"Niyyah: {day} note on {data.section}", db)
 
 
@@ -540,25 +552,33 @@ async def _save_task(path: str, apply, message: str, db: AsyncSession) -> EditRe
 
 
 @router.put("/tasks", response_model=EditResponse)
-async def put_task(data: TaskToggleIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def put_task(data: TaskToggleIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date().isoformat()
     message = f"Niyyah: {'done' if data.done else 'reopen'} task in {{rel}}"
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.set_task_done(db, user.id, data.line, data.done, _local_now().date()))
     return await _save_task(data.path, lambda c: set_task_done(c, data.line, data.hash, data.done, today), message, db)
 
 
 @router.put("/tasks/text", response_model=EditResponse)
-async def put_task_text(data: TaskTextIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def put_task_text(data: TaskTextIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.set_task_text(db, user.id, data.line, data.text))
     return await _save_task(data.path, lambda c: set_task_text(c, data.line, data.hash, data.text), "Niyyah: edit task in {rel}", db)
 
 
 @router.post("/tasks/remove", response_model=EditResponse)
-async def post_task_remove(data: TaskRemoveIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def post_task_remove(data: TaskRemoveIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.remove_task(db, user.id, data.line))
     return await _save_task(data.path, lambda c: remove_task(c, data.line, data.hash), "Niyyah: remove task in {rel}", db)
 
 
 @router.post("/day/{day}/tasks", response_model=EditResponse)
-async def post_task(day: date, data: TaskIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def post_task(day: date, data: TaskIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     _check_day(day)
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.add_task(db, user.id, day, data.text))
     return await _save(day, lambda c: add_task(c, data.text, day.isoformat()), f"Niyyah: {day} add task", db)
 
 
@@ -575,14 +595,18 @@ async def get_day_log(day: date, user: User = Depends(require_planner_user), db:
 
 
 @router.put("/day/{day}/log", response_model=EditResponse)
-async def put_log_entry(day: date, data: LogEntryIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def put_log_entry(day: date, data: LogEntryIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     _check_day(day)
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.edit_log_entry(db, user.id, day, data.index, data.hash, data.text))
     return await _save(day, lambda c: edit_log_entry(c, data.index, data.hash, data.text), f"Niyyah: {day} edit log entry", db)
 
 
 @router.post("/day/{day}/log/remove", response_model=EditResponse)
-async def post_log_remove(day: date, data: LogEntryRemoveIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def post_log_remove(day: date, data: LogEntryRemoveIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     _check_day(day)
+    if _db_mode():
+        return await _db_day_write(db, lambda: planner_day.remove_log_entry(db, user.id, day, data.index, data.hash))
     return await _save(day, lambda c: remove_log_entry(c, data.index, data.hash), f"Niyyah: {day} remove log entry", db)
 
 
