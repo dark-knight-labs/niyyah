@@ -644,9 +644,23 @@ async def get_objectives(user: User = Depends(require_planner_user), db: AsyncSe
 
 
 @router.put("/objectives", response_model=ObjectivesResponse)
-async def put_objective(data: ObjectiveIn, user: User = Depends(require_editor)):
+async def put_objective(data: ObjectiveIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """Edit a week objective. For blocks with a pipeline the objective is its small-domino item: the item is renamed,
     created in Now (new text) or moved to Done / back to Now (done flag) in the same commit."""
+    if _db_mode():
+        today = _local_now().date()
+        week = week_for(today)[2]
+        streams = await planner_store.streams_for(db, user.id, today)
+        block = next((s for s in streams if s.id == data.stream), None)
+
+        async def work():
+            await planner_work.update_objective(db, user.id, today, data.stream, data.text, data.done, data.checkpoint, streams)
+            if block and block.goal and not block.archived and (data.text is not None or data.done is not None):
+                await planner_work.sync_focus(db, user.id, data.stream, week, today, text=data.text, done=data.done)
+
+        await _db_run(db, work)
+        parsed = await planner_store.week_objectives(db, user.id, week, streams)
+        return objectives_response(parsed, streams, today)
     today = _local_now().date()
     week_start, _, label = week_for(today)
     streams = await asyncio.to_thread(_streams, today)
@@ -682,16 +696,20 @@ def _quarter_response(today: date) -> QuarterResponse:
     return quarter_response(parse_quarter(content), label, today)
 
 
+async def _db_quarter(db: AsyncSession, user: User, today: date) -> QuarterResponse:
+    label = quarter_for(today)
+    data = await planner_store.quarter_data(db, user.id, label)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"No plan for {label} yet")
+    return quarter_response(data, label, today)
+
+
 @router.get("/quarter", response_model=QuarterResponse)
 async def get_quarter(user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """This quarter's objective, goals and month checkpoints. Private plans, so signed-in owners only."""
     today = _local_now().date()
     if _db_mode():
-        label = quarter_for(today)
-        data = await planner_store.quarter_data(db, user.id, label)
-        if data is None:
-            raise HTTPException(status_code=404, detail=f"No plan for {label} yet")
-        return quarter_response(data, label, today)
+        return await _db_quarter(db, user, today)
     return await asyncio.to_thread(_quarter_response, today)
 
 
@@ -714,24 +732,36 @@ def _fields(data: StreamFieldsIn) -> dict[str, str]:
 
 
 @router.put("/quarter", response_model=QuarterResponse)
-async def put_super_objective(data: SuperObjectiveIn, user: User = Depends(require_editor)):
-    label = quarter_for(_local_now().date())
+async def put_super_objective(data: SuperObjectiveIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    label = quarter_for(today)
+    if _db_mode():
+        await _db_run(db, lambda: planner_work.set_super_objective(db, user.id, label, data.text, data.arabic))
+        return await _db_quarter(db, user, today)
     return await _save_quarter(lambda c: set_super_objective(c, label, data.text, data.arabic), "Niyyah: edit the Super Objective")
 
 
 @router.put("/quarter/stream", response_model=QuarterResponse)
-async def put_stream(data: StreamFieldsIn, user: User = Depends(require_editor)):
-    label = quarter_for(_local_now().date())
+async def put_stream(data: StreamFieldsIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    label = quarter_for(today)
     fields = _fields(data)
     if not fields:
         raise HTTPException(status_code=422, detail="nothing to change")
+    if _db_mode():
+        await _db_run(db, lambda: planner_work.update_stream(db, user.id, label, data.stream, fields))
+        return await _db_quarter(db, user, today)
     return await _save_quarter(lambda c: update_stream(c, label, data.stream, fields), f"Niyyah: edit {data.stream} in the quarter")
 
 
 @router.post("/quarter/stream", response_model=QuarterResponse)
-async def post_stream(data: StreamAddIn, user: User = Depends(require_editor)):
-    label = quarter_for(_local_now().date())
+async def post_stream(data: StreamAddIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    label = quarter_for(today)
     fields = _fields(data)
+    if _db_mode():
+        await _db_run(db, lambda: planner_work.add_stream(db, user.id, label, data.stream, fields))
+        return await _db_quarter(db, user, today)
     return await _save_quarter(lambda c: add_stream(c, label, data.stream, fields), f"Niyyah: add {data.stream} to the quarter")
 
 
@@ -805,7 +835,16 @@ async def put_pipeline_move(data: PipelineMoveIn, user: User = Depends(require_p
     if _db_mode():
         today = _local_now().date()
         await _known_stream(db, user, data.stream, today)
-        return await _db_day_write(db, lambda: planner_work.move_item(db, user.id, data.stream, data.line, data.lane, today))
+        week = week_for(today)[2]
+        streams = await planner_store.streams_for(db, user.id, today)
+
+        async def work():
+            item = await planner_work.item_row(db, user.id, data.stream, data.line)
+            if item.focus_week == week and (data.lane == "done") != item.done:  # finishing the small domino ticks the objective
+                await planner_work.update_objective(db, user.id, today, data.stream, None, data.lane == "done", None, streams)
+            await planner_work.move_item(db, user.id, data.stream, data.line, data.lane, today)
+
+        return await _db_day_write(db, work)
     today = _local_now().date()
     week = week_for(today)[2]
     item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
@@ -824,7 +863,15 @@ async def put_pipeline_focus(data: PipelineRefIn, user: User = Depends(require_p
     if _db_mode():
         today = _local_now().date()
         await _known_stream(db, user, data.stream, today)
-        return await _db_day_write(db, lambda: planner_work.set_focus(db, user.id, data.stream, data.line, week_for(today)[2], today))
+        week = week_for(today)[2]
+        streams = await planner_store.streams_for(db, user.id, today)
+
+        async def work():
+            item = await planner_work.item_row(db, user.id, data.stream, data.line)
+            await planner_work.update_objective(db, user.id, today, data.stream, item.text, False, item.checkpoint or "", streams)
+            await planner_work.set_focus(db, user.id, data.stream, data.line, week, today)
+
+        return await _db_day_write(db, work)
     today = _local_now().date()
     week = week_for(today)[2]
     item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
@@ -886,7 +933,16 @@ async def post_pipeline_remove(data: PipelineRefIn, user: User = Depends(require
     if _db_mode():
         today = _local_now().date()
         await _known_stream(db, user, data.stream, today)
-        return await _db_day_write(db, lambda: planner_work.remove_item(db, user.id, data.stream, data.line))
+        week = week_for(today)[2]
+        streams = await planner_store.streams_for(db, user.id, today)
+
+        async def work():
+            item = await planner_work.item_row(db, user.id, data.stream, data.line)
+            if item.focus_week == week:
+                await planner_work.update_objective(db, user.id, today, data.stream, "", None, "", streams)
+            await planner_work.remove_item(db, user.id, data.stream, data.line)
+
+        return await _db_day_write(db, work)
     today = _local_now().date()
     item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
     objective_edit = None

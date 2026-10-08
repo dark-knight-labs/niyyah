@@ -6,7 +6,10 @@ from datetime import date
 
 from sqlalchemy import func, select
 
-from app.models.planner import PipelineItem
+from app.models.planner import PipelineItem, Quarter, QuarterStream, WeekObjective
+from app.services.vault_objectives import MAX_OBJECTIVE_CHARS, week_for, weekly_streams
+from app.services.vault_quarter import FIELD_KEYS, _one_line, _validate, quarter_months
+from app.services.vault_streams import DEFAULTS, MONTHS, SLUG, make_stream
 from app.services.vault_pipeline import LANES, MAX_DESCRIPTION_CHARS, _BLOCKER_ID, _PRODUCT, _clean as clean_item
 
 ITEM_GONE = "that item changed or moved; reload and try again"
@@ -127,3 +130,155 @@ async def set_focus(db, user_id: int, stream: str, item_id: int, week: str, toda
         other.focus_week = None
     row.focus_week = week
     await move_item(db, user_id, stream, item_id, "now", today)
+
+
+async def update_objective(db, user_id: int, today: date, stream: str, text: str | None, done: bool | None,
+                           checkpoint: str | None, streams) -> None:
+    """Set the text, done flag and/or checkpoint of one stream's objective for today's week ('' clears the checkpoint)."""
+    if stream not in {s.id for s in weekly_streams(streams)}:
+        raise ValueError(f"unknown stream '{stream}'")
+    if text is None and done is None and checkpoint is None:
+        raise ValueError("nothing to change")
+    if checkpoint and checkpoint not in MONTHS:
+        raise ValueError(f"unknown month '{checkpoint}'")
+    week = week_for(today)[2]
+    existing = (await db.execute(select(WeekObjective).where(
+        WeekObjective.user_id == user_id, WeekObjective.week == week, WeekObjective.stream == stream))).scalar_one_or_none()
+    row = existing or WeekObjective(user_id=user_id, week=week, stream=stream, text="", done=False, checkpoint=None)
+    if text is not None:
+        cleaned = " ".join(text.split())
+        if len(cleaned) > MAX_OBJECTIVE_CHARS:
+            raise ValueError(f"objective is longer than {MAX_OBJECTIVE_CHARS} characters")
+        row.text = cleaned
+    if done is not None:
+        row.done = done
+    if checkpoint is not None:
+        row.checkpoint = checkpoint or None
+    if not row.text:
+        row.checkpoint = None  # a checkpoint is only kept with a line of text, as in the weekly note
+    keep = bool(row.text or row.done)
+    if keep and existing is None:
+        db.add(row)
+    elif not keep and existing is not None:
+        await db.delete(row)
+    await db.flush()
+
+
+async def sync_focus(db, user_id: int, stream: str, week: str, today: date, *, text: str | None = None,
+                     done: bool | None = None) -> None:
+    """Keep the week's small-domino item in step with its objective line (same rules as the vault path)."""
+    item = await focused_item(db, user_id, stream, week)
+    if text is not None:
+        if text.strip() == "":
+            if item:
+                item.focus_week = None
+            return
+        if item:
+            await set_text(db, user_id, stream, item.id, text)
+            return
+        wanted = clean_item(_split_product(text)[0])[0].lower()
+        same = (await db.execute(select(PipelineItem).where(
+            PipelineItem.user_id == user_id, PipelineItem.stream == stream, PipelineItem.done.is_(False))
+            .order_by(PipelineItem.position))).scalars().all()
+        match = next((i for i in same if i.text.lower() == wanted), None)
+        if match:  # the objective names an item already in the pipeline: link it instead of adding a twin
+            await set_focus(db, user_id, stream, match.id, week, today)
+            return
+        await add_items(db, user_id, stream, [text], "now", today)
+        created = (await db.execute(select(PipelineItem).where(
+            PipelineItem.user_id == user_id, PipelineItem.stream == stream).order_by(PipelineItem.position.desc()))).scalars().first()
+        await set_focus(db, user_id, stream, created.id, week, today)
+        return
+    if done is not None and item:
+        await move_item(db, user_id, stream, item.id, "done" if done else "now", today)
+
+
+async def _quarter(db, user_id: int, label: str) -> Quarter:
+    """This quarter's row; a new quarter starts like the vault's skeleton note: a placeholder objective and the built-in extras."""
+    row = (await db.execute(select(Quarter).where(Quarter.user_id == user_id, Quarter.label == label))).scalar_one_or_none()
+    if row is not None:
+        return row
+    row = Quarter(user_id=user_id, label=label, starts=None, ends=None, objective="Set this quarter's Super Objective", objective_ar="")
+    db.add(row)
+    extras = [make_stream(sid, goal=False) for sid, d in DEFAULTS.items() if d.get("goal") is False]
+    for pos, s in enumerate(extras):
+        db.add(QuarterStream(user_id=user_id, quarter=label, slug=s.id, name=s.name, color=s.color, icon=s.icon, slot=s.slot,
+                             weekly=s.weekly, has_pipeline=s.goal, in_note=False, goal="", status=s.status, checkpoints=[], position=pos))
+    await db.flush()
+    return row
+
+
+async def _stream_rows(db, user_id: int, label: str) -> list[QuarterStream]:
+    return list((await db.execute(select(QuarterStream).where(
+        QuarterStream.user_id == user_id, QuarterStream.quarter == label).order_by(QuarterStream.position))).scalars().all())
+
+
+async def set_super_objective(db, user_id: int, label: str, text: str, arabic: str | None) -> None:
+    text = _one_line(text, "objective")
+    if not text:
+        raise ValueError("objective is empty")
+    quarter = await _quarter(db, user_id, label)
+    quarter.objective = text
+    if arabic is not None:
+        quarter.objective_ar = _one_line(arabic, "Arabic text")
+
+
+def _set_checkpoint_text(row: QuarterStream, month: str, text: str) -> None:
+    checkpoints = [dict(c) for c in row.checkpoints or []]
+    for c in checkpoints:
+        if c["month"] == month:
+            c["text"] = text
+            break
+    else:
+        checkpoints.append({"month": month, "text": text})
+    row.checkpoints = checkpoints
+
+
+async def update_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str]) -> None:
+    """Change name/colour/icon/slot/weekly/goal/status and month checkpoints of one stream defined in the quarter."""
+    await _quarter(db, user_id, label)
+    row = next((r for r in await _stream_rows(db, user_id, label) if r.slug == stream and r.in_note), None)
+    if row is None:
+        raise ValueError(f"unknown stream '{stream}'")
+    months = quarter_months(label)
+    for key, value in fields.items():
+        if key not in FIELD_KEYS and key not in months:
+            raise ValueError(f"cannot set '{key}'")
+        if key in months:
+            _set_checkpoint_text(row, key, _one_line(value, key))
+            continue
+        clean = _validate(key, value)
+        if key == "weekly":
+            row.weekly = clean.lower() != "no"
+        else:
+            setattr(row, key, clean)
+
+
+async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str]) -> None:
+    if not SLUG.match(stream):
+        raise ValueError("id must be 2-24 lowercase letters, digits or dashes, starting with a letter")
+    await _quarter(db, user_id, label)
+    rows = await _stream_rows(db, user_id, label)
+    if any(r.slug == stream and r.in_note for r in rows):
+        raise ValueError(f"stream '{stream}' already exists")
+    months = quarter_months(label)
+    data = {"status": "committed", **fields}
+    for key in data:
+        if key not in FIELD_KEYS and key not in months:
+            raise ValueError(f"cannot set '{key}'")
+    written = {k: _validate(k, data[k]) for k in FIELD_KEYS if k in data and data[k].strip()}
+    if not written.get("name"):
+        raise ValueError("name is required")
+    info = make_stream(stream, written)
+    checkpoints = [{"month": m, "text": _one_line(data[m], m)} for m in months if m in data]
+    last_note = max((r.position for r in rows if r.in_note), default=-1)
+    for r in rows:
+        if r.position > last_note:
+            r.position += 1  # built-in extras stay after the streams the quarter defines
+    taken = next((r for r in rows if r.slug == stream and not r.in_note), None)
+    if taken is not None:
+        await db.delete(taken)
+        await db.flush()
+    db.add(QuarterStream(user_id=user_id, quarter=label, slug=stream, name=info.name, color=info.color, icon=info.icon,
+                         slot=info.slot, weekly=info.weekly, has_pipeline=info.goal, in_note=True, goal=written.get("goal", ""),
+                         status=info.status, checkpoints=checkpoints, position=last_note + 1))

@@ -94,3 +94,83 @@ async def test_another_users_item_is_not_reachable(db_client):
     res = await client.post(f"{V}/pipeline/remove", json=_ref("kahf", items[0]), headers=other)
     assert res.status_code == 422
     assert len((await _pipeline(client))[0]) == len(items)
+
+
+async def _objectives(client):
+    return {i["stream"]: i for i in (await client.get(f"{V}/objectives")).json()["items"]}
+
+
+@pytest.mark.asyncio
+async def test_objective_text_done_and_checkpoint(db_client):
+    client, today = db_client
+    res = await client.put(f"{V}/objectives", json={"stream": "alisha", "text": "  Launch   the store ", "checkpoint": "nov"})
+    assert res.status_code == 200
+    alisha = (await _objectives(client))["alisha"]
+    assert (alisha["text"], alisha["done"], alisha["checkpoint"]) == ("Launch the store", True, "nov")
+    await client.put(f"{V}/objectives", json={"stream": "alisha", "done": False})
+    assert (await _objectives(client))["alisha"]["done"] is False
+    assert (await client.put(f"{V}/objectives", json={"stream": "nope", "text": "x"})).status_code == 422
+    assert (await client.put(f"{V}/objectives", json={"stream": "alisha", "text": "x" * 201})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_an_objective_without_text_loses_its_checkpoint(db_client):
+    client, today = db_client
+    await client.put(f"{V}/objectives", json={"stream": "kahf", "text": "", "checkpoint": "nov"})
+    kahf = (await _objectives(client))["kahf"]
+    assert (kahf["text"], kahf["checkpoint"]) == ("", None)
+
+
+@pytest.mark.asyncio
+async def test_objective_text_creates_and_links_the_small_domino(db_client):
+    client, today = db_client
+    await client.put(f"{V}/objectives", json={"stream": "kahf", "text": "Cut over DNS"})
+    items, week = await _pipeline(client)
+    linked = [i for i in items if i["focus"] == week]
+    assert [i["text"] for i in linked] == ["Cut over DNS"] and linked[0]["lane"] == "now"
+    await client.put(f"{V}/objectives", json={"stream": "kahf", "done": True})
+    items, week = await _pipeline(client)
+    assert next(i for i in items if i["focus"] == week)["lane"] == "done"
+
+
+@pytest.mark.asyncio
+async def test_finishing_the_small_domino_ticks_the_objective(db_client):
+    client, today = db_client
+    items, week = await _pipeline(client)
+    domino = next(i for i in items if i["focus"] == week)
+    await client.put(f"{V}/pipeline/move", json=_ref("kahf", domino, lane="done"))
+    assert (await _objectives(client))["kahf"]["done"] is True
+    items, week = await _pipeline(client)
+    domino = next(i for i in items if i["focus"] == week)
+    await client.post(f"{V}/pipeline/remove", json=_ref("kahf", domino))
+    assert (await _objectives(client))["kahf"]["text"] == ""
+
+
+@pytest.mark.asyncio
+async def test_focus_writes_the_objective_line(db_client):
+    client, today = db_client
+    items, week = await _pipeline(client)
+    plan = next(i for i in items if i["text"].startswith("Plan the DNS"))
+    await client.put(f"{V}/pipeline/focus", json=_ref("kahf", plan))
+    assert (await _objectives(client))["kahf"]["text"] == "Plan the DNS cutover"
+
+
+@pytest.mark.asyncio
+async def test_super_objective_and_streams(db_client):
+    client, today = db_client
+    res = await client.put(f"{V}/quarter", json={"text": "  New   objective ", "arabic": ""})
+    assert res.status_code == 200 and res.json()["objective"] == "New objective" and res.json()["objective_ar"] == ""
+    changed = await client.put(f"{V}/quarter/stream", json={"stream": "kahf", "name": "Kahf Hosting", "color": "teal", "weekly": False,
+                                                              "checkpoints": {"nov": "DNS live", "oct": "Router done"}})
+    kahf = next(s for s in changed.json()["streams"] if s["stream"] == "kahf")
+    assert (kahf["name"], kahf["color"], kahf["weekly"]) == ("Kahf Hosting", "teal", False)
+    assert [(c["month"], c["text"]) for c in kahf["checkpoints"]] == [("oct", "Router done"), ("nov", "DNS live")]
+    assert (await client.put(f"{V}/quarter/stream", json={"stream": "kahf", "color": "plaid"})).status_code == 422
+    assert (await client.put(f"{V}/quarter/stream", json={"stream": "sleep", "name": "x"})).status_code == 422
+    added = await client.post(f"{V}/quarter/stream", json={"stream": "errands", "name": "Errands", "goal": "Clear the list"})
+    assert added.status_code == 200
+    names = [s["stream"] for s in added.json()["streams"]]
+    assert names[-1] == "errands" and added.json()["streams"][-1]["status"] == "committed"
+    assert (await client.post(f"{V}/quarter/stream", json={"stream": "errands", "name": "Again"})).status_code == 422
+    assert (await client.post(f"{V}/quarter/stream", json={"stream": "Bad Id", "name": "x"})).status_code == 422
+    assert (await client.post(f"{V}/quarter/stream", json={"stream": "noname"})).status_code == 422
