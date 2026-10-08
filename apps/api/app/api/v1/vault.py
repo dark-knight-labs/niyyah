@@ -982,7 +982,11 @@ async def _save_notebook(stream: str, edit, message: str) -> EditResponse:
 
 
 @router.post("/notebook/{stream}/entries", response_model=EditResponse)
-async def post_notebook_entry(stream: str, data: NotebookAddIn, user: User = Depends(require_editor)):
+async def post_notebook_entry(stream: str, data: NotebookAddIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, stream, today)
+        return await _db_day_write(db, lambda: planner_work.add_entry(db, user.id, stream, data.kind, data.title, data.body, today))
     today = _local_now().date()
     name = next((s.name for s in await asyncio.to_thread(_streams, today) if s.id == stream), None)
     return await _save_notebook(
@@ -991,21 +995,33 @@ async def post_notebook_entry(stream: str, data: NotebookAddIn, user: User = Dep
 
 
 @router.put("/notebook/entry", response_model=EditResponse)
-async def put_notebook_entry(data: NotebookEditIn, user: User = Depends(require_editor)):
+async def put_notebook_entry(data: NotebookEditIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.set_entry(db, user.id, data.stream, data.line, data.title, data.body))
     return await _save_notebook(
         data.stream, lambda c: vault_notebook.set_entry(c or "", data.line, data.hash, data.title, data.body),
         f"Niyyah: edit an entry in the {data.stream} notebook")
 
 
 @router.put("/notebook/blocker", response_model=EditResponse)
-async def put_notebook_blocker(data: NotebookBlockerIn, user: User = Depends(require_editor)):
+async def put_notebook_blocker(data: NotebookBlockerIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.set_blocker(db, user.id, data.stream, data.line, data.open))
     return await _save_notebook(
         data.stream, lambda c: vault_notebook.set_blocker(c or "", data.line, data.hash, data.open),
         f"Niyyah: {'reopen' if data.open else 'clear'} a blocker in the {data.stream} notebook")
 
 
 @router.post("/notebook/remove", response_model=EditResponse)
-async def post_notebook_remove(data: PipelineRefIn, user: User = Depends(require_editor)):
+async def post_notebook_remove(data: PipelineRefIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.remove_entry(db, user.id, data.stream, data.line))
     return await _save_notebook(
         data.stream, lambda c: vault_notebook.remove_entry(c or "", data.line, data.hash),
         f"Niyyah: remove an entry from the {data.stream} notebook")

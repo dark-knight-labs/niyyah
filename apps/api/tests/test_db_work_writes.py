@@ -174,3 +174,40 @@ async def test_super_objective_and_streams(db_client):
     assert (await client.post(f"{V}/quarter/stream", json={"stream": "errands", "name": "Again"})).status_code == 422
     assert (await client.post(f"{V}/quarter/stream", json={"stream": "Bad Id", "name": "x"})).status_code == 422
     assert (await client.post(f"{V}/quarter/stream", json={"stream": "noname"})).status_code == 422
+
+
+async def _notebook(client, stream="kahf"):
+    data = (await client.get(f"{V}/notebooks")).json()
+    return next(s for s in data["streams"] if s["stream"] == stream)["entries"]
+
+
+@pytest.mark.asyncio
+async def test_notebook_entries_come_newest_first(db_client):
+    client, today = db_client
+    res = await client.post(f"{V}/notebook/kahf/entries", json={"kind": "blocker", "title": "", "body": "# Need approval\nfrom legal"})
+    assert res.status_code == 200
+    entries = await _notebook(client)
+    first = entries[0]
+    assert first["kind"] == "blocker" and first["open"] is True and first["date"] == today.isoformat()
+    assert first["title"] == "### Need approval" and first["body"] == "### Need approval\nfrom legal" and len(first["id"]) == 8
+    assert len(entries) == 3
+    assert (await client.post(f"{V}/notebook/kahf/entries", json={"kind": "poem", "title": "x", "body": ""})).status_code == 422
+    assert (await client.post(f"{V}/notebook/nope/entries", json={"kind": "idea", "title": "x", "body": ""})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_notebook_edit_blocker_and_remove(db_client):
+    client, today = db_client
+    entries = await _notebook(client)
+    idea = next(e for e in entries if e["kind"] == "idea")
+    blocker = next(e for e in entries if e["kind"] == "blocker")
+    await client.put(f"{V}/notebook/entry", json=_ref("kahf", idea, title="Passkeys v2", body="cheaper than SSO\nsee https://example.com/x"))
+    await client.put(f"{V}/notebook/blocker", json=_ref("kahf", blocker, open=False))
+    entries = await _notebook(client)
+    idea = next(e for e in entries if e["kind"] == "idea")
+    blocker = next(e for e in entries if e["kind"] == "blocker")
+    assert idea["title"] == "Passkeys v2" and idea["url"] == "https://example.com/x" and blocker["open"] is False
+    assert (await client.put(f"{V}/notebook/blocker", json=_ref("kahf", idea, open=False))).status_code == 422
+    await client.post(f"{V}/notebook/remove", json=_ref("kahf", idea))
+    assert all(e["kind"] != "idea" for e in await _notebook(client))
+    assert (await client.post(f"{V}/notebook/remove", json=_ref("kahf", idea))).status_code == 422

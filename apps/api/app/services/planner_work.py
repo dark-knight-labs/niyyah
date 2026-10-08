@@ -6,7 +6,8 @@ from datetime import date
 
 from sqlalchemy import func, select
 
-from app.models.planner import PipelineItem, Quarter, QuarterStream, WeekObjective
+from app.models.planner import NotebookEntry, PipelineItem, Quarter, QuarterStream, WeekObjective
+from app.services.vault_notebook import _clean as clean_entry, _new_id
 from app.services.vault_objectives import MAX_OBJECTIVE_CHARS, week_for, weekly_streams
 from app.services.vault_quarter import FIELD_KEYS, _one_line, _validate, quarter_months
 from app.services.vault_streams import DEFAULTS, MONTHS, SLUG, make_stream
@@ -282,3 +283,41 @@ async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str
     db.add(QuarterStream(user_id=user_id, quarter=label, slug=stream, name=info.name, color=info.color, icon=info.icon,
                          slot=info.slot, weekly=info.weekly, has_pipeline=info.goal, in_note=True, goal=written.get("goal", ""),
                          status=info.status, checkpoints=checkpoints, position=last_note + 1))
+
+
+ENTRY_GONE = "that entry changed or moved; reload and try again"
+
+
+async def _entry(db, user_id: int, stream: str, entry_id: int) -> NotebookEntry:
+    row = (await db.execute(select(NotebookEntry).where(
+        NotebookEntry.user_id == user_id, NotebookEntry.stream == stream, NotebookEntry.id == entry_id))).scalar_one_or_none()
+    if row is None:
+        raise ValueError(ENTRY_GONE)
+    return row
+
+
+async def add_entry(db, user_id: int, stream: str, kind: str, title: str, body: str, today: date) -> None:
+    """A new entry goes first; a blocker starts open."""
+    title, body = clean_entry(kind, title, body)
+    first = (await db.execute(select(func.min(NotebookEntry.position)).where(
+        NotebookEntry.user_id == user_id, NotebookEntry.stream == stream))).scalar()
+    db.add(NotebookEntry(user_id=user_id, stream=stream, ext_id=_new_id(), kind=kind, title=title, body=body,
+                         entry_date=today.isoformat(), is_open=True if kind == "blocker" else None,
+                         position=0 if first is None else first - 1))
+    await db.flush()
+
+
+async def set_entry(db, user_id: int, stream: str, entry_id: int, title: str, body: str) -> None:
+    row = await _entry(db, user_id, stream, entry_id)
+    row.title, row.body = clean_entry(row.kind, title, body)
+
+
+async def set_blocker(db, user_id: int, stream: str, entry_id: int, open_: bool) -> None:
+    row = await _entry(db, user_id, stream, entry_id)
+    if row.kind != "blocker":
+        raise ValueError("only a blocker can be opened or cleared")
+    row.is_open = open_
+
+
+async def remove_entry(db, user_id: int, stream: str, entry_id: int) -> None:
+    await db.delete(await _entry(db, user_id, stream, entry_id))
