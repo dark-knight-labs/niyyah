@@ -77,7 +77,7 @@ from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault, vault_status
 from app.services.vault_goals import GOALS_PATH, parse_goals
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
-from app.services import planner_day, planner_store, vault_notebook, vault_pipeline
+from app.services import planner_day, planner_store, planner_work, vault_notebook, vault_pipeline
 from app.services.vault_notebook import notebook_path, parse_notebook
 from app.services.vault_pipeline import NOW_LIMIT, STALE_DAYS, parse_pipeline, pipeline_path
 from app.services.vault_quarter import (
@@ -750,6 +750,12 @@ async def get_pipelines(user: User = Depends(require_planner_user), db: AsyncSes
     return await asyncio.to_thread(_pipelines_response, today)
 
 
+async def _known_stream(db: AsyncSession, user: User, stream: str, today: date) -> None:
+    streams = await planner_store.streams_for(db, user.id, today)
+    if stream not in {s.id for s in streams if s.goal and not s.archived}:
+        raise HTTPException(status_code=422, detail=f"unknown stream '{stream}'")
+
+
 async def _save_pipeline(stream: str, edit, message: str) -> EditResponse:
     streams = await asyncio.to_thread(_streams, _local_now().date())
     if stream not in {s.id for s in streams if s.goal and not s.archived}:
@@ -762,7 +768,11 @@ async def _save_pipeline(stream: str, edit, message: str) -> EditResponse:
 
 
 @router.post("/pipeline/{stream}/items", response_model=EditResponse)
-async def post_pipeline_items(stream: str, data: PipelineAddIn, user: User = Depends(require_editor)):
+async def post_pipeline_items(stream: str, data: PipelineAddIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, stream, today)
+        return await _db_day_write(db, lambda: planner_work.add_items(db, user.id, stream, data.texts, data.lane, today, data.descriptions))
     today = _local_now().date()
     name = next((s.name for s in await asyncio.to_thread(_streams, today) if s.id == stream), None)
     return await _save_pipeline(
@@ -791,7 +801,11 @@ async def _save_pipeline_and_objective(stream: str, edit, objective_edit, messag
 
 
 @router.put("/pipeline/move", response_model=EditResponse)
-async def put_pipeline_move(data: PipelineMoveIn, user: User = Depends(require_editor)):
+async def put_pipeline_move(data: PipelineMoveIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.move_item(db, user.id, data.stream, data.line, data.lane, today))
     today = _local_now().date()
     week = week_for(today)[2]
     item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
@@ -805,8 +819,12 @@ async def put_pipeline_move(data: PipelineMoveIn, user: User = Depends(require_e
 
 
 @router.put("/pipeline/focus", response_model=EditResponse)
-async def put_pipeline_focus(data: PipelineRefIn, user: User = Depends(require_editor)):
+async def put_pipeline_focus(data: PipelineRefIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """Make a pipeline item this week's small domino: it goes to Now and the objective line follows."""
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.set_focus(db, user.id, data.stream, data.line, week_for(today)[2], today))
     today = _local_now().date()
     week = week_for(today)[2]
     item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
@@ -820,35 +838,55 @@ async def put_pipeline_focus(data: PipelineRefIn, user: User = Depends(require_e
 
 
 @router.put("/pipeline/checkpoint", response_model=EditResponse)
-async def put_pipeline_checkpoint(data: PipelineCheckpointIn, user: User = Depends(require_editor)):
+async def put_pipeline_checkpoint(data: PipelineCheckpointIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.set_checkpoint(db, user.id, data.stream, data.line, data.checkpoint or None))
     return await _save_pipeline(
         data.stream, lambda c: vault_pipeline.set_checkpoint(c or "", data.line, data.hash, data.checkpoint or None),
         f"Niyyah: {data.stream} pipeline item checkpoint")
 
 
 @router.put("/pipeline/text", response_model=EditResponse)
-async def put_pipeline_text(data: PipelineTextIn, user: User = Depends(require_editor)):
+async def put_pipeline_text(data: PipelineTextIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.set_text(db, user.id, data.stream, data.line, data.text))
     return await _save_pipeline(
         data.stream, lambda c: vault_pipeline.set_text(c or "", data.line, data.hash, data.text),
         f"Niyyah: rename an item in the {data.stream} pipeline")
 
 
 @router.put("/pipeline/description", response_model=EditResponse)
-async def put_pipeline_description(data: PipelineDescriptionIn, user: User = Depends(require_editor)):
+async def put_pipeline_description(data: PipelineDescriptionIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.set_description(db, user.id, data.stream, data.line, data.description))
     return await _save_pipeline(
         data.stream, lambda c: vault_pipeline.set_description(c or "", data.line, data.hash, data.description),
         f"Niyyah: describe an item in the {data.stream} pipeline")
 
 
 @router.put("/pipeline/blocked-by", response_model=EditResponse)
-async def put_pipeline_blocked_by(data: PipelineBlockedByIn, user: User = Depends(require_editor)):
+async def put_pipeline_blocked_by(data: PipelineBlockedByIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.set_blocked_by(db, user.id, data.stream, data.line, data.ids))
     return await _save_pipeline(
         data.stream, lambda c: vault_pipeline.set_blocked_by(c or "", data.line, data.hash, data.ids),
         f"Niyyah: set what an item in the {data.stream} pipeline waits on")
 
 
 @router.post("/pipeline/remove", response_model=EditResponse)
-async def post_pipeline_remove(data: PipelineRefIn, user: User = Depends(require_editor)):
+async def post_pipeline_remove(data: PipelineRefIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        today = _local_now().date()
+        await _known_stream(db, user, data.stream, today)
+        return await _db_day_write(db, lambda: planner_work.remove_item(db, user.id, data.stream, data.line))
     today = _local_now().date()
     item = await asyncio.to_thread(_item_at, data.stream, data.line, data.hash, today)
     objective_edit = None
