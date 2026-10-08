@@ -17,6 +17,7 @@ from app.services.vault_objectives import weekly_streams
 from app.services.vault_pipeline import STALE_DAYS
 from app.services.vault_quarter import quarter_for
 from app.services.vault_streams import Stream, default_streams
+from app.services.vault_tasks import line_hash
 
 
 async def _all(db: AsyncSession, stmt) -> list:
@@ -47,7 +48,7 @@ async def day_tasks(db: AsyncSession, user_id: int, day: date) -> list[dict]:
 
 async def day_log(db: AsyncSession, user_id: int, day: date) -> list[dict]:
     rows = await _all(db, select(LogEntry).where(LogEntry.user_id == user_id, LogEntry.day == day).order_by(LogEntry.position))
-    return [{"index": r.position, "hash": "", "text": r.text} for r in rows]
+    return [{"index": r.position, "hash": line_hash(r.text), "text": r.text} for r in rows]
 
 
 async def goals(db: AsyncSession, user_id: int) -> list[dict]:

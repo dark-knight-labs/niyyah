@@ -58,3 +58,23 @@ async def auth_client(client: AsyncClient) -> AsyncClient:
     token = resp.json()["access_token"]
     client.headers["Authorization"] = f"Bearer {token}"
     return client
+
+
+@pytest_asyncio.fixture
+async def db_client(auth_client: AsyncClient, tmp_path, monkeypatch):
+    """The logged-in user with the fixture vault imported into their rows and STORAGE_BACKEND=db."""
+    from sqlalchemy import select
+
+    from app.api.v1.vault import _local_now
+    from app.core.config import settings
+    from app.models.user import User
+    from app.services.vault_import import import_vault
+    from tests.vault_fixture import build_vault
+
+    today = _local_now().date()
+    build_vault(tmp_path, today)
+    async with TestSession() as db:
+        user_id = (await db.execute(select(User.id))).scalar_one()
+        await import_vault(db, user_id, tmp_path, today)
+    monkeypatch.setattr(settings, "storage_backend", "db")
+    return auth_client, today

@@ -325,11 +325,22 @@ def _db_mode() -> bool:
     return settings.storage_backend == "db"
 
 
-def require_reader(user: User = Depends(get_current_user)) -> User:
+def require_planner_user(user: User = Depends(get_current_user)) -> User:
     """Reads of private planner data: the allow-listed owner in vault mode, any signed-in user in db mode (rows are per user)."""
     if not _db_mode() and not _can_edit(user):
         raise HTTPException(status_code=403, detail="Not allowed to edit the vault")
     return user
+
+
+async def _db_run(db: AsyncSession, work):
+    """Run a database write and commit it. Bad input or a stale row (ValueError) is a 422 and nothing is saved."""
+    try:
+        result = await work()
+        await db.commit()
+        return result
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 def require_editor(user: User = Depends(get_current_user)) -> User:
@@ -504,7 +515,7 @@ async def post_event(day: date, data: CalendarEventIn, user: User = Depends(requ
 
 
 @router.get("/day/{day}/tasks", response_model=list[TaskResponse])
-async def get_day_tasks(day: date, user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+async def get_day_tasks(day: date, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """Tasks due or scheduled on `day`. Private note text, so signed-in owners only."""
     if _db_mode():
         return await planner_store.day_tasks(db, user.id, day)
@@ -552,7 +563,7 @@ async def post_task(day: date, data: TaskIn, user: User = Depends(require_editor
 
 
 @router.get("/day/{day}/log", response_model=list[LogEntryResponse])
-async def get_day_log(day: date, user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+async def get_day_log(day: date, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """Entries under the day's '## Log'. Private note text, so signed-in owners only."""
     _check_day(day)
     if _db_mode():
@@ -599,7 +610,7 @@ def _objectives_response(today: date) -> ObjectivesResponse:
 
 
 @router.get("/objectives", response_model=ObjectivesResponse)
-async def get_objectives(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+async def get_objectives(user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
     if _db_mode():
         streams = await planner_store.streams_for(db, user.id, today)
@@ -632,7 +643,7 @@ async def put_objective(data: ObjectiveIn, user: User = Depends(require_editor))
 
 
 @router.get("/goals", response_model=GoalsResponse)
-async def get_goals(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+async def get_goals(user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """Goal cards for the Overview header, read from Calendar/Goals.md (edited in Obsidian) or the database."""
     if _db_mode():
         return GoalsResponse(items=await planner_store.goals(db, user.id))
@@ -648,7 +659,7 @@ def _quarter_response(today: date) -> QuarterResponse:
 
 
 @router.get("/quarter", response_model=QuarterResponse)
-async def get_quarter(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+async def get_quarter(user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """This quarter's objective, goals and month checkpoints. Private plans, so signed-in owners only."""
     today = _local_now().date()
     if _db_mode():
@@ -707,7 +718,7 @@ def _pipelines_response(today: date) -> PipelinesResponse:
 
 
 @router.get("/pipelines", response_model=PipelinesResponse)
-async def get_pipelines(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+async def get_pipelines(user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
     if _db_mode():
         streams = await planner_store.streams_for(db, user.id, today)
@@ -833,7 +844,7 @@ def _notebooks_response(today: date) -> NotebooksResponse:
 
 
 @router.get("/notebooks", response_model=NotebooksResponse)
-async def get_notebooks(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+async def get_notebooks(user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
     if _db_mode():
         streams = await planner_store.streams_for(db, user.id, today)

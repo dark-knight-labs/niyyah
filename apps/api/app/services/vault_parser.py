@@ -95,6 +95,14 @@ def _extract_section(body: str, heading: str) -> str | None:
     return joined or None
 
 
+def possible_for(mode: str, blocks) -> int:
+    """The day's maximum stars: the mode's table value, scaled when the merged OT block replaces onething and ops."""
+    possible = MODE_META.get(mode, MODE_META["full"])["possible"]
+    if "ot" in blocks and "onething" not in blocks and "ops" not in blocks:
+        possible = round(possible * OT_SCALE)
+    return possible
+
+
 def parse_daily_note(content: str, note_date: date) -> ParsedDay:
     frontmatter, body = _split_frontmatter(content)
     mode = frontmatter.get("mode", "full")
@@ -104,13 +112,10 @@ def parse_daily_note(content: str, note_date: date) -> ParsedDay:
         # is a non-nullable string column, so an unnormalized None would raise
         # an IntegrityError at commit time instead of falling back cleanly.
         mode = "full"
-    meta = MODE_META.get(mode, MODE_META["full"])
 
     blocks = _parse_blocks(body)
     total = sum(blocks.values())
-    possible = meta["possible"]
-    if "ot" in blocks and "onething" not in blocks and "ops" not in blocks:
-        possible = round(possible * OT_SCALE)
+    possible = possible_for(mode, blocks)
 
     focus = None
     focus_section = _extract_section(body, "## Focus")
