@@ -1,25 +1,27 @@
 import { VaultGoalsData } from "@/lib/vault-types";
 
-/** Goals you keep in front of you, one card each, read from Calendar/Goals.md in the vault (edit them in Obsidian). */
+/** Goals you keep in front of you, one quiet line each, read from Calendar/Goals.md in the vault (edit them in Obsidian). */
 export function GoalCards({ data }: { data: VaultGoalsData | null }) {
   const items = data?.items ?? [];
   if (data && items.length === 0) {
-    return <p className="self-center text-xs text-[var(--muted-foreground)]">No goals yet. Add one line each to Calendar/Goals.md in the vault.</p>;
+    return <p className="mb-3 text-xs text-[var(--muted-foreground)]">No goals yet. Add one line each to Calendar/Goals.md in the vault.</p>;
   }
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(10.625rem,1fr))] gap-2.5">
+    <ul className="mb-3 flex flex-wrap gap-x-8 gap-y-2 border-y border-[var(--border)] py-2">
       {items.map((g) => (
-        <article key={g.title} className="grid min-w-0 content-start gap-0.5 rounded-lg border border-[var(--border)] px-3 py-2">
-          <h2 className="text-[0.625rem] font-extrabold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">{g.title}</h2>
-          <p className="break-words font-serif text-xl font-medium leading-tight">{g.value}</p>
-          {g.caption && <p className="text-xs text-[var(--muted-foreground)]">{g.caption}</p>}
+        <li key={g.title} className="min-w-0">
+          <p className="text-[0.625rem] font-bold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">{g.title}</p>
+          <p className="break-words text-sm">
+            <span className="font-serif font-medium">{g.value}</span>
+            {g.caption && <span className="text-[var(--muted-foreground)]"> · {g.caption}</span>}
+          </p>
           {g.progress !== null && (
-            <div className="mt-1 h-1.5 overflow-hidden rounded bg-[var(--muted)]" role="progressbar" aria-label={`${g.title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={g.progress}>
+            <div className="mt-1 h-0.5 w-full bg-[var(--muted)]" role="progressbar" aria-label={`${g.title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={g.progress}>
               <div className="h-full bg-[var(--accent)]" style={{ width: `${g.progress}%` }} />
             </div>
           )}
-        </article>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

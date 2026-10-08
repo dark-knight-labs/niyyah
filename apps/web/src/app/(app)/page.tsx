@@ -143,9 +143,8 @@ export default function OverviewPage() {
       {calendarNote && <p role="status" className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs">{calendarNote}</p>}
       {schedule && day && (
         <>
-          <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday}>
-            {owner && goals && <GoalCards data={goals} />}
-          </DayHeader>
+          <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
+          {owner && goals && <GoalCards data={goals} />}
           {owner ? (
             <>
               <div className="mb-4"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>

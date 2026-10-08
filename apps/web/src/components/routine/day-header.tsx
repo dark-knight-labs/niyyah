@@ -17,12 +17,10 @@ interface Props {
   editDay: string | null;
   today: VaultDayData | null;
   onSaved: (day: VaultDayData | null) => void;
-  /** Goal cards, shown between the date and the mode. */
-  children?: React.ReactNode;
 }
 
 /** Date, the day's mode (a picker for the owner) and today's star total. */
-export function DayHeader({ dateLabel, city, editDay, today, onSaved, children }: Props) {
+export function DayHeader({ dateLabel, city, editDay, today, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
   const mode = today?.mode ?? null;
 
@@ -37,12 +35,11 @@ export function DayHeader({ dateLabel, city, editDay, today, onSaved, children }
   }
 
   return (
-    <header className="mb-4 grid items-center gap-x-6 gap-y-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
+    <header className="mb-4 grid items-center gap-x-6 gap-y-3 lg:grid-cols-[1fr_auto]">
       <div>
         <h1 className="font-serif text-[1.5rem] font-medium leading-tight">{dateLabel}</h1>
         {city && <p className="text-[0.8125rem] text-[var(--muted-foreground)]">{city}</p>}
       </div>
-      {children ?? <div />}
       {today && (
         <div className="flex items-center gap-3">
           <label className="flex min-h-8 items-center gap-1.5 rounded-[0.3125rem] border border-[var(--border)] bg-[var(--surface)] pl-2.5 pr-1 text-xs font-semibold">

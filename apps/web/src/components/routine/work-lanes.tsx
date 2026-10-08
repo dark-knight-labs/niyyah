@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Checkbox } from "@/components/routine/checkbox";
 import { ItemDetail } from "@/components/routine/item-detail";
 import { Section } from "@/components/routine/section";
@@ -127,7 +127,8 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
               const by = (l: Lane) => rows.filter((r) => r.item.lane === l);
               const parked = by("backlog");
               return (
-                <tr key={id} className={id === ot ? "bg-[var(--accent-light)]" : ""}>
+                <Fragment key={id}>
+                <tr className={id === ot ? "bg-[var(--accent-light)]" : ""}>
                   <th scope="row" className={`${TD} text-left text-xs font-bold`}>
                     <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: meta.color }} aria-hidden="true" />{meta.label}
                     {id === ot && <span className="mt-1 block w-fit rounded bg-[var(--surface)] px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.05em] text-[var(--accent)]">OT today</span>}
@@ -148,12 +149,19 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
                     {parked.length === 0 ? dash : allSomeday ? cell(parked, "next", "Next") : <span className="text-xs text-[var(--muted-foreground)]">{parked.length} parked</span>}
                   </td>
                 </tr>
+                {open?.stream === id && (
+                  <tr className={id === ot ? "bg-[var(--accent-light)]" : ""}>
+                    <td colSpan={4} className="border-t border-[var(--border)] px-2.5 py-2">
+                      <WorkDetail r={open} week={data.week} busy={busy} onMove={async (to) => { await move(open, to); setOpen(null); }} onClose={() => setOpen(null)} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
-      {open && <WorkDetail r={open} week={data.week} busy={busy} onMove={async (to) => { await move(open, to); setOpen(null); }} onClose={() => setOpen(null)} />}
       {count("backlog") > 0 && (
         <button type="button" onClick={() => setAllSomeday((v) => !v)} aria-expanded={allSomeday}
           className="mt-1 min-h-9 text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
