@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.core import database
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_optional_user
 from app.models.google import GoogleCredential
 from app.models.user import User
 from app.models.vault import VaultDay
@@ -312,7 +312,20 @@ def _can_edit(user: User) -> bool:
     return user.email.lower() in allowed
 
 
+def _db_mode() -> bool:
+    return settings.storage_backend == "db"
+
+
+def require_reader(user: User = Depends(get_current_user)) -> User:
+    """Reads of private planner data: the allow-listed owner in vault mode, any signed-in user in db mode (rows are per user)."""
+    if not _db_mode() and not _can_edit(user):
+        raise HTTPException(status_code=403, detail="Not allowed to edit the vault")
+    return user
+
+
 def require_editor(user: User = Depends(get_current_user)) -> User:
+    if _db_mode():
+        raise HTTPException(status_code=501, detail="Writes are not available with STORAGE_BACKEND=db yet")
     if not _can_edit(user):
         raise HTTPException(status_code=403, detail="Not allowed to edit the vault")
     return user
@@ -482,7 +495,7 @@ async def post_event(day: date, data: CalendarEventIn, user: User = Depends(requ
 
 
 @router.get("/day/{day}/tasks", response_model=list[TaskResponse])
-async def get_day_tasks(day: date, user: User = Depends(require_editor)):
+async def get_day_tasks(day: date, user: User = Depends(require_reader)):
     """Tasks (Obsidian Tasks syntax) due or scheduled on `day`. Private note text, so owner only."""
     root = Path(settings.vault_workdir)
     return await asyncio.to_thread(lambda: [asdict(t) for t in find_tasks(root, day.isoformat())])
@@ -528,7 +541,7 @@ async def post_task(day: date, data: TaskIn, user: User = Depends(require_editor
 
 
 @router.get("/day/{day}/log", response_model=list[LogEntryResponse])
-async def get_day_log(day: date, user: User = Depends(require_editor)):
+async def get_day_log(day: date, user: User = Depends(require_reader)):
     """Entries under the day's '## Log'. Private note text, so owner only."""
     _check_day(day)
     note = Path(settings.vault_workdir) / "Calendar" / "Daily" / f"{day.isoformat()}.md"
@@ -580,7 +593,7 @@ def _objectives_response(today: date) -> ObjectivesResponse:
 
 
 @router.get("/objectives", response_model=ObjectivesResponse)
-async def get_objectives(user: User = Depends(require_editor)):
+async def get_objectives(user: User = Depends(require_reader)):
     return await asyncio.to_thread(_objectives_response, _local_now().date())
 
 
@@ -608,7 +621,7 @@ async def put_objective(data: ObjectiveIn, user: User = Depends(require_editor))
 
 
 @router.get("/goals", response_model=GoalsResponse)
-async def get_goals(user: User = Depends(require_editor)):
+async def get_goals(user: User = Depends(require_reader)):
     """Goal cards for the Overview header, read from Calendar/Goals.md (edited in Obsidian)."""
     return GoalsResponse(items=parse_goals(await asyncio.to_thread(_read, GOALS_PATH)))
 
@@ -637,7 +650,7 @@ def _quarter_response(today: date) -> QuarterResponse:
 
 
 @router.get("/quarter", response_model=QuarterResponse)
-async def get_quarter(user: User = Depends(require_editor)):
+async def get_quarter(user: User = Depends(require_reader)):
     """This quarter's objective, goals and month checkpoints. Private plans, so owner only."""
     return await asyncio.to_thread(_quarter_response, _local_now().date())
 
@@ -693,7 +706,7 @@ def _pipelines_response(today: date) -> PipelinesResponse:
 
 
 @router.get("/pipelines", response_model=PipelinesResponse)
-async def get_pipelines(user: User = Depends(require_editor)):
+async def get_pipelines(user: User = Depends(require_reader)):
     return await asyncio.to_thread(_pipelines_response, _local_now().date())
 
 
@@ -819,7 +832,7 @@ def _notebooks_response(today: date) -> NotebooksResponse:
 
 
 @router.get("/notebooks", response_model=NotebooksResponse)
-async def get_notebooks(user: User = Depends(require_editor)):
+async def get_notebooks(user: User = Depends(require_reader)):
     return await asyncio.to_thread(_notebooks_response, _local_now().date())
 
 

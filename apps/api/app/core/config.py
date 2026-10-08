@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     vault_git_name: str = "Niyyah"
     vault_git_email: str = "niyyah@burak.bd"
     vault_tz: str = "Asia/Dhaka"
+    # Where planner data lives: "vault" = notes in the git checkout (today's behaviour), "db" = this database.
+    storage_backend: str = "vault"
 
     # Google Calendar (adding events from the Overview page). Both empty = the feature is off.
     google_client_id: str = ""
