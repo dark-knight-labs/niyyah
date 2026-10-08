@@ -13,10 +13,11 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
+    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
     WeekObjective,
 )
 from app.models.vault import VaultBlockVote, VaultDay
+from app.services.vault_calendar import sources
 from app.services.vault_goals import GOALS_PATH, parse_goals
 from app.services.vault_notebook import _new_id as new_entry_id, parse_notebook
 from app.services.vault_objectives import parse_objectives
@@ -34,7 +35,7 @@ _COLUMN = {"📅": "due_on", "⏳": "scheduled_on", "🛫": "start_on"}
 _QUARTER = re.compile(r"^\d{4}-Q[1-4]$")
 _WEEK = re.compile(r"^\d{4}-W\d{2}$")
 
-USER_TABLES = (Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem, NotebookEntry,
+USER_TABLES = (PlannerCalendarFeed, Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem, NotebookEntry,
                PlannerScheduleSetting, PlannerScheduleBlock)
 
 
@@ -222,6 +223,8 @@ async def import_vault(db: AsyncSession, user_id: int, root: Path, today: date) 
         "pipeline_items": _pipelines(root, user_id, today, report),
         "notebook_entries": _notebooks(root, user_id, report),
         "schedule_blocks": schedule_blocks,
+        "calendar_feeds": [PlannerCalendarFeed(user_id=user_id, name=f["name"], url=f["url"], color=f["color"], email=f["email"], position=n)
+                           for n, f in enumerate(sources(root))],
     }
     await _wipe(db, user_id)
     for rows in groups.values():

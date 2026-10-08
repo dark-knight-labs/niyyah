@@ -8,7 +8,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
+    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
     WeekObjective,
 )
 from app.services.vault_goals import MAX_GOALS
@@ -118,3 +118,8 @@ async def schedule(db: AsyncSession, user_id: int) -> dict | None:
     for r in rows:
         days.setdefault(r.day_type, []).append({"block": r.block, "start": r.start, "end": r.end, "what": r.what})
     return {"meta": dict(setting.meta), "days": days, "errors": []}
+
+
+async def calendar_feeds(db: AsyncSession, user_id: int) -> list[dict]:
+    rows = await _all(db, select(PlannerCalendarFeed).where(PlannerCalendarFeed.user_id == user_id).order_by(PlannerCalendarFeed.position))
+    return [{"name": r.name, "url": r.url, "color": r.color, "email": r.email} for r in rows]

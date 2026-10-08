@@ -430,7 +430,7 @@ async def _credential(db: AsyncSession, user: User) -> GoogleCredential | None:
 
 
 @router.get("/day/{day}/events", response_model=CalendarEventsResponse)
-async def get_day_events(day: date, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def get_day_events(day: date, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """The day's events from the calendars configured in the vault (Day Planner iCal feeds). Private, owner only.
 
     The calendar matching the connected Google account is read through the Calendar API (fresh), the rest via iCal."""
@@ -440,7 +440,8 @@ async def get_day_events(day: date, user: User = Depends(require_editor), db: As
     if cred:
         refresh = cred.refresh_token
         google = (cred.email, lambda start, end: google_calendar.list_events(google_calendar.access_token(refresh), start, end))
-    events, errors = await asyncio.to_thread(events_for_day, root, day, settings.vault_tz, google)
+    feeds = await planner_store.calendar_feeds(db, user.id) if _db_mode() else None
+    events, errors = await asyncio.to_thread(events_for_day, root, day, settings.vault_tz, google, feeds)
     return {"events": events, "errors": errors}
 
 
@@ -451,13 +452,13 @@ GOOGLE_PATH = "/calendar/google"
 
 
 @router.get(f"{GOOGLE_PATH}/status", response_model=GoogleStatusResponse)
-async def google_status(user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def google_status(user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     cred = await _credential(db, user)
     return {"configured": google_calendar.configured(), "connected": cred is not None, "email": cred.email if cred else None}
 
 
 @router.get(f"{GOOGLE_PATH}/connect", response_model=GoogleConnectResponse)
-async def google_connect(user: User = Depends(require_editor)):
+async def google_connect(user: User = Depends(require_planner_user)):
     if not google_calendar.configured():
         raise HTTPException(status_code=409, detail="Google Calendar is not set up on the server")
     return {"url": google_calendar.build_auth_url(google_calendar.make_state(user.id))}
@@ -487,7 +488,7 @@ async def google_callback(code: str = "", state: str = "", db: AsyncSession = De
 
 
 @router.post("/day/{day}/events", response_model=CalendarEventResponse)
-async def post_event(day: date, data: CalendarEventIn, user: User = Depends(require_editor), db: AsyncSession = Depends(get_db)):
+async def post_event(day: date, data: CalendarEventIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
     """Add an event to the owner's primary Google calendar. Today and the next 60 days."""
     today = _local_now().date()
     if not today <= day <= today + timedelta(days=EVENT_AHEAD_DAYS):

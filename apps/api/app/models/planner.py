@@ -152,3 +152,16 @@ class PlannerScheduleBlock(Base):
     end: Mapped[str] = mapped_column(String(20), nullable=False)
     what: Mapped[str] = mapped_column(Text, default="", nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class PlannerCalendarFeed(Base):
+    """An iCal feed (private URL) whose events show on the Overview."""
+    __tablename__ = "planner_calendar_feeds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    color: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)  # the Google account, to read through its API instead
+    position: Mapped[int] = mapped_column(Integer, nullable=False)

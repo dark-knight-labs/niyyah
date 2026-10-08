@@ -92,18 +92,20 @@ def events_for_day(
     day: date,
     tz: str,
     google: tuple[str, Callable[[datetime, datetime], list[dict]]] | None = None,
+    feeds: list[dict] | None = None,
 ) -> tuple[list[dict], list[str]]:
     """(events, errors) for `day` in `tz`. A calendar that cannot be read is reported, the others still show.
 
     `google` = (connected account's email, lister(day_start, day_end) -> Calendar API events): the Day Planner
     calendar with that email is read through it instead of its iCal feed.
+    `feeds` replaces the calendars read from the vault (db mode).
     """
     zone = ZoneInfo(tz)
     day_start = datetime.combine(day, clock.min, zone)
     day_end = day_start + timedelta(days=1)
     events: list[dict] = []
     errors: list[str] = []
-    for source in sources(root):
+    for source in (sources(root) if feeds is None else feeds):
         if google and source["email"] and source["email"].lower() == google[0].lower():
             try:
                 items = google[1](day_start, day_end)
