@@ -410,7 +410,7 @@ async def google_connect(user: User = Depends(require_editor)):
 @router.get(f"{GOOGLE_PATH}/callback", include_in_schema=False)
 async def google_callback(code: str = "", state: str = "", db: AsyncSession = Depends(get_db)):
     """Google sends the browser here, so there is no auth header: the signed state proves who started the flow."""
-    back = f"{settings.web_public_url.rstrip('/')}/routine?calendar="
+    back = f"{settings.web_public_url.rstrip('/')}/?calendar="
     user_id = google_calendar.read_state(state)
     if user_id is None or not code or not google_calendar.configured():
         return RedirectResponse(back + "error", status_code=302)

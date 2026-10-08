@@ -93,3 +93,7 @@ Clock: 24h ring, current block thicker, past blocks faded, block names on slices
 ### Phase 2 shipped: the Plan page (`/plan`)
 
 Header: Super Objective (editable, Arabic line), quarter ring, and the week's seven days with the block that owns OT (Kahf, Alisha Noor on Fri and Sat). Under it a collapsible block rail (state kept in `localStorage`, a chip row on phones) and the selected block's workspace: goal with month checkpoints, the small domino (tick, rewrite, or pick from the pipeline), open-blocker bar, the pipeline (Now, Next, Someday, add items with descriptions, done list) and the notebook, side by side on wide screens. `?stream=<id>` selects a block. The pipeline board is now a shared component (`pipeline-board.tsx`) used by both `/plan` and `/pipelines`; the Backlog lane is labelled Someday in the UI only. The old Quarter, Week and Pipelines pages remain until phase 3.
+
+### Phase 3 shipped: four pages
+
+Navigation is Overview (`/`), Plan (`/plan`), Vault, Settings. Overview moved from `/routine` to `/`. `/routine`, `/quarter`, `/week` and `/pipelines` redirect (307, query string kept, so `?calendar=` and `?stream=` still land) to `/` and `/plan` via `next.config.ts`. Google's OAuth return link is now `<web_public_url>/?calendar=`. The Quarter, Week and Pipelines pages and the chain breadcrumb component are deleted; the shared pipeline board, notebook, stream editor and month track live on.

@@ -30,7 +30,7 @@ async def _connect(auth_client: AsyncClient, monkeypatch, email="me@gmail.com"):
     user_id = (await auth_client.get("/api/v1/auth/me")).json()["id"]
     monkeypatch.setattr(google_calendar, "exchange_code", lambda code: ("refresh-1", email))
     r = await auth_client.get(f"{API}/calendar/google/callback", params={"code": "c", "state": google_calendar.make_state(user_id)}, follow_redirects=False)
-    assert r.headers["location"].endswith("/routine?calendar=connected")
+    assert r.headers["location"].endswith("/?calendar=connected")
 
 
 # --- status / connect / callback -------------------------------------------------------------------------------
@@ -66,7 +66,7 @@ async def test_callback_rejects_bad_state_and_failed_exchange(auth_client: Async
         {"state": google_calendar.make_state(user_id)},  # user denied: no code
     ):
         r = await auth_client.get(f"{API}/calendar/google/callback", params=params, follow_redirects=False)
-        assert r.status_code == 302 and r.headers["location"].endswith("/routine?calendar=error")
+        assert r.status_code == 302 and r.headers["location"].endswith("/?calendar=error")
     assert (await auth_client.get(f"{API}/calendar/google/status")).json()["connected"] is False
 
 

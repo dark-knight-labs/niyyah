@@ -21,8 +21,8 @@ import { WorkLanes } from "@/components/routine/work-lanes";
 
 const REFRESH_MS = 60_000;
 
-/** Overview: the day's clock, lists and votes, with Now / Next / Someday across every block at the end. (The route is still /routine: Google's return link points at it.) */
-export default function RoutinePage() {
+/** Overview, the home page: the day's clock, lists and votes, with Now / Next / Someday across every block at the end. */
+export default function OverviewPage() {
   const [schedule, setSchedule] = useState<VaultScheduleData | null>(null);
   const [today, setToday] = useState<VaultDayData | null>(null);
   const [error, setError] = useState<string | null>(null);

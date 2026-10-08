@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     vault_git_email: str = "niyyah@burak.bd"
     vault_tz: str = "Asia/Dhaka"
 
-    # Google Calendar (adding events from /routine). Both empty = the feature is off.
+    # Google Calendar (adding events from the Overview page). Both empty = the feature is off.
     google_client_id: str = ""
     google_client_secret: str = ""
     # OAuth redirect URI = {api_public_url}/api/v1/vault/calendar/google/callback; the browser returns to web_public_url.

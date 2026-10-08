@@ -9,10 +9,7 @@ import { logout } from "@/lib/auth";
 import {
   Activity,
   Clock,
-  CalendarDays,
-  Layers3,
   ListChecks,
-  Target,
   Settings,
   LogOut,
   PanelLeftClose,
@@ -22,14 +19,11 @@ import {
 const NAV_COLLAPSED_KEY = "niyyah-nav-collapsed";
 
 // Readable without signing in; every other page in this group requires a session.
-const PUBLIC_PATHS = ["/routine"];
+const PUBLIC_PATHS = ["/"];
 
 const nav = [
-  { href: "/routine", label: "Overview", icon: Clock },
+  { href: "/", label: "Overview", icon: Clock },
   { href: "/plan", label: "Plan", icon: ListChecks },
-  { href: "/week", label: "Week", icon: CalendarDays },
-  { href: "/quarter", label: "Quarter", icon: Target },
-  { href: "/pipelines", label: "Pipelines", icon: Layers3 },
   { href: "/vault", label: "Vault", icon: Activity },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
