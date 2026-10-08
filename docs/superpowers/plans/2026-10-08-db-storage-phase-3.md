@@ -1533,33 +1533,33 @@ async def scenario(client, today):
     results.append(ok(await client.put(f"{V}/day/{d}/log", json={"index": 0, "hash": log[0]["hash"], "text": "Fixed the router"})))
     results.append(ok(await client.post(f"{V}/day/{d}/log/remove", json={"index": 1, "hash": log[1]["hash"]})))
 
-    pipes = (await client.get(f"{V}/pipelines")).json()
-    items = next(s for s in pipes["streams"] if s["stream"] == "kahf")["items"]
-    by = lambda prefix: next(i for i in items if i["text"].startswith(prefix))  # noqa: E731
+    async def item(prefix):  # fresh reference each time: in the vault a mutation shifts the line numbers of the items below it
+        pipes = (await client.get(f"{V}/pipelines")).json()
+        return next(i for s in pipes["streams"] if s["stream"] == "kahf" for i in s["items"] if i["text"].startswith(prefix))
+
     ref = lambda i, **kw: {"stream": "kahf", "line": i["line"], "hash": i["hash"], **kw}  # noqa: E731
     results.append(ok(await client.post(f"{V}/pipeline/kahf/items", json={"texts": ["Buy cables [product:: Router] #nov"], "lane": "next", "descriptions": ["Cat6"]})))
-    results.append(ok(await client.put(f"{V}/pipeline/text", json=ref(by("Plan the DNS"), text="Plan the DNS move"))))
-    results.append(ok(await client.put(f"{V}/pipeline/checkpoint", json=ref(by("Replace the switch"), checkpoint="dec"))))
-    results.append(ok(await client.put(f"{V}/pipeline/description", json=ref(by("Replace the switch"), description="Line one\n\nLine three"))))
-    results.append(ok(await client.put(f"{V}/pipeline/move", json=ref(by("Order the modem"), lane="next"))))
-    results.append(ok(await client.put(f"{V}/pipeline/focus", json=ref(by("Plan the DNS"))))
+    results.append(ok(await client.put(f"{V}/pipeline/text", json=ref(await item("Plan the DNS"), text="Plan the DNS move"))))
+    results.append(ok(await client.put(f"{V}/pipeline/checkpoint", json=ref(await item("Replace the switch"), checkpoint="dec"))))
+    results.append(ok(await client.put(f"{V}/pipeline/description", json=ref(await item("Replace the switch"), description="Line one\n\nLine three"))))
+    results.append(ok(await client.put(f"{V}/pipeline/move", json=ref(await item("Order the modem"), lane="next"))))
+    results.append(ok(await client.put(f"{V}/pipeline/focus", json=ref(await item("Plan the DNS")))))
     results.append(ok(await client.put(f"{V}/objectives", json={"stream": "alisha", "text": "Launch the store", "checkpoint": "nov"})))
     results.append(ok(await client.put(f"{V}/objectives", json={"stream": "kahf", "done": True})))
-    pipes = (await client.get(f"{V}/pipelines")).json()
-    items = next(s for s in pipes["streams"] if s["stream"] == "kahf")["items"]
-    results.append(ok(await client.post(f"{V}/pipeline/remove", json=ref(next(i for i in items if i["text"].startswith("Replace"))))))
+    results.append(ok(await client.post(f"{V}/pipeline/remove", json=ref(await item("Replace")))))
 
     results.append(ok(await client.put(f"{V}/quarter", json={"text": "New objective", "arabic": ""})))
     results.append(ok(await client.put(f"{V}/quarter/stream", json={"stream": "kahf", "name": "Kahf Hosting", "weekly": False, "checkpoints": {"nov": "DNS live"}})))
     results.append(ok(await client.post(f"{V}/quarter/stream", json={"stream": "errands", "name": "Errands", "goal": "Clear it"})))
     results.append(ok(await client.put(f"{V}/quarter/stream", json={"stream": "kahf", "color": "plaid"})))
 
-    nb = (await client.get(f"{V}/notebooks")).json()
-    entries = next(s for s in nb["streams"] if s["stream"] == "kahf")["entries"]
+    async def entry(kind):
+        nb = (await client.get(f"{V}/notebooks")).json()
+        return next(e for s in nb["streams"] if s["stream"] == "kahf" for e in s["entries"] if e["kind"] == kind)
+
     results.append(ok(await client.post(f"{V}/notebook/kahf/entries", json={"kind": "idea", "title": "Passkeys v2", "body": "see https://example.com/x"})))
-    blocker = next(e for e in entries if e["kind"] == "blocker")
-    results.append(ok(await client.put(f"{V}/notebook/blocker", json=ref(blocker, open=False))))
-    results.append(ok(await client.post(f"{V}/notebook/remove", json=ref(next(e for e in entries if e["kind"] == "idea")))))
+    results.append(ok(await client.put(f"{V}/notebook/blocker", json=ref(await entry("blocker"), open=False))))
+    results.append(ok(await client.post(f"{V}/notebook/remove", json=ref(await entry("idea")))))
     return results
 
 
