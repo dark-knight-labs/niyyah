@@ -165,7 +165,7 @@ git commit -m "Add the STORAGE_BACKEND switch and split read access from write a
 - Test: `tests/test_planner_models.py`
 
 **Interfaces:**
-- Produces (all in `app.models.planner`, each with `id` and `user_id`): `Task(text, done, due_on, scheduled_on, start_on, done_on, source_path, position)`, `LogEntry(day, position, text)`, `Goal(position, title, value, caption, progress)`, `Quarter(label, starts, ends, objective, objective_ar)`, `QuarterStream(quarter, slug, name, color, icon, slot, weekly, has_pipeline, in_note, goal, status, checkpoints, position)`, `WeekObjective(week, stream, text, done, checkpoint)`, `PipelineItem(stream, lane, text, description, product, checkpoint, added_on, done_on, focus_week, done, blocked_by, position)`, `NotebookEntry(stream, ext_id, kind, title, body, entry_date, is_open, position)`, `ScheduleSetting(meta)`, `ScheduleBlock(day_type, block, start, end, what, position)`. `VaultDay.user_id: int | None`.
+- Produces (all in `app.models.planner`, each with `id` and `user_id`): `Task(text, done, due_on, scheduled_on, start_on, done_on, source_path, position)`, `LogEntry(day, position, text)`, `Goal(position, title, value, caption, progress)`, `Quarter(label, starts, ends, objective, objective_ar)`, `QuarterStream(quarter, slug, name, color, icon, slot, weekly, has_pipeline, in_note, goal, status, checkpoints, position)`, `WeekObjective(week, stream, text, done, checkpoint)`, `PipelineItem(stream, lane, text, description, product, checkpoint, added_on, done_on, focus_week, done, blocked_by, position)`, `NotebookEntry(stream, ext_id, kind, title, body, entry_date, is_open, position)`, `PlannerScheduleSetting(meta)`, `PlannerScheduleBlock(day_type, block, start, end, what, position)`. `VaultDay.user_id: int | None`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -365,7 +365,7 @@ class NotebookEntry(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
-class ScheduleSetting(Base):
+class PlannerScheduleSetting(Base):
     __tablename__ = "planner_schedule_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -373,7 +373,7 @@ class ScheduleSetting(Base):
     meta: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # city, lat, lon, tz, method, madhab
 
 
-class ScheduleBlock(Base):
+class PlannerScheduleBlock(Base):
     __tablename__ = "planner_schedule_blocks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -790,7 +790,7 @@ from datetime import date
 import pytest
 from sqlalchemy import func, select
 
-from app.models.planner import Goal, LogEntry, NotebookEntry, PipelineItem, QuarterStream, ScheduleBlock, Task, WeekObjective
+from app.models.planner import Goal, LogEntry, NotebookEntry, PipelineItem, QuarterStream, PlannerScheduleBlock, Task, WeekObjective
 from app.models.vault import VaultBlockVote, VaultDay
 from app.services.vault_import import import_vault
 from tests.conftest import TestSession
@@ -831,10 +831,10 @@ async def test_import_twice_does_not_duplicate(tmp_path):
         first = await import_vault(db, 1, tmp_path, TODAY)
         second = await import_vault(db, 1, tmp_path, TODAY)
         assert first.counts == second.counts
-        for model in (Task, LogEntry, PipelineItem, NotebookEntry, QuarterStream, ScheduleBlock, VaultDay):
+        for model in (Task, LogEntry, PipelineItem, NotebookEntry, QuarterStream, PlannerScheduleBlock, VaultDay):
             assert await _count(db, model, 1) == first.counts[{
                 Task: "tasks", LogEntry: "log_entries", PipelineItem: "pipeline_items", NotebookEntry: "notebook_entries",
-                QuarterStream: "quarter_streams", ScheduleBlock: "schedule_blocks", VaultDay: "days"}[model]]
+                QuarterStream: "quarter_streams", PlannerScheduleBlock: "schedule_blocks", VaultDay: "days"}[model]]
         votes = (await db.execute(select(func.count()).select_from(VaultBlockVote))).scalar_one()
         assert votes == 4  # two days, two voted blocks each; the first import's votes were removed
 
@@ -878,7 +878,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, Quarter, QuarterStream, ScheduleBlock, ScheduleSetting, Task,
+    Goal, LogEntry, NotebookEntry, PipelineItem, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
     WeekObjective,
 )
 from app.models.vault import VaultBlockVote, VaultDay
@@ -900,7 +900,7 @@ _QUARTER = re.compile(r"^\d{4}-Q[1-4]$")
 _WEEK = re.compile(r"^\d{4}-W\d{2}$")
 
 USER_TABLES = (Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem, NotebookEntry,
-               ScheduleSetting, ScheduleBlock)
+               PlannerScheduleSetting, PlannerScheduleBlock)
 
 
 @dataclass
@@ -1052,16 +1052,16 @@ def _notebooks(root: Path, user_id: int, report: ImportReport) -> list[NotebookE
     return rows
 
 
-def _schedule(root: Path, user_id: int, report: ImportReport) -> tuple[list[ScheduleSetting], list[ScheduleBlock]]:
+def _schedule(root: Path, user_id: int, report: ImportReport) -> tuple[list[PlannerScheduleSetting], list[PlannerScheduleBlock]]:
     note = root / "Calendar" / "Schedule.md"
     if not note.is_file():
         return [], []
     parsed = parse_schedule(note.read_text(encoding="utf-8"))
     report.errors += [f"Schedule.md: {e}" for e in parsed.errors]
     meta = json.loads(json.dumps(parsed.meta, default=str))
-    blocks = [ScheduleBlock(user_id=user_id, day_type=day, block=b.block, start=b.start, end=b.end, what=b.what, position=n)
+    blocks = [PlannerScheduleBlock(user_id=user_id, day_type=day, block=b.block, start=b.start, end=b.end, what=b.what, position=n)
               for day, listed in parsed.days.items() for n, b in enumerate(listed)]
-    return [ScheduleSetting(user_id=user_id, meta=meta)], blocks
+    return [PlannerScheduleSetting(user_id=user_id, meta=meta)], blocks
 
 
 async def _wipe(db: AsyncSession, user_id: int) -> None:
@@ -1408,7 +1408,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, Quarter, QuarterStream, ScheduleBlock, ScheduleSetting, Task,
+    Goal, LogEntry, NotebookEntry, PipelineItem, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
     WeekObjective,
 )
 from app.services.vault_goals import MAX_GOALS
@@ -1509,10 +1509,10 @@ async def notebook_entries(db: AsyncSession, user_id: int) -> dict[str, list[dic
 
 
 async def schedule(db: AsyncSession, user_id: int) -> dict | None:
-    setting = (await db.execute(select(ScheduleSetting).where(ScheduleSetting.user_id == user_id))).scalar_one_or_none()
+    setting = (await db.execute(select(PlannerScheduleSetting).where(PlannerScheduleSetting.user_id == user_id))).scalar_one_or_none()
     if setting is None:
         return None
-    rows = await _all(db, select(ScheduleBlock).where(ScheduleBlock.user_id == user_id).order_by(ScheduleBlock.position))
+    rows = await _all(db, select(PlannerScheduleBlock).where(PlannerScheduleBlock.user_id == user_id).order_by(PlannerScheduleBlock.position))
     days: dict[str, list[dict]] = {}
     for r in rows:
         days.setdefault(r.day_type, []).append({"block": r.block, "start": r.start, "end": r.end, "what": r.what})

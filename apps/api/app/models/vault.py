@@ -9,9 +9,12 @@ from app.core.database import Base
 
 class VaultDay(Base):
     __tablename__ = "vault_days"
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_vault_days_user_date"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    date: Mapped[dt.date] = mapped_column(Date, unique=True, nullable=False, index=True)
+    # NULL = a row synced from the vault checkout (STORAGE_BACKEND=vault); set = a row owned by that user (db mode).
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    date: Mapped[dt.date] = mapped_column(Date, nullable=False, index=True)
     mode: Mapped[str] = mapped_column(String(20), nullable=False)
     possible: Mapped[int] = mapped_column(Integer, nullable=False)
     total: Mapped[int] = mapped_column(Integer, nullable=False)
