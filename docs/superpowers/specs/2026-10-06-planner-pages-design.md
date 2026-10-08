@@ -89,3 +89,7 @@ Clock: 24h ring, current block thicker, past blocks faded, block names on slices
 ### Phases
 
 1. Overview (this release). 2. Plan page. 3. Nav to four items and redirects from the old routes, including the Google return link. 4. Phone layout, keyboard, polish.
+
+### Phase 2 shipped: the Plan page (`/plan`)
+
+Header: Super Objective (editable, Arabic line), quarter ring, and the week's seven days with the block that owns OT (Kahf, Alisha Noor on Fri and Sat). Under it a collapsible block rail (state kept in `localStorage`, a chip row on phones) and the selected block's workspace: goal with month checkpoints, the small domino (tick, rewrite, or pick from the pipeline), open-blocker bar, the pipeline (Now, Next, Someday, add items with descriptions, done list) and the notebook, side by side on wide screens. `?stream=<id>` selects a block. The pipeline board is now a shared component (`pipeline-board.tsx`) used by both `/plan` and `/pipelines`; the Backlog lane is labelled Someday in the UI only. The old Quarter, Week and Pipelines pages remain until phase 3.

@@ -8,7 +8,7 @@ import { vaultApi } from "@/lib/vault-api";
 import { NotebookEntryData, NotebookKind } from "@/lib/vault-types";
 
 export const KINDS: { id: NotebookKind; label: string; icon: LucideIcon; hint: string }[] = [
-  { id: "idea", label: "Idea", icon: Lightbulb, hint: "Thinking, a link, a rough plan. One line is fine; promote it to the backlog when it earns a slot." },
+  { id: "idea", label: "Idea", icon: Lightbulb, hint: "Thinking, a link, a rough plan. One line is fine; promote it to Someday when it earns a slot." },
   { id: "meeting", label: "Meeting", icon: Users, hint: "Who, what was agreed, then actions as '- [ ] text'." },
   { id: "blocker", label: "Blocker", icon: OctagonAlert, hint: "What you wait on and who owns it. Tick it when cleared." },
 ];
@@ -30,12 +30,14 @@ interface Props {
   meta: StreamMeta;
   entries: NotebookEntryData[];
   busy: boolean;
-  run: (action: () => Promise<unknown>) => Promise<void>;
+  run: (action: () => Promise<unknown>) => Promise<unknown>;
+  /** One column: the blockers and links panels go under the feed. For a narrow workspace. */
+  compact?: boolean;
   /** Start on this filter, e.g. "blocker" when arriving from the blocker bar. */
   initialFilter?: NotebookKind | "all";
 }
 
-export function Notebook({ meta, entries, busy, run, initialFilter = "all" }: Props) {
+export function Notebook({ meta, entries, busy, run, initialFilter = "all", compact }: Props) {
   const stream = meta.id;
   const [kind, setKind] = useState<NotebookKind>("idea");
   const [title, setTitle] = useState("");
@@ -57,7 +59,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all" }: Pr
 
   const field = "w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2.5 text-sm placeholder:text-[var(--muted-foreground)]";
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <div className={compact ? "grid gap-4" : "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]"}>
       <div className="grid min-w-0 gap-3">
         <form className="grid gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-4"
           onSubmit={(e) => { e.preventDefault(); void add(); }}>
@@ -100,7 +102,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all" }: Pr
         </ul>
       </div>
 
-      <aside className="grid gap-3 lg:sticky lg:top-4">
+      <aside className={compact ? "grid gap-3" : "grid gap-3 lg:sticky lg:top-4"}>
         <section aria-label="Blockers" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 sm:p-4">
           <SectionTitle title="Blockers" />
           {blockers.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">Nothing is holding this block.</p>}
@@ -180,7 +182,7 @@ function Entry({ entry, meta, busy, onSave, onRemove, onPromote }: {
         <div>
           <button type="button" disabled={busy || promoted} onClick={() => { onPromote(); setPromoted(true); }}
             className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 text-xs font-bold hover:bg-[var(--muted)] disabled:opacity-60">
-            {promoted && <Check size={13} aria-hidden="true" />}{promoted ? "In backlog" : "Promote to backlog"}
+            {promoted && <Check size={13} aria-hidden="true" />}{promoted ? "In Someday" : "Promote to Someday"}
           </button>
         </div>
       )}

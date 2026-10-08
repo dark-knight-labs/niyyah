@@ -11,6 +11,7 @@ import {
   Clock,
   CalendarDays,
   Layers3,
+  ListChecks,
   Target,
   Settings,
   LogOut,
@@ -25,6 +26,7 @@ const PUBLIC_PATHS = ["/routine"];
 
 const nav = [
   { href: "/routine", label: "Overview", icon: Clock },
+  { href: "/plan", label: "Plan", icon: ListChecks },
   { href: "/week", label: "Week", icon: CalendarDays },
   { href: "/quarter", label: "Quarter", icon: Target },
   { href: "/pipelines", label: "Pipelines", icon: Layers3 },
