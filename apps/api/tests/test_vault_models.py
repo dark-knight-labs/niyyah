@@ -33,17 +33,17 @@ async def test_vault_day_and_block_vote_roundtrip():
 
 
 @pytest.mark.asyncio
-async def test_vault_day_date_is_unique():
+async def test_vault_day_date_is_unique_per_user():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     async with Session() as session:
-        session.add(VaultDay(date=date(2026, 8, 23), mode="full", possible=21, total=0))
+        session.add(VaultDay(user_id=1, date=date(2026, 8, 23), mode="full", possible=21, total=0))
         await session.commit()
 
-        session.add(VaultDay(date=date(2026, 8, 23), mode="full", possible=21, total=5))
+        session.add(VaultDay(user_id=1, date=date(2026, 8, 23), mode="full", possible=21, total=5))
         with pytest.raises(IntegrityError):
             await session.commit()
 

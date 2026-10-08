@@ -77,13 +77,13 @@ from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault, vault_status
 from app.services.vault_goals import GOALS_PATH, parse_goals
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
-from app.services import vault_notebook, vault_pipeline
+from app.services import planner_store, vault_notebook, vault_pipeline
 from app.services.vault_notebook import notebook_path, parse_notebook
 from app.services.vault_pipeline import NOW_LIMIT, STALE_DAYS, parse_pipeline, pipeline_path
 from app.services.vault_quarter import (
-    add_stream, load_streams, parse_quarter, quarter_for, quarter_months, quarter_path, set_super_objective, update_stream,
+    add_stream, load_streams, parse_quarter, quarter_for, quarter_path, set_super_objective, update_stream,
 )
-from app.services.vault_streams import COLORS, ICONS, MONTHS
+from app.services.vault_views import notebooks_response, objectives_response, pipelines_response, quarter_response
 from app.services.vault_tasks import add_task, find_tasks, remove_task, set_task_done, set_task_text, task_file
 from app.services.vault_write import (
     add_log_note,
@@ -108,26 +108,29 @@ def _day_to_response(day: VaultDay) -> VaultDayResponse:
     )
 
 
-async def _get_day(db: AsyncSession, target_date: date) -> VaultDay | None:
-    result = await db.execute(
-        select(VaultDay).where(VaultDay.date == target_date).options(selectinload(VaultDay.block_votes))
-    )
+def _owned(stmt, user: User | None):
+    """Rows of this user in db mode; the legacy checkout rows (user_id NULL) otherwise."""
+    if user is not None and _db_mode():
+        return stmt.where(VaultDay.user_id == user.id)
+    return stmt.where(VaultDay.user_id.is_(None))
+
+
+async def _get_day(db: AsyncSession, target_date: date, user: User | None = None) -> VaultDay | None:
+    result = await db.execute(_owned(
+        select(VaultDay).where(VaultDay.date == target_date).options(selectinload(VaultDay.block_votes)), user))
     return result.scalar_one_or_none()
 
 
-async def _get_days_range(db: AsyncSession, start: date, end: date) -> list[VaultDay]:
-    result = await db.execute(
-        select(VaultDay)
-        .where(VaultDay.date >= start, VaultDay.date <= end)
-        .options(selectinload(VaultDay.block_votes))
-        .order_by(VaultDay.date)
-    )
+async def _get_days_range(db: AsyncSession, start: date, end: date, user: User | None = None) -> list[VaultDay]:
+    result = await db.execute(_owned(
+        select(VaultDay).where(VaultDay.date >= start, VaultDay.date <= end)
+        .options(selectinload(VaultDay.block_votes)).order_by(VaultDay.date), user))
     return list(result.scalars().all())
 
 
 @router.get("/today", response_model=VaultDayResponse)
 async def get_today(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    day = await _get_day(db, date.today())
+    day = await _get_day(db, date.today(), user)
     if day is None:
         raise HTTPException(status_code=404, detail="No vault data synced for today")
     return _day_to_response(day)
@@ -137,7 +140,7 @@ async def get_today(user: User = Depends(get_current_user), db: AsyncSession = D
 async def get_week(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     end = date.today()
     start = end - timedelta(days=6)
-    responses = [_day_to_response(d) for d in await _get_days_range(db, start, end)]
+    responses = [_day_to_response(d) for d in await _get_days_range(db, start, end, user)]
 
     totals: dict[str, int] = {}
     for r in responses:
@@ -163,7 +166,7 @@ async def get_month(month: str, user: User = Depends(get_current_user), db: Asyn
         raise HTTPException(status_code=400, detail="month must be YYYY-MM")
     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1) - timedelta(days=1)
 
-    responses = [_day_to_response(d) for d in await _get_days_range(db, start, end)]
+    responses = [_day_to_response(d) for d in await _get_days_range(db, start, end, user)]
 
     totals: dict[str, int] = {}
     modes: dict[str, int] = {}
@@ -187,7 +190,7 @@ async def get_blocks(
 ):
     end = date.today()
     start = end - timedelta(days=days - 1)
-    day_rows = await _get_days_range(db, start, end)
+    day_rows = await _get_days_range(db, start, end, user)
 
     # Every block gets one entry per day in [start, end], using None where
     # that block has no vote at all that day. A block present on only some
@@ -214,9 +217,8 @@ async def get_blocks(
 
 @router.get("/streaks", response_model=VaultStreaksResponse)
 async def get_streaks(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(VaultDay).options(selectinload(VaultDay.block_votes)).order_by(VaultDay.date.asc())
-    )
+    result = await db.execute(_owned(
+        select(VaultDay).options(selectinload(VaultDay.block_votes)).order_by(VaultDay.date.asc()), user))
     day_rows = list(result.scalars().all())
 
     running: dict[str, int] = {}
@@ -235,8 +237,15 @@ async def get_streaks(user: User = Depends(get_current_user), db: AsyncSession =
 
 
 @router.get("/schedule", response_model=VaultScheduleResponse)
-async def get_schedule():
-    # Public by design: the routine ring is a shareable page. Read-only, no user data.
+async def get_schedule(user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        if user is None:
+            raise HTTPException(status_code=401, detail="Sign in to see your schedule")
+        found = await planner_store.schedule(db, user.id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="No schedule yet")
+        return found
+    # Public by design in vault mode: the routine ring is a shareable page. Read-only, no user data.
     note = Path(settings.vault_workdir) / "Calendar" / "Schedule.md"
     if not note.exists():
         raise HTTPException(status_code=404, detail="Calendar/Schedule.md not found in vault checkout")
@@ -495,8 +504,10 @@ async def post_event(day: date, data: CalendarEventIn, user: User = Depends(requ
 
 
 @router.get("/day/{day}/tasks", response_model=list[TaskResponse])
-async def get_day_tasks(day: date, user: User = Depends(require_reader)):
-    """Tasks (Obsidian Tasks syntax) due or scheduled on `day`. Private note text, so owner only."""
+async def get_day_tasks(day: date, user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+    """Tasks due or scheduled on `day`. Private note text, so signed-in owners only."""
+    if _db_mode():
+        return await planner_store.day_tasks(db, user.id, day)
     root = Path(settings.vault_workdir)
     return await asyncio.to_thread(lambda: [asdict(t) for t in find_tasks(root, day.isoformat())])
 
@@ -541,9 +552,11 @@ async def post_task(day: date, data: TaskIn, user: User = Depends(require_editor
 
 
 @router.get("/day/{day}/log", response_model=list[LogEntryResponse])
-async def get_day_log(day: date, user: User = Depends(require_reader)):
-    """Entries under the day's '## Log'. Private note text, so owner only."""
+async def get_day_log(day: date, user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+    """Entries under the day's '## Log'. Private note text, so signed-in owners only."""
     _check_day(day)
+    if _db_mode():
+        return await planner_store.day_log(db, user.id, day)
     note = Path(settings.vault_workdir) / "Calendar" / "Daily" / f"{day.isoformat()}.md"
     if not note.is_file():
         return []
@@ -573,10 +586,6 @@ def _streams(today: date):
     return load_streams(_read(quarter_path(quarter_for(today))))
 
 
-def _info(s) -> dict:
-    return {"stream": s.id, "name": s.name, "color": s.color, "icon": s.icon, "slot": s.slot, "weekly": s.weekly, "status": s.status}
-
-
 def _write_error(exc: Exception) -> HTTPException:
     if isinstance(exc, VaultWriteError):
         return HTTPException(status_code=502, detail=str(exc))
@@ -584,17 +593,19 @@ def _write_error(exc: Exception) -> HTTPException:
 
 
 def _objectives_response(today: date) -> ObjectivesResponse:
-    start, end, label = week_for(today)
     streams = _streams(today)
-    by_id = {s.id: s for s in streams}
-    items = [{**i, "name": by_id[i["stream"]].name, "color": by_id[i["stream"]].color, "icon": by_id[i["stream"]].icon}
-             for i in parse_objectives(_read(objectives_path(label)), streams)]
-    return ObjectivesResponse(week=label, period=f"{start.isoformat()}/{end.isoformat()}", items=items)
+    parsed = parse_objectives(_read(objectives_path(week_for(today)[2])), streams)
+    return objectives_response(parsed, streams, today)
 
 
 @router.get("/objectives", response_model=ObjectivesResponse)
-async def get_objectives(user: User = Depends(require_reader)):
-    return await asyncio.to_thread(_objectives_response, _local_now().date())
+async def get_objectives(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    if _db_mode():
+        streams = await planner_store.streams_for(db, user.id, today)
+        parsed = await planner_store.week_objectives(db, user.id, week_for(today)[2], streams)
+        return objectives_response(parsed, streams, today)
+    return await asyncio.to_thread(_objectives_response, today)
 
 
 @router.put("/objectives", response_model=ObjectivesResponse)
@@ -621,8 +632,10 @@ async def put_objective(data: ObjectiveIn, user: User = Depends(require_editor))
 
 
 @router.get("/goals", response_model=GoalsResponse)
-async def get_goals(user: User = Depends(require_reader)):
-    """Goal cards for the Overview header, read from Calendar/Goals.md (edited in Obsidian)."""
+async def get_goals(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+    """Goal cards for the Overview header, read from Calendar/Goals.md (edited in Obsidian) or the database."""
+    if _db_mode():
+        return GoalsResponse(items=await planner_store.goals(db, user.id))
     return GoalsResponse(items=parse_goals(await asyncio.to_thread(_read, GOALS_PATH)))
 
 
@@ -631,28 +644,20 @@ def _quarter_response(today: date) -> QuarterResponse:
     content = _read(quarter_path(label))
     if content is None:
         raise HTTPException(status_code=404, detail=f"{quarter_path(label)} is not in the synced vault yet")
-    data = parse_quarter(content)
-    year, number = int(label[:4]), int(label[-1])
-    first = date(year, 3 * number - 2, 1)
-    try:
-        start = date.fromisoformat(data["starts"]) if data["starts"] else first
-        end = date.fromisoformat(data["ends"]) if data["ends"] else first + timedelta(days=90)
-    except ValueError:
-        start, end = first, first + timedelta(days=90)
-    streams = [{**_info(s["info"]), "goal": s["goal"], "checkpoints": s["checkpoints"]} for s in data["streams"]]
-    return QuarterResponse(
-        quarter=data["quarter"] or label, starts=start.isoformat(), ends=end.isoformat(),
-        objective=data["objective"], objective_ar=data["objective_ar"],
-        week_of_quarter=max(1, (today - start).days // 7 + 1), weeks_in_quarter=((end - start).days + 7) // 7,
-        current_month=MONTHS[today.month - 1], months=quarter_months(label), colors=list(COLORS), icons=list(ICONS),
-        streams=streams,
-    )
+    return quarter_response(parse_quarter(content), label, today)
 
 
 @router.get("/quarter", response_model=QuarterResponse)
-async def get_quarter(user: User = Depends(require_reader)):
-    """This quarter's objective, goals and month checkpoints. Private plans, so owner only."""
-    return await asyncio.to_thread(_quarter_response, _local_now().date())
+async def get_quarter(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+    """This quarter's objective, goals and month checkpoints. Private plans, so signed-in owners only."""
+    today = _local_now().date()
+    if _db_mode():
+        label = quarter_for(today)
+        data = await planner_store.quarter_data(db, user.id, label)
+        if data is None:
+            raise HTTPException(status_code=404, detail=f"No plan for {label} yet")
+        return quarter_response(data, label, today)
+    return await asyncio.to_thread(_quarter_response, today)
 
 
 async def _save_quarter(edit, message: str) -> QuarterResponse:
@@ -696,18 +701,18 @@ async def post_stream(data: StreamAddIn, user: User = Depends(require_editor)):
 
 
 def _pipelines_response(today: date) -> PipelinesResponse:
-    streams = []
-    for s in _streams(today):
-        if not s.goal or s.archived:
-            continue
-        path = pipeline_path(s.id)
-        streams.append({**_info(s), "path": path, "items": parse_pipeline(_read(path), today)})
-    return PipelinesResponse(week=week_for(today)[2], now_limit=NOW_LIMIT, stale_days=STALE_DAYS, streams=streams)
+    streams = _streams(today)
+    items = {s.id: parse_pipeline(_read(pipeline_path(s.id)), today) for s in streams if s.goal and not s.archived}
+    return pipelines_response(streams, items, today)
 
 
 @router.get("/pipelines", response_model=PipelinesResponse)
-async def get_pipelines(user: User = Depends(require_reader)):
-    return await asyncio.to_thread(_pipelines_response, _local_now().date())
+async def get_pipelines(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    if _db_mode():
+        streams = await planner_store.streams_for(db, user.id, today)
+        return pipelines_response(streams, await planner_store.pipeline_items(db, user.id, today), today)
+    return await asyncio.to_thread(_pipelines_response, today)
 
 
 async def _save_pipeline(stream: str, edit, message: str) -> EditResponse:
@@ -822,18 +827,18 @@ async def post_pipeline_remove(data: PipelineRefIn, user: User = Depends(require
 # --- stream notebooks: ideas, meetings, blockers (owner only) ---------------------------------
 
 def _notebooks_response(today: date) -> NotebooksResponse:
-    streams = []
-    for s in _streams(today):
-        if not s.goal or s.archived:
-            continue
-        path = notebook_path(s.id)
-        streams.append({**_info(s), "path": path, "entries": parse_notebook(_read(path))})
-    return NotebooksResponse(streams=streams)
+    streams = _streams(today)
+    entries = {s.id: parse_notebook(_read(notebook_path(s.id))) for s in streams if s.goal and not s.archived}
+    return notebooks_response(streams, entries)
 
 
 @router.get("/notebooks", response_model=NotebooksResponse)
-async def get_notebooks(user: User = Depends(require_reader)):
-    return await asyncio.to_thread(_notebooks_response, _local_now().date())
+async def get_notebooks(user: User = Depends(require_reader), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    if _db_mode():
+        streams = await planner_store.streams_for(db, user.id, today)
+        return notebooks_response(streams, await planner_store.notebook_entries(db, user.id))
+    return await asyncio.to_thread(_notebooks_response, today)
 
 
 async def _save_notebook(stream: str, edit, message: str) -> EditResponse:
