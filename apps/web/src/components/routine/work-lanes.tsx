@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Checkbox } from "@/components/routine/checkbox";
+import { ItemDetail } from "@/components/routine/item-detail";
 import { Section } from "@/components/routine/section";
 import { StreamMeta, toMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
@@ -31,9 +32,10 @@ interface ItemProps {
   week: string;
   busy: boolean;
   onMove: (r: Row, to: Lane) => Promise<void>;
+  onOpen: (r: Row) => void;
 }
 
-function Item({ r, to, toLabel, tick, week, busy, onMove }: ItemProps) {
+function Item({ r, to, toLabel, tick, week, busy, onMove, onOpen }: ItemProps) {
   return (
     <li className="group flex min-h-8 items-center gap-1.5 rounded-md px-1 hover:bg-[var(--muted)]">
       {tick ? (
@@ -41,7 +43,7 @@ function Item({ r, to, toLabel, tick, week, busy, onMove }: ItemProps) {
       ) : (
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.meta.color }} aria-hidden="true" />
       )}
-      <span className="min-w-0 flex-1 break-words text-[0.8125rem] leading-snug">{r.item.text}</span>
+      <button type="button" onClick={() => onOpen(r)} className="min-h-8 min-w-0 flex-1 break-words text-left text-[0.8125rem] leading-snug" aria-haspopup="dialog">{r.item.text}</button>
       {r.item.product && <span className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">{r.item.product}</span>}
       {r.item.focus === week && <span className="text-[0.6875rem] font-bold" style={{ color: r.meta.color }} title="This week's focus">★</span>}
       {r.blocked && <span className="text-[0.625rem] font-bold uppercase text-[var(--destructive)]">blocked</span>}
@@ -60,6 +62,7 @@ const TD = "border-t border-[var(--border)] px-2.5 py-1.5 align-top";
 export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState<Row | null>(null);
   const [allSomeday, setAllSomeday] = useState(false);
   /** Per block, the product its items are narrowed to (blocks without products never have one). */
   const [product, setProduct] = useState<Record<string, string | null>>({});
@@ -101,7 +104,7 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
   const dash = <span className="text-[var(--border)]" aria-label="empty">·</span>;
   const cell = (rows: Row[], to: Lane, toLabel: string, tick?: boolean) =>
     rows.length === 0 ? dash : (
-      <ul>{rows.map((r) => <Item key={`${r.stream}:${r.item.line}`} r={r} week={data.week} busy={busy} onMove={move} to={to} toLabel={toLabel} tick={tick} />)}</ul>
+      <ul>{rows.map((r) => <Item key={`${r.stream}:${r.item.line}`} r={r} week={data.week} busy={busy} onMove={move} onOpen={setOpen} to={to} toLabel={toLabel} tick={tick} />)}</ul>
     );
 
   return (
@@ -150,6 +153,7 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
           </tbody>
         </table>
       </div>
+      {open && <WorkDetail r={open} week={data.week} busy={busy} onMove={async (to) => { await move(open, to); setOpen(null); }} onClose={() => setOpen(null)} />}
       {count("backlog") > 0 && (
         <button type="button" onClick={() => setAllSomeday((v) => !v)} aria-expanded={allSomeday}
           className="mt-1 min-h-9 text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
@@ -157,5 +161,31 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
         </button>
       )}
     </Section>
+  );
+}
+
+const LANE_LABEL: Record<Lane, string> = { now: "Now", next: "Next", backlog: "Someday", done: "Done" };
+
+function WorkDetail({ r, week, busy, onMove, onClose }: { r: Row; week: string; busy: boolean; onMove: (to: Lane) => Promise<void>; onClose: () => void }) {
+  const { item } = r;
+  const btn = "min-h-9 rounded-lg px-3 text-xs font-semibold disabled:opacity-50";
+  const fields = [
+    { label: "Status", value: LANE_LABEL[item.lane] },
+    ...(item.product ? [{ label: "Product", value: item.product }] : []),
+    ...(item.focus === week ? [{ label: "Focus", value: "This week's small domino" }] : []),
+    ...(r.blocked ? [{ label: "Blocked", value: <span className="text-[var(--destructive)]">waiting on {item.blocked_by.join(", ")}</span> }] : []),
+    ...(item.checkpoint ? [{ label: "Checkpoint", value: item.checkpoint.toUpperCase() }] : []),
+    ...(item.added ? [{ label: "Added", value: `${item.added} · ${item.age_days}d ago${item.stale ? " · stale" : ""}` }] : []),
+    ...(item.done_on ? [{ label: "Done on", value: item.done_on }] : []),
+  ];
+  const actions = item.lane === "done" ? null : (
+    <>
+      {item.lane !== "now" && <button type="button" disabled={busy} onClick={() => void onMove("now")} className={`${btn} border border-[var(--border)] hover:bg-[var(--muted)]`}>→ Now</button>}
+      {item.lane === "now" && <button type="button" disabled={busy} onClick={() => void onMove("next")} className={`${btn} border border-[var(--border)] hover:bg-[var(--muted)]`}>→ Next</button>}
+      <button type="button" disabled={busy} onClick={() => void onMove("done")} className={`${btn} bg-[var(--accent)] text-[var(--accent-fg)]`}>Mark done</button>
+    </>
+  );
+  return (
+    <ItemDetail title={item.text} eyebrow={<span style={{ color: r.meta.color }}>{r.meta.label}</span>} fields={fields} description={item.description} actions={actions} onClose={onClose} />
   );
 }
