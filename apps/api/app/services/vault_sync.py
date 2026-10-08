@@ -24,6 +24,26 @@ def _run_git(args: list[str], cwd: str | None = None) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True, timeout=60)
 
 
+def vault_status(workdir: str) -> dict:
+    """What the checkout looks like right now: {head, head_at, pulled_at}, all None when there is no checkout.
+
+    Read from the volume the API pods share, so every pod answers the same: `head` is the short commit id,
+    `head_at` its commit time, `pulled_at` when the remote was last contacted (git rewrites FETCH_HEAD on every pull).
+    """
+    path = Path(workdir)
+    empty = {"head": None, "head_at": None, "pulled_at": None}
+    if not (path / ".git").exists():
+        return empty
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%h %cI"], cwd=workdir, check=True, capture_output=True, text=True, timeout=10).stdout
+        head, head_at = out.strip().split(" ", 1)
+    except (subprocess.SubprocessError, ValueError):
+        return empty
+    fetched = path / ".git" / "FETCH_HEAD"
+    pulled = datetime.fromtimestamp(fetched.stat().st_mtime, tz=timezone.utc).isoformat() if fetched.exists() else None
+    return {"head": head, "head_at": head_at, "pulled_at": pulled}
+
+
 def _ensure_repo(workdir: str) -> None:
     path = Path(workdir)
     with vault_lock(path):

@@ -35,7 +35,7 @@ interface ItemProps {
 
 function Item({ r, to, toLabel, tick, week, busy, onMove }: ItemProps) {
   return (
-    <li className="group flex min-h-9 items-center gap-1.5 rounded-md px-1 hover:bg-[var(--muted)]">
+    <li className="group flex min-h-8 items-center gap-1.5 rounded-md px-1 hover:bg-[var(--muted)]">
       {tick ? (
         <Checkbox checked={false} disabled={busy} label={`Done: ${r.item.text}`} onChange={() => void onMove(r, "done")} />
       ) : (
@@ -53,8 +53,8 @@ function Item({ r, to, toLabel, tick, week, busy, onMove }: ItemProps) {
   );
 }
 
-const TH = "px-2.5 py-2 text-left text-[10px] font-extrabold uppercase tracking-[0.09em] text-[var(--muted-foreground)]";
-const TD = "border-t border-[var(--border)] px-2.5 py-2 align-top";
+const TH = "px-2.5 py-1.5 text-left text-[10px] font-extrabold uppercase tracking-[0.09em] text-[var(--muted-foreground)]";
+const TD = "border-t border-[var(--border)] px-2.5 py-1.5 align-top";
 
 /** Now, Next and Someday for every block, one table row per block. Someday is the pipeline's Backlog lane under another name. */
 export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
@@ -106,7 +106,7 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
 
   return (
     <Section title="Work" aside={otLabel ? `by block · ${otLabel} has OT today` : "by block"} error={error}>
-      <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+      <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
         <table className="w-full min-w-[760px] table-fixed border-collapse">
           <thead>
             <tr>

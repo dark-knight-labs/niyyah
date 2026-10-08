@@ -7,7 +7,7 @@ import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, VaultEventsData } from "@/lib/vault-types";
 import { Section } from "@/components/routine/section";
 
-const INPUT = "min-h-11 min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm placeholder:text-[var(--muted-foreground)]";
+const INPUT = "min-h-9 min-w-0 rounded-[6px] border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm placeholder:text-[var(--muted-foreground)]";
 
 /** The next half hour as HH:MM, for the new event's default start (capped so +1h stays on the same day). */
 function nextHalfHour(): string {
@@ -48,14 +48,14 @@ function AddEventForm({ day, onChanged }: { day: string; onChanged: () => void }
   }
 
   return (
-    <form onSubmit={submit} className="mt-2.5 space-y-2">
+    <form onSubmit={submit} className="mt-1.5 space-y-1.5">
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New event" maxLength={200} aria-label="Event title" className={`${INPUT} w-full`} />
       <div className="flex gap-2">
         <input type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Start time" className={`${INPUT} flex-1`} />
         <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="End time" className={`${INPUT} flex-1`} />
       </div>
       <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (optional)" maxLength={200} aria-label="Location" className={`${INPUT} w-full`} />
-      <button type="submit" disabled={busy || !title.trim() || !start || !end} className="min-h-11 rounded-xl bg-[var(--accent)] px-4 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">Add event</button>
+      <button type="submit" disabled={busy || !title.trim() || !start || !end} className="min-h-9 rounded-[6px] bg-[var(--accent)] px-3.5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">Add event</button>
       {error && <p role="alert" className="text-xs text-[var(--destructive)]">{error}</p>}
     </form>
   );
@@ -101,7 +101,7 @@ export function CalendarCard({ day, data, status, onChanged }: { day: string | n
       ) : (
         <ul>
           {data.events.map((e, i) => (
-            <li key={`${e.calendar}-${e.title}-${i}`} className="flex gap-3 border-b border-[var(--border)] py-2.5 text-sm" style={{ borderLeft: `3px solid ${e.color ?? "var(--border)"}`, paddingLeft: 10 }}>
+            <li key={`${e.calendar}-${e.title}-${i}`} className="flex gap-3 border-b border-[var(--border)] py-1.5 text-[13px]" style={{ borderLeft: `3px solid ${e.color ?? "var(--border)"}`, paddingLeft: 10 }}>
               <span className="w-[104px] shrink-0 tabular-nums text-[var(--muted-foreground)]">
                 {e.all_day || e.start_min === null || e.end_min === null ? "All day" : `${formatMinutes(e.start_min)}–${formatMinutes(e.end_min)}`}
               </span>

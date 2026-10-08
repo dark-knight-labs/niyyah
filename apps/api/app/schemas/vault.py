@@ -60,6 +60,13 @@ class VaultScheduleResponse(BaseModel):
     errors: list[str]
 
 
+class VaultSyncStatus(BaseModel):
+    head: str | None  # short id of the commit the checkout is at; None when there is no checkout yet
+    head_at: str | None  # that commit's time (ISO 8601)
+    pulled_at: str | None  # when the vault remote was last contacted (ISO 8601)
+    days: int  # daily notes synced into the database
+
+
 class VaultSyncResponse(BaseModel):
     synced_days: int
     errors: list[str]

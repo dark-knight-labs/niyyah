@@ -257,3 +257,27 @@ async def test_db_write_failure_for_one_day_does_not_abort_whole_sync(tmp_path, 
 
     days = (await db_session.execute(VaultDay.__table__.select())).fetchall()
     assert {d.date for d in days} == {date(2026, 8, 20)}  # the broken day was rolled back, not half-written
+
+
+def test_vault_status_reports_head_and_last_pull(tmp_path):
+    from app.services.vault_sync import vault_status
+    assert vault_status(str(tmp_path / "nowhere")) == {"head": None, "head_at": None, "pulled_at": None}
+    repo = tmp_path / "vault"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    (repo / "a.md").write_text("x")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "seed"], check=True)
+    status = vault_status(str(repo))
+    assert len(status["head"]) >= 7 and status["head_at"] and status["pulled_at"] is None
+    (repo / ".git" / "FETCH_HEAD").write_text("")
+    assert vault_status(str(repo))["pulled_at"]
+
+
+@pytest.mark.asyncio
+async def test_sync_status_endpoint_counts_days(auth_client, monkeypatch):
+    from app.api.v1 import vault
+    monkeypatch.setattr(vault, "vault_status", lambda w: {"head": "abc1234", "head_at": "2026-10-08T10:00:00+06:00", "pulled_at": None})
+    resp = await auth_client.get("/api/v1/vault/sync/status")
+    assert resp.status_code == 200
+    assert resp.json() == {"head": "abc1234", "head_at": "2026-10-08T10:00:00+06:00", "pulled_at": None, "days": 0}

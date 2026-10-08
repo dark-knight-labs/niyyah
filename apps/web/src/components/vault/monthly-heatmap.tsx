@@ -26,15 +26,15 @@ export function MonthlyHeatmap({ month }: MonthlyHeatmapProps) {
   ];
 
   return (
-    <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
-      <div className="flex items-baseline justify-between mb-4">
-        <p className="heading-elegant text-base">Monthly Heatmap — {month.month}</p>
-        <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">habit tracker</p>
+    <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-3.5">
+      <div className="flex items-baseline justify-between mb-2.5">
+        <p className="heading-elegant text-sm">Monthly Heatmap — {month.month}</p>
+        <p className="text-xs text-[var(--muted-foreground)]">habit tracker</p>
       </div>
       {/* Fixed-width columns (not 1fr) — cells stay small habit-tracker
           squares instead of stretching to fill the card. Color is the mode's
           color everywhere on the page, not a separate percent-tier scale. */}
-      <div className="grid grid-cols-[repeat(7,1.75rem)] gap-1">
+      <div className="grid grid-cols-[repeat(7,1.5rem)] gap-0.5">
         {WEEKDAY_LABELS.map((w, i) => (
           <p key={`h-${i}`} className="text-center text-[9px] uppercase text-[var(--muted-foreground)] font-mono">
             {w}
@@ -45,7 +45,7 @@ export function MonthlyHeatmap({ month }: MonthlyHeatmapProps) {
             <div
               key={day.date}
               title={`${day.date}: ${day.total}/${day.possible} · ${day.mode}`}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-[8px] font-mono tabular-nums relative transition-transform duration-150 hover:scale-125 hover:z-10"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-[8px] font-mono tabular-nums relative transition-transform duration-150 hover:scale-125 hover:z-10"
               style={{
                 backgroundColor: resolveModeColor(day.mode),
                 color: "rgba(255,255,255,0.8)",
@@ -54,7 +54,7 @@ export function MonthlyHeatmap({ month }: MonthlyHeatmapProps) {
               {Number(day.date.slice(-2))}
             </div>
           ) : (
-            <div key={`blank-${i}`} className="w-7 h-7" />
+            <div key={`blank-${i}`} className="w-6 h-6" />
           )
         )}
       </div>

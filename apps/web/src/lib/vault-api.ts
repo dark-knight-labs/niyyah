@@ -9,6 +9,7 @@ import {
   VaultEventsData,
   VaultLogEntry,
   VaultGoalsData,
+  VaultSyncStatusData,
   VaultObjectivesData,
   Lane,
   MonthKey,
@@ -84,5 +85,6 @@ export const vaultApi = {
     api.put<VaultEditData>("/vault/notebook/blocker", { stream, line: entry.line, hash: entry.hash, open }),
   removeNotebookEntry: (stream: string, entry: NotebookEntryData) =>
     api.post<VaultEditData>("/vault/notebook/remove", { stream, line: entry.line, hash: entry.hash }),
+  syncStatus: () => api.get<VaultSyncStatusData>("/vault/sync/status"),
   sync: () => api.post<VaultSyncData>("/vault/sync", {}),
 };

@@ -8,6 +8,7 @@ import {
   VaultDayData,
   VaultMonthData,
   VaultStreaksData,
+  VaultSyncStatusData,
   VaultWeekData,
 } from "@/lib/vault-types";
 import { VaultHeader } from "@/components/vault/header";
@@ -28,6 +29,7 @@ export default function VaultPage() {
   const [month, setMonth] = useState<VaultMonthData | null>(null);
   const [blocks, setBlocks] = useState<VaultBlocksSeriesData | null>(null);
   const [streaks, setStreaks] = useState<VaultStreaksData | null>(null);
+  const [status, setStatus] = useState<VaultSyncStatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -55,13 +57,15 @@ export default function VaultPage() {
       fetchOrNull("month", vaultApi.month(currentMonth())),
       fetchOrNull("blocks", vaultApi.blocks(30)),
       fetchOrNull("streaks", vaultApi.streaks()),
+      fetchOrNull("sync status", vaultApi.syncStatus()),
     ])
-      .then(([t, w, m, b, s]) => {
+      .then(([t, w, m, b, s, st]) => {
         setToday(t);
         setWeek(w);
         setMonth(m);
         setBlocks(b);
         setStreaks(s);
+        setStatus(st);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -79,18 +83,22 @@ export default function VaultPage() {
   }
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-3">
       {fetchError && (
         <div className="border border-[var(--destructive)] bg-[var(--surface)] rounded-xl px-4 py-2 text-xs text-[var(--destructive)]">
           {fetchError}
         </div>
       )}
-      <VaultHeader today={today} onSynced={load} />
+      <VaultHeader today={today} status={status} onSynced={load} />
       <BlockCards today={today} />
-      <WeeklyPulse week={week} />
-      <MonthlyHeatmap month={month} />
-      <BlockTrends series={blocks} />
-      <FooterStats month={month} streaks={streaks} />
+      <div className="grid gap-3 xl:grid-cols-2 xl:items-start">
+        <WeeklyPulse week={week} />
+        <MonthlyHeatmap month={month} />
+      </div>
+      <div className="grid gap-3 xl:grid-cols-2 xl:items-start">
+        <BlockTrends series={blocks} />
+        <FooterStats stacked month={month} streaks={streaks} />
+      </div>
     </div>
   );
 }

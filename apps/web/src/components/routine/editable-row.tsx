@@ -31,14 +31,14 @@ export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, 
     }
   }
 
-  const icon = "grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
+  const icon = "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
 
   if (editing) {
     return (
-      <form className="flex min-h-12 items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) void run(() => onSave(draft.trim())); }}>
+      <form className="flex min-h-9 items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) void run(() => onSave(draft.trim())); }}>
         {lead}
         <input autoFocus value={draft} maxLength={maxLength} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
-          aria-label="Edit text" className="min-h-10 min-w-0 flex-1 rounded-lg border border-[var(--accent)] bg-[var(--background)] px-2.5 text-sm" />
+          aria-label="Edit text" className="min-h-8 min-w-0 flex-1 rounded-md border border-[var(--accent)] bg-[var(--background)] px-2.5 text-sm" />
         <button type="submit" disabled={busy || !draft.trim()} aria-label="Save" className={icon}><Check size={16} /></button>
         {onDelete && <button type="button" disabled={busy} aria-label="Delete" onClick={() => void run(onDelete)} className={`${icon} hover:!text-[var(--destructive)]`}><Trash2 size={16} /></button>}
       </form>
@@ -46,7 +46,7 @@ export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, 
   }
 
   return (
-    <div className="group flex min-h-12 items-center gap-2.5">
+    <div className="group flex min-h-9 items-center gap-2">
       {lead}
       <span className={`min-w-0 flex-1 break-words text-sm ${struck ? "text-[var(--muted-foreground)] line-through" : ""} ${text ? "" : "text-[var(--muted-foreground)]"}`}>{text || placeholder}</span>
       <button aria-label="Edit" onClick={() => { setDraft(text); setEditing(true); }} className={`${icon} opacity-60 group-hover:opacity-100`}><Pencil size={15} /></button>

@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
-/* Niyyah — light, white-minimalist theme.
+/* Niyyah — the "paper" theme: warm off-white surfaces, hairline borders, one teal accent.
    Everything is token-driven: change a value here and it propagates
    to every page (pages consume var(--*) + Tailwind color mapping). */
 :root {
   color-scheme: light;
 
-  --background: #ffffff;
-  --surface: #fafafa;
-  --foreground: #18181b;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --border: #ededed;
-  --accent: #1f8a5b;
-  --accent-fg: #ffffff;
-  --accent-light: #eaf6ef;
-  --destructive: #dc2626;
+  --background: #f5f4f0;
+  --surface: #fffefb;
+  --foreground: #1d2321;
+  --muted: #eceae2;
+  --muted-foreground: #6a726e;
+  --border: #e3e1d8;
+  --accent: #0f6b5c;
+  --accent-fg: #fffefb;
+  --accent-light: #dcefe9;
+  --destructive: #b4412f;
 
   --radius: 0.625rem;
   /* One colour per stream (a goal and its pipeline), used for rails, chips and icons. */
@@ -31,10 +31,11 @@
   --stream-indigo: #4f46e5;
   --stream-lime: #65a30d;
   --stream-sky: #0284c7;
-  --warn: #b45309;
-  --warn-light: #fdf1dc;
+  --warn: #a8741a;
+  --warn-light: #f5ead2;
 
-  --font-sans: "Manrope Variable", system-ui, -apple-system, sans-serif;
+  --font-sans: "Public Sans Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-hand: "Caveat", "Segoe Print", cursive;
   --font-serif: "Fraunces", Georgia, serif;
 }
@@ -42,15 +43,16 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --background: #0a0a0a;
-  --surface: #141414;
-  --foreground: #fafafa;
-  --muted: #1a1a1a;
-  --muted-foreground: #a1a1aa;
-  --border: #262626;
-  --accent: #7c3aed;
-  --accent-fg: #ffffff;
-  --accent-light: #241a35;
+  --background: #141917;
+  --surface: #1c2220;
+  --foreground: #e8ece9;
+  --muted: #252c29;
+  --muted-foreground: #8f9a95;
+  --border: #2d3532;
+  --accent: #5fc4ae;
+  --accent-fg: #10201c;
+  --accent-light: #1d3a34;
+  --destructive: #ee8a76;
   --stream-emerald: #34d399;
   --stream-amber: #fbbf24;
   --stream-violet: #a78bfa;
@@ -63,8 +65,8 @@
   --stream-indigo: #818cf8;
   --stream-lime: #a3e635;
   --stream-sky: #38bdf8;
-  --warn: #f0b35a;
-  --warn-light: #362a12;
+  --warn: #e0b15a;
+  --warn-light: #3a2f17;
 }
 
 @theme inline {
@@ -78,6 +80,7 @@
   --color-accent-light: var(--accent-light);
   --color-destructive: var(--destructive);
   --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
   --font-hand: var(--font-hand);
   --font-serif: var(--font-serif);
   --radius: var(--radius);
@@ -89,7 +92,6 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.011em;
 }
 
 :focus-visible {

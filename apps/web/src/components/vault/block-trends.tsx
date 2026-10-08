@@ -9,12 +9,12 @@ export function BlockTrends({ series }: BlockTrendsProps) {
   if (!series) return null;
 
   return (
-    <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
-      <div className="flex items-baseline justify-between mb-4">
-        <p className="heading-elegant text-base">Block Trends ({series.range}d)</p>
-        <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">the long view</p>
+    <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-3.5">
+      <div className="flex items-baseline justify-between mb-2.5">
+        <p className="heading-elegant text-sm">Block Trends ({series.range}d)</p>
+        <p className="text-xs text-[var(--muted-foreground)]">the long view</p>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1">
         {BLOCK_ORDER.map((block) => {
           const values = series.blocks[block] ?? [];
           if (values.every((v) => v === null)) return null; // e.g. legacy blocks in a post-merge range
@@ -25,7 +25,7 @@ export function BlockTrends({ series }: BlockTrendsProps) {
               <span className="text-xs w-24 shrink-0" style={{ color }}>
                 {BLOCK_LABELS[block]}
               </span>
-              <div className="chart-grid flex-1 flex items-end gap-px h-6 rounded-sm">
+              <div className="chart-grid flex-1 flex items-end gap-px h-5 rounded-sm">
                 {values.map((v, i) =>
                   v === null ? (
                     // No data for this day (block wasn't applicable) — a faint

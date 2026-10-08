@@ -39,7 +39,7 @@ export function DayHeader({ dateLabel, city, editDay, today, onSaved, children }
   return (
     <header className="mb-4 grid items-center gap-x-6 gap-y-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
       <div>
-        <h1 className="font-serif text-[26px] font-medium leading-tight">{dateLabel}</h1>
+        <h1 className="font-serif text-[24px] font-medium leading-tight">{dateLabel}</h1>
         {city && <p className="text-[13px] text-[var(--muted-foreground)]">{city}</p>}
       </div>
       {children ?? <div />}

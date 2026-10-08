@@ -79,6 +79,15 @@ export interface VaultObjective {
   checkpoint: MonthKey | null;
 }
 
+export interface VaultSyncStatusData {
+  /** Short id of the commit the vault checkout is at; null when there is no checkout yet. */
+  head: string | null;
+  head_at: string | null;
+  /** When the vault remote was last contacted. */
+  pulled_at: string | null;
+  days: number;
+}
+
 export interface VaultGoal {
   title: string;
   value: string;

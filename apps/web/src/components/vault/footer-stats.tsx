@@ -2,17 +2,19 @@ import { BLOCK_COLORS, BLOCK_LABELS, BLOCK_ORDER, resolveModeColor } from "@/lib
 import { VaultMonthData, VaultStreaksData } from "@/lib/vault-types";
 
 interface FooterStatsProps {
+  /** Put the two cards in one column (for a narrow slot). */
+  stacked?: boolean;
   month: VaultMonthData | null;
   streaks: VaultStreaksData | null;
 }
 
-export function FooterStats({ month, streaks }: FooterStatsProps) {
+export function FooterStats({ stacked, month, streaks }: FooterStatsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
-        <div className="flex items-baseline justify-between mb-3">
-          <p className="heading-elegant text-base">Mode Distribution</p>
-          <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">the month in modes</p>
+    <div className={`grid grid-cols-1 gap-3 ${stacked ? "" : "md:grid-cols-2"}`}>
+      <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-3.5">
+        <div className="flex items-baseline justify-between mb-2">
+          <p className="heading-elegant text-sm">Mode Distribution</p>
+          <p className="text-xs text-[var(--muted-foreground)]">the month in modes</p>
         </div>
         {month && month.days.length > 0 ? (
           <>
@@ -42,12 +44,12 @@ export function FooterStats({ month, streaks }: FooterStatsProps) {
         )}
       </div>
 
-      <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-5">
-        <div className="flex items-baseline justify-between mb-3">
-          <p className="heading-elegant text-base">Streaks</p>
-          <p className="font-hand text-lg leading-none text-[var(--muted-foreground)]">current / best</p>
+      <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-3.5">
+        <div className="flex items-baseline justify-between mb-2">
+          <p className="heading-elegant text-sm">Streaks</p>
+          <p className="text-xs text-[var(--muted-foreground)]">current / best</p>
         </div>
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {BLOCK_ORDER.map((block) => {
             const entry = streaks?.streaks[block];
             if (streaks && !entry) return null; // block never voted (e.g. legacy or merged)

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -65,6 +65,7 @@ from app.schemas.vault import (
     NotebooksResponse,
     VaultSyncResponse,
     VaultWeekResponse,
+    VaultSyncStatus,
     GoalsResponse,
 )
 from app.services.vault_parser import CANONICAL_BLOCKS
@@ -73,7 +74,7 @@ from app.services import google_calendar
 from app.services.google_calendar import GoogleCalendarError
 from app.services.vault_calendar import events_for_day
 from app.services.vault_git import Edit, VaultWriteError, commit_edits
-from app.services.vault_sync import sync_vault
+from app.services.vault_sync import sync_vault, vault_status
 from app.services.vault_goals import GOALS_PATH, parse_goals
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
 from app.services import vault_notebook, vault_pipeline
@@ -251,6 +252,14 @@ async def get_schedule():
 async def trigger_sync(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await sync_vault(db)
     return VaultSyncResponse(synced_days=result.synced_days, errors=result.errors)
+
+
+@router.get("/sync/status", response_model=VaultSyncStatus)
+async def sync_status(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Where the vault checkout is and how many days are in the database, for the Vault page's status line."""
+    state = await asyncio.to_thread(vault_status, settings.vault_workdir)
+    days = (await db.execute(select(func.count()).select_from(VaultDay))).scalar_one()
+    return VaultSyncStatus(**state, days=days)
 
 
 async def _sync_vault_in_background() -> None:
