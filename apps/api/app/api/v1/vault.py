@@ -349,14 +349,6 @@ async def _db_day_write(db: AsyncSession, work) -> EditResponse:
     return EditResponse(commit="db", day=_day_to_response(row) if row is not None else None)
 
 
-def require_editor(user: User = Depends(get_current_user)) -> User:
-    if _db_mode():
-        raise HTTPException(status_code=501, detail="Writes are not available with STORAGE_BACKEND=db yet")
-    if not _can_edit(user):
-        raise HTTPException(status_code=403, detail="Not allowed to edit the vault")
-    return user
-
-
 def _local_now() -> datetime:
     return datetime.now(ZoneInfo(settings.vault_tz))
 
@@ -397,7 +389,7 @@ async def _save(day: date, apply, message: str, db: AsyncSession) -> EditRespons
 
 @router.get("/edit-access", response_model=EditAccessResponse)
 async def edit_access(user: User = Depends(get_current_user)):
-    return EditAccessResponse(allowed=_can_edit(user))
+    return EditAccessResponse(allowed=_db_mode() or _can_edit(user))
 
 
 @router.put("/day/{day}/mode", response_model=EditResponse)

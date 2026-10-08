@@ -1,6 +1,6 @@
 # Niyyah: database storage instead of the Obsidian vault
 
-Date: 2026-10-08. Status: design approved by the owner. Phases 1 and 2 built on branch `feature/db-storage` (plan: `docs/superpowers/plans/2026-10-08-db-storage-phases-1-2.md`); phases 3 to 6 not started.
+Date: 2026-10-08. Status: design approved by the owner. Phases 1 to 3 built (plans: `docs/superpowers/plans/2026-10-08-db-storage-phases-1-2.md`, `2026-10-08-db-storage-phase-3.md`); phases 4 to 6 not started.
 
 ## Goal
 
@@ -96,8 +96,13 @@ Hosted-service features, live two-way vault sync, mobile apps, and any change to
 2. `blocked_by` is a JSON list of blocker ids on `planner_pipeline_items`, not an `item_blockers` table: a blocker's id is its notebook entry's `ext_id`, so a link table would hold the same strings with no useful foreign key.
 3. Config tables are `planner_schedule_settings` (one JSON `meta` row per user) and `planner_schedule_blocks`. The user-defined `blocks` table is deferred to phase 4.
 4. New tables are prefixed `planner_` (a `schedule_blocks` table already exists); the legacy `vault_days` rows keep `user_id NULL` and belong to `STORAGE_BACKEND=vault`.
-5. In `db` mode `line` carries the row id and `hash` is empty until phase 3 moves the frontend to ids. Vault-backed writes answer 501 in `db` mode.
+5. In `db` mode `line` carries the row id and `hash` is empty (log entries carry a content hash of their text). Phase 3 kept this addressing: the frontend sends `line` and `hash` back untouched, so it needed no change. Renaming `line` to `id` waits for phase 5, when the vault path is removed.
+6. Phase 3: every write is atomic per request (one commit, or a rollback and a 422 with the vault path's message). `planner_calendar_feeds` holds a user's iCal feeds (they came from the Day Planner plugin settings in the vault); there is no editor for them yet (phase 4). Tasks list in vault order (file path, then position).
 
 ## Phase 2 result on the owner's real vault (2026-10-08)
 
 Imported 85 days, 57 log entries, 15 dated tasks, 3 goals, 1 quarter (8 streams), 6 objectives, 40 pipeline items, 4 notebook entries and 11 schedule blocks with 0 errors. Tasks, log (for today), goals, objectives, quarter, pipelines, notebooks and schedule returned identical JSON from the vault path and the database path once `line` and `hash` were removed. Not yet compared: day aggregates (week, month, streaks), which are asserted against fixture values only, and tasks or log for days other than today.
+
+## Phase 3 result (2026-10-08)
+
+All planner writes work in `db` mode: day mode, votes, notes, tasks, log entries, pipeline items (eight operations, including the link between the week's small domino and its objective), objectives, the quarter (super objective, stream edit and add) and notebooks. A replay test runs 28 operations against a git-backed vault and against the imported database and compares every read afterwards (statuses and error messages included); it passes, and fails when a total is deliberately miscomputed. `alembic check` reports no drift between the models and the migrations.

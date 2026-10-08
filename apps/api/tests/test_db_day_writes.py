@@ -70,7 +70,7 @@ async def test_task_lifecycle(db_client):
     await client.put(f"{V}/tasks/text", json={"path": first["path"], "line": first["line"], "hash": "", "text": "  Pay   the invoice "})
     assert (await client.get(f"{V}/day/{today}/tasks")).json()[0]["text"] == "Pay the invoice"
     await client.post(f"{V}/day/{today}/tasks", json={"text": "Call the bank"})
-    assert [t["text"] for t in (await client.get(f"{V}/day/{today}/tasks")).json()] == ["Pay the invoice", "Renew domain", "Call the bank"]
+    assert [t["text"] for t in (await client.get(f"{V}/day/{today}/tasks")).json()] == ["Call the bank", "Pay the invoice", "Renew domain"]  # file path order, as in the vault
     gone = await client.post(f"{V}/tasks/remove", json={"path": first["path"], "line": first["line"], "hash": ""})
     assert gone.status_code == 200
     again = await client.post(f"{V}/tasks/remove", json={"path": first["path"], "line": first["line"], "hash": ""})
