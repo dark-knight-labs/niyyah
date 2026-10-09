@@ -17,7 +17,7 @@ def quarter_response(data: dict, label: str, today: date) -> QuarterResponse:
         end = date.fromisoformat(data["ends"]) if data["ends"] else first + timedelta(days=90)
     except ValueError:
         start, end = first, first + timedelta(days=90)
-    streams = [{**stream_info(s["info"]), "goal": s["goal"], "checkpoints": s["checkpoints"]} for s in data["streams"]]
+    streams = [{**stream_info(s["info"]), "goal": s["goal"], "goal_checklist": s["goal_checklist"], "checkpoints": s["checkpoints"]} for s in data["streams"]]
     return QuarterResponse(
         quarter=data["quarter"] or label, starts=start.isoformat(), ends=end.isoformat(),
         objective=data["objective"], objective_ar=data["objective_ar"],

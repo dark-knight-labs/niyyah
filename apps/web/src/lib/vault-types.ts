@@ -79,11 +79,17 @@ export interface DaysStatusData {
   days: number;
 }
 
+/** One line of a checklist under a goal or a month. */
+export interface ChecklistItemData { id: string; text: string; done: boolean }
+/** A line being sent: a new one has no id yet. */
+export interface ChecklistLine { id?: string; text: string; done?: boolean }
+
 export interface VaultGoal {
   title: string;
   value: string;
   caption: string;
-  /** 0-100, null when the vault line has none. */
+  checklist: ChecklistItemData[];
+  /** 0-100: from the checklist when there is one, else the number typed in; null when neither. */
   progress: number | null;
 }
 
@@ -130,8 +136,10 @@ export interface VaultEventsData {
 }
 
 export interface QuarterStreamData extends StreamInfo {
+  /** The goal's lines joined into one summary. */
   goal: string;
-  checkpoints: { month: MonthKey; text: string }[];
+  goal_checklist: ChecklistItemData[];
+  checkpoints: { month: MonthKey; text: string; checklist: ChecklistItemData[] }[];
 }
 
 export interface QuarterData {
@@ -161,6 +169,8 @@ export interface StreamChange {
   goal?: string;
   status?: "active" | "committed" | "paused" | "archived";
   checkpoints?: Partial<Record<MonthKey, string>>;
+  goal_checklist?: ChecklistLine[];
+  month_checklists?: Partial<Record<MonthKey, ChecklistLine[]>>;
 }
 
 export interface PipelineItemData {
@@ -235,7 +245,7 @@ export interface ScheduleMetaIn { city: string | null; lat: number | null; lon: 
 export interface ScheduleConfigIn { meta: ScheduleMetaIn; weekday: ScheduleRowIn[]; weekend: ScheduleRowIn[] }
 export interface FeedData { id: number; name: string; host: string; color: string | null; email: string | null }
 
-export interface GoalIn { title: string; value: string; caption: string; progress: number | null }
+export interface GoalIn { title: string; value: string; caption: string; progress: number | null; checklist: ChecklistLine[] }
 
 export interface ApiTokenData { id: number; name: string; prefix: string; created_at: string; last_used_at: string | null }
 export interface NewApiToken extends ApiTokenData { token: string }

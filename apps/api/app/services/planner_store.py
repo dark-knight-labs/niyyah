@@ -11,7 +11,9 @@ from app.models.planner import (
     Goal, LogEntry, NotebookEntry, PipelineItem, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
     WeekObjective,
 )
-from app.services.rules import MAX_GOALS, STALE_DAYS, URL, Stream, line_hash, quarter_for, weekly_streams
+from app.services.rules import (
+    MAX_GOALS, STALE_DAYS, URL, Stream, checklist_from_text, checklist_progress, line_hash, quarter_for, weekly_streams,
+)
 
 
 async def _all(db: AsyncSession, stmt) -> list:
@@ -48,7 +50,8 @@ async def day_log(db: AsyncSession, user_id: int, day: date) -> list[dict]:
 
 async def goals(db: AsyncSession, user_id: int) -> list[dict]:
     rows = await _all(db, select(Goal).where(Goal.user_id == user_id).order_by(Goal.position))
-    return [{"title": r.title, "value": r.value, "caption": r.caption, "progress": r.progress} for r in rows][:MAX_GOALS]
+    return [{"title": r.title, "value": r.value, "caption": r.caption, "checklist": list(r.checklist or []),
+             "progress": checklist_progress(r.checklist or []) if r.checklist else r.progress} for r in rows][:MAX_GOALS]
 
 
 async def quarter_data(db: AsyncSession, user_id: int, label: str) -> dict | None:
@@ -62,7 +65,9 @@ async def quarter_data(db: AsyncSession, user_id: int, label: str) -> dict | Non
         "quarter": label, "starts": _iso(quarter.starts), "ends": _iso(quarter.ends),
         "objective": quarter.objective, "objective_ar": quarter.objective_ar,
         "streams": [{"stream": r.slug, "info": _stream(r), "goal": r.goal, "status": r.status,
-                     "checkpoints": list(r.checkpoints or [])} for r in rows],
+                     "goal_checklist": list(r.goal_checklist or checklist_from_text(r.goal)),
+                     "checkpoints": [{**c, "checklist": c.get("checklist") or checklist_from_text(c.get("text", ""))}
+                                     for c in r.checkpoints or []]} for r in rows],
     }
 
 

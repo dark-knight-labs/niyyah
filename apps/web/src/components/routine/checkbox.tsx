@@ -1,13 +1,33 @@
-import { Check } from "lucide-react";
+"use client";
 
-/** Square tick box with a 44px tap area; the native input stays for keyboard and screen readers. */
+import { useRef } from "react";
+
+/** The app's one checkbox: a 14px square with a 36px tap area. Ticking it draws the tick, rings once and flashes the row if the row has `data-check-row`. */
 export function Checkbox({ checked, disabled, label, onChange }: { checked: boolean; disabled?: boolean; label: string; onChange: () => void }) {
+  const box = useRef<HTMLLabelElement>(null);
+
+  function change() {
+    if (!checked && box.current) {
+      const el = box.current;
+      el.classList.remove("pulse");
+      void el.offsetWidth; // restart the animation when ticked twice in a row
+      el.classList.add("pulse");
+      const row = el.closest("[data-check-row]");
+      if (row) {
+        row.classList.remove("niy-flash");
+        void (row as HTMLElement).offsetWidth;
+        row.classList.add("niy-flash");
+      }
+    }
+    onChange();
+  }
+
   return (
-    <label className="relative -mx-2.5 -my-1.5 grid h-11 w-11 shrink-0 cursor-pointer place-items-center">
-      <input type="checkbox" className="peer absolute inset-0 cursor-pointer opacity-0" checked={checked} disabled={disabled} onChange={onChange} aria-label={label} />
-      <span className="grid h-[1.375rem] w-[1.375rem] place-items-center rounded-[0.4375rem] border-2 border-[var(--muted-foreground)] text-transparent transition peer-checked:border-[var(--accent)] peer-checked:bg-[var(--accent)] peer-checked:text-[var(--accent-fg)] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--accent)]">
-        <Check size={14} strokeWidth={3.5} />
-      </span>
+    <label ref={box} className="niy-cb">
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={change} aria-label={label} />
+      <span className="niy-cb-box" />
+      <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3.2 7.4l2.6 2.6 5-5.6" /></svg>
+      <span className="niy-cb-ring" />
     </label>
   );
 }

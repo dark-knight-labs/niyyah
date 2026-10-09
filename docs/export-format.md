@@ -18,8 +18,8 @@
 | `blocks` | `key`, `label`, `ring_name`, `color`, `counts_for_stars`, `archived`, in display order |
 | `schedule` | `null`, or `{meta, days: {weekday: [...], weekend: [...]}}`; rows are `block`, `start`, `end`, `what`, `stream` |
 | `feeds` | `name`, `host`, `color`, `email` |
-| `goals` | `title`, `value`, `caption`, `progress` (0 to 100 or `null`) |
-| `quarters` | per quarter: `label`, `starts`, `ends`, `objective`, `objective_ar`, `streams` (`slug`, `name`, `color`, `icon`, `slot`, `weekly`, `has_pipeline`, `in_note`, `goal`, `status`, `checkpoints`) |
+| `goals` | `title`, `value`, `caption`, `checklist` (lines, below), `progress` (from the checklist when there is one, else the typed number, or `null`) |
+| `quarters` | per quarter: `label`, `starts`, `ends`, `objective`, `objective_ar`, `streams` (`slug`, `name`, `color`, `icon`, `slot`, `weekly`, `has_pipeline`, `in_note`, `goal`, `goal_checklist`, `status`, `checkpoints`) |
 | `week_objectives` | `week`, `stream`, `text`, `done`, `checkpoint` |
 | `pipeline_items` | `id`, `stream`, `lane` (`now`, `next`, `backlog`, `done`), `text`, `description`, `product`, `checkpoint`, `added_on`, `done_on`, `focus_week`, `done`, `blocked_by` (notebook entry ids) |
 | `notebook_entries` | `stream`, `id`, `kind` (`idea`, `meeting`, `blocker`), `title`, `body`, `date`, `open` |
@@ -37,3 +37,7 @@ Dates are ISO `YYYY-MM-DD`. Lists are in a stable order, so the same data always
 - Everything is validated first (lengths, lane and kind values, duplicate days or notebook ids). A refused import changes nothing.
 
 From a file on the server: `python -m app.cli import-snapshot export.json --user you@example.com --replace`.
+
+## Checklists
+
+A stream's quarter goal (`goal_checklist`), each month's checkpoint (`checkpoints[].checklist`) and each goal card (`goals[].checklist`) hold lines: `{id, text, done}`. `id` is a short stable string, `text` is one line of at most 400 characters, at most 15 lines to a list. The older `goal` and `checkpoints[].text` fields stay as a summary: the lines joined with ` · `. An import accepts either form: a snapshot with only the plain text (an export from before checklists) becomes one line per goal or month.

@@ -16,6 +16,7 @@ from app.models.planner import (
     Quarter, QuarterStream, Task, WeekObjective,
 )
 from app.models.user import User
+from app.services.rules import checklist_from_text, checklist_progress
 from app.models.vault import VaultDay
 
 FORMAT_VERSION = 1
@@ -40,7 +41,8 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
         quarters[s.quarter]["streams"].append({
             "slug": s.slug, "name": s.name, "color": s.color, "icon": s.icon, "slot": s.slot, "weekly": s.weekly,
             "has_pipeline": s.has_pipeline, "in_note": s.in_note, "goal": s.goal, "status": s.status,
-            "checkpoints": list(s.checkpoints or [])})
+            "goal_checklist": list(s.goal_checklist or checklist_from_text(s.goal)),
+            "checkpoints": [{**c, "checklist": c.get("checklist") or checklist_from_text(c.get("text", ""))} for c in s.checkpoints or []]})
 
     setting = (await db.execute(select(PlannerScheduleSetting).where(PlannerScheduleSetting.user_id == uid))).scalar_one_or_none()
     schedule = None
@@ -66,7 +68,8 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
         "schedule": schedule,
         "feeds": [{"name": f.name, "host": urlparse(f.url).hostname or "", "color": f.color, "email": f.email}
                   for f in await rows(PlannerCalendarFeed, PlannerCalendarFeed.position)],
-        "goals": [{"title": g.title, "value": g.value, "caption": g.caption, "progress": g.progress}
+        "goals": [{"title": g.title, "value": g.value, "caption": g.caption, "checklist": list(g.checklist or []),
+                   "progress": checklist_progress(g.checklist) if g.checklist else g.progress}
                   for g in await rows(Goal, Goal.position)],
         "quarters": list(quarters.values()),
         "week_objectives": [{"week": o.week, "stream": o.stream, "text": o.text, "done": o.done, "checkpoint": o.checkpoint}

@@ -62,6 +62,9 @@ export const vaultApi = {
     api.put<VaultObjectivesData>("/vault/objectives", { stream, ...change }),
   quarter: () => api.get<QuarterData>("/vault/quarter"),
   setSuperObjective: (text: string, arabic?: string) => api.put<QuarterData>("/vault/quarter", { text, arabic }),
+  tickStreamItem: (stream: string, scope: string, id: string, done: boolean) =>
+    api.put<QuarterData>("/vault/quarter/stream/item", { stream, scope, id, done }),
+  tickGoalItem: (id: string, done: boolean) => api.put<VaultGoalsData>("/vault/goals/item", { id, done }),
   updateStream: (stream: string, change: StreamChange) => api.put<QuarterData>("/vault/quarter/stream", { stream, ...change }),
   addStream: (stream: string, change: StreamChange & { name: string }) => api.post<QuarterData>("/vault/quarter/stream", { stream, ...change }),
   focusPipelineItem: (stream: string, item: PipelineItemData) =>

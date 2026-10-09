@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/routine/checkbox";
 import { useState } from "react";
 import { Check, Lightbulb, OctagonAlert, Pencil, Trash2, Users, type LucideIcon } from "lucide-react";
 import { SectionTitle } from "@/components/planner/page-title";
@@ -109,13 +110,13 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all", comp
           <ul className="grid gap-2.5">
             {blockers.map((b) => (
               <li key={`${b.line}-${b.hash}`}>
-                <label className="flex items-start gap-2.5 text-sm">
-                  <input type="checkbox" checked={!b.open} disabled={busy} onChange={() => void run(() => vaultApi.setBlocker(stream, b, !b.open))} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
+                <div className="flex items-start gap-2.5 text-sm">
+                  <span className="mt-[0.28rem]"><Checkbox checked={!b.open} disabled={busy} label={`Cleared: ${b.title}`} onChange={() => void run(() => vaultApi.setBlocker(stream, b, !b.open))} /></span>
                   <span className={`min-w-0 break-words ${b.open ? "" : "text-[var(--muted-foreground)] line-through"}`}>
                     {b.title}
                     {b.date && <span className="block text-xs text-[var(--muted-foreground)] no-underline">{b.date}</span>}
                   </span>
-                </label>
+                </div>
               </li>
             ))}
           </ul>

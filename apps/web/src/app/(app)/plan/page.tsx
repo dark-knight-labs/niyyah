@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { PanelLeftClose, PanelLeftOpen, Pencil, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Plus } from "lucide-react";
 import { usePlanner } from "@/hooks/use-planner";
 import { useNow } from "@/hooks/use-now";
+import { Checklist } from "@/components/planner/checklist";
 import { MonthTrack } from "@/components/planner/month-track";
 import { Notebook } from "@/components/planner/notebook";
 import { Notice, Spinner } from "@/components/planner/page-title";
@@ -84,12 +85,18 @@ export default function PlanPage() {
         onSaveObjective={(text) => run(() => vaultApi.setSuperObjective(text, quarter.objective_ar))} />
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
-      <div className={`grid gap-6 lg:items-start ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[13rem_minmax(0,1fr)]"}`}>
+      <div className={`grid gap-6 ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[13rem_minmax(0,1fr)]"}`}>
+        <div className="relative min-w-0">
+          {/* The handle rides the rail's right edge at the middle of the screen (not the middle of a short list), and only exists where the rail does. */}
+          <div className="pointer-events-none absolute inset-y-0 -right-3 z-10 hidden w-6 lg:block">
+            <button type="button" onClick={toggleRail} aria-expanded={!collapsed} aria-label={collapsed ? "Expand the stream list" : "Collapse the stream list"}
+              title={collapsed ? "Expand the stream list" : "Collapse the stream list"}
+              className="pointer-events-auto sticky top-[calc(50vh-0.75rem)] grid h-6 w-6 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition-colors hover:border-[var(--border-strong,var(--muted-foreground))] hover:text-[var(--foreground)] active:scale-90">
+              {collapsed ? <ChevronRight size={13} aria-hidden="true" /> : <ChevronLeft size={13} aria-hidden="true" />}
+            </button>
+          </div>
         <nav aria-label="Streams" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:p-0 [&::-webkit-scrollbar]:hidden">
-          <button type="button" onClick={toggleRail} aria-expanded={!collapsed} aria-label={collapsed ? "Expand the stream list" : "Collapse the stream list"}
-            className="hidden min-h-10 items-center gap-2 rounded-lg px-2.5 text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)] hover:bg-[var(--muted)] lg:flex">
-            {collapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <><PanelLeftClose size={16} aria-hidden="true" /> Streams</>}
-          </button>
+          <p className={`hidden min-h-10 items-center px-2.5 text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)] ${collapsed ? "" : "lg:flex"}`}>Streams</p>
           {streams.map((s) => {
             const on = s.id === meta?.id;
             const blocked = blockedCount(s.id);
@@ -113,6 +120,7 @@ export default function PlanPage() {
             <span className={collapsed ? "lg:sr-only" : ""}>Add a stream</span>
           </button>
         </nav>
+        </div>
 
         <div className="grid min-w-0 gap-6">
           {editing === "new" && <StreamEditor quarter={quarter} busy={busy} onCancel={() => setEditing(null)} onSave={(c, id) => save(id, c, true)} />}
@@ -136,9 +144,17 @@ export default function PlanPage() {
               </header>
 
               <section aria-label="Goal and small domino" className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-10">
-                <div className="grid gap-4">
-                  <p className={`text-[0.9375rem] font-semibold leading-snug ${goal?.goal ? "" : "text-[var(--muted-foreground)]"}`}>{goal?.goal || "No goal yet. Edit the stream to set one."}</p>
-                  {goal && <MonthTrack checkpoints={goal.checkpoints} current={quarter.current_month} color={meta.color} />}
+                <div className="grid gap-6">
+                  {goal && (
+                    <Checklist title="Quarter goal" label={`${meta.label} quarter goal`} items={goal.goal_checklist} busy={busy} placeholder="Add a line to the goal"
+                      onToggle={(item, done) => run(() => vaultApi.tickStreamItem(meta.id, "goal", item.id, done))}
+                      onChange={(lines) => run(() => vaultApi.updateStream(meta.id, { goal_checklist: lines }))} />
+                  )}
+                  {goal && (
+                    <MonthTrack months={quarter.months} checkpoints={goal.checkpoints} current={quarter.current_month} color={meta.color} busy={busy}
+                      onToggle={(month, item, done) => run(() => vaultApi.tickStreamItem(meta.id, month, item.id, done))}
+                      onChange={(month, lines) => run(() => vaultApi.updateStream(meta.id, { month_checklists: { [month]: lines } }))} />
+                  )}
                 </div>
                 <div>
                   <p className="mb-1 text-[0.625rem] font-extrabold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Small domino · this week</p>

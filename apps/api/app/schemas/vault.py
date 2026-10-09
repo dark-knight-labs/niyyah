@@ -143,6 +143,18 @@ Lane = Literal["now", "next", "backlog", "done"]
 Status = Literal["active", "committed", "paused", "archived"]
 
 
+class ChecklistItem(BaseModel):
+    id: str
+    text: str
+    done: bool
+
+
+class ChecklistItemIn(BaseModel):
+    id: str | None = None  # a new line has none; the server gives it one
+    text: str
+    done: bool = False
+
+
 class StreamInfo(BaseModel):
     """What a stream looks like and where its time goes; defined by its section in the quarter note."""
     stream: str
@@ -174,7 +186,8 @@ class GoalItem(BaseModel):
     title: str
     value: str
     caption: str
-    progress: int | None  # 0-100, None when the line has none
+    checklist: list[ChecklistItem] = []
+    progress: int | None  # 0-100: from the checklist when there is one, else the number typed in; None when neither
 
 
 class GoalsResponse(BaseModel):
@@ -186,6 +199,12 @@ class GoalIn(BaseModel):
     value: str
     caption: str = ""
     progress: int | None = None
+    checklist: list[ChecklistItemIn] = []
+
+
+class GoalItemTickIn(BaseModel):
+    id: str
+    done: bool
 
 
 class GoalsIn(BaseModel):
@@ -209,11 +228,13 @@ class ObjectiveIn(BaseModel):
 
 class QuarterCheckpoint(BaseModel):
     month: Month
-    text: str
+    text: str  # the lines joined, for anything that only shows text
+    checklist: list[ChecklistItem] = []
 
 
 class QuarterStream(StreamInfo):
-    goal: str
+    goal: str  # the goal's lines joined
+    goal_checklist: list[ChecklistItem] = []
     checkpoints: list[QuarterCheckpoint]
 
 
@@ -245,9 +266,18 @@ class StreamFieldsIn(BaseModel):
     icon: str | None = None
     slot: str | None = None
     weekly: bool | None = None
-    goal: str | None = None
+    goal: str | None = None  # plain text: becomes a single line
     status: Status | None = None
     checkpoints: dict[Month, str] | None = None
+    goal_checklist: list[ChecklistItemIn] | None = None  # replaces the goal's lines
+    month_checklists: dict[Month, list[ChecklistItemIn]] | None = None  # replaces the lines of the months given
+
+
+class StreamItemTickIn(BaseModel):
+    stream: str
+    scope: str  # "goal" or a month key
+    id: str
+    done: bool
 
 
 class StreamAddIn(StreamFieldsIn):

@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from app.models.planner import NotebookEntry, PipelineItem, Quarter, QuarterStream, WeekObjective
 from app.services.rules import (
-    BLOCKER_ID, FIELD_KEYS, LANES, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, MONTHS, PRODUCT, SLUG, clean_entry, clean_item,
+    BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, MONTHS, PRODUCT, SLUG, clean_entry, clean_item,
     make_stream, new_id, one_line_field, quarter_months, validate_field, week_for, weekly_streams,
 )
 
@@ -218,19 +218,51 @@ async def set_super_objective(db, user_id: int, label: str, text: str, arabic: s
         quarter.objective_ar = one_line_field(arabic, "Arabic text")
 
 
-def _set_checkpoint_text(row: QuarterStream, month: str, text: str) -> None:
-    checkpoints = [dict(c) for c in row.checkpoints or []]
+def _month_entry(checkpoints: list[dict], month: str) -> dict:
     for c in checkpoints:
         if c["month"] == month:
-            c["text"] = text
-            break
-    else:
-        checkpoints.append({"month": month, "text": text})
+            return c
+    entry = {"month": month, "text": "", "checklist": []}
+    checkpoints.append(entry)
+    return entry
+
+
+def _set_month_checklist(row: QuarterStream, month: str, items: list[dict]) -> None:
+    checkpoints = [dict(c) for c in row.checkpoints or []]
+    entry = _month_entry(checkpoints, month)
+    entry["checklist"], entry["text"] = items, checklist_text(items)
     row.checkpoints = checkpoints
 
 
-async def update_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str]) -> None:
-    """Change name/colour/icon/slot/weekly/goal/status and month checkpoints of one stream defined in the quarter."""
+def _set_checkpoint_text(row: QuarterStream, month: str, text: str) -> None:
+    """The older plain-text way to set a month: it becomes one line (unchanged text keeps its ticks)."""
+    checkpoints = [dict(c) for c in row.checkpoints or []]
+    entry = _month_entry(checkpoints, month)
+    if entry.get("text") != text or "checklist" not in entry:
+        entry["checklist"] = checklist_from_text(text)
+    entry["text"] = text
+    row.checkpoints = checkpoints
+
+
+def _set_goal_checklist(row: QuarterStream, items: list[dict]) -> None:
+    row.goal_checklist, row.goal = items, checklist_text(items)
+
+
+def _apply_lists(row: QuarterStream, months: list[str], goal_checklist, month_checklists) -> None:
+    if goal_checklist is not None:
+        _set_goal_checklist(row, clean_checklist(goal_checklist))
+    for month, items in (month_checklists or {}).items():
+        if month not in months:
+            raise ValueError(f"'{month}' is not a month of this quarter")
+        _set_month_checklist(row, month, clean_checklist(items))
+
+
+async def update_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str],
+                        goal_checklist: list[dict] | None = None, month_checklists: dict[str, list[dict]] | None = None) -> None:
+    """Change name/colour/icon/slot/weekly/goal/status and month checkpoints of one stream defined in the quarter.
+
+    `goal_checklist` and `month_checklists` ({month: lines}) replace the goal's and the months' lines; `fields["goal"]` and a month
+    key in `fields` are the older plain-text way and turn into a single line."""
     await ensure_quarter(db, user_id, label)
     row = next((r for r in await _stream_rows(db, user_id, label) if r.slug == stream and r.in_note), None)
     if row is None:
@@ -245,11 +277,17 @@ async def update_stream(db, user_id: int, label: str, stream: str, fields: dict[
         clean = validate_field(key, value)
         if key == "weekly":
             row.weekly = clean.lower() != "no"
+        elif key == "goal":
+            if clean != row.goal or not row.goal_checklist:
+                row.goal_checklist = checklist_from_text(clean)
+            row.goal = clean
         else:
             setattr(row, key, clean)
+    _apply_lists(row, months, goal_checklist, month_checklists)
 
 
-async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str]) -> None:
+async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str],
+                     goal_checklist: list[dict] | None = None, month_checklists: dict[str, list[dict]] | None = None) -> None:
     if not SLUG.match(stream):
         raise ValueError("id must be 2-24 lowercase letters, digits or dashes, starting with a letter")
     await ensure_quarter(db, user_id, label)
@@ -265,7 +303,8 @@ async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str
     if not written.get("name"):
         raise ValueError("name is required")
     info = make_stream(stream, written)
-    checkpoints = [{"month": m, "text": one_line_field(data[m], m)} for m in months if m in data]
+    checkpoints = [{"month": m, "text": one_line_field(data[m], m), "checklist": checklist_from_text(one_line_field(data[m], m))}
+                   for m in months if m in data]
     last_note = max((r.position for r in rows if r.in_note), default=-1)
     for r in rows:
         if r.position > last_note:
@@ -274,9 +313,34 @@ async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str
     if taken is not None:
         await db.delete(taken)
         await db.flush()
-    db.add(QuarterStream(user_id=user_id, quarter=label, slug=stream, name=info.name, color=info.color, icon=info.icon,
-                         slot=info.slot, weekly=info.weekly, has_pipeline=info.goal, in_note=True, goal=written.get("goal", ""),
-                         status=info.status, checkpoints=checkpoints, position=last_note + 1))
+    row = QuarterStream(user_id=user_id, quarter=label, slug=stream, name=info.name, color=info.color, icon=info.icon,
+                        slot=info.slot, weekly=info.weekly, has_pipeline=info.goal, in_note=True, goal=written.get("goal", ""),
+                        goal_checklist=checklist_from_text(written.get("goal", "")), status=info.status, checkpoints=checkpoints,
+                        position=last_note + 1)
+    _apply_lists(row, months, goal_checklist, month_checklists)
+    db.add(row)
+
+
+async def toggle_stream_item(db, user_id: int, label: str, stream: str, scope: str, item_id: str, done: bool) -> None:
+    """Tick or untick one line of a stream's quarter goal (scope "goal") or of one month (scope = the month)."""
+    row = next((r for r in await _stream_rows(db, user_id, label) if r.slug == stream and r.in_note), None)
+    if row is None:
+        raise ValueError(f"unknown stream '{stream}'")
+    if scope == "goal":
+        items = [dict(i) for i in row.goal_checklist or checklist_from_text(row.goal)]
+    elif scope in quarter_months(label):
+        entry = next((c for c in row.checkpoints or [] if c["month"] == scope), {})
+        items = [dict(i) for i in entry.get("checklist") or checklist_from_text(entry.get("text", ""))]
+    else:
+        raise ValueError(f"'{scope}' is not the goal or a month of this quarter")
+    line = next((i for i in items if i["id"] == item_id), None)
+    if line is None:
+        raise ValueError("that line changed or was removed; reload and try again")
+    line["done"] = done
+    if scope == "goal":
+        _set_goal_checklist(row, items)
+    else:
+        _set_month_checklist(row, scope, items)
 
 
 ENTRY_GONE = "that entry changed or moved; reload and try again"

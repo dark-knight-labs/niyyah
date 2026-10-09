@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/routine/checkbox";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronDown, NotebookPen, OctagonAlert, Pencil, Star, Trash2 } from "lucide-react";
 import { SectionTitle } from "@/components/planner/page-title";
@@ -183,11 +184,11 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
           <legend className="px-1 text-[0.6875rem] font-extrabold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">Waiting on</legend>
           {blockers.length === 0 && <p className="text-xs text-[var(--muted-foreground)]">No blockers yet. Add one in the Notebook.</p>}
           {blockers.map((b) => (
-            <label key={`${b.line}-${b.hash}`} className="flex items-start gap-2 text-xs">
-              <input type="checkbox" disabled={busy || !b.id} className="mt-0.5 accent-[var(--accent)]" checked={!!b.id && item.blocked_by.includes(b.id)}
-                onChange={(e) => b.id && onBlock(e.target.checked ? [...item.blocked_by, b.id] : item.blocked_by.filter((i) => i !== b.id))} />
+            <div key={`${b.line}-${b.hash}`} className="flex items-start gap-2 text-xs">
+              <span className="mt-[0.2rem]"><Checkbox disabled={busy || !b.id} label={`Blocked by: ${b.title}`} checked={!!b.id && item.blocked_by.includes(b.id)}
+                onChange={() => b.id && onBlock(item.blocked_by.includes(b.id) ? item.blocked_by.filter((i) => i !== b.id) : [...item.blocked_by, b.id])} /></span>
               <span className={`min-w-0 break-words ${b.open ? "" : "text-[var(--muted-foreground)] line-through"}`}>{b.title}{!b.id && " (save any change in the Notebook to link it)"}</span>
-            </label>
+            </div>
           ))}
           <button type="button" onClick={() => setLinking(false)} className="justify-self-start text-[0.6875rem] font-bold text-[var(--accent)]">Done</button>
         </fieldset>

@@ -212,3 +212,47 @@ def valid_time(value: str) -> bool:
     if match.group(1) is not None:
         return int(match.group(1)) < 24 and int(match.group(2)) < 60
     return True
+
+
+# --- Checklists: the lines under a goal or a month ---------------------------------------------------------------
+
+MAX_CHECKLIST = 15
+MAX_LINE_CHARS = 400
+_LINE_ID = re.compile(r"^[a-z0-9]{4,12}$")
+
+
+def clean_checklist(raw: list[dict] | None) -> list[dict]:
+    """Validated lines as [{id, text, done}]. A new line (no id) gets one, an id is never reused within a list, empty lines are dropped."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in raw or []:
+        text = " ".join(str(item.get("text", "")).split())
+        if not text:
+            continue
+        if len(text) > MAX_LINE_CHARS:
+            raise ValueError(f"a line is longer than {MAX_LINE_CHARS} characters")
+        line_id = item.get("id")
+        if not isinstance(line_id, str) or not _LINE_ID.match(line_id) or line_id in seen:
+            line_id = new_id()
+        seen.add(line_id)
+        out.append({"id": line_id, "text": text, "done": bool(item.get("done", False))})
+    if len(out) > MAX_CHECKLIST:
+        raise ValueError(f"at most {MAX_CHECKLIST} lines in a list")
+    return out
+
+
+def checklist_text(items: list[dict]) -> str:
+    """The lines on one line, for places that only hold text (the summary column, the vault mirror)."""
+    return " \u00b7 ".join(i["text"] for i in items)
+
+
+def checklist_from_text(text: str) -> list[dict]:
+    """A plain goal or checkpoint written before checklists: one line, not done."""
+    text = " ".join((text or "").split())
+    # The id comes from the text so the same plain text always yields the same line: a tick sent after a reload still finds it.
+    return [{"id": hashlib.sha1(text.encode("utf-8")).hexdigest()[:8], "text": text, "done": False}] if text else []
+
+
+def checklist_progress(items: list[dict]) -> int | None:
+    """Percent of lines done (0-100), or None for an empty list."""
+    return round(100 * sum(1 for i in items if i.get("done")) / len(items)) if items else None

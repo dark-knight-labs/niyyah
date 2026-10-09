@@ -59,16 +59,24 @@ class SnapFeed(_Loose):
         return url
 
 
+class SnapLine(_Loose):
+    id: str | None = Field(default=None, max_length=12)
+    text: str = Field(max_length=400)
+    done: bool = False
+
+
 class SnapGoal(_Loose):
     title: str = Field(max_length=200)
     value: str = Field(max_length=400)
     caption: str = Field(default="", max_length=400)
     progress: int | None = Field(default=None, ge=0, le=100)
+    checklist: list[SnapLine] = Field(default=[], max_length=15)
 
 
 class SnapCheckpoint(_Loose):
     month: Month
     text: str = ""
+    checklist: list[SnapLine] = Field(default=[], max_length=15)
 
 
 class SnapStream(_Loose):
@@ -81,6 +89,7 @@ class SnapStream(_Loose):
     has_pipeline: bool = True
     in_note: bool = True
     goal: str = ""
+    goal_checklist: list[SnapLine] = Field(default=[], max_length=15)
     status: str = Field(default="committed", max_length=20)
     checkpoints: list[SnapCheckpoint] = []
 

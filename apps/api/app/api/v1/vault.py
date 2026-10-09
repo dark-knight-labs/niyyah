@@ -30,6 +30,7 @@ from app.schemas.vault import (
     EditResponse,
     FeedIn,
     FeedResponse,
+    GoalItemTickIn,
     GoalsIn,
     GoalsResponse,
     GoogleConnectResponse,
@@ -57,6 +58,7 @@ from app.schemas.vault import (
     ScheduleConfigIn,
     StreamAddIn,
     StreamFieldsIn,
+    StreamItemTickIn,
     SuperObjectiveIn,
     TaskIn,
     TaskRemoveIn,
@@ -307,6 +309,13 @@ async def get_goals(user: User = Depends(get_current_user), db: AsyncSession = D
     return GoalsResponse(items=await planner_store.goals(db, user.id))
 
 
+@router.put("/goals/item", response_model=GoalsResponse)
+async def put_goal_item(data: GoalItemTickIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Tick or untick one line of a goal card."""
+    await _db_run(db, lambda: planner_config.toggle_goal_item(db, user.id, data.id, data.done))
+    return GoalsResponse(items=await planner_store.goals(db, user.id))
+
+
 @router.put("/config/goals", response_model=GoalsResponse)
 async def put_goals_config(data: GoalsIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _db_run(db, lambda: planner_config.replace_goals(db, user.id, [g.model_dump() for g in data.items]))
@@ -539,6 +548,13 @@ def _fields(data: StreamFieldsIn) -> dict[str, str]:
     return out
 
 
+def _lists(data: StreamFieldsIn):
+    """The goal's lines and the months' lines from a stream request, as plain dicts (None where the request leaves them alone)."""
+    goal = None if data.goal_checklist is None else [i.model_dump() for i in data.goal_checklist]
+    months = None if data.month_checklists is None else {m: [i.model_dump() for i in items] for m, items in data.month_checklists.items()}
+    return goal, months
+
+
 @router.put("/quarter", response_model=QuarterResponse)
 async def put_super_objective(data: SuperObjectiveIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
@@ -552,9 +568,17 @@ async def put_stream(data: StreamFieldsIn, user: User = Depends(get_current_user
     today = _local_now().date()
     label = quarter_for(today)
     fields = _fields(data)
-    if not fields:
+    if not fields and data.goal_checklist is None and not data.month_checklists:
         raise HTTPException(status_code=422, detail="nothing to change")
-    await _db_run(db, lambda: planner_work.update_stream(db, user.id, label, data.stream, fields))
+    await _db_run(db, lambda: planner_work.update_stream(db, user.id, label, data.stream, fields, *_lists(data)))
+    return await _quarter(db, user, today)
+
+
+@router.put("/quarter/stream/item", response_model=QuarterResponse)
+async def put_stream_item(data: StreamItemTickIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Tick or untick one line of a stream's goal or of one of its months."""
+    today = _local_now().date()
+    await _db_run(db, lambda: planner_work.toggle_stream_item(db, user.id, quarter_for(today), data.stream, data.scope, data.id, data.done))
     return await _quarter(db, user, today)
 
 
@@ -563,7 +587,7 @@ async def post_stream(data: StreamAddIn, user: User = Depends(get_current_user),
     today = _local_now().date()
     label = quarter_for(today)
     fields = _fields(data)
-    await _db_run(db, lambda: planner_work.add_stream(db, user.id, label, data.stream, fields))
+    await _db_run(db, lambda: planner_work.add_stream(db, user.id, label, data.stream, fields, *_lists(data)))
     return await _quarter(db, user, today)
 
 

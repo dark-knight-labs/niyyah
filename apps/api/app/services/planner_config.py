@@ -9,7 +9,7 @@ from sqlalchemy import delete, func, select
 from app.models.planner import Goal, PlannerBlock, PlannerCalendarFeed, PlannerScheduleBlock, PlannerScheduleSetting
 from app.services.calendar_events import check_public_url
 from app.services.planner_defaults import STARTER_BLOCKS, STARTER_META, STARTER_WEEKDAY, STARTER_WEEKEND
-from app.services.rules import valid_time
+from app.services.rules import clean_checklist, valid_time
 
 METHODS = {"karachi", "mwl", "isna", "egyptian", "ummalqura", "dubai", "qatar", "kuwait", "singapore", "turkey", "tehran", "moonsighting"}
 MADHABS = {"hanafi", "shafi"}
@@ -146,8 +146,21 @@ async def replace_goals(db, user_id: int, items: list[dict]) -> None:
         if progress is not None and not 0 <= progress <= 100:
             raise ValueError("progress is 0 to 100")
         clean.append({"title": _goal_text(g["title"], "title", 60, True), "value": _goal_text(g["value"], "value", 80, True),
-                      "caption": _goal_text(g.get("caption") or "", "caption", 120, False), "progress": progress})
+                      "caption": _goal_text(g.get("caption") or "", "caption", 120, False), "progress": progress,
+                      "checklist": clean_checklist(g.get("checklist"))})
     await db.execute(delete(Goal).where(Goal.user_id == user_id))
     for position, g in enumerate(clean):
         db.add(Goal(user_id=user_id, position=position, **g))
     await db.flush()
+
+
+async def toggle_goal_item(db, user_id: int, item_id: str, done: bool) -> None:
+    """Tick or untick one line of an Overview goal card."""
+    for goal in (await db.execute(select(Goal).where(Goal.user_id == user_id))).scalars().all():
+        items = [dict(i) for i in goal.checklist or []]
+        line = next((i for i in items if i["id"] == item_id), None)
+        if line is not None:
+            line["done"] = done
+            goal.checklist = items
+            return
+    raise ValueError("that line changed or was removed; reload and try again")

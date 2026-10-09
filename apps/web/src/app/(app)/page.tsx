@@ -155,7 +155,7 @@ export default function OverviewPage() {
       {schedule && day && (
         <>
           <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
-          {owner && goals && <GoalCards data={goals} />}
+          {owner && goals && <GoalCards data={goals} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} />}
           {owner ? (
             <>
               <div className="mb-4"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>

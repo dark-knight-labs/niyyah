@@ -11,6 +11,7 @@ from app.models.planner import (
 )
 from app.models.vault import VaultBlockVote, VaultDay
 from app.schemas.snapshot import Snapshot
+from app.services.rules import checklist_from_text, checklist_text, clean_checklist
 
 USER_TABLES = (PlannerBlock, PlannerCalendarFeed, Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem,
                NotebookEntry, PlannerScheduleSetting, PlannerScheduleBlock)
@@ -43,6 +44,22 @@ def _check(snap: Snapshot) -> None:
         raise ValueError("a block key appears twice")
 
 
+def _lines(checklist, text: str) -> list[dict]:
+    """The snapshot's lines, or one line made from older plain text when it carries none."""
+    return clean_checklist([i.model_dump() for i in checklist]) if checklist else checklist_from_text(text)
+
+
+def _stream_row(user_id: int, label: str, s, position: int) -> QuarterStream:
+    goal_lines = _lines(s.goal_checklist, s.goal)
+    checkpoints = []
+    for c in s.checkpoints:
+        lines = _lines(c.checklist, c.text)
+        checkpoints.append({"month": c.month, "text": checklist_text(lines), "checklist": lines})
+    return QuarterStream(user_id=user_id, quarter=label, slug=s.slug, name=s.name, color=s.color, icon=s.icon, slot=s.slot,
+                         weekly=s.weekly, has_pipeline=s.has_pipeline, in_note=s.in_note, goal=checklist_text(goal_lines),
+                         goal_checklist=goal_lines, status=s.status, checkpoints=checkpoints, position=position)
+
+
 def _blocks(snap: Snapshot, user_id: int) -> list[PlannerBlock]:
     """The snapshot's blocks, plus a plain block for any key its votes or schedule use that it does not list."""
     listed = {b.key for b in snap.blocks}
@@ -72,10 +89,7 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
     quarters, streams = [], []
     for q in snap.quarters:
         quarters.append(Quarter(user_id=user_id, label=q.label, starts=q.starts, ends=q.ends, objective=q.objective, objective_ar=q.objective_ar))
-        streams += [QuarterStream(
-            user_id=user_id, quarter=q.label, slug=s.slug, name=s.name, color=s.color, icon=s.icon, slot=s.slot, weekly=s.weekly,
-            has_pipeline=s.has_pipeline, in_note=s.in_note, goal=s.goal, status=s.status,
-            checkpoints=[c.model_dump() for c in s.checkpoints], position=n) for n, s in enumerate(q.streams)]
+        streams += [_stream_row(user_id, q.label, s, n) for n, s in enumerate(q.streams)]
 
     pipeline = [PipelineItem(
         user_id=user_id, stream=i.stream, lane=i.lane, text=i.text, description=i.description, product=i.product, checkpoint=i.checkpoint,
@@ -87,7 +101,8 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
                   for o in snap.week_objectives]
     tasks = [Task(user_id=user_id, text=t.text, done=t.done, due_on=t.due_on, scheduled_on=t.scheduled_on, start_on=t.start_on,
                   done_on=t.done_on, source_path=t.source_path, position=n) for n, t in enumerate(snap.tasks)]
-    goals = [Goal(user_id=user_id, position=n, title=g.title, value=g.value, caption=g.caption, progress=g.progress) for n, g in enumerate(snap.goals)]
+    goals = [Goal(user_id=user_id, position=n, title=g.title, value=g.value, caption=g.caption, progress=g.progress,
+                  checklist=clean_checklist([i.model_dump() for i in g.checklist])) for n, g in enumerate(snap.goals)]
     feeds = [PlannerCalendarFeed(user_id=user_id, name=f.name, url=f.url, color=f.color, email=f.email, position=n) for n, f in enumerate(f for f in snap.feeds if f.url)]
     schedule_rows = []
     if snap.schedule:

@@ -157,3 +157,30 @@ body {
 .pulse-dot {
   animation: pulse-ring 2s ease-out infinite;
 }
+
+/* --- Checkbox: one em square, a tick that draws itself, one soft ring. The tap area is 36px; the box stays 14px. -------------- */
+.niy-cb { --s: 14px; position: relative; display: inline-grid; place-items: center; flex: none; width: var(--s); height: var(--s); margin-block: var(--cb-mt, 0); }
+.niy-cb input { position: absolute; inset: -11px; width: calc(100% + 22px); height: calc(100% + 22px); margin: 0; opacity: 0; cursor: pointer; }
+.niy-cb input:disabled { cursor: default; }
+.niy-cb .niy-cb-box { width: 100%; height: 100%; border: 1.25px solid color-mix(in srgb, var(--muted-foreground) 45%, var(--border)); border-radius: 4px; background: var(--surface);
+  transition: border-color 0.15s, background-color 0.18s; }
+.niy-cb:hover .niy-cb-box { border-color: var(--muted-foreground); }
+.niy-cb svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.niy-cb path { fill: none; stroke: var(--accent-fg); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 14; stroke-dashoffset: 14;
+  transition: stroke-dashoffset 0.22s ease 0.05s; }
+.niy-cb input:checked ~ .niy-cb-box { background: var(--accent); border-color: var(--accent); }
+.niy-cb input:checked ~ svg path { stroke-dashoffset: 0; }
+.niy-cb input:disabled ~ .niy-cb-box { opacity: 0.55; }
+.niy-cb input:focus-visible ~ .niy-cb-box { outline: 2px solid var(--accent); outline-offset: 2px; }
+.niy-cb .niy-cb-ring { position: absolute; inset: -1px; border-radius: 50%; border: 1.5px solid var(--accent); opacity: 0; pointer-events: none; }
+.niy-cb.pulse .niy-cb-ring { animation: niy-ring 0.5s ease-out; }
+.niy-cb.pulse .niy-cb-box { animation: niy-pop 0.3s ease; }
+.niy-flash { animation: niy-flash 0.7s ease; }
+@keyframes niy-ring { 0% { transform: scale(0.7); opacity: 0.75; } 100% { transform: scale(2.5); opacity: 0; } }
+@keyframes niy-pop { 40% { transform: scale(0.78); } 100% { transform: scale(1); } }
+@keyframes niy-flash { 0% { background: var(--accent-light); } 100% { background: transparent; } }
+@keyframes niy-bump { 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.niy-bump { animation: niy-bump 0.35s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .niy-cb *, .niy-cb.pulse *, .niy-flash, .niy-bump { animation: none !important; transition: none !important; }
+}

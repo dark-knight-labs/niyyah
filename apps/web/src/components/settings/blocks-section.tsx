@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/routine/checkbox";
 import { useState } from "react";
 import { SettingsSection, FIELD, MICRO } from "@/components/settings/section";
 import { colorVar } from "@/lib/streams";
@@ -62,9 +63,9 @@ export function BlocksSection({ blocks, onChange, usedKeys }: Props) {
                 className="h-[1.375rem] w-[1.375rem] rounded-full border-2 border-[var(--surface)] shadow-[0_0_0_1px_var(--border)]" style={{ background: colorVar(b.color) }} />
               <input className={FIELD} value={b.label} aria-label="Block name" aria-invalid={!b.label.trim()} onChange={(e) => update(b.key, { label: e.target.value })} />
               <input className={`${FIELD} font-mono max-sm:col-start-3`} value={b.ring_name} maxLength={6} aria-label="Short name on the clock" onChange={(e) => update(b.key, { ring_name: e.target.value.toUpperCase() })} />
-              <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--muted-foreground)]">
-                <input type="checkbox" checked={b.counts_for_stars} onChange={(e) => update(b.key, { counts_for_stars: e.target.checked })} /> Stars
-              </label>
+              <div className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--muted-foreground)]">
+                <Checkbox checked={b.counts_for_stars} label={`${b.label} counts for stars`} onChange={() => update(b.key, { counts_for_stars: !b.counts_for_stars })} /> Stars
+              </div>
               <button type="button" disabled={usedKeys.has(b.key)} title={usedKeys.has(b.key) ? "Still on your schedule: remove those rows first" : undefined}
                 onClick={() => update(b.key, { archived: true })} className="min-h-8 rounded-lg px-2 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] disabled:opacity-40">Archive</button>
             </div>

@@ -1,8 +1,9 @@
 "use client";
 
+import { Checkbox } from "@/components/routine/checkbox";
 import { useState } from "react";
 import { Archive, Check, X } from "lucide-react";
-import { ICONS, MONTH_LABEL, colorVar } from "@/lib/streams";
+import { ICONS, colorVar } from "@/lib/streams";
 import { QuarterData, QuarterStreamData, StreamChange } from "@/lib/vault-types";
 
 interface Props {
@@ -21,16 +22,14 @@ const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 const field = "min-h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm placeholder:text-[var(--muted-foreground)]";
 const label = "mb-1.5 block text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]";
 
-/** Add a stream (Finance, Errands…) or edit one: name, goal, month checkpoints, colour, icon. Saved to your plan. */
+/** Add a stream (Finance, Errands…) or edit one: name, colour, icon. Its goal and month lines are edited on the stream's own page. */
 export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props) {
   const [name, setName] = useState(stream?.name ?? "");
   const [slot, setSlot] = useState(stream?.slot ?? "");
-  const [goal, setGoal] = useState(stream?.goal ?? "");
   const [status, setStatus] = useState<string>(stream?.status === "archived" ? "committed" : stream?.status || "committed");
   const [weekly, setWeekly] = useState(stream?.weekly ?? true);
   const [color, setColor] = useState(stream?.color ?? "teal");
   const [icon, setIcon] = useState(stream?.icon ?? "circle-dot");
-  const [cps, setCps] = useState<Record<string, string>>(() => Object.fromEntries(quarter.months.map((m) => [m, stream?.checkpoints.find((c) => c.month === m)?.text ?? ""])));
   const taken = new Set(quarter.streams.map((s) => s.stream));
 
   function newId(): string {
@@ -43,7 +42,7 @@ export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props)
   function save(e: React.FormEvent, nextStatus = status) {
     e.preventDefault();
     if (!name.trim()) return;
-    void onSave({ name: name.trim(), slot: slot.trim(), goal: goal.trim(), status: nextStatus as StreamChange["status"], weekly, color, icon, checkpoints: cps }, stream?.stream ?? newId());
+    void onSave({ name: name.trim(), slot: slot.trim(), status: nextStatus as StreamChange["status"], weekly, color, icon }, stream?.stream ?? newId());
   }
 
   return (
@@ -58,21 +57,6 @@ export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props)
           <input className={field} value={slot} onChange={(e) => setSlot(e.target.value)} placeholder="Weekends, after Asr" maxLength={80} />
         </label>
       </div>
-
-      <label>
-        <span className={label}>Quarter goal</span>
-        <textarea className={`${field} py-2.5`} rows={2} value={goal} onChange={(e) => setGoal(e.target.value)} maxLength={400} placeholder="The end state at the end of the quarter" />
-      </label>
-
-      <fieldset className="grid gap-3 sm:grid-cols-3">
-        <legend className={label}>Month checkpoints</legend>
-        {quarter.months.map((m) => (
-          <label key={m}>
-            <span className="mb-1 block text-xs font-bold" style={{ color: colorVar(color) }}>{MONTH_LABEL[m]}</span>
-            <input className={field} value={cps[m]} onChange={(e) => setCps({ ...cps, [m]: e.target.value })} maxLength={400} placeholder="Where it should be" />
-          </label>
-        ))}
-      </fieldset>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <fieldset>
@@ -113,10 +97,10 @@ export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props)
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" className="h-4 w-4 accent-[var(--accent)]" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} />
+        <div className="flex items-center gap-2 text-sm">
+          <Checkbox checked={weekly} label="Has a weekly objective" onChange={() => setWeekly(!weekly)} />
           Has a weekly objective
-        </label>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

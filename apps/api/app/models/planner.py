@@ -47,7 +47,8 @@ class Goal(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     value: Mapped[str] = mapped_column(String(400), nullable=False)
     caption: Mapped[str] = mapped_column(String(400), default="", nullable=False)
-    progress: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-100
+    progress: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-100, used when there is no checklist
+    checklist: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # [{"id", "text", "done"}]; progress comes from it
 
 
 class Quarter(Base):
@@ -79,9 +80,11 @@ class QuarterStream(Base):
     weekly: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)  # has a one-line weekly objective
     has_pipeline: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)  # has a quarter goal and a pipeline
     in_note: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)  # False for built-ins the note does not define
-    goal: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    goal: Mapped[str] = mapped_column(Text, default="", nullable=False)  # the checklist's lines joined, kept as a plain summary
+    goal_checklist: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # [{"id", "text", "done"}]
     status: Mapped[str] = mapped_column(String(20), default="committed", nullable=False)
-    checkpoints: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # [{"month": "oct", "text": "..."}]
+    # [{"month": "oct", "text": "<lines joined>", "checklist": [{"id", "text", "done"}]}]
+    checkpoints: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
 

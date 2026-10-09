@@ -30,7 +30,7 @@ export default function SettingsPage() {
     const [cfg, sched, quarter, goals] = await Promise.all([vaultApi.blocksConfig(), vaultApi.schedule(), vaultApi.quarter().catch(() => null), vaultApi.goals()]);
     const next: Draft = {
       blocks: cfg.blocks,
-      goals: goals.items.map((x) => ({ title: x.title, value: x.value, caption: x.caption, progress: x.progress })),
+      goals: goals.items.map((x) => ({ title: x.title, value: x.value, caption: x.caption, checklist: x.checklist, progress: x.checklist.length ? null : x.progress })),
       meta: { city: sched.meta.city, lat: sched.meta.lat, lon: sched.meta.lon, tz: sched.meta.tz, method: sched.meta.method.toLowerCase(),
         madhab: sched.meta.madhab.toLowerCase(), weekend_days: sched.meta.weekend_days },
       weekday: toRows(sched.days.weekday), weekend: toRows(sched.days.weekend),

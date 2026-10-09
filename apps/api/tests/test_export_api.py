@@ -21,7 +21,7 @@ async def test_snapshot_carries_the_users_data(db_client):
     snap = (await client.get(E)).json()
     assert snap["version"] == 1 and snap["user"] == {"email": "test@niyyah.app", "timezone": "UTC"}
     assert all(key in snap for key in SECTIONS)
-    assert snap["goals"] == [{"title": "Zero debt", "value": "62% paid", "caption": "", "progress": 62}]
+    assert snap["goals"] == [{"title": "Zero debt", "value": "62% paid", "caption": "", "checklist": [], "progress": 62}]
     async with TestSession() as db:
         days = (await db.execute(select(func.count()).select_from(VaultDay).where(VaultDay.user_id.is_not(None)))).scalar_one()
     assert days > 0 and len(snap["days"]) == days
