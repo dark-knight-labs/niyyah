@@ -70,12 +70,12 @@ export function ScheduleSection({ draft, streams, onChange }: Props) {
     }>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
         <div className="min-w-0">
-          <div className="hidden grid-cols-[minmax(6rem,1.1fr)_5.75rem_5.75rem_minmax(5.5rem,1.4fr)_minmax(6rem,1fr)_auto] gap-1.5 pb-0.5 sm:grid" aria-hidden="true">
+          <div className="hidden grid-cols-[minmax(6rem,1.1fr)_7.25rem_7.25rem_minmax(5.5rem,1.4fr)_minmax(6rem,1fr)_auto] gap-1.5 pb-0.5 sm:grid" aria-hidden="true">
             {["Block", "Start", "End", "What", "Stream", ""].map((h) => <span key={h} className={MICRO}>{h}</span>)}
           </div>
           {rows.length === 0 && <p className="py-2 text-sm text-[var(--muted-foreground)]">No rows yet. Add one.</p>}
           {rows.map((r, i) => (
-            <div key={i} className="grid grid-cols-[minmax(0,1fr)_5.25rem_5.25rem] items-center gap-1.5 py-1 sm:grid-cols-[minmax(6rem,1.1fr)_5.75rem_5.75rem_minmax(5.5rem,1.4fr)_minmax(6rem,1fr)_auto]">
+            <div key={i} className="grid grid-cols-[minmax(0,1fr)_6.5rem_6.5rem] items-center gap-1.5 py-1 sm:grid-cols-[minmax(6rem,1.1fr)_7.25rem_7.25rem_minmax(5.5rem,1.4fr)_minmax(6rem,1fr)_auto]">
               <select className={FIELD} aria-label="Block" value={r.block} onChange={(e) => edit(i, { block: e.target.value })}>
                 {choices.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
                 {!choices.some((b) => b.key === r.block) && <option value={r.block}>{byKey.get(r.block)?.label ?? r.block} (archived)</option>}
@@ -97,7 +97,7 @@ export function ScheduleSection({ draft, streams, onChange }: Props) {
             Times are 24h <span className="font-mono">HH:MM</span> or a prayer with an offset, like <span className="font-mono">fajr+10</span> or <span className="font-mono">maghrib-15</span>.
             A stream on a row makes it the owner of that slot on the Overview.
           </p>
-          {problems.length > 0 && <div className="mt-2 rounded-lg bg-[var(--warn)]/10 px-2.5 py-1.5 text-xs text-[var(--warn)]">{problems.map((p) => <p key={p}>{p}</p>)}</div>}
+          {problems.length > 0 && <div className="mt-2 rounded-lg bg-[var(--warn)]/10 px-2.5 py-1.5 text-xs text-[var(--warn)]">{problems.map((p, i) => <p key={`${i}-${p}`}>{p}</p>)}</div>}
         </div>
         <div className="mx-auto w-full max-w-[16rem] text-center lg:sticky lg:top-3">
           <svg viewBox="0 0 260 260" role="img" aria-label="Preview of the 24 hour clock" className="h-auto w-full">

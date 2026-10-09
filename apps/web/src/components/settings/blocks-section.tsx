@@ -50,10 +50,10 @@ export function BlocksSection({ blocks, onChange, usedKeys }: Props) {
   return (
     <SettingsSection id="blocks" title="Blocks" aside={`${active.length} active · ${active.filter((b) => b.counts_for_stars).length} count for stars`}>
       <p className="mb-2 max-w-[62ch] text-sm text-[var(--muted-foreground)]">A block is a part of your day. It shows on the clock when the schedule uses it, and you give it stars when &quot;Stars&quot; is on. Archived blocks keep your history readable.</p>
-      <ul>
+      <ul className="max-w-[46rem]">
         {active.map((b, i) => (
           <li key={b.key} className="border-t border-[var(--border)] first:border-t-0">
-            <div className="grid grid-cols-[auto_auto_minmax(0,1.4fr)_minmax(4.5rem,.6fr)_auto_auto] items-center gap-2 py-1.5 max-sm:grid-cols-[auto_auto_minmax(0,1fr)_auto]">
+            <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_6rem_auto_auto] items-center gap-2 py-1.5 max-sm:grid-cols-[auto_auto_minmax(0,1fr)_auto]">
               <span className="flex flex-col">
                 <button type="button" disabled={i === 0} onClick={() => move(b.key, -1)} aria-label={`Move ${b.label} up`} className="px-1 text-[0.625rem] leading-none text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-30">▲</button>
                 <button type="button" disabled={i === active.length - 1} onClick={() => move(b.key, 1)} aria-label={`Move ${b.label} down`} className="px-1 text-[0.625rem] leading-none text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-30">▼</button>

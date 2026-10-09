@@ -66,6 +66,7 @@ class VaultSyncStatus(BaseModel):
     head_at: str | None  # that commit's time (ISO 8601)
     pulled_at: str | None  # when the vault remote was last contacted (ISO 8601)
     days: int  # daily notes synced into the database
+    storage: str = "vault"  # "db": days are the user's own and there is nothing to sync
 
 
 class VaultSyncResponse(BaseModel):

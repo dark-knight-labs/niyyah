@@ -48,7 +48,8 @@ export function VaultHeader({ today, status, onSynced }: VaultHeaderProps) {
   }
 
   const modeColor = today ? resolveModeColor(today.mode) : "#71717a";
-  const empty = status !== null && status.head === null;
+  const stored = status?.storage === "db"; // the user's own days: nothing to pull from a vault
+  const empty = status !== null && !stored && status.head === null;
 
   return (
     <header className="grid gap-1.5">
@@ -69,16 +70,17 @@ export function VaultHeader({ today, status, onSynced }: VaultHeaderProps) {
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted-foreground)]">
           {today && <span className="font-mono tabular-nums">{today.total}/{today.possible} · {today.pct}%</span>}
-          {status && !empty && (
+          {stored && status && <span className="font-mono tabular-nums">{status.days} {status.days === 1 ? "day" : "days"} logged</span>}
+          {status && !empty && !stored && (
             <span className="font-mono tabular-nums" title={`Vault remote last contacted ${status.pulled_at ?? "never"}`}>
               synced {ago(status.pulled_at ?? status.head_at)} · {status.head} · {status.days} days
             </span>
           )}
-          <button onClick={handleSync} disabled={syncing}
+          {!stored && <button onClick={handleSync} disabled={syncing}
             className="flex min-h-8 items-center gap-1.5 rounded-[0.3125rem] border border-[var(--border)] px-2.5 text-[0.6875rem] font-semibold text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50">
             <RefreshCw size={12} className={syncing ? "animate-spin" : ""} />
             {syncing ? "Syncing" : "Sync now"}
-          </button>
+          </button>}
         </div>
       </div>
       {empty && (

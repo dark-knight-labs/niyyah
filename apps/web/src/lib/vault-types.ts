@@ -86,6 +86,8 @@ export interface VaultSyncStatusData {
   /** When the vault remote was last contacted. */
   pulled_at: string | null;
   days: number;
+  /** "db": the days are the user's own, so there is no vault to sync. */
+  storage: "vault" | "db";
 }
 
 export interface VaultGoal {

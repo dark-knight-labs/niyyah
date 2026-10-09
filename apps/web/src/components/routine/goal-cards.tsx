@@ -4,7 +4,7 @@ import { VaultGoalsData } from "@/lib/vault-types";
 export function GoalCards({ data }: { data: VaultGoalsData | null }) {
   const items = data?.items ?? [];
   if (data && items.length === 0) {
-    return <p className="mb-3 text-xs text-[var(--muted-foreground)]">No goals yet. Add one line each to Calendar/Goals.md in the vault.</p>;
+    return <p className="mb-3 text-xs text-[var(--muted-foreground)]">No goals yet.</p>;
   }
   return (
     <ul className="mb-3 flex flex-wrap gap-x-8 gap-y-2 border-y border-[var(--border)] py-2">

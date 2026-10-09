@@ -266,6 +266,8 @@ async def get_schedule(user: User | None = Depends(get_optional_user), db: Async
 
 @router.post("/sync", response_model=VaultSyncResponse)
 async def trigger_sync(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if _db_mode():
+        raise HTTPException(status_code=409, detail="Your days are stored in Niyyah; there is no vault to sync")
     result = await sync_vault(db)
     return VaultSyncResponse(synced_days=result.synced_days, errors=result.errors)
 
@@ -273,8 +275,10 @@ async def trigger_sync(user: User = Depends(get_current_user), db: AsyncSession 
 @router.get("/sync/status", response_model=VaultSyncStatus)
 async def sync_status(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Where the vault checkout is and how many days are in the database, for the Vault page's status line."""
-    state = await asyncio.to_thread(vault_status, settings.vault_workdir)
     days = (await db.execute(_owned(select(func.count()).select_from(VaultDay), user))).scalar_one()
+    if _db_mode():
+        return VaultSyncStatus(head=None, head_at=None, pulled_at=None, days=days, storage="db")
+    state = await asyncio.to_thread(vault_status, settings.vault_workdir)
     return VaultSyncStatus(**state, days=days)
 
 
@@ -751,8 +755,9 @@ def _quarter_response(today: date) -> QuarterResponse:
 async def _db_quarter(db: AsyncSession, user: User, today: date) -> QuarterResponse:
     label = quarter_for(today)
     data = await planner_store.quarter_data(db, user.id, label)
-    if data is None:
-        raise HTTPException(status_code=404, detail=f"No plan for {label} yet")
+    if data is None:  # a new account has no plan yet: start this quarter with the placeholder objective
+        await _db_run(db, lambda: planner_work.ensure_quarter(db, user.id, label))
+        data = await planner_store.quarter_data(db, user.id, label)
     return quarter_response(data, label, today)
 
 

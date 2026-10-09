@@ -16,7 +16,7 @@ from app.services.vault_notebook import _URL
 from app.services.vault_objectives import weekly_streams
 from app.services.vault_pipeline import STALE_DAYS
 from app.services.vault_quarter import quarter_for
-from app.services.vault_streams import Stream, default_streams
+from app.services.vault_streams import Stream
 from app.services.vault_tasks import line_hash
 
 
@@ -34,10 +34,10 @@ def _stream(row: QuarterStream) -> Stream:
 
 
 async def streams_for(db: AsyncSession, user_id: int, today: date) -> list[Stream]:
-    """The streams of today's quarter; the built-ins stand in until that quarter exists, as with the vault note."""
+    """The streams of today's quarter. A new account has none until it adds some: the owner's built-in streams are never lent out."""
     rows = await _all(db, select(QuarterStream).where(
         QuarterStream.user_id == user_id, QuarterStream.quarter == quarter_for(today)).order_by(QuarterStream.position))
-    return [_stream(r) for r in rows] or default_streams()
+    return [_stream(r) for r in rows]
 
 
 async def day_tasks(db: AsyncSession, user_id: int, day: date) -> list[dict]:

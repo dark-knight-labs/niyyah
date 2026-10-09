@@ -280,4 +280,4 @@ async def test_sync_status_endpoint_counts_days(auth_client, monkeypatch):
     monkeypatch.setattr(vault, "vault_status", lambda w: {"head": "abc1234", "head_at": "2026-10-08T10:00:00+06:00", "pulled_at": None})
     resp = await auth_client.get("/api/v1/vault/sync/status")
     assert resp.status_code == 200
-    assert resp.json() == {"head": "abc1234", "head_at": "2026-10-08T10:00:00+06:00", "pulled_at": None, "days": 0}
+    assert resp.json() == {"head": "abc1234", "head_at": "2026-10-08T10:00:00+06:00", "pulled_at": None, "days": 0, "storage": "vault"}

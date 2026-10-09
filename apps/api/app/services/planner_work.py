@@ -194,18 +194,13 @@ async def sync_focus(db, user_id: int, stream: str, week: str, today: date, *, t
         await move_item(db, user_id, stream, item.id, "done" if done else "now", today)
 
 
-async def _quarter(db, user_id: int, label: str) -> Quarter:
-    """This quarter's row; a new quarter starts like the vault's skeleton note: a placeholder objective and the built-in extras."""
+async def ensure_quarter(db, user_id: int, label: str) -> Quarter:
+    """This quarter's row; a new quarter starts with the vault skeleton's placeholder objective and no streams."""
     row = (await db.execute(select(Quarter).where(Quarter.user_id == user_id, Quarter.label == label))).scalar_one_or_none()
-    if row is not None:
-        return row
-    row = Quarter(user_id=user_id, label=label, starts=None, ends=None, objective="Set this quarter's Super Objective", objective_ar="")
-    db.add(row)
-    extras = [make_stream(sid, goal=False) for sid, d in DEFAULTS.items() if d.get("goal") is False]
-    for pos, s in enumerate(extras):
-        db.add(QuarterStream(user_id=user_id, quarter=label, slug=s.id, name=s.name, color=s.color, icon=s.icon, slot=s.slot,
-                             weekly=s.weekly, has_pipeline=s.goal, in_note=False, goal="", status=s.status, checkpoints=[], position=pos))
-    await db.flush()
+    if row is None:
+        row = Quarter(user_id=user_id, label=label, starts=None, ends=None, objective="Set this quarter's Super Objective", objective_ar="")
+        db.add(row)
+        await db.flush()
     return row
 
 
@@ -218,7 +213,7 @@ async def set_super_objective(db, user_id: int, label: str, text: str, arabic: s
     text = _one_line(text, "objective")
     if not text:
         raise ValueError("objective is empty")
-    quarter = await _quarter(db, user_id, label)
+    quarter = await ensure_quarter(db, user_id, label)
     quarter.objective = text
     if arabic is not None:
         quarter.objective_ar = _one_line(arabic, "Arabic text")
@@ -237,7 +232,7 @@ def _set_checkpoint_text(row: QuarterStream, month: str, text: str) -> None:
 
 async def update_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str]) -> None:
     """Change name/colour/icon/slot/weekly/goal/status and month checkpoints of one stream defined in the quarter."""
-    await _quarter(db, user_id, label)
+    await ensure_quarter(db, user_id, label)
     row = next((r for r in await _stream_rows(db, user_id, label) if r.slug == stream and r.in_note), None)
     if row is None:
         raise ValueError(f"unknown stream '{stream}'")
@@ -258,7 +253,7 @@ async def update_stream(db, user_id: int, label: str, stream: str, fields: dict[
 async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str]) -> None:
     if not SLUG.match(stream):
         raise ValueError("id must be 2-24 lowercase letters, digits or dashes, starting with a letter")
-    await _quarter(db, user_id, label)
+    await ensure_quarter(db, user_id, label)
     rows = await _stream_rows(db, user_id, label)
     if any(r.slug == stream and r.in_note for r in rows):
         raise ValueError(f"stream '{stream}' already exists")

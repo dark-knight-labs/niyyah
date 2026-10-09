@@ -81,9 +81,9 @@ async def test_a_second_user_sees_none_of_the_first_users_data(auth_client: Asyn
     d = today.isoformat()
     assert await _get(auth_client, f"/api/v1/vault/day/{d}/tasks", other) == []
     assert (await _get(auth_client, "/api/v1/vault/goals", other))["items"] == []
-    assert (await _get(auth_client, "/api/v1/vault/notebooks", other))["streams"][0]["entries"] == []
+    assert (await _get(auth_client, "/api/v1/vault/notebooks", other))["streams"] == []
     assert (await auth_client.get("/api/v1/vault/today", headers=other)).status_code == 404
-    assert (await auth_client.get("/api/v1/vault/quarter", headers=other)).status_code == 404
+    assert (await _get(auth_client, "/api/v1/vault/quarter", other))["streams"] == []
     assert (await auth_client.get("/api/v1/vault/schedule", headers=other)).status_code == 404
     assert len(await _get(auth_client, f"/api/v1/vault/day/{d}/tasks")) == 2  # the owner still has theirs
 
@@ -107,3 +107,5 @@ async def test_sync_status_counts_only_the_callers_days(auth_client: AsyncClient
     monkeypatch.setattr(settings, "storage_backend", "db")
     assert (await _get(auth_client, "/api/v1/vault/sync/status"))["days"] == 2
     assert (await _get(auth_client, "/api/v1/vault/sync/status", other))["days"] == 0
+    assert (await _get(auth_client, "/api/v1/vault/sync/status"))["storage"] == "db"
+    assert (await auth_client.post("/api/v1/vault/sync", json={})).status_code == 409
