@@ -23,7 +23,9 @@ def client_ip(request: Request) -> str:
     entry from the right; anything further left was written by the client and is never used."""
     hops = settings.trusted_proxy_hops
     if hops > 0:
-        entries = [e.strip() for e in request.headers.get("x-forwarded-for", "").split(",") if e.strip()]
+        # A proxy may add its entry as a separate header line: read every line, in order, as one list.
+        lines = request.headers.getlist("x-forwarded-for")
+        entries = [e.strip() for line in lines for e in line.split(",") if e.strip()]
         if len(entries) >= hops:
             return entries[-hops]
     return request.client.host if request.client else "unknown"

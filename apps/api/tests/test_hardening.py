@@ -92,3 +92,13 @@ async def test_different_real_clients_behind_the_proxy_are_counted_apart(client,
 
 def test_negative_hops_are_refused():
     assert check_secrets(cfg(trusted_proxy_hops=-1))
+
+
+@pytest.mark.asyncio
+async def test_every_forwarded_header_line_is_read(client, monkeypatch):
+    monkeypatch.setattr(live, "trusted_proxy_hops", 1)
+    # the client writes the first line; the proxy adds its own line with the real address, which must be the one counted
+    codes = [(await client.post("/api/v1/auth/login", json={"email": f"u{i}@example.com", "password": "x"},
+                                 headers=[("x-forwarded-for", f"spoof{i}"), ("x-forwarded-for", "203.0.113.9")])).status_code
+             for i in range(21)]
+    assert codes[-1] == 429
