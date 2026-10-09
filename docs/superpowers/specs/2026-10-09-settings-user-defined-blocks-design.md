@@ -1,6 +1,6 @@
 # Settings and user-defined blocks (storage phase 4)
 
-Date: 2026-10-09. Status: design and mock approved by the owner (mock: https://claude.ai/artifact/Q7Ffwr4FHcRkEXxjQqLcpR). Part of `2026-10-08-db-storage-design.md`, phase 4.
+Date: 2026-10-09. Status: built (see Result at the end); design and mock approved by the owner (mock: https://claude.ai/artifact/Q7Ffwr4FHcRkEXxjQqLcpR). Part of `2026-10-08-db-storage-design.md`, phase 4.
 
 ## Goal
 
@@ -36,7 +36,7 @@ A new user can make Niyyah theirs without touching code: set their location and 
 ## API (all under `/vault/config`, signed-in user, own rows only)
 
 - `GET /blocks` returns the ordered list including archived blocks. `PUT /blocks` takes the whole ordered list; the server creates, updates, reorders and archives. A key that existing votes or schedule rows use is never deleted: omitting it archives it. Keys are slugs and cannot change after creation.
-- `PUT /schedule` takes `{meta, weekday: [...], weekend: [...]}`. It validates times (`HH:MM` or a prayer anchor with an offset), that each block exists and is not archived, that each stream is a stream of the current quarter, and that `weekend_days` are valid. Overlaps are reported as warnings in the response, not errors.
+- `PUT /schedule` takes `{meta, weekday: [...], weekend: [...]}`. It validates times (`HH:MM` or a prayer anchor with an offset), that each block exists and is not archived, that each stream is a stream of the current quarter, and that the location and `weekend_days` are valid. Overlap warnings are computed in the web app only, because prayer anchors are resolved there.
 - `GET /feeds` lists feeds with the URL masked to its host. `POST /feeds` adds one (https only). `DELETE /feeds/{id}` removes one. The full URL is never returned.
 - `GET /vault/schedule` rows gain `stream`; its `meta` gains `weekend_days`.
 - In `db` mode vote validation, the new-day layout and the `/vault/blocks?days=` series use the user's blocks. A new day is created with the user's current counted, non-archived blocks.
@@ -57,3 +57,19 @@ User-defined modes, a seven-day schedule, a streams editor in Settings, export, 
 - API: block replace (create, rename, reorder, archive, refuse to delete used keys), schedule validation (bad time, unknown block, unknown stream, overlap warning), feeds masking, seeding at registration, the star ceiling for 2, 6 and 7 blocks, votes on a custom block, a new day built from current blocks, and isolation between two users.
 - A new-account journey test: register, seeded, set location, add a block, schedule it, vote on it, read the Vault series.
 - Web: `tsc` and `next build`; then the app run locally in `db` mode and the pages driven in a browser (Overview, Vault, Plan, Settings) at desktop and phone widths, light and dark.
+
+## Result (2026-10-09)
+
+Built as specified, with these changes found while building and running it:
+
+- Block keys are at most 20 characters, the width of the existing `block` columns on votes and schedule rows.
+- A block that a day does not have yet joins that day on its first vote, so adding a block mid-day works.
+- A new day is created from the user's current counted blocks, not by copying the previous day. The star ceiling is `round(mode_base * counted_blocks / 7)`.
+- Calendar addresses are fetched by the server, so they are checked to be https, on the standard port, and to resolve only to public hosts; every redirect hop is checked again and the response is capped at 5 MB.
+- A new account is never lent the owner's built-in streams. Its first look at the Plan page creates the quarter with the placeholder objective and no streams.
+- In db mode the Vault page shows "N days logged" and no Sync button; `POST /vault/sync` answers 409.
+- `GET /vault/schedule` rows carry `stream` and its `meta` carries `weekend_days` in both modes; vault mode derives them from the old rules, so the owner's pages behave as before.
+
+Checked by running the app locally: a new account in db mode (register, set location, add a block, schedule it, vote on it, archive refusal, calendar address masking) and the same pages in vault mode against a fixture vault (public clock, Overview, Vault, Plan). No horizontal overflow at 390 px on Overview, Plan, Vault or Settings; dark mode checked on Overview.
+
+Not done, and left for later: an editor for the Overview goals in db mode (the table and read path exist), user-defined modes, and one word for two things: the Plan page calls a stream a "block" while Settings uses "block" for a part of the day.

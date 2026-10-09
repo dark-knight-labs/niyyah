@@ -65,13 +65,12 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
             const ownerId = slotOwnerFor(schedule, new Date(`${d}T12:00:00Z`));
             const owner = streams.find((s) => s.id === ownerId);
             const isToday = d === today;
-            if (!owner) return null;
             return (
               <li key={d} className="min-w-0 rounded-xl border border-[var(--border)] px-1 py-2 text-center"
-                style={{ borderTop: `3px solid ${owner.color}`, background: isToday ? "var(--accent-light)" : "var(--surface)", outline: isToday ? "2px solid var(--accent)" : undefined, outlineOffset: -1 }}>
+                style={{ borderTop: `3px solid ${owner?.color ?? "var(--border)"}`, background: isToday ? "var(--accent-light)" : "var(--surface)", outline: isToday ? "2px solid var(--accent)" : undefined, outlineOffset: -1 }}>
                 <span className="block text-[0.625rem] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">{fmtDay(d, { weekday: "short" })}</span>
                 <b className="block text-[0.875rem] tabular-nums">{fmtDay(d, { day: "numeric" })}</b>
-                <span className="block truncate text-[0.625rem] font-bold" style={{ color: owner.color }}>{owner.label === "Alisha Noor" ? "Alisha" : owner.label}</span>
+                <span className="block truncate text-[0.625rem] font-bold" style={{ color: owner?.color ?? "var(--muted-foreground)" }}>{owner ? (owner.label === "Alisha Noor" ? "Alisha" : owner.label) : "·"}</span>
               </li>
             );
           })}
