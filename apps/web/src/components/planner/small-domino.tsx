@@ -15,9 +15,9 @@ interface Props {
   onPick: (item: PipelineItemData) => void;
 }
 
-/** The week's one thing for a block: tick it, rewrite it, or pick it from the pipeline. */
+/** The week's one thing for a stream: tick it, rewrite it, or pick it from the pipeline. */
 export function SmallDomino({ meta, objective, pool, run, onPick }: Props) {
-  if (!meta.weekly) return <p className="text-sm text-[var(--muted-foreground)]">No weekly objective for this block.</p>;
+  if (!meta.weekly) return <p className="text-sm text-[var(--muted-foreground)]">No weekly objective for this stream.</p>;
   const done = objective?.done ?? false;
   return (
     <div>

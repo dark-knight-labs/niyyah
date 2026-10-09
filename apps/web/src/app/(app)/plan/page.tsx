@@ -19,7 +19,7 @@ import { StreamChange } from "@/lib/vault-types";
 
 const RAIL_KEY = "niyyah-plan-rail";
 
-/** Plan: the Super Objective, the week, and each block's goal, small domino, pipeline and notebook in one place. */
+/** Plan: the Super Objective, the week, and each stream's goal, small domino, pipeline and notebook in one place. */
 export default function PlanPage() {
   const { loading, owner, quarter, quarterError, pipelines, objectives, notebooks, schedule, streams, error, reload } = usePlanner();
   // The page renders a spinner until the plan loads, so reading the browser here cannot cause a hydration mismatch.
@@ -85,10 +85,10 @@ export default function PlanPage() {
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
       <div className={`grid gap-6 lg:items-start ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[13rem_minmax(0,1fr)]"}`}>
-        <nav aria-label="Blocks" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:p-0 [&::-webkit-scrollbar]:hidden">
-          <button type="button" onClick={toggleRail} aria-expanded={!collapsed} aria-label={collapsed ? "Expand the block list" : "Collapse the block list"}
+        <nav aria-label="Streams" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:p-0 [&::-webkit-scrollbar]:hidden">
+          <button type="button" onClick={toggleRail} aria-expanded={!collapsed} aria-label={collapsed ? "Expand the stream list" : "Collapse the stream list"}
             className="hidden min-h-10 items-center gap-2 rounded-lg px-2.5 text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)] hover:bg-[var(--muted)] lg:flex">
-            {collapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <><PanelLeftClose size={16} aria-hidden="true" /> Blocks</>}
+            {collapsed ? <PanelLeftOpen size={16} aria-hidden="true" /> : <><PanelLeftClose size={16} aria-hidden="true" /> Streams</>}
           </button>
           {streams.map((s) => {
             const on = s.id === meta?.id;
@@ -107,17 +107,17 @@ export default function PlanPage() {
               </button>
             );
           })}
-          <button type="button" onClick={() => setEditing("new")} aria-label="Add a block" title="Add a block"
+          <button type="button" onClick={() => setEditing("new")} aria-label="Add a stream" title="Add a stream"
             className={`flex min-h-11 shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-sm font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--accent)] ${collapsed ? "lg:justify-center lg:px-0" : ""}`}>
             <Plus size={16} aria-hidden="true" className="shrink-0" />
-            <span className={collapsed ? "lg:sr-only" : ""}>Add a block</span>
+            <span className={collapsed ? "lg:sr-only" : ""}>Add a stream</span>
           </button>
         </nav>
 
         <div className="grid min-w-0 gap-6">
           {editing === "new" && <StreamEditor quarter={quarter} busy={busy} onCancel={() => setEditing(null)} onSave={(c, id) => save(id, c, true)} />}
           {!meta ? (
-            editing !== "new" && <Notice>No blocks yet. Use “Add a block”.</Notice>
+            editing !== "new" && <Notice>No streams yet. Use “Add a stream”.</Notice>
           ) : editing === meta.id && goal ? (
             <StreamEditor quarter={quarter} stream={goal} busy={busy} onCancel={() => setEditing(null)} onSave={(c, id) => save(id, c, false)} />
           ) : (
@@ -130,14 +130,14 @@ export default function PlanPage() {
                 </div>
                 <StatusPill status={meta.status} />
                 {goal && (
-                  <button type="button" aria-label={`Edit ${meta.label}`} title="Edit the block" onClick={() => setEditing(meta.id)}
+                  <button type="button" aria-label={`Edit ${meta.label}`} title="Edit the stream" onClick={() => setEditing(meta.id)}
                     className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"><Pencil size={15} /></button>
                 )}
               </header>
 
               <section aria-label="Goal and small domino" className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-10">
                 <div className="grid gap-4">
-                  <p className={`text-[0.9375rem] font-semibold leading-snug ${goal?.goal ? "" : "text-[var(--muted-foreground)]"}`}>{goal?.goal || "No goal yet. Edit the block to set one."}</p>
+                  <p className={`text-[0.9375rem] font-semibold leading-snug ${goal?.goal ? "" : "text-[var(--muted-foreground)]"}`}>{goal?.goal || "No goal yet. Edit the stream to set one."}</p>
                   {goal && <MonthTrack checkpoints={goal.checkpoints} current={quarter.current_month} color={meta.color} />}
                 </div>
                 <div>
