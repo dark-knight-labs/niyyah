@@ -1,55 +1,60 @@
+# Self-hosting: `cp .env.example .env`, fill it in, `docker compose up --build`. See docs/self-hosting.md.
 services:
   db:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: niyyah
       POSTGRES_USER: niyyah
-      POSTGRES_PASSWORD: niyyah
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U niyyah"]
       interval: 5s
       timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:8-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
   api:
-    build: ./apps/api
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile.standalone
     ports:
-      - "8000:8000"
-    env_file: .env
+      - "127.0.0.1:8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://niyyah:niyyah@db:5432/niyyah
-      REDIS_URL: redis://redis:6379/0
+      APP_ENV: production
+      STORAGE_BACKEND: db
+      RUN_MIGRATIONS: "1"
+      DATABASE_URL: postgresql+asyncpg://niyyah:${POSTGRES_PASSWORD}@db:5432/niyyah
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      REGISTRATION: ${REGISTRATION:-open}
+      CORS_ORIGINS: ${WEB_URL:-http://localhost:3000}
+      WEB_PUBLIC_URL: ${WEB_URL:-http://localhost:3000}
+      API_PUBLIC_URL: ${API_URL:-http://localhost:8000}
+      TRUST_FORWARDED_FOR: ${TRUST_FORWARDED_FOR:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+    restart: unless-stopped
 
   web:
-    build: ./apps/web
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.standalone
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_OPERATOR_NAME: ${OPERATOR_NAME:-}
+        NEXT_PUBLIC_OPERATOR_CONTACT: ${OPERATOR_CONTACT:-}
+        NEXT_PUBLIC_SITE_URL: ${WEB_URL:-}
     ports:
-      - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      - "127.0.0.1:3000:3000"
     depends_on:
       - api
+    restart: unless-stopped
 
 volumes:
   pgdata:
-  redisdata:
