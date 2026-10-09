@@ -22,7 +22,7 @@
     "@radix-ui/react-toast": "^1.2.15",
     "adhan": "^4.4.6",
     "lucide-react": "^0.563.0",
-    "next": "16.1.6",
+    "next": "16.4.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "zustand": "^5.0.10"
