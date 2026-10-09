@@ -1,3 +1,7 @@
+import os
+
+os.environ.setdefault("APP_ENV", "development")  # tests use the default placeholder secrets
+
 import asyncio
 from collections.abc import AsyncGenerator
 
@@ -20,6 +24,13 @@ def event_loop():
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    from app.core import ratelimit
+    ratelimit.reset()
+    yield
 
 
 @pytest_asyncio.fixture(autouse=True)

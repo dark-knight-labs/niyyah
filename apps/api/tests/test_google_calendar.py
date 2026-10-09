@@ -19,6 +19,8 @@ def google_env(monkeypatch):
     monkeypatch.setattr(settings, "google_client_id", "cid")
     monkeypatch.setattr(settings, "google_client_secret", "csecret")
     monkeypatch.setattr(settings, "vault_write_emails", "test@niyyah.app")
+    monkeypatch.setattr(settings, "api_public_url", "https://api.example.com")
+    monkeypatch.setattr(settings, "web_public_url", "https://app.example.com")
     google_calendar._access.clear()
 
 
@@ -43,7 +45,7 @@ async def test_status_connect_and_callback(auth_client: AsyncClient, monkeypatch
     q = parse_qs(urlparse(url).query)
     assert q["access_type"] == ["offline"] and q["prompt"] == ["consent"] and q["client_id"] == ["cid"]
     assert q["scope"] == ["https://www.googleapis.com/auth/calendar.events openid email"]
-    assert q["redirect_uri"] == ["https://niyyah-api.alamin.rocks/api/v1/vault/calendar/google/callback"]
+    assert q["redirect_uri"] == ["https://api.example.com/api/v1/vault/calendar/google/callback"]
     assert jwt.decode(q["state"][0], settings.secret_key, algorithms=["HS256"])["purpose"] == "google-calendar"
 
     await _connect(auth_client, monkeypatch)

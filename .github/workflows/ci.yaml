@@ -1,60 +1,75 @@
-name: CI/CD
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
-
-env:
-  REGISTRY: registry.homelab.alamin.rocks
-  API_IMAGE: registry.homelab.alamin.rocks/niyyah/api
-  WEB_IMAGE: registry.homelab.alamin.rocks/niyyah/web
 
 jobs:
-  test-api:
-    runs-on: homelab-runner
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -r apps/api/requirements.txt
-      - run: cd apps/api && pytest -v
+          cache: pip
+          cache-dependency-path: apps/api/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+        env:
+          APP_ENV: development
 
-  lint-web:
-    runs-on: homelab-runner
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: niyyah
+          POSTGRES_USER: niyyah
+          POSTGRES_PASSWORD: niyyah
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U niyyah" --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://niyyah:niyyah@localhost:5432/niyyah
+          APP_ENV: development
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm ci
+      - run: npm install
+      - run: npx tsc --noEmit -p .
       - run: npm run lint
+      - run: npm run build
 
-  build-and-deploy:
-    runs-on: homelab-runner
-    needs: [test-api, lint-web]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  secrets:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to registry
-        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ env.REGISTRY }} -u "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
-
-      - name: Build and push API
-        run: |
-          docker build -t ${{ env.API_IMAGE }}:latest apps/api/
-          docker push ${{ env.API_IMAGE }}:latest
-
-      - name: Build and push web
-        run: |
-          docker build -t ${{ env.WEB_IMAGE }}:latest apps/web/
-          docker push ${{ env.WEB_IMAGE }}:latest
-
-      - name: Deploy to Kubernetes
-        run: |
-          kubectl rollout restart deployment/niyyah-api -n niyyah
-          kubectl rollout restart deployment/niyyah-web -n niyyah
-          kubectl rollout status deployment/niyyah-api -n niyyah --timeout=120s
-          kubectl rollout status deployment/niyyah-web -n niyyah --timeout=120s
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

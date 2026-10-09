@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { site } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Privacy Policy - Niyyah" };
 
@@ -7,17 +8,18 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-12 space-y-5 text-sm leading-relaxed">
       <h1 className="text-2xl font-semibold">Privacy Policy</h1>
-      <p className="text-[var(--muted-foreground)]">Last updated 6 October 2026</p>
+      <p className="text-[var(--muted-foreground)]">Last updated 9 October 2026</p>
       <p>
-        Niyyah is a personal productivity app run by Alamin Mahamud for his own use at niyyah.alamin.rocks. Anyone can view
-        the public routine page. Everything else is private to the owner.
+        Niyyah{site.url ? ` at ${site.url}` : ""} is a personal planner run by {site.operator}. Everything you enter is private to
+        your account.
       </p>
       <h2 className="text-lg font-semibold">What Niyyah handles</h2>
       <ul className="list-disc pl-5 space-y-1">
-        <li>The owner&apos;s account details (email, hashed password) and sign-in sessions.</li>
-        <li>Notes, tasks and logs stored in the owner&apos;s own Obsidian vault, which Niyyah reads and writes.</li>
+        <li>Your account details (email, hashed password) and sign-in sessions.</li>
+        <li>What you put in the planner: your blocks and schedule, tasks, logs, goals, streams and pipelines.</li>
+        <li>Calendar addresses you add. They are stored on the server and never sent back to the browser.</li>
         <li>
-          If the owner connects Google Calendar: a refresh token and the connected Google email address, used only to add
+          If you connect Google Calendar: a refresh token and the connected Google email address, used only to add
           events to and read events from that calendar.
         </li>
       </ul>
@@ -32,13 +34,14 @@ export default function PrivacyPage() {
       </p>
       <h2 className="text-lg font-semibold">Storage and retention</h2>
       <p>
-        Data lives on the owner&apos;s own servers. The Google refresh token is stored in the app&apos;s database. You can revoke
+        Data lives in the database of the server that runs Niyyah. The Google refresh token is stored there too. You can revoke
         access at any time at{" "}
         <a className="underline" href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>; on
-        request the stored token is deleted. Visitors who are not signed in are not tracked and no cookies are set for them.
+        request the stored token is deleted, and you can download all your data from your account. Visitors who are not signed
+        in are not tracked and no cookies are set for them.
       </p>
       <h2 className="text-lg font-semibold">Contact</h2>
-      <p>Questions or deletion requests: alamin.root@gmail.com.</p>
+      <p>{site.contact ? `Questions or deletion requests: ${site.contact}.` : `Questions or deletion requests: contact ${site.operator}.`}</p>
       <p><Link className="underline" href="/terms">Terms of Service</Link></p>
     </main>
   );

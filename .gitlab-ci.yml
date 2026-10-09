@@ -39,12 +39,27 @@ build:api:
     CONTEXT: apps/api
     DEPS_FILES: apps/api/requirements.txt
 
+# The web bundle bakes in the public API address and the operator named on the legal pages (NEXT_PUBLIC_* are build-time).
 build:web:
   extends: .build_on_base
   variables:
     IMAGE: web
     CONTEXT: apps/web
     DEPS_FILES: apps/web/package.json
+    PUBLIC_API_URL: https://niyyah-api.alamin.rocks
+    OPERATOR_NAME: Alamin Mahamud
+    OPERATOR_CONTACT: alamin.root@gmail.com
+    SITE_URL: niyyah.alamin.rocks
+  script:
+    - DEPS_HASH=$(cat $DEPS_FILES $CONTEXT/Dockerfile.base | sha256sum | cut -c1-12)
+    - BASE=$REGISTRY/$IMAGE-base:$DEPS_HASH
+    - docker pull -q $BASE || { docker build --network host -f $CONTEXT/Dockerfile.base -t $BASE $CONTEXT && docker push $BASE; }
+    - >-
+      docker build --network host --build-arg BASE_IMAGE=$BASE
+      --build-arg NEXT_PUBLIC_API_URL="$PUBLIC_API_URL" --build-arg NEXT_PUBLIC_OPERATOR_NAME="$OPERATOR_NAME"
+      --build-arg NEXT_PUBLIC_OPERATOR_CONTACT="$OPERATOR_CONTACT" --build-arg NEXT_PUBLIC_SITE_URL="$SITE_URL"
+      -t $REGISTRY/$IMAGE:latest -t $REGISTRY/$IMAGE:$CI_COMMIT_SHORT_SHA $CONTEXT
+    - docker push $REGISTRY/$IMAGE --all-tags
 
 deploy:
   stage: deploy

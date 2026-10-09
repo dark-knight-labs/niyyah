@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { site } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Terms of Service - Niyyah" };
 
@@ -7,14 +8,14 @@ export default function TermsPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-12 space-y-5 text-sm leading-relaxed">
       <h1 className="text-2xl font-semibold">Terms of Service</h1>
-      <p className="text-[var(--muted-foreground)]">Last updated 6 October 2026</p>
+      <p className="text-[var(--muted-foreground)]">Last updated 9 October 2026</p>
       <p>
-        Niyyah (niyyah.alamin.rocks) is a personal productivity tool run by Alamin Mahamud. By using it you agree to these terms.
+        Niyyah{site.url ? ` (${site.url})` : ""} is a personal planner run by {site.operator}. By using it you agree to these terms.
       </p>
       <h2 className="text-lg font-semibold">Use of the service</h2>
       <p>
-        The public routine page is free to view. Editing, tasks, logs and the Google Calendar connection are limited to the
-        owner. Do not attempt to access private data, disrupt the service or probe it for weaknesses.
+        Your account holds your own plan, tasks and logs, and nobody else can see them. Do not attempt to access other people&apos;s
+        data, disrupt the service or probe it for weaknesses.
       </p>
       <h2 className="text-lg font-semibold">Google Calendar</h2>
       <p>
@@ -23,12 +24,11 @@ export default function TermsPage() {
       </p>
       <h2 className="text-lg font-semibold">No warranty</h2>
       <p>
-        The service is provided as is, without warranties of any kind. It is a personal project: it may change, be
-        unavailable or be shut down at any time. The author is not liable for any loss arising from its use, including
-        missed events or lost data.
+        The service is provided as is, without warranties of any kind. It may change, be unavailable or be shut down at any
+        time. The operator and the authors are not liable for any loss arising from its use, including missed events or lost data.
       </p>
       <h2 className="text-lg font-semibold">Changes and contact</h2>
-      <p>These terms may be updated; the date above shows the latest version. Contact: alamin.root@gmail.com.</p>
+      <p>These terms may be updated; the date above shows the latest version.{site.contact ? ` Contact: ${site.contact}.` : ""}</p>
     </main>
   );
 }

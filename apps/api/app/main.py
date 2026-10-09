@@ -1,10 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
+from app.core.config import check_secrets, settings
 from app.api.v1 import auth, personas, schedule, principles, tracker, settings as settings_router, dashboard, vault, tokens, export
 
-app = FastAPI(title="Niyyah API", version="1.0.0", docs_url="/docs", redoc_url="/redoc")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    problems = check_secrets(settings)
+    if problems:
+        raise RuntimeError("Refusing to start with unsafe configuration:\n- " + "\n- ".join(problems))
+    yield
+
+
+app = FastAPI(title="Niyyah API", version="1.0.0", docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
