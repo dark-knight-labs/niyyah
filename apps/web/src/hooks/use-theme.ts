@@ -8,7 +8,7 @@ interface ThemeSetting {
   theme: string;
 }
 
-function applyResolvedTheme(theme: string) {
+export function applyResolvedTheme(theme: string) {
   const resolved =
     theme === "system"
       ? window.matchMedia("(prefers-color-scheme: dark)").matches

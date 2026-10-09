@@ -5,12 +5,15 @@ credentials of its own. They are private links: they never leave the server, and
 When Google is connected, the feed for the connected account is read through the Calendar API instead: Google's
 iCal export lags by hours, so a freshly added event would not show.
 """
+import ipaddress
 import json
 import re
+import socket
 import time
 from collections.abc import Callable
 from datetime import date, datetime, time as clock, timedelta
 from pathlib import Path
+from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -45,14 +48,53 @@ def sources(root: Path) -> list[dict]:
     return [{"name": c.get("name") or "Calendar", "url": c["url"], "color": c.get("color"), "email": c.get("email")} for c in icals if c.get("url")]
 
 
+MAX_FEED_BYTES = 5_000_000
+MAX_REDIRECTS = 3
+
+
+def check_public_url(url: str) -> None:
+    """Refuse an address the server must not fetch: it has to be https, on the default port, and resolve only to public hosts.
+
+    Calendar addresses are typed in by users and fetched from the server, so without this a feed could probe the cluster
+    network or a cloud metadata service. Raises ValueError with a message that is safe to show.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise ValueError("the calendar address must start with https://")
+    if parsed.port not in (None, 443):
+        raise ValueError("the calendar address must use the standard https port")
+    try:
+        infos = socket.getaddrinfo(parsed.hostname, 443, proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        raise ValueError("the calendar address does not resolve")
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        if getattr(ip, "ipv4_mapped", None):
+            ip = ip.ipv4_mapped
+        if not ip.is_global:
+            raise ValueError("the calendar address must point to a public host")
+
+
 def _download(url: str) -> bytes:
     hit = _cache.get(url)
     if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
         return hit[1]
-    res = httpx.get(url, timeout=FETCH_TIMEOUT, follow_redirects=True)
-    res.raise_for_status()
-    _cache[url] = (time.monotonic(), res.content)
-    return res.content
+    target = url
+    for _ in range(MAX_REDIRECTS + 1):
+        check_public_url(target)  # every hop, so a public address cannot redirect into the private network
+        with httpx.stream("GET", target, timeout=FETCH_TIMEOUT, follow_redirects=False) as res:
+            if res.is_redirect:
+                target = urljoin(target, res.headers.get("location", ""))
+                continue
+            res.raise_for_status()
+            body = bytearray()
+            for chunk in res.iter_bytes():
+                body += chunk
+                if len(body) > MAX_FEED_BYTES:
+                    raise ValueError("the calendar is too large")
+        _cache[url] = (time.monotonic(), bytes(body))
+        return bytes(body)
+    raise ValueError("the calendar address redirects too many times")
 
 
 def _minutes(moment: datetime, day_start: datetime) -> int:

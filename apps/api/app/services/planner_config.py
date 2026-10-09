@@ -1,11 +1,13 @@
 """Saving a user's schedule settings; validation mirrors what the web app can resolve."""
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import asyncio
 from urllib.parse import urlparse
 
 from sqlalchemy import delete, func, select
 
 from app.models.planner import PlannerBlock, PlannerCalendarFeed, PlannerScheduleBlock, PlannerScheduleSetting
+from app.services.vault_calendar import check_public_url
 from app.services.planner_defaults import STARTER_BLOCKS, STARTER_META, STARTER_WEEKDAY, STARTER_WEEKEND
 from app.services.vault_schedule import _valid_time
 
@@ -89,11 +91,9 @@ async def list_feeds(db, user_id: int) -> list[dict]:
 
 async def add_feed(db, user_id: int, name: str, url: str) -> None:
     name, url = " ".join(name.split()), url.strip()
-    parsed = urlparse(url)
     if not name or len(name) > 120:
         raise ValueError("give the calendar a name of 1-120 characters")
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise ValueError("the calendar address must start with https://")
+    await asyncio.to_thread(check_public_url, url)  # never store an address the server must not fetch
     top = (await db.execute(select(func.max(PlannerCalendarFeed.position)).where(PlannerCalendarFeed.user_id == user_id))).scalar()
     db.add(PlannerCalendarFeed(user_id=user_id, name=name, url=url, color=None, email=None, position=0 if top is None else top + 1))
     await db.flush()
