@@ -11,6 +11,6 @@ bcrypt>=4.2
 redis>=5.2
 httpx>=0.28
 python-multipart>=0.0.18
-pyyaml>=6.0
+pyyaml>=6.0.3
 icalendar>=6.0
 recurring-ical-events>=3.3
