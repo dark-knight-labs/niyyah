@@ -5,6 +5,7 @@ import { AppearanceSection } from "@/components/settings/appearance-section";
 import { BlocksSection } from "@/components/settings/blocks-section";
 import { GoalsSection } from "@/components/settings/goals-section";
 import { FeedsSection } from "@/components/settings/feeds-section";
+import { TokensSection } from "@/components/settings/tokens-section";
 import { LocationSection } from "@/components/settings/location-section";
 import { ScheduleSection } from "@/components/settings/schedule-section";
 import { useBlocks } from "@/lib/blocks";
@@ -74,6 +75,7 @@ export default function SettingsPage() {
       <GoalsSection goals={draft.goals} onChange={(goals) => set({ goals })} />
       <ScheduleSection draft={draft} streams={streams} onChange={set} />
       <FeedsSection />
+      <TokensSection />
       <AppearanceSection />
       <div className="fixed inset-x-0 bottom-0 flex flex-wrap items-center justify-end gap-2.5 border-t border-[var(--border)] bg-[var(--surface)] px-4 py-2.5">
         <span role="status" className={`mr-auto text-sm ${error ? "text-[var(--destructive)]" : "text-[var(--muted-foreground)]"}`}>{error ?? (dirty ? "Unsaved changes" : "All changes saved")}</span>

@@ -249,3 +249,6 @@ export interface ScheduleConfigIn { meta: ScheduleMetaIn; weekday: ScheduleRowIn
 export interface FeedData { id: number; name: string; host: string; color: string | null; email: string | null }
 
 export interface GoalIn { title: string; value: string; caption: string; progress: number | null }
+
+export interface ApiTokenData { id: number; name: string; prefix: string; created_at: string; last_used_at: string | null }
+export interface NewApiToken extends ApiTokenData { token: string }
