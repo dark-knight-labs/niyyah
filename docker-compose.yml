@@ -33,7 +33,7 @@ services:
       CORS_ORIGINS: ${WEB_URL:-http://localhost:3000}
       WEB_PUBLIC_URL: ${WEB_URL:-http://localhost:3000}
       API_PUBLIC_URL: ${API_URL:-http://localhost:8000}
-      TRUST_FORWARDED_FOR: ${TRUST_FORWARDED_FOR:-false}
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     depends_on:

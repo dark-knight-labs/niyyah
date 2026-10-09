@@ -23,7 +23,7 @@ WEB_URL=https://niyyah.example.com
 API_URL=https://niyyah-api.example.com
 OPERATOR_NAME=Your Name
 OPERATOR_CONTACT=you@example.com
-TRUST_FORWARDED_FOR=true
+TRUSTED_PROXY_HOPS=1
 ```
 
 `API_URL` is baked into the web bundle, so rebuild the web image (`docker compose up --build`) after changing it.

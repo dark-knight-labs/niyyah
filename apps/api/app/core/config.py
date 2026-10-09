@@ -9,8 +9,9 @@ class Settings(BaseSettings):
     app_env: str = "production"
     # "open" lets anyone create an account; "closed" turns the register endpoint off (create accounts another way).
     registration: str = "open"
-    # Behind a reverse proxy the client address is in X-Forwarded-For; trust it only when a proxy you control sets it.
-    trust_forwarded_for: bool = False
+    # How many reverse proxies you control sit in front of the API. 0 = none: the connection's address is the client.
+    # With N, the client is the Nth entry from the right of X-Forwarded-For (entries to its left are client-supplied and ignored).
+    trusted_proxy_hops: int = 0
     database_url: str = "postgresql+asyncpg://niyyah:niyyah@localhost:5432/niyyah"
     secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 15
@@ -55,6 +56,8 @@ def check_secrets(cfg: Settings) -> list[str]:
         problems.append("SECRET_KEY is a placeholder or shorter than 32 characters (generate one: python -c \"import secrets; print(secrets.token_urlsafe(48))\")")
     if cfg.storage_backend == "vault" and _weak(cfg.vault_sync_secret):
         problems.append("VAULT_SYNC_SECRET is a placeholder or shorter than 32 characters")
+    if cfg.trusted_proxy_hops < 0:
+        problems.append("TRUSTED_PROXY_HOPS cannot be negative")
     if cfg.registration not in ("open", "closed"):
         problems.append("REGISTRATION must be 'open' or 'closed'")
     return problems
