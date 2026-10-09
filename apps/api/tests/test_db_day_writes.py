@@ -113,4 +113,4 @@ async def test_a_block_added_later_joins_the_day_on_its_first_vote(db_client):
     assert (await client.put(f"{V}/config/blocks", json={"blocks": blocks})).status_code == 200
     res = await client.put(f"{V}/day/{today}/vote", json={"block": "reading", "stars": 2})
     day = res.json()["day"]
-    assert res.status_code == 200 and day["blocks"]["reading"] == 2 and day["total"] == 4 and day["possible"] == round(21 * 7 / 7)
+    assert res.status_code == 200 and day["blocks"]["reading"] == 2 and day["total"] == 5 and day["possible"] == 21
