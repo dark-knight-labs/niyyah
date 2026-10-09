@@ -4,6 +4,7 @@ import {
   BlockConfig,
   BlocksConfigData,
   FeedData,
+  GoalIn,
   ScheduleConfigIn,
   VaultBlocksSeriesData,
   VaultDayData,
@@ -56,6 +57,7 @@ export const vaultApi = {
   editLog: (day: string, entry: VaultLogEntry, text: string) => api.put<VaultEditData>(`/vault/day/${day}/log`, { index: entry.index, hash: entry.hash, text }),
   removeLog: (day: string, entry: VaultLogEntry) => api.post<VaultEditData>(`/vault/day/${day}/log/remove`, { index: entry.index, hash: entry.hash }),
   goals: () => api.get<VaultGoalsData>("/vault/goals"),
+  saveGoals: (items: GoalIn[]) => api.put<VaultGoalsData>("/vault/config/goals", { items }),
   objectives: () => api.get<VaultObjectivesData>("/vault/objectives"),
   setObjective: (stream: string, change: { text?: string; done?: boolean; checkpoint?: MonthKey | "" }) =>
     api.put<VaultObjectivesData>("/vault/objectives", { stream, ...change }),

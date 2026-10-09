@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from sqlalchemy import delete, func, select
 
-from app.models.planner import PlannerBlock, PlannerCalendarFeed, PlannerScheduleBlock, PlannerScheduleSetting
+from app.models.planner import Goal, PlannerBlock, PlannerCalendarFeed, PlannerScheduleBlock, PlannerScheduleSetting
 from app.services.vault_calendar import check_public_url
 from app.services.planner_defaults import STARTER_BLOCKS, STARTER_META, STARTER_WEEKDAY, STARTER_WEEKEND
 from app.services.vault_schedule import _valid_time
@@ -117,4 +117,37 @@ async def seed_new_user(db, user_id: int) -> None:
     for day_type, rows in (("weekday", STARTER_WEEKDAY), ("weekend", STARTER_WEEKEND)):
         for position, r in enumerate(rows):
             db.add(PlannerScheduleBlock(user_id=user_id, day_type=day_type, position=position, **r))
+    await db.flush()
+
+
+MAX_GOALS = 6
+
+
+def _goal_text(value: str, what: str, limit: int, required: bool) -> str:
+    text = " ".join(value.split())
+    if "|" in value:
+        raise ValueError(f"the {what} cannot contain |")
+    if required and not text:
+        raise ValueError(f"a goal needs a {what}")
+    if len(text) > limit:
+        raise ValueError(f"the {what} is longer than {limit} characters")
+    return text
+
+
+async def replace_goals(db, user_id: int, items: list[dict]) -> None:
+    """Replace the user's goals (the cards at the top of the Overview) with `items`, in order."""
+    if len(items) > MAX_GOALS:
+        raise ValueError(f"at most {MAX_GOALS} goals")
+    clean = []
+    for g in items:
+        if "\n" in g["caption"] or "\n" in g["title"] or "\n" in g["value"]:
+            raise ValueError("a goal is one line")
+        progress = g.get("progress")
+        if progress is not None and not 0 <= progress <= 100:
+            raise ValueError("progress is 0 to 100")
+        clean.append({"title": _goal_text(g["title"], "title", 60, True), "value": _goal_text(g["value"], "value", 80, True),
+                      "caption": _goal_text(g.get("caption") or "", "caption", 120, False), "progress": progress})
+    await db.execute(delete(Goal).where(Goal.user_id == user_id))
+    for position, g in enumerate(clean):
+        db.add(Goal(user_id=user_id, position=position, **g))
     await db.flush()

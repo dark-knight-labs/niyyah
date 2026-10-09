@@ -190,6 +190,17 @@ class GoalsResponse(BaseModel):
     items: list[GoalItem]
 
 
+class GoalIn(BaseModel):
+    title: str
+    value: str
+    caption: str = ""
+    progress: int | None = None
+
+
+class GoalsIn(BaseModel):
+    items: list[GoalIn]
+
+
 class ObjectiveIn(BaseModel):
     stream: str
     text: str | None = None
