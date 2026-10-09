@@ -1,3 +1,5 @@
+> **Superseded in part (2026-10-09).** The owner moved Obsidian out of Niyyah into a separate private service. Only Task 1 (goals editor) and the cutover tasks (9, 10) still apply. Tasks 2 to 8 (export tables, renderers, dirty listener, in-API exporter) move to the private `niyyah-obsidian` repo, and core gets the export endpoint and API tokens instead. See the revised spec; a new plan will replace this one.
+
 # Cutover to the database and the optional Obsidian mirror (storage phase 5a)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
