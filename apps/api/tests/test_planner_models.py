@@ -37,7 +37,7 @@ async def test_planner_rows_round_trip():
         db.add_all([
             Task(user_id=1, text="Pay invoice", done=False, due_on=D, source_path="Efforts/todo.md", position=0),
             Goal(user_id=1, position=0, title="Zero debt", value="62% paid", caption="", progress=62),
-            QuarterStream(user_id=1, quarter="2026-Q4", slug="kahf", name="Kahf", color="violet", icon="server", slot="OT",
+            QuarterStream(user_id=1, quarter="2026-Q4", slug="studio", name="Studio", color="violet", icon="server", slot="OT",
                           weekly=True, has_pipeline=True, in_note=True, goal="Ship DNS", status="committed",
                           checkpoints=[{"month": "oct", "text": "Router live"}], position=0),
         ])

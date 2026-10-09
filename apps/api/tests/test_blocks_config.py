@@ -1,7 +1,5 @@
 import pytest
 
-from app.core.config import settings
-
 V = "/api/v1/vault/config/blocks"
 
 
@@ -10,23 +8,7 @@ def _blocks(res):
 
 
 @pytest.mark.asyncio
-async def test_vault_mode_serves_the_owners_defaults_publicly(client):
-    res = await client.get(V)
-    assert res.status_code == 200
-    keys = [b["key"] for b in _blocks(res)]
-    assert keys[:3] == ["soul", "body", "ot"] and "onething" in keys
-    assert next(b for b in _blocks(res) if b["key"] == "onething")["archived"] is True
-
-
-@pytest.mark.asyncio
-async def test_vault_mode_refuses_writes(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "vault_write_emails", "test@niyyah.app")
-    assert (await auth_client.put(V, json={"blocks": []})).status_code == 501
-
-
-@pytest.mark.asyncio
 async def test_db_mode_needs_a_login(client, monkeypatch):
-    monkeypatch.setattr(settings, "storage_backend", "db")
     assert (await client.get(V)).status_code == 401
 
 

@@ -2,7 +2,7 @@ import socket
 
 import pytest
 
-from app.services import vault_calendar
+from app.services import calendar_events
 
 F = "/api/v1/vault/config/feeds"
 
@@ -41,7 +41,7 @@ def fake_dns(monkeypatch):
             return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (table[host], port))]
         return real(host, port, *args, **kwargs)
 
-    monkeypatch.setattr(vault_calendar.socket, "getaddrinfo", fake)
+    monkeypatch.setattr(calendar_events.socket, "getaddrinfo", fake)
 
 
 @pytest.mark.asyncio
@@ -69,21 +69,21 @@ def test_a_redirect_into_the_private_network_is_refused(monkeypatch):
         def __enter__(self): return self
         def __exit__(self, *a): return False
 
-    monkeypatch.setattr(vault_calendar.httpx, "stream", lambda *a, **k: Hop())
-    vault_calendar._cache.clear()
+    monkeypatch.setattr(calendar_events.httpx, "stream", lambda *a, **k: Hop())
+    calendar_events._cache.clear()
     with pytest.raises(ValueError, match="public host"):
-        vault_calendar._download("https://x.example/a.ics")
+        calendar_events._download("https://x.example/a.ics")
 
 
 def test_an_oversized_feed_is_refused(monkeypatch):
     class Big:
         is_redirect = False
         def raise_for_status(self): pass
-        def iter_bytes(self): yield b"x" * (vault_calendar.MAX_FEED_BYTES + 1)
+        def iter_bytes(self): yield b"x" * (calendar_events.MAX_FEED_BYTES + 1)
         def __enter__(self): return self
         def __exit__(self, *a): return False
 
-    monkeypatch.setattr(vault_calendar.httpx, "stream", lambda *a, **k: Big())
-    vault_calendar._cache.clear()
+    monkeypatch.setattr(calendar_events.httpx, "stream", lambda *a, **k: Big())
+    calendar_events._cache.clear()
     with pytest.raises(ValueError, match="too large"):
-        vault_calendar._download("https://x.example/a.ics")
+        calendar_events._download("https://x.example/a.ics")

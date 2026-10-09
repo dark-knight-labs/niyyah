@@ -27,3 +27,13 @@
 | `tasks` | `id`, `text`, `done`, `due_on`, `scheduled_on`, `start_on`, `done_on`, `source_path` |
 
 Dates are ISO `YYYY-MM-DD`. Lists are in a stable order, so the same data always produces the same bytes and the same `ETag`.
+
+## Importing
+
+`POST /api/v1/import?replace=true` (signed-in session only; an API token cannot write) loads a snapshot into your account and **replaces all your planner data**. It accepts what the export produces, so an export from one account or install imports into another. A few differences:
+
+- `feeds[].url` is optional and never exported (it is a secret). An import carries it only when another tool supplies it; a feed without one is skipped. It must be `https`.
+- Unknown fields are ignored; unknown block keys used by votes or the schedule are created as plain blocks.
+- Everything is validated first (lengths, lane and kind values, duplicate days or notebook ids). A refused import changes nothing.
+
+From a file on the server: `python -m app.cli import-snapshot export.json --user you@example.com --replace`.

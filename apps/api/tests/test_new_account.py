@@ -8,7 +8,6 @@ V = "/api/v1/vault"
 
 @pytest.mark.asyncio
 async def test_registration_in_db_mode_seeds_the_starter(client, monkeypatch):
-    monkeypatch.setattr(settings, "storage_backend", "db")
     await client.post("/api/v1/auth/register", json={"email": "new@niyyah.app", "password": "newpass1234"})
     token = (await client.post("/api/v1/auth/login", json={"email": "new@niyyah.app", "password": "newpass1234"})).json()["access_token"]
     h = {"Authorization": f"Bearer {token}"}
@@ -21,7 +20,6 @@ async def test_registration_in_db_mode_seeds_the_starter(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_a_new_account_can_vote_on_its_own_blocks(client, monkeypatch):
-    monkeypatch.setattr(settings, "storage_backend", "db")
     await client.post("/api/v1/auth/register", json={"email": "new@niyyah.app", "password": "newpass1234"})
     token = (await client.post("/api/v1/auth/login", json={"email": "new@niyyah.app", "password": "newpass1234"})).json()["access_token"]
     h = {"Authorization": f"Bearer {token}"}
@@ -36,7 +34,6 @@ async def test_a_new_account_can_vote_on_its_own_blocks(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_a_new_account_gets_no_streams_of_anyone_elses(client, monkeypatch):
-    monkeypatch.setattr(settings, "storage_backend", "db")
     await client.post("/api/v1/auth/register", json={"email": "new@niyyah.app", "password": "newpass1234"})
     token = (await client.post("/api/v1/auth/login", json={"email": "new@niyyah.app", "password": "newpass1234"})).json()["access_token"]
     h = {"Authorization": f"Bearer {token}"}

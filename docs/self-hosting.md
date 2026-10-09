@@ -28,6 +28,10 @@ TRUSTED_PROXY_HOPS=1
 
 `API_URL` is baked into the web bundle, so rebuild the web image (`docker compose up --build`) after changing it.
 
+## Timezone
+
+Set `APP_TIMEZONE` (for example `Europe/London`) in `.env` so "today" rolls over at your midnight; the default is UTC.
+
 ## Registration
 
 `REGISTRATION=open` (default) lets anyone create an account. For a private installation create your own account, then set `REGISTRATION=closed` and restart the API.

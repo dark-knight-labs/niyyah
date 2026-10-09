@@ -15,7 +15,7 @@ interface Props {
   onChanged: () => void;
 }
 
-/** The day's Obsidian tasks as a checklist. Ticking, editing or deleting one rewrites the vault note it lives in. */
+/** The day's tasks as a checklist: tick, edit or delete them here. */
 export function TaskList({ day, tasks, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
 

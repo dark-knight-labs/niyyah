@@ -87,11 +87,10 @@ async def test_a_token_exports_its_own_user_only(db_client):
     assert snap["days"] == [] and snap["tasks"] == [] and snap["goals"] == []
 
 
+
+
 @pytest.mark.asyncio
-async def test_export_needs_db_mode_and_a_login(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "storage_backend", "vault")
-    assert (await auth_client.get(E)).status_code == 409
-    monkeypatch.setattr(settings, "storage_backend", "db")
+async def test_export_needs_a_login(auth_client):
     assert (await auth_client.get(E)).status_code == 200
     del auth_client.headers["Authorization"]
     assert (await auth_client.get(E)).status_code in (401, 403)

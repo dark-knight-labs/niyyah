@@ -11,13 +11,7 @@ from app.models.planner import (
     Goal, LogEntry, NotebookEntry, PipelineItem, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
     WeekObjective,
 )
-from app.services.vault_goals import MAX_GOALS
-from app.services.vault_notebook import _URL
-from app.services.vault_objectives import weekly_streams
-from app.services.vault_pipeline import STALE_DAYS
-from app.services.vault_quarter import quarter_for
-from app.services.vault_streams import Stream
-from app.services.vault_tasks import line_hash
+from app.services.rules import MAX_GOALS, STALE_DAYS, URL, Stream, line_hash, quarter_for, weekly_streams
 
 
 async def _all(db: AsyncSession, stmt) -> list:
@@ -102,7 +96,7 @@ async def notebook_entries(db: AsyncSession, user_id: int) -> dict[str, list[dic
     rows = await _all(db, select(NotebookEntry).where(NotebookEntry.user_id == user_id).order_by(NotebookEntry.position))
     out: dict[str, list[dict]] = {}
     for r in rows:
-        url = _URL.search(r.body)
+        url = URL.search(r.body)
         out.setdefault(r.stream, []).append({
             "line": r.id, "id": r.ext_id, "hash": "", "kind": r.kind, "title": r.title, "date": r.entry_date, "body": r.body,
             "open": r.is_open if r.kind == "blocker" else None, "url": url.group(0) if url else None,

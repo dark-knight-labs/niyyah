@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import check_secrets, settings
-from app.api.v1 import auth, personas, schedule, principles, tracker, settings as settings_router, dashboard, vault, tokens, export
+from app.api.v1 import auth, personas, schedule, principles, tracker, settings as settings_router, dashboard, vault, tokens, export, import_data
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -34,6 +34,7 @@ app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(vault.router, prefix="/api/v1")
 app.include_router(tokens.router, prefix="/api/v1")
 app.include_router(export.router, prefix="/api/v1")
+app.include_router(import_data.router, prefix="/api/v1")
 
 
 @app.get("/health")

@@ -12,7 +12,7 @@ def _owner() -> Mapped[int]:
 
 
 class Task(Base):
-    """An Obsidian-Tasks style task. It shows on a day when that day is its due, scheduled or start date."""
+    """A task. It shows on a day when that day is its due, scheduled or start date."""
     __tablename__ = "planner_tasks"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

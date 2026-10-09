@@ -36,7 +36,3 @@ async def test_goals_are_per_user(db_client):
     assert (await client.get("/api/v1/vault/goals", headers=other)).json()["items"] == []
 
 
-@pytest.mark.asyncio
-async def test_vault_mode_refuses(auth_client, monkeypatch):
-    monkeypatch.setattr(settings, "vault_write_emails", "test@niyyah.app")
-    assert (await auth_client.put(G, json={"items": []})).status_code == 501

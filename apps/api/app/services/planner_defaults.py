@@ -1,34 +1,11 @@
-"""Block and schedule defaults: the owner's set (what vault mode serves today) and the starter template for new accounts."""
-from app.services.vault_streams import COLORS
+"""The starter template a new account begins with: blocks, location settings and a prayer-anchored weekly schedule."""
+from app.services.rules import COLORS
 
 COLOR_KEYS = list(COLORS)
 
 
 def _b(key, label, ring, color, stars=True, archived=False):
     return {"key": key, "label": label, "ring_name": ring, "color": color, "counts_for_stars": stars, "archived": archived}
-
-
-# The block set the app has hard-coded until now, with its colours mapped onto the stream palette.
-DEFAULT_BLOCKS = [
-    _b("soul", "Soul", "SOUL", "emerald"),
-    _b("body", "Body", "BODY", "amber"),
-    _b("ot", "OT", "OT", "violet"),
-    _b("planning", "Planning", "PLAN", "sky", stars=False),
-    _b("distribution", "Distribution", "DIST", "cyan"),
-    _b("fnf", "FnF", "FNF", "rose"),
-    _b("sleep", "Sleep", "SLEEP", "slate"),
-    _b("onething", "ONE Thing", "ONE", "indigo", archived=True),
-    _b("ops", "OPS", "OPS", "violet", archived=True),
-]
-
-LEGACY_WEEKEND_DAYS = ["fri", "sat"]
-
-
-def legacy_stream(block: str, day_type: str) -> str | None:
-    """The old hard-coded rule: the OT slot is Kahf on weekdays and Alisha Noor on the weekend."""
-    if block != "ot":
-        return None
-    return "alisha" if day_type == "weekend" else "kahf"
 
 
 STARTER_BLOCKS = [

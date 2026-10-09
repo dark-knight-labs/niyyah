@@ -72,20 +72,19 @@ async def auth_client(client: AsyncClient) -> AsyncClient:
 
 
 @pytest_asyncio.fixture
-async def db_client(auth_client: AsyncClient, tmp_path, monkeypatch):
-    """The logged-in user with the fixture vault imported into their rows and STORAGE_BACKEND=db."""
+async def db_client(auth_client: AsyncClient):
+    """The logged-in user with the sample account (tests/sample_snapshot.py) loaded into their rows."""
     from sqlalchemy import select
 
     from app.api.v1.vault import _local_now
-    from app.core.config import settings
     from app.models.user import User
-    from app.services.vault_import import import_vault
-    from tests.vault_fixture import build_vault
+    from app.schemas.snapshot import Snapshot
+    from app.services.planner_import import import_snapshot
+    from tests.sample_snapshot import sample_snapshot
 
     today = _local_now().date()
-    build_vault(tmp_path, today)
     async with TestSession() as db:
         user_id = (await db.execute(select(User.id))).scalar_one()
-        await import_vault(db, user_id, tmp_path, today)
-    monkeypatch.setattr(settings, "storage_backend", "db")
+        await import_snapshot(db, user_id, Snapshot.model_validate(sample_snapshot(today)))
+        await db.commit()
     return auth_client, today

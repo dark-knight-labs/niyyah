@@ -16,7 +16,7 @@ async def test_vault_day_and_block_vote_roundtrip():
         await conn.run_sync(Base.metadata.create_all)
 
     async with Session() as session:
-        day = VaultDay(date=date(2026, 8, 23), mode="full", possible=21, total=2)
+        day = VaultDay(user_id=1, date=date(2026, 8, 23), mode="full", possible=21, total=2)
         session.add(day)
         await session.commit()
         await session.refresh(day)
@@ -58,7 +58,7 @@ async def test_block_vote_unique_per_day():
         await conn.run_sync(Base.metadata.create_all)
 
     async with Session() as session:
-        day = VaultDay(date=date(2026, 8, 23), mode="full", possible=21, total=0)
+        day = VaultDay(user_id=1, date=date(2026, 8, 23), mode="full", possible=21, total=0)
         session.add(day)
         await session.commit()
         await session.refresh(day)

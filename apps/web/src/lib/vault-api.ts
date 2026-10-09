@@ -14,7 +14,7 @@ import {
   VaultEventsData,
   VaultLogEntry,
   VaultGoalsData,
-  VaultSyncStatusData,
+  DaysStatusData,
   VaultObjectivesData,
   Lane,
   MonthKey,
@@ -29,7 +29,6 @@ import {
   VaultEditData,
   VaultStreaksData,
   VaultTaskData,
-  VaultSyncData,
   VaultWeekData,
 } from "@/lib/vault-types";
 
@@ -97,6 +96,5 @@ export const vaultApi = {
   feeds: () => api.get<FeedData[]>("/vault/config/feeds"),
   addFeed: (name: string, url: string) => api.post<FeedData>("/vault/config/feeds", { name, url }),
   removeFeed: (id: number) => api.delete(`/vault/config/feeds/${id}`),
-  syncStatus: () => api.get<VaultSyncStatusData>("/vault/sync/status"),
-  sync: () => api.post<VaultSyncData>("/vault/sync", {}),
+  status: () => api.get<DaysStatusData>("/vault/status"),
 };
