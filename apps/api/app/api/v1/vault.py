@@ -66,6 +66,7 @@ from app.schemas.vault import (
     VaultSyncResponse,
     VaultWeekResponse,
     VaultSyncStatus,
+    GoalsIn,
     GoalsResponse,
     BlocksConfigIn,
     BlocksConfigResponse,
@@ -448,6 +449,14 @@ async def delete_feed(feed_id: int, user: User = Depends(require_planner_user), 
     if not await planner_config.remove_feed(db, user.id, feed_id):
         raise HTTPException(status_code=404, detail="no such calendar")
     await db.commit()
+
+
+@router.put("/config/goals", response_model=GoalsResponse)
+async def put_goals_config(data: GoalsIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if not _db_mode():
+        raise HTTPException(status_code=501, detail="Goals are edited in the vault until STORAGE_BACKEND=db")
+    await _db_run(db, lambda: planner_config.replace_goals(db, user.id, [g.model_dump() for g in data.items]))
+    return GoalsResponse(items=await planner_store.goals(db, user.id))
 
 
 @router.get("/edit-access", response_model=EditAccessResponse)

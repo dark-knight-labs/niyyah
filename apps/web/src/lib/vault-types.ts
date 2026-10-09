@@ -247,3 +247,5 @@ export interface ScheduleRowIn { block: string; start: string; end: string; what
 export interface ScheduleMetaIn { city: string | null; lat: number | null; lon: number | null; tz: string; method: string; madhab: string; weekend_days: string[] }
 export interface ScheduleConfigIn { meta: ScheduleMetaIn; weekday: ScheduleRowIn[]; weekend: ScheduleRowIn[] }
 export interface FeedData { id: number; name: string; host: string; color: string | null; email: string | null }
+
+export interface GoalIn { title: string; value: string; caption: string; progress: number | null }
