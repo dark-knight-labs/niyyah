@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { logout } from "@/lib/auth";
+import { BlocksProvider } from "@/lib/blocks";
 import {
   Activity,
   Clock,
@@ -28,7 +29,7 @@ const nav = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isPublic = PUBLIC_PATHS.includes(pathname);
   const { user, loading } = useAuth(!isPublic);
@@ -152,5 +153,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
     </div>
+  );
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <BlocksProvider>
+      <AppShell>{children}</AppShell>
+    </BlocksProvider>
   );
 }

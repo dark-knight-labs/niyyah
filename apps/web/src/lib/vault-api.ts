@@ -1,6 +1,10 @@
 import { api } from "@/lib/api-client";
 import { VaultScheduleData } from "@/lib/routine";
 import {
+  BlockConfig,
+  BlocksConfigData,
+  FeedData,
+  ScheduleConfigIn,
   VaultBlocksSeriesData,
   VaultDayData,
   GoogleStatusData,
@@ -85,6 +89,12 @@ export const vaultApi = {
     api.put<VaultEditData>("/vault/notebook/blocker", { stream, line: entry.line, hash: entry.hash, open }),
   removeNotebookEntry: (stream: string, entry: NotebookEntryData) =>
     api.post<VaultEditData>("/vault/notebook/remove", { stream, line: entry.line, hash: entry.hash }),
+  blocksConfig: () => api.get<BlocksConfigData>("/vault/config/blocks"),
+  saveBlocks: (blocks: BlockConfig[]) => api.put<BlocksConfigData>("/vault/config/blocks", { blocks }),
+  saveSchedule: (body: ScheduleConfigIn) => api.put<VaultScheduleData>("/vault/config/schedule", body),
+  feeds: () => api.get<FeedData[]>("/vault/config/feeds"),
+  addFeed: (name: string, url: string) => api.post<FeedData>("/vault/config/feeds", { name, url }),
+  removeFeed: (id: number) => api.delete(`/vault/config/feeds/${id}`),
   syncStatus: () => api.get<VaultSyncStatusData>("/vault/sync/status"),
   sync: () => api.post<VaultSyncData>("/vault/sync", {}),
 };
