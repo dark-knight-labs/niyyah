@@ -1,4 +1,4 @@
-.PHONY: dev up down test test-api migrate migration
+.PHONY: dev web up down test test-api migrate migration
 
 # Development
 dev:
@@ -6,6 +6,9 @@ dev:
 	@echo "Postgres is on 127.0.0.1:5432. Start the apps separately (APP_ENV=development allows the placeholder secrets):"
 	@echo "  cd apps/api && APP_ENV=development STORAGE_BACKEND=db alembic upgrade head && APP_ENV=development STORAGE_BACKEND=db uvicorn app.main:app --reload"
 	@echo "  cd apps/web && npm run dev"
+
+web:
+	cd apps/web && npm install && npm run dev
 
 up:
 	docker compose up --build

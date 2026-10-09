@@ -8,7 +8,7 @@ Bug reports and focused pull requests are welcome. For anything larger than a fi
 make dev
 cd apps/api && python -m venv .venv && . .venv/bin/activate && pip install -r requirements-dev.txt
 APP_ENV=development python -m pytest -q          # uses a temporary sqlite file, no Postgres needed
-cd ../web && npm install && npx tsc --noEmit -p . && npm run lint
+cd ../web && npm ci && npx tsc --noEmit -p . && npm run lint
 ```
 
 ## Guidelines

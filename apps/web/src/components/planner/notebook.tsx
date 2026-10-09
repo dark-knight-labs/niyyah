@@ -105,7 +105,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all", comp
       <aside className={compact ? "grid gap-3" : "grid gap-3 lg:sticky lg:top-4"}>
         <section aria-label="Blockers" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 sm:p-4">
           <SectionTitle title="Blockers" />
-          {blockers.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">Nothing is holding this block.</p>}
+          {blockers.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">Nothing is holding this stream.</p>}
           <ul className="grid gap-2.5">
             {blockers.map((b) => (
               <li key={`${b.line}-${b.hash}`}>

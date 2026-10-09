@@ -7,7 +7,7 @@ import { QuarterData, QuarterStreamData, StreamChange } from "@/lib/vault-types"
 
 interface Props {
   quarter: QuarterData;
-  /** The stream being edited; omit to add a new block. */
+  /** The stream being edited; omit to add a new stream. */
   stream?: QuarterStreamData;
   busy: boolean;
   onSave: (change: StreamChange & { name: string }, id: string) => Promise<void>;
@@ -21,7 +21,7 @@ const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 const field = "min-h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm placeholder:text-[var(--muted-foreground)]";
 const label = "mb-1.5 block text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]";
 
-/** Add a block (Finance, Errands…) or edit one: name, goal, month checkpoints, colour, icon. Saved into the quarter note. */
+/** Add a stream (Finance, Errands…) or edit one: name, goal, month checkpoints, colour, icon. Saved to your plan. */
 export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props) {
   const [name, setName] = useState(stream?.name ?? "");
   const [slot, setSlot] = useState(stream?.slot ?? "");
@@ -34,8 +34,8 @@ export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props)
   const taken = new Set(quarter.streams.map((s) => s.stream));
 
   function newId(): string {
-    const base = slug(name) || "block";
-    let id = base.length < 2 ? `${base}-block` : base;
+    const base = slug(name) || "stream";
+    let id = base.length < 2 ? `${base}-stream` : base;
     for (let n = 2; taken.has(id); n++) id = `${base}-${n}`.slice(0, 24);
     return id;
   }
@@ -47,7 +47,7 @@ export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props)
   }
 
   return (
-    <form onSubmit={save} className="grid gap-5 rounded-2xl border-2 bg-[var(--background)] p-5 sm:p-6" style={{ borderColor: colorVar(color) }} aria-label={stream ? `Edit ${stream.name}` : "Add a block"}>
+    <form onSubmit={save} className="grid gap-5 rounded-2xl border-2 bg-[var(--background)] p-5 sm:p-6" style={{ borderColor: colorVar(color) }} aria-label={stream ? `Edit ${stream.name}` : "Add a stream"}>
       <div className="grid gap-4 sm:grid-cols-2">
         <label>
           <span className={label}>Name</span>
@@ -125,7 +125,7 @@ export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props)
         {stream && (
           <button type="button" disabled={busy} onClick={(e) => save(e as unknown as React.FormEvent, "archived")}
             className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-[var(--muted-foreground)] hover:text-[var(--destructive)]"
-            title="Hide this block from the planner. Its notes stay in the vault.">
+            title="Hide this stream from the planner. Its notes stay saved.">
             <Archive size={15} aria-hidden="true" /> Archive
           </button>
         )}
