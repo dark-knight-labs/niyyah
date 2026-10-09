@@ -16,7 +16,7 @@ Spec: `docs/superpowers/specs/2026-10-09-settings-user-defined-blocks-design.md`
 - Web work in `/home/ubuntu/src/dark-knight/niyyah/apps/web`; checks `../../node_modules/.bin/tsc --noEmit -p .` and `../../node_modules/.bin/next build`.
 - `STORAGE_BACKEND` stays `vault` by default and in production. Vault-mode responses keep today's meaning: the owner's pages must look and behave the same.
 - Colours are the 12 stream colour keys: `emerald, amber, violet, fuchsia, cyan, rose, slate, teal, orange, indigo, lime, sky`; in CSS `var(--stream-<key>)` (defined for light and dark in `globals.css`). Never use hex alpha suffixes on them; use `color-mix(in srgb, <color> 8%, transparent)`.
-- Block keys are slugs matching `^[a-z][a-z0-9-]{1,23}$` and never change after creation. Ring names are 1 to 6 characters, upper case.
+- Block keys are slugs matching `^[a-z][a-z0-9-]{1,19}$` (at most 20 characters, the width of the existing `block` columns) and never change after creation. Ring names are 1 to 6 characters, upper case.
 - Branch `feature/settings-blocks` (exists, has the spec). Commit after each task, no AI attribution lines. Do not push until Task 12.
 - Overlap warnings stay client-side (the server cannot compute prayer anchors); the server validates syntax, blocks, streams and location only.
 - Migrations are not run by CI. Task 12 lists the manual steps.
@@ -159,7 +159,7 @@ class PlannerBlock(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = _owner()
-    key: Mapped[str] = mapped_column(String(24), nullable=False)
+    key: Mapped[str] = mapped_column(String(20), nullable=False)
     label: Mapped[str] = mapped_column(String(40), nullable=False)
     ring_name: Mapped[str] = mapped_column(String(6), nullable=False)
     color: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -195,7 +195,7 @@ def upgrade() -> None:
         "planner_blocks",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("key", sa.String(24), nullable=False),
+        sa.Column("key", sa.String(20), nullable=False),
         sa.Column("label", sa.String(40), nullable=False),
         sa.Column("ring_name", sa.String(6), nullable=False),
         sa.Column("color", sa.String(20), nullable=False),
@@ -331,8 +331,9 @@ from sqlalchemy import select
 
 from app.models.planner import PlannerBlock, PlannerScheduleBlock
 from app.services.planner_defaults import COLOR_KEYS
-from app.services.vault_streams import SLUG
+import re
 
+BLOCK_KEY = re.compile(r"^[a-z][a-z0-9-]{1,19}$")
 MAX_LABEL = 40
 
 
@@ -356,8 +357,8 @@ async def counted_keys(db, user_id: int, include_archived: bool = False) -> list
 
 def _clean(item: dict) -> dict:
     key = item["key"]
-    if not SLUG.match(key):
-        raise ValueError(f"'{key}' is not a valid key: use 2-24 lowercase letters, digits or dashes, starting with a letter")
+    if not BLOCK_KEY.match(key):
+        raise ValueError(f"'{key}' is not a valid key: use 2-20 lowercase letters, digits or dashes, starting with a letter")
     label = " ".join(item["label"].split())
     if not label or len(label) > MAX_LABEL:
         raise ValueError(f"the name of '{key}' must be 1-{MAX_LABEL} characters")

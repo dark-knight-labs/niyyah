@@ -151,6 +151,7 @@ class PlannerScheduleBlock(Base):
     start: Mapped[str] = mapped_column(String(20), nullable=False)  # "06:00" or an anchor like "fajr+10"
     end: Mapped[str] = mapped_column(String(20), nullable=False)
     what: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    stream: Mapped[str | None] = mapped_column(String(24), nullable=True)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
@@ -165,3 +166,19 @@ class PlannerCalendarFeed(Base):
     color: Mapped[str | None] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)  # the Google account, to read through its API instead
     position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class PlannerBlock(Base):
+    """A part of the user's day. Votes and schedule rows refer to it by key; archived blocks stay so history still resolves."""
+    __tablename__ = "planner_blocks"
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_planner_block_user_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    key: Mapped[str] = mapped_column(String(20), nullable=False)
+    label: Mapped[str] = mapped_column(String(40), nullable=False)
+    ring_name: Mapped[str] = mapped_column(String(6), nullable=False)
+    color: Mapped[str] = mapped_column(String(20), nullable=False)
+    counts_for_stars: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
