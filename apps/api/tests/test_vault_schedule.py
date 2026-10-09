@@ -76,7 +76,7 @@ async def test_schedule_endpoint_reads_vault_checkout(auth_client: AsyncClient, 
     assert resp.status_code == 200
     body = resp.json()
     assert body["meta"]["city"] == "Dhaka"
-    assert body["days"]["weekday"][0] == {"block": "soul", "start": "03:30", "end": "fajr", "what": "Tahajjud"}
+    assert body["days"]["weekday"][0] == {"block": "soul", "start": "03:30", "end": "fajr", "what": "Tahajjud", "stream": None}
     assert body["errors"] == []
 
 
