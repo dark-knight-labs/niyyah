@@ -76,25 +76,18 @@ function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex">
       <aside
-        className={`border-r border-[var(--border)] flex flex-col justify-between p-4 hidden md:flex transition-[width] duration-200 ${
+        className={`sticky top-0 h-screen shrink-0 self-start border-r border-[var(--border)] flex flex-col justify-between p-4 hidden md:flex transition-[width] duration-200 ${
           collapsed ? "w-16" : "w-56"
         }`}
       >
         <div>
-          <div className="flex items-center justify-between mb-6 gap-2">
+          <div className="mb-6 flex min-h-10 items-center">
             {!collapsed && (
               <Link href="/vault" className="block min-w-0">
                 <h1 className="text-lg font-bold tracking-tight">Niyyah</h1>
                 <p className="text-xs text-[var(--muted-foreground)]" dir="rtl">نِيَّة</p>
               </Link>
             )}
-            <button
-              onClick={toggleCollapsed}
-              className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] shrink-0 transition-colors active:scale-90"
-              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-            </button>
           </div>
           <nav className="space-y-1">
             {nav.map((item) => {
@@ -119,6 +112,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
         </div>
+        <button
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="absolute -right-3 top-1/2 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)] active:scale-90"
+        >
+          {collapsed ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
+        </button>
         <div className="border-t border-[var(--border)] pt-4">
           {!collapsed && (
             <p className="text-xs text-[var(--muted-foreground)] truncate mb-2">{user.email}</p>
