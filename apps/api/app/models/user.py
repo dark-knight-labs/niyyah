@@ -42,6 +42,20 @@ class RefreshToken(Base):
     user: Mapped["User"] = relationship(back_populates="refresh_tokens", foreign_keys=[user_id])
 
 
+class ApiToken(Base):
+    """A long-lived, read-only credential for one user's export. Only the hash is stored; the raw value is shown once."""
+    __tablename__ = "api_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(12), nullable=False)  # first characters, to tell tokens apart
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class UserSettings(Base):
     __tablename__ = "user_settings"
 
