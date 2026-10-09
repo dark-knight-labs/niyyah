@@ -1,0 +1,13 @@
+node_modules/
+.next/
+dist/
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.env
+.env.local
+.pytest_cache/
+htmlcov/
+.coverage
+test.db

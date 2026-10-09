@@ -1,0 +1,7 @@
+-r requirements.txt
+pytest>=8
+pytest-asyncio>=0.25
+pytest-cov>=6
+httpx>=0.28
+factory-boy>=3.3
+aiosqlite>=0.20

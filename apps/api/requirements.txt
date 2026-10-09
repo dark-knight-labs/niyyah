@@ -1,0 +1,16 @@
+fastapi[standard]>=0.115
+uvicorn[standard]>=0.34
+sqlalchemy[asyncio]>=2.0
+asyncpg>=0.30
+alembic>=1.14
+pydantic>=2.10
+pydantic-settings>=2.7
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+bcrypt>=4.2
+redis>=5.2
+httpx>=0.28
+python-multipart>=0.0.18
+pyyaml>=6.0
+icalendar>=6.0
+recurring-ical-events>=3.3

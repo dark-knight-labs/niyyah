@@ -1,0 +1,78 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  REGISTRY: $CI_REGISTRY_IMAGE
+
+.build:
+  stage: build
+  image: docker:27
+  tags: [homelab]
+  services:
+    - name: docker:27-dind
+      command: ["--dns", "8.8.8.8"]
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: tcp://localhost:2375
+  before_script:
+    - until docker info >/dev/null 2>&1; do sleep 2; done
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Builds the dependency base once per hash of its dependency files (self-healing: if the tag is missing in the
+# registry it is built and pushed here), then builds the app on top of it. A code-only change reuses the base.
+.build_on_base:
+  extends: .build
+  script:
+    - DEPS_HASH=$(cat $DEPS_FILES $CONTEXT/Dockerfile.base | sha256sum | cut -c1-12)
+    - BASE=$REGISTRY/$IMAGE-base:$DEPS_HASH
+    - docker pull -q $BASE || { docker build --network host -f $CONTEXT/Dockerfile.base -t $BASE $CONTEXT && docker push $BASE; }
+    - docker build --network host --build-arg BASE_IMAGE=$BASE -t $REGISTRY/$IMAGE:latest -t $REGISTRY/$IMAGE:$CI_COMMIT_SHORT_SHA $CONTEXT
+    - docker push $REGISTRY/$IMAGE --all-tags
+
+build:api:
+  extends: .build_on_base
+  variables:
+    IMAGE: api
+    CONTEXT: apps/api
+    DEPS_FILES: apps/api/requirements.txt
+
+# The web bundle bakes in the public API address and the operator named on the legal pages (NEXT_PUBLIC_* are build-time).
+build:web:
+  extends: .build_on_base
+  variables:
+    IMAGE: web
+    CONTEXT: apps/web
+    DEPS_FILES: apps/web/package.json
+    PUBLIC_API_URL: https://niyyah-api.alamin.rocks
+    OPERATOR_NAME: Alamin Mahamud
+    OPERATOR_CONTACT: alamin.root@gmail.com
+    SITE_URL: niyyah.alamin.rocks
+  script:
+    - DEPS_HASH=$(cat $DEPS_FILES $CONTEXT/Dockerfile.base | sha256sum | cut -c1-12)
+    - BASE=$REGISTRY/$IMAGE-base:$DEPS_HASH
+    - docker pull -q $BASE || { docker build --network host -f $CONTEXT/Dockerfile.base -t $BASE $CONTEXT && docker push $BASE; }
+    - >-
+      docker build --network host --build-arg BASE_IMAGE=$BASE
+      --build-arg NEXT_PUBLIC_API_URL="$PUBLIC_API_URL" --build-arg NEXT_PUBLIC_OPERATOR_NAME="$OPERATOR_NAME"
+      --build-arg NEXT_PUBLIC_OPERATOR_CONTACT="$OPERATOR_CONTACT" --build-arg NEXT_PUBLIC_SITE_URL="$SITE_URL"
+      -t $REGISTRY/$IMAGE:latest -t $REGISTRY/$IMAGE:$CI_COMMIT_SHORT_SHA $CONTEXT
+    - docker push $REGISTRY/$IMAGE --all-tags
+
+deploy:
+  stage: deploy
+  image: bitnami/kubectl:latest
+  tags: [homelab]
+  needs: ["build:api", "build:web"]
+  script:
+    # Pin to the immutable sha tag just pushed above, instead of restarting
+    # onto :latest — a registry outage during a pod reschedule can no longer
+    # strand a deploy (see imagePullPolicy: IfNotPresent in the deployment manifest).
+    - kubectl set image deployment/niyyah-api api=$REGISTRY/api:$CI_COMMIT_SHORT_SHA -n niyyah
+    - kubectl set image deployment/niyyah-web web=$REGISTRY/web:$CI_COMMIT_SHORT_SHA -n niyyah
+    - kubectl rollout status deployment/niyyah-api -n niyyah --timeout=120s
+    - kubectl rollout status deployment/niyyah-web -n niyyah --timeout=120s
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

@@ -1,0 +1,159 @@
+@import "tailwindcss";
+
+/* Niyyah — the "paper" theme: warm off-white surfaces, hairline borders, one teal accent.
+   Everything is token-driven: change a value here and it propagates
+   to every page (pages consume var(--*) + Tailwind color mapping). */
+:root {
+  color-scheme: light;
+
+  --background: #f5f4f0;
+  --surface: #fffefb;
+  --foreground: #1d2321;
+  --muted: #eceae2;
+  --muted-foreground: #6a726e;
+  --border: #e3e1d8;
+  --accent: #0f6b5c;
+  --accent-fg: #fffefb;
+  --accent-light: #dcefe9;
+  --destructive: #b4412f;
+
+  --radius: 0.625rem;
+  /* One colour per stream (a goal and its pipeline), used for rails, chips and icons. */
+  --stream-emerald: #059669;
+  --stream-amber: #d97706;
+  --stream-violet: #7c3aed;
+  --stream-fuchsia: #c026d3;
+  --stream-cyan: #0891b2;
+  --stream-rose: #e11d48;
+  --stream-slate: #475569;
+  --stream-teal: #0d9488;
+  --stream-orange: #ea580c;
+  --stream-indigo: #4f46e5;
+  --stream-lime: #65a30d;
+  --stream-sky: #0284c7;
+  --warn: #a8741a;
+  --warn-light: #f5ead2;
+
+  --font-sans: "Public Sans Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-hand: "Caveat", "Segoe Print", cursive;
+  --font-serif: "Fraunces", Georgia, serif;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --background: #141917;
+  --surface: #1c2220;
+  --foreground: #e8ece9;
+  --muted: #252c29;
+  --muted-foreground: #8f9a95;
+  --border: #2d3532;
+  --accent: #5fc4ae;
+  --accent-fg: #10201c;
+  --accent-light: #1d3a34;
+  --destructive: #ee8a76;
+  --stream-emerald: #34d399;
+  --stream-amber: #fbbf24;
+  --stream-violet: #a78bfa;
+  --stream-fuchsia: #e879f9;
+  --stream-cyan: #22d3ee;
+  --stream-rose: #fb7185;
+  --stream-slate: #94a3b8;
+  --stream-teal: #2dd4bf;
+  --stream-orange: #fb923c;
+  --stream-indigo: #818cf8;
+  --stream-lime: #a3e635;
+  --stream-sky: #38bdf8;
+  --warn: #e0b15a;
+  --warn-light: #3a2f17;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-fg: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-destructive: var(--destructive);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-hand: var(--font-hand);
+  --font-serif: var(--font-serif);
+  --radius: var(--radius);
+}
+
+/* Root size stays at the browser default (16px); sizes are rem so a user's own zoom setting still applies. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.font-hand {
+  font-family: var(--font-hand);
+}
+
+/* Elegant, editorial heading system (retail-boutique register) — a light
+   serif title under a small, wide-tracked eyebrow label, in place of the
+   dense all-caps mono tags used for data chrome elsewhere on the page. */
+.eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.heading-elegant {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+}
+
+/* Horizontal gridlines behind timeseries/bar panels, like a monitoring
+   chart's axis ticks — 0/25/50/75/100% reference lines. */
+.chart-grid {
+  background-image: repeating-linear-gradient(
+    to top,
+    var(--border) 0,
+    var(--border) 1px,
+    transparent 1px,
+    transparent 25%
+  );
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.pulse-dot {
+  animation: pulse-ring 2s ease-out infinite;
+}
