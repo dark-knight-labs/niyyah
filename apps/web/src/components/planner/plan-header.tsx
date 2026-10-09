@@ -22,6 +22,20 @@ interface Props {
   onSaveObjective: (text: string) => Promise<boolean>;
 }
 
+/** A phone's version of the quarter ring: one tick per week, passed weeks filled, this week tall, and the count at the right end. */
+function WeekTicks({ week, weeks }: { week: number; weeks: number }) {
+  return (
+    <div className="flex w-full items-center gap-3 text-[var(--accent)] sm:hidden" role="img" aria-label={`Week ${week} of ${weeks}`}>
+      <div className="flex h-2 flex-1 items-center gap-[3px]" aria-hidden="true">
+        {Array.from({ length: weeks }, (_, i) => (
+          <span key={i} className="flex-1 rounded-full bg-current" style={{ height: i + 1 === week ? 6 : 3, opacity: i + 1 === week ? 1 : i + 1 < week ? 0.55 : 0.16 }} />
+        ))}
+      </div>
+      <p className="whitespace-nowrap text-[0.78125rem] text-[var(--muted-foreground)]">Week <b className="font-mono font-bold tabular-nums text-[var(--foreground)]">{week}</b> of <span className="font-mono tabular-nums">{weeks}</span></p>
+    </div>
+  );
+}
+
 /** The quarter's Super Objective with its ring, and the week's seven days showing which block owns OT. */
 export function PlanHeader({ quarter, objectives, streams, schedule, today, busy, onSaveObjective }: Props) {
   const [editing, setEditing] = useState(false);
@@ -53,10 +67,13 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
         }
         sub={quarter.objective_ar ? <span dir="rtl" lang="ar" className="text-xl">{quarter.objective_ar}</span> : undefined}
         visual={
-          <div className="flex items-end gap-6 text-[var(--accent)]">
-            <DominoChain count={6} height={72} className="hidden sm:block" />
-            <QuarterRing week={quarter.week_of_quarter} weeks={quarter.weeks_in_quarter} label={`OF ${quarter.weeks_in_quarter} WEEKS`} />
-          </div>
+          <>
+            <div className="hidden items-end gap-6 text-[var(--accent)] sm:flex">
+              <DominoChain count={6} height={72} />
+              <QuarterRing week={quarter.week_of_quarter} weeks={quarter.weeks_in_quarter} label={`OF ${quarter.weeks_in_quarter} WEEKS`} />
+            </div>
+            <WeekTicks week={quarter.week_of_quarter} weeks={quarter.weeks_in_quarter} />
+          </>
         }
       />
       {days.length > 0 && schedule && (
