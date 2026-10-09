@@ -7,26 +7,13 @@ ROW = {"block": "soul", "start": "fajr", "end": "sunrise", "what": "Quran", "str
 
 
 @pytest.mark.asyncio
-async def test_vault_mode_schedule_carries_weekend_days_and_the_legacy_ot_stream(client, tmp_path, monkeypatch):
-    from app.core.config import settings
-    from tests.vault_fixture import build_vault
-    from datetime import date
-    build_vault(tmp_path, date(2026, 10, 7))
-    monkeypatch.setattr(settings, "vault_workdir", str(tmp_path))
-    body = (await client.get(S)).json()
-    assert body["meta"]["weekend_days"] == ["fri", "sat"]
-    ot = next(r for r in body["days"]["weekday"] if r["block"] == "ot")
-    assert ot["stream"] == "kahf" and next(r for r in body["days"]["weekday"] if r["block"] == "soul")["stream"] is None
-
-
-@pytest.mark.asyncio
 async def test_save_then_read_back(db_client):
     client, _ = db_client
-    res = await client.put(C, json={"meta": META, "weekday": [ROW, {**ROW, "block": "ot", "start": "08:30", "end": "dhuhr-10", "stream": "kahf"}], "weekend": [ROW]})
+    res = await client.put(C, json={"meta": META, "weekday": [ROW, {**ROW, "block": "ot", "start": "08:30", "end": "dhuhr-10", "stream": "studio"}], "weekend": [ROW]})
     assert res.status_code == 200
     body = (await client.get(S)).json()
     assert body["meta"]["city"] == "Leeds" and body["meta"]["weekend_days"] == ["sat", "sun"]
-    assert [r["block"] for r in body["days"]["weekday"]] == ["soul", "ot"] and body["days"]["weekday"][1]["stream"] == "kahf"
+    assert [r["block"] for r in body["days"]["weekday"]] == ["soul", "ot"] and body["days"]["weekday"][1]["stream"] == "studio"
 
 
 @pytest.mark.asyncio

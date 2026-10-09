@@ -25,7 +25,7 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       APP_ENV: production
-      STORAGE_BACKEND: db
+      APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       RUN_MIGRATIONS: "1"
       DATABASE_URL: postgresql+asyncpg://niyyah:${POSTGRES_PASSWORD}@db:5432/niyyah
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}

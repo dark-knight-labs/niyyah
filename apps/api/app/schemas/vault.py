@@ -61,17 +61,8 @@ class VaultScheduleResponse(BaseModel):
     errors: list[str]
 
 
-class VaultSyncStatus(BaseModel):
-    head: str | None  # short id of the commit the checkout is at; None when there is no checkout yet
-    head_at: str | None  # that commit's time (ISO 8601)
-    pulled_at: str | None  # when the vault remote was last contacted (ISO 8601)
-    days: int  # daily notes synced into the database
-    storage: str = "vault"  # "db": days are the user's own and there is nothing to sync
-
-
-class VaultSyncResponse(BaseModel):
-    synced_days: int
-    errors: list[str]
+class DaysStatus(BaseModel):
+    days: int  # days the user has logged
 
 
 class ModeIn(BaseModel):
@@ -107,9 +98,9 @@ class TaskResponse(BaseModel):
 
 
 class TaskToggleIn(BaseModel):
-    path: str
+    path: str = ""
     line: int
-    hash: str
+    hash: str = ""
     done: bool
 
 
@@ -118,16 +109,16 @@ class TaskIn(BaseModel):
 
 
 class TaskTextIn(BaseModel):
-    path: str
+    path: str = ""
     line: int
-    hash: str
+    hash: str = ""
     text: str
 
 
 class TaskRemoveIn(BaseModel):
-    path: str
+    path: str = ""
     line: int
-    hash: str
+    hash: str = ""
 
 
 class LogEntryResponse(BaseModel):
@@ -138,13 +129,13 @@ class LogEntryResponse(BaseModel):
 
 class LogEntryIn(BaseModel):
     index: int
-    hash: str
+    hash: str = ""
     text: str
 
 
 class LogEntryRemoveIn(BaseModel):
     index: int
-    hash: str
+    hash: str = ""
 
 
 Month = Literal["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
@@ -281,7 +272,6 @@ class PipelineItem(BaseModel):
 
 
 class PipelineStreamData(StreamInfo):
-    path: str
     items: list[PipelineItem]
 
 
@@ -301,7 +291,7 @@ class PipelineAddIn(BaseModel):
 class PipelineRefIn(BaseModel):
     stream: str
     line: int
-    hash: str
+    hash: str = ""
 
 
 class PipelineMoveIn(PipelineRefIn):
@@ -370,7 +360,6 @@ class NotebookEntry(BaseModel):
 
 
 class NotebookStreamData(StreamInfo):
-    path: str
     entries: list[NotebookEntry]
 
 

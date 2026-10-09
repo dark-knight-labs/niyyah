@@ -7,9 +7,9 @@ from urllib.parse import urlparse
 from sqlalchemy import delete, func, select
 
 from app.models.planner import Goal, PlannerBlock, PlannerCalendarFeed, PlannerScheduleBlock, PlannerScheduleSetting
-from app.services.vault_calendar import check_public_url
+from app.services.calendar_events import check_public_url
 from app.services.planner_defaults import STARTER_BLOCKS, STARTER_META, STARTER_WEEKDAY, STARTER_WEEKEND
-from app.services.vault_schedule import _valid_time
+from app.services.rules import valid_time
 
 METHODS = {"karachi", "mwl", "isna", "egyptian", "ummalqura", "dubai", "qatar", "kuwait", "singapore", "turkey", "tehran", "moonsighting"}
 MADHABS = {"hanafi", "shafi"}
@@ -49,7 +49,7 @@ def _rows(rows: list[dict], label: str, blocks: dict[str, bool], stream_ids: set
     out = []
     for n, r in enumerate(rows, start=1):
         for field in ("start", "end"):
-            if not _valid_time(r[field].strip().lower()):
+            if not valid_time(r[field].strip().lower()):
                 raise ValueError(f"{label} row {n}: '{r[field]}' is not a time (use HH:MM or a prayer like fajr+10)")
         if r["block"] not in blocks:
             raise ValueError(f"{label} row {n}: unknown block '{r['block']}'")

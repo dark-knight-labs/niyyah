@@ -47,10 +47,6 @@ export interface VaultStreaksData {
   streaks: Record<string, VaultStreakEntry>;
 }
 
-export interface VaultSyncData {
-  synced_days: number;
-  errors: string[];
-}
 
 export interface VaultTaskData {
   path: string;
@@ -79,15 +75,8 @@ export interface VaultObjective {
   checkpoint: MonthKey | null;
 }
 
-export interface VaultSyncStatusData {
-  /** Short id of the commit the vault checkout is at; null when there is no checkout yet. */
-  head: string | null;
-  head_at: string | null;
-  /** When the vault remote was last contacted. */
-  pulled_at: string | null;
+export interface DaysStatusData {
   days: number;
-  /** "db": the days are the user's own, so there is no vault to sync. */
-  storage: "vault" | "db";
 }
 
 export interface VaultGoal {
@@ -196,7 +185,6 @@ export interface PipelineItemData {
 }
 
 export interface PipelineStreamData extends StreamInfo {
-  path: string;
   items: PipelineItemData[];
 }
 
@@ -226,7 +214,6 @@ export interface NotebookEntryData {
 }
 
 export interface NotebookStreamData extends StreamInfo {
-  path: string;
   entries: NotebookEntryData[];
 }
 

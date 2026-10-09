@@ -45,7 +45,7 @@ The API refuses to start in production with a placeholder or short `SECRET_KEY`.
 | `SECRET_KEY` | none (required) | Signs login tokens. At least 32 random characters. |
 | `DATABASE_URL` | local Postgres | `postgresql+asyncpg://user:password@host:5432/db` |
 | `APP_ENV` | `production` | `development` allows placeholder secrets for local work. |
-| `STORAGE_BACKEND` | `vault` | Use `db`. The `vault` mode is a legacy single-owner mode that is being removed. |
+| `APP_TIMEZONE` | `UTC` | The timezone that decides what "today" is, e.g. `Europe/London`. |
 | `REGISTRATION` | `open` | `closed` turns account creation off. |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated web origins allowed to call the API. |
 | `TRUSTED_PROXY_HOPS` | `0` | Number of reverse proxies in front of the API, so rate limits see real client addresses. |

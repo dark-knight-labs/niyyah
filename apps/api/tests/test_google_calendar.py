@@ -1,4 +1,3 @@
-import json
 from datetime import date, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
@@ -8,7 +7,7 @@ from httpx import AsyncClient
 from jose import jwt
 
 from app.core.config import settings
-from app.services import google_calendar, vault_calendar
+from app.services import google_calendar, calendar_events
 
 API = "/api/v1/vault"
 TZ = ZoneInfo("Asia/Dhaka")
@@ -18,7 +17,7 @@ TZ = ZoneInfo("Asia/Dhaka")
 def google_env(monkeypatch):
     monkeypatch.setattr(settings, "google_client_id", "cid")
     monkeypatch.setattr(settings, "google_client_secret", "csecret")
-    monkeypatch.setattr(settings, "vault_write_emails", "test@niyyah.app")
+    monkeypatch.setattr(settings, "app_timezone", "Asia/Dhaka")
     monkeypatch.setattr(settings, "api_public_url", "https://api.example.com")
     monkeypatch.setattr(settings, "web_public_url", "https://app.example.com")
     google_calendar._access.clear()
@@ -73,12 +72,10 @@ async def test_callback_rejects_bad_state_and_failed_exchange(auth_client: Async
 
 
 @pytest.mark.asyncio
-async def test_unconfigured_and_non_owner(auth_client: AsyncClient, monkeypatch):
+async def test_unconfigured(auth_client: AsyncClient, monkeypatch):
     monkeypatch.setattr(settings, "google_client_secret", "")
     assert (await auth_client.get(f"{API}/calendar/google/status")).json()["configured"] is False
     assert (await auth_client.get(f"{API}/calendar/google/connect")).status_code == 409
-    monkeypatch.setattr(settings, "vault_write_emails", "")
-    assert (await auth_client.get(f"{API}/calendar/google/status")).status_code == 403
 
 
 # --- insert_event / access_token -------------------------------------------------------------------------------
@@ -162,24 +159,25 @@ async def test_post_event_google_failure_is_a_clean_502(auth_client: AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_get_events_reads_google_for_the_connected_email(auth_client: AsyncClient, monkeypatch, tmp_path):
+async def test_get_events_reads_google_for_the_connected_email(auth_client: AsyncClient, monkeypatch):
     await _connect(auth_client, monkeypatch)
-    monkeypatch.setattr(settings, "vault_workdir", str(tmp_path))
     monkeypatch.setattr(google_calendar, "access_token", lambda refresh: "at")
     monkeypatch.setattr(google_calendar, "list_events", lambda token, s, e: [{"summary": "Fresh", "start": {"dateTime": "2026-10-06T09:00:00+06:00"}, "end": {"dateTime": "2026-10-06T10:00:00+06:00"}}])
-    _vault(tmp_path, {"name": "Me", "url": "https://example.test/me.ics", "email": "ME@gmail.com", "color": "#123456"})
-    monkeypatch.setattr(vault_calendar, "_download", lambda url: pytest.fail("ICS must not be read"))
+    from app.models.planner import PlannerCalendarFeed
+    from tests.conftest import TestSession
+    async with TestSession() as db:
+        db.add(PlannerCalendarFeed(user_id=(await auth_client.get("/api/v1/auth/me")).json()["id"], name="Me", url="https://example.test/me.ics",
+                                   email="ME@gmail.com", color="#123456", position=0))
+        await db.commit()
+    monkeypatch.setattr(calendar_events, "_download", lambda url: pytest.fail("ICS must not be read"))
     body = (await auth_client.get(f"{API}/day/2026-10-06/events")).json()
     assert body["errors"] == [] and [(e["title"], e["color"], e["start_min"]) for e in body["events"]] == [("Fresh", "#123456", 540)]
 
 
 # --- events_for_day seam ---------------------------------------------------------------------------------------
 
-def _vault(tmp_path, *icals):
-    path = tmp_path / vault_calendar.SETTINGS_PATH
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"icals": list(icals)}))
-    return tmp_path
+def _feeds(*icals):
+    return [{"name": c.get("name") or "Calendar", "url": c["url"], "color": c.get("color"), "email": c.get("email")} for c in icals]
 
 
 ICS = b"""BEGIN:VCALENDAR
@@ -189,35 +187,35 @@ BEGIN:VEVENT
 UID:k
 DTSTART;TZID=Asia/Dhaka:20261006T120000
 DTEND;TZID=Asia/Dhaka:20261006T130000
-SUMMARY:Kahf standup
+SUMMARY:Studio standup
 END:VEVENT
 END:VCALENDAR
 """
 
 
-def test_events_for_day_uses_google_for_matching_email_and_ics_for_others(tmp_path, monkeypatch):
-    root = _vault(tmp_path,
+def test_events_for_day_uses_google_for_matching_email_and_ics_for_others(monkeypatch):
+    feeds = _feeds(
                   {"name": "Personal", "url": "https://example.test/p.ics", "email": "me@gmail.com", "color": "#111111"},
-                  {"name": "Kahf", "url": "https://example.test/k.ics", "email": "me@kahf.co", "color": "#222222"})
-    monkeypatch.setattr(vault_calendar, "_download", lambda url: ICS if "k.ics" in url else pytest.fail("Personal must not use ICS"))
+                  {"name": "Studio", "url": "https://example.test/k.ics", "email": "me@studio.co", "color": "#222222"})
+    monkeypatch.setattr(calendar_events, "_download", lambda url: ICS if "k.ics" in url else pytest.fail("Personal must not use ICS"))
     items = [
         {"summary": "Dentist", "location": "Clinic", "start": {"dateTime": "2026-10-06T14:00:00+06:00"}, "end": {"dateTime": "2026-10-06T15:00:00+06:00"}},
         {"summary": "Eid", "start": {"date": "2026-10-06"}, "end": {"date": "2026-10-07"}},
         {"summary": "Dropped", "status": "cancelled", "start": {"dateTime": "2026-10-06T16:00:00+06:00"}, "end": {"dateTime": "2026-10-06T17:00:00+06:00"}},
     ]
-    events, errors = vault_calendar.events_for_day(root, date(2026, 10, 6), "Asia/Dhaka", ("Me@Gmail.com", lambda s, e: items))
+    events, errors = calendar_events.events_for_day(date(2026, 10, 6), "Asia/Dhaka", feeds, ("Me@Gmail.com", lambda s, e: items))
     assert errors == []
     assert [(e["title"], e["calendar"], e["all_day"], e["start_min"], e["end_min"], e["location"]) for e in events] == [
         ("Eid", "Personal", True, None, None, None),
-        ("Kahf standup", "Kahf", False, 720, 780, None),
+        ("Studio standup", "Studio", False, 720, 780, None),
         ("Dentist", "Personal", False, 840, 900, "Clinic"),
     ]
 
 
-def test_google_listing_failure_names_only_the_calendar(tmp_path):
-    root = _vault(tmp_path, {"name": "Personal", "url": "https://example.test/p.ics", "email": "me@gmail.com"})
+def test_google_listing_failure_names_only_the_calendar():
+    feeds = _feeds({"name": "Personal", "url": "https://example.test/p.ics", "email": "me@gmail.com"})
 
     def boom(s, e):
         raise google_calendar.GoogleCalendarError("secret detail")
 
-    assert vault_calendar.events_for_day(root, date(2026, 10, 6), "Asia/Dhaka", ("me@gmail.com", boom)) == ([], ["Personal: GoogleCalendarError"])
+    assert calendar_events.events_for_day(date(2026, 10, 6), "Asia/Dhaka", feeds, ("me@gmail.com", boom)) == ([], ["Personal: GoogleCalendarError"])

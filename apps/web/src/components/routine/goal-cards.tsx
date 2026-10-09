@@ -1,6 +1,6 @@
 import { VaultGoalsData } from "@/lib/vault-types";
 
-/** Goals you keep in front of you, one quiet line each, read from Calendar/Goals.md in the vault (edit them in Obsidian). */
+/** Goals you keep in front of you, one quiet line each, edit them in Settings. */
 export function GoalCards({ data }: { data: VaultGoalsData | null }) {
   const items = data?.items ?? [];
   if (data && items.length === 0) {

@@ -7,11 +7,10 @@ from datetime import date
 from sqlalchemy import func, select
 
 from app.models.planner import NotebookEntry, PipelineItem, Quarter, QuarterStream, WeekObjective
-from app.services.vault_notebook import _clean as clean_entry, _new_id
-from app.services.vault_objectives import MAX_OBJECTIVE_CHARS, week_for, weekly_streams
-from app.services.vault_quarter import FIELD_KEYS, _one_line, _validate, quarter_months
-from app.services.vault_streams import DEFAULTS, MONTHS, SLUG, make_stream
-from app.services.vault_pipeline import LANES, MAX_DESCRIPTION_CHARS, _BLOCKER_ID, _PRODUCT, _clean as clean_item
+from app.services.rules import (
+    BLOCKER_ID, FIELD_KEYS, LANES, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, MONTHS, PRODUCT, SLUG, clean_entry, clean_item,
+    make_stream, new_id, one_line_field, quarter_months, validate_field, week_for, weekly_streams,
+)
 
 ITEM_GONE = "that item changed or moved; reload and try again"
 
@@ -32,10 +31,10 @@ async def _next_position(db, user_id: int, stream: str) -> int:
 
 def _split_product(text: str) -> tuple[str, str | None]:
     """('Wire it [product:: Router]') -> ('Wire it', 'Router'): the product is a field of the item, not part of its text."""
-    found = _PRODUCT.search(text)
+    found = PRODUCT.search(text)
     if not found:
         return text, None
-    return _PRODUCT.sub("", text).strip(), found.group(1) or None
+    return PRODUCT.sub("", text).strip(), found.group(1) or None
 
 
 def _description(text: str) -> str:
@@ -98,7 +97,7 @@ async def set_blocked_by(db, user_id: int, stream: str, item_id: int, ids: list[
     row = await item_row(db, user_id, stream, item_id)
     clean: list[str] = []
     for blocker in ids:
-        if not _BLOCKER_ID.match(blocker):
+        if not BLOCKER_ID.match(blocker):
             raise ValueError(f"'{blocker}' is not a blocker id")
         if blocker not in clean:
             clean.append(blocker)
@@ -210,13 +209,13 @@ async def _stream_rows(db, user_id: int, label: str) -> list[QuarterStream]:
 
 
 async def set_super_objective(db, user_id: int, label: str, text: str, arabic: str | None) -> None:
-    text = _one_line(text, "objective")
+    text = one_line_field(text, "objective")
     if not text:
         raise ValueError("objective is empty")
     quarter = await ensure_quarter(db, user_id, label)
     quarter.objective = text
     if arabic is not None:
-        quarter.objective_ar = _one_line(arabic, "Arabic text")
+        quarter.objective_ar = one_line_field(arabic, "Arabic text")
 
 
 def _set_checkpoint_text(row: QuarterStream, month: str, text: str) -> None:
@@ -241,9 +240,9 @@ async def update_stream(db, user_id: int, label: str, stream: str, fields: dict[
         if key not in FIELD_KEYS and key not in months:
             raise ValueError(f"cannot set '{key}'")
         if key in months:
-            _set_checkpoint_text(row, key, _one_line(value, key))
+            _set_checkpoint_text(row, key, one_line_field(value, key))
             continue
-        clean = _validate(key, value)
+        clean = validate_field(key, value)
         if key == "weekly":
             row.weekly = clean.lower() != "no"
         else:
@@ -262,11 +261,11 @@ async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str
     for key in data:
         if key not in FIELD_KEYS and key not in months:
             raise ValueError(f"cannot set '{key}'")
-    written = {k: _validate(k, data[k]) for k in FIELD_KEYS if k in data and data[k].strip()}
+    written = {k: validate_field(k, data[k]) for k in FIELD_KEYS if k in data and data[k].strip()}
     if not written.get("name"):
         raise ValueError("name is required")
     info = make_stream(stream, written)
-    checkpoints = [{"month": m, "text": _one_line(data[m], m)} for m in months if m in data]
+    checkpoints = [{"month": m, "text": one_line_field(data[m], m)} for m in months if m in data]
     last_note = max((r.position for r in rows if r.in_note), default=-1)
     for r in rows:
         if r.position > last_note:
@@ -296,7 +295,7 @@ async def add_entry(db, user_id: int, stream: str, kind: str, title: str, body: 
     title, body = clean_entry(kind, title, body)
     first = (await db.execute(select(func.min(NotebookEntry.position)).where(
         NotebookEntry.user_id == user_id, NotebookEntry.stream == stream))).scalar()
-    db.add(NotebookEntry(user_id=user_id, stream=stream, ext_id=_new_id(), kind=kind, title=title, body=body,
+    db.add(NotebookEntry(user_id=user_id, stream=stream, ext_id=new_id(), kind=kind, title=title, body=body,
                          entry_date=today.isoformat(), is_open=True if kind == "blocker" else None,
                          position=0 if first is None else first - 1))
     await db.flush()

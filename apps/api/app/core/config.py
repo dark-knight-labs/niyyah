@@ -18,17 +18,8 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 30
     cors_origins: str = "http://localhost:3000"
 
-    vault_gitlab_url: str = ""
-    vault_github_url: str = ""
-    vault_sync_secret: str = "change-me-in-production"
-    vault_workdir: str = "/app/data/vault-sync"
-    # Who may write to the vault from the app (registration is open, so this must be explicit). Empty = nobody.
-    vault_write_emails: str = ""
-    vault_git_name: str = "Niyyah"
-    vault_git_email: str = "niyyah@localhost"
-    vault_tz: str = "Asia/Dhaka"
-    # Where planner data lives: "vault" = notes in the git checkout (today's behaviour), "db" = this database.
-    storage_backend: str = "vault"
+    # The timezone that decides what "today" is on every page (a per-user timezone is not wired in yet).
+    app_timezone: str = "UTC"
 
     # Google Calendar (adding events from the Overview page). Both empty = the feature is off.
     google_client_id: str = ""
@@ -54,8 +45,6 @@ def check_secrets(cfg: Settings) -> list[str]:
     problems = []
     if _weak(cfg.secret_key):
         problems.append("SECRET_KEY is a placeholder or shorter than 32 characters (generate one: python -c \"import secrets; print(secrets.token_urlsafe(48))\")")
-    if cfg.storage_backend == "vault" and _weak(cfg.vault_sync_secret):
-        problems.append("VAULT_SYNC_SECRET is a placeholder or shorter than 32 characters")
     if cfg.trusted_proxy_hops < 0:
         problems.append("TRUSTED_PROXY_HOPS cannot be negative")
     if cfg.registration not in ("open", "closed"):

@@ -11,9 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.models.planner import LogEntry, Task
 from app.models.vault import VaultBlockVote, VaultDay
 from app.services import planner_blocks
-from app.services.vault_parser import BLOCK_ALIASES, MODE_META, possible_for_count
-from app.services.vault_tasks import line_hash
-from app.services.vault_write import _one_line
+from app.services.rules import MODE_META, line_hash, one_line_note, possible_for_count
 
 TASK_GONE = "this task no longer exists; reload and try again"
 LOG_GONE = "this log entry changed; reload and try again"
@@ -49,7 +47,7 @@ async def set_mode(db, user_id: int, day: date, mode: str) -> VaultDay:
 
 
 async def set_vote(db, user_id: int, day: date, block: str, stars: int) -> VaultDay:
-    block = BLOCK_ALIASES.get(block.lower(), block.lower())
+    block = block.lower()
     if block not in await planner_blocks.counted_keys(db, user_id, include_archived=True):
         raise ValueError(f"unknown block '{block}'")
     if not 0 <= stars <= 3:
@@ -78,7 +76,7 @@ async def _summarise(db, user_id: int, row: VaultDay) -> None:
 
 
 async def add_note(db, user_id: int, day: date, clock: str, section: str, span: str, text: str) -> VaultDay:
-    entry = f"{clock} · {_one_line(section)} ({_one_line(span)}): {_one_line(text)}"
+    entry = f"{clock} · {one_line_note(section)} ({one_line_note(span)}): {one_line_note(text)}"
     row = await _day(db, user_id, day)
     top = (await db.execute(select(func.max(LogEntry.position)).where(LogEntry.user_id == user_id, LogEntry.day == day))).scalar()
     db.add(LogEntry(user_id=user_id, day=day, position=0 if top is None else top + 1, text=entry))
@@ -95,7 +93,7 @@ async def _log_entry(db, user_id: int, day: date, index: int, expected_hash: str
 
 
 async def edit_log_entry(db, user_id: int, day: date, index: int, expected_hash: str, text: str) -> VaultDay | None:
-    body = _one_line(text)
+    body = one_line_note(text)
     entry = await _log_entry(db, user_id, day, index, expected_hash)
     entry.text = body
     row = await _find_day(db, user_id, day)

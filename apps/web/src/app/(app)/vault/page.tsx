@@ -8,7 +8,7 @@ import {
   VaultDayData,
   VaultMonthData,
   VaultStreaksData,
-  VaultSyncStatusData,
+  DaysStatusData,
   VaultWeekData,
 } from "@/lib/vault-types";
 import { VaultHeader } from "@/components/vault/header";
@@ -29,7 +29,7 @@ export default function VaultPage() {
   const [month, setMonth] = useState<VaultMonthData | null>(null);
   const [blocks, setBlocks] = useState<VaultBlocksSeriesData | null>(null);
   const [streaks, setStreaks] = useState<VaultStreaksData | null>(null);
-  const [status, setStatus] = useState<VaultSyncStatusData | null>(null);
+  const [status, setStatus] = useState<DaysStatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -57,7 +57,7 @@ export default function VaultPage() {
       fetchOrNull("month", vaultApi.month(currentMonth())),
       fetchOrNull("blocks", vaultApi.blocks(30)),
       fetchOrNull("streaks", vaultApi.streaks()),
-      fetchOrNull("sync status", vaultApi.syncStatus()),
+      fetchOrNull("status", vaultApi.status()),
     ])
       .then(([t, w, m, b, s, st]) => {
         setToday(t);
@@ -89,7 +89,7 @@ export default function VaultPage() {
           {fetchError}
         </div>
       )}
-      <VaultHeader today={today} status={status} onSynced={load} />
+      <VaultHeader today={today} status={status} />
       <BlockCards today={today} />
       <div className="grid gap-3 xl:grid-cols-2 xl:items-start">
         <WeeklyPulse week={week} />

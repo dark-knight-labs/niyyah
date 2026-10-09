@@ -90,7 +90,7 @@ function meetingName(url: string): string {
   return "call";
 }
 
-/** Today's events from the calendars set up in Obsidian (Day Planner's iCal feeds); new ones go to Google Calendar. */
+/** Today's events from your calendar feeds (Settings > Calendars); new ones go to Google Calendar. */
 export function CalendarCard({ day, data, status, onChanged }: { day: string | null; data: VaultEventsData | null; status: GoogleStatusData | null; onChanged: () => void }) {
   if (!data) return null;
   return (

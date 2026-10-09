@@ -8,18 +8,13 @@ GOOD = "x" * 40
 
 
 def cfg(**kw):
-    return Settings(app_env="production", secret_key=GOOD, vault_sync_secret=GOOD, storage_backend="db", **kw)
+    return Settings(app_env="production", secret_key=GOOD, **kw)
 
 
 def test_production_refuses_placeholder_and_short_secrets():
     assert check_secrets(cfg()) == []
     for bad in ["change-me-in-production", "changeme-niyyah-secret-key-generate-secure-random", "short", ""]:
-        assert check_secrets(Settings(app_env="production", secret_key=bad, storage_backend="db")), bad
-
-
-def test_the_vault_secret_only_matters_in_vault_mode():
-    assert check_secrets(Settings(app_env="production", secret_key=GOOD, storage_backend="db")) == []
-    assert check_secrets(Settings(app_env="production", secret_key=GOOD, storage_backend="vault"))
+        assert check_secrets(Settings(app_env="production", secret_key=bad)), bad
 
 
 def test_development_allows_placeholders():
