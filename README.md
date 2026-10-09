@@ -48,6 +48,6 @@ The API refuses to start in production with a placeholder or short `SECRET_KEY`.
 | `STORAGE_BACKEND` | `vault` | Use `db`. The `vault` mode is a legacy single-owner mode that is being removed. |
 | `REGISTRATION` | `open` | `closed` turns account creation off. |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated web origins allowed to call the API. |
-| `TRUST_FORWARDED_FOR` | `false` | Trust `X-Forwarded-For` from your reverse proxy for rate limits. |
+| `TRUSTED_PROXY_HOPS` | `0` | Number of reverse proxies in front of the API, so rate limits see real client addresses. |
 | `RUN_MIGRATIONS` | `0` | The Docker image runs `alembic upgrade head` on start when `1`. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | empty | Optional Google Calendar. |

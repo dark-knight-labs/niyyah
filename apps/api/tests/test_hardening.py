@@ -66,15 +66,29 @@ async def test_registration_is_limited_per_address(client):
 
 
 @pytest.mark.asyncio
-async def test_forwarded_address_is_used_only_when_trusted(client, monkeypatch):
-    def attempt(ip):
-        return client.post("/api/v1/auth/login", json={"email": f"{ip}@example.com", "password": "x"}, headers={"x-forwarded-for": ip})
+async def test_forwarded_header_is_ignored_without_a_trusted_proxy(client, monkeypatch):
+    monkeypatch.setattr(live, "trusted_proxy_hops", 0)
+    codes = [(await client.post("/api/v1/auth/login", json={"email": f"u{i}@example.com", "password": "x"},
+                                 headers={"x-forwarded-for": f"10.0.0.{i}"})).status_code for i in range(21)]
+    assert codes[-1] == 429  # every request looks like the same client
 
-    monkeypatch.setattr(live, "trust_forwarded_for", False)
-    first = [(await attempt(f"10.0.0.{i}")).status_code for i in range(21)]
-    assert first[-1] == 429  # all requests look like one client
-    from app.core import ratelimit
-    ratelimit.reset()
-    monkeypatch.setattr(live, "trust_forwarded_for", True)
-    second = [(await attempt(f"10.0.0.{i}")).status_code for i in range(21)]
-    assert 429 not in second
+
+@pytest.mark.asyncio
+async def test_a_client_cannot_dodge_the_limit_by_writing_the_header(client, monkeypatch):
+    monkeypatch.setattr(live, "trusted_proxy_hops", 1)
+    # the proxy appends the real address on the right; the spoofed entries on the left change every time
+    codes = [(await client.post("/api/v1/auth/login", json={"email": f"u{i}@example.com", "password": "x"},
+                                 headers={"x-forwarded-for": f"spoof{i}, 203.0.113.7"})).status_code for i in range(21)]
+    assert codes[-1] == 429
+
+
+@pytest.mark.asyncio
+async def test_different_real_clients_behind_the_proxy_are_counted_apart(client, monkeypatch):
+    monkeypatch.setattr(live, "trusted_proxy_hops", 1)
+    codes = [(await client.post("/api/v1/auth/login", json={"email": f"u{i}@example.com", "password": "x"},
+                                 headers={"x-forwarded-for": f"203.0.113.{i}"})).status_code for i in range(21)]
+    assert 429 not in codes
+
+
+def test_negative_hops_are_refused():
+    assert check_secrets(cfg(trusted_proxy_hops=-1))

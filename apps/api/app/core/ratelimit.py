@@ -19,10 +19,13 @@ def reset() -> None:
 
 
 def client_ip(request: Request) -> str:
-    if settings.trust_forwarded_for:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+    """The caller's address. Each trusted proxy appends the address it saw to X-Forwarded-For, so the real client is the Nth
+    entry from the right; anything further left was written by the client and is never used."""
+    hops = settings.trusted_proxy_hops
+    if hops > 0:
+        entries = [e.strip() for e in request.headers.get("x-forwarded-for", "").split(",") if e.strip()]
+        if len(entries) >= hops:
+            return entries[-hops]
     return request.client.host if request.client else "unknown"
 
 
