@@ -1,11 +1,6 @@
-import { ResolvedBlock, ResolvedDay, RoutineBlock, PRAYERS, Prayer } from "@/lib/routine";
+import { ResolvedBlock, ResolvedDay, PRAYERS, Prayer } from "@/lib/routine";
 
 const TAU = Math.PI * 2;
-
-/** Short name written on the ring itself. */
-export const RING_NAMES: Record<RoutineBlock, string> = {
-  soul: "SOUL", body: "BODY", ot: "OT", planning: "PLAN", distribution: "DIST", fnf: "FNF", sleep: "SLEEP",
-};
 
 export const duration = (b: ResolvedBlock) => b.endMin - b.startMin;
 
@@ -61,9 +56,9 @@ export function ringGeometry(cx: number, cy: number, r: number) {
 }
 
 /** Name along the arc only if it fits (about 6.3 units per capital at the ring's font size). */
-export function nameFits(b: ResolvedBlock, r: number, charWidth: number): boolean {
+export function nameFits(b: ResolvedBlock, r: number, charWidth: number, name: string): boolean {
   const length = (TAU * r * duration(b)) / 1440;
-  return length >= RING_NAMES[b.block].length * charWidth + 2;
+  return length >= name.length * charWidth + 2;
 }
 
 export const onBottomHalf = (b: ResolvedBlock) => {

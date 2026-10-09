@@ -5,7 +5,8 @@ import { Pencil } from "lucide-react";
 import { DominoChain } from "@/components/planner/domino-chain";
 import { PageTitle } from "@/components/planner/page-title";
 import { QuarterRing } from "@/components/planner/quarter-ring";
-import { MONTH_LABEL, StreamMeta, otStreamFor } from "@/lib/streams";
+import { VaultScheduleData, slotOwnerFor } from "@/lib/routine";
+import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { fmtDay, weekDays } from "@/lib/week";
 import { QuarterData, VaultObjectivesData } from "@/lib/vault-types";
 
@@ -13,6 +14,8 @@ interface Props {
   quarter: QuarterData;
   objectives: VaultObjectivesData | null;
   streams: StreamMeta[];
+  /** Decides which stream owns the slot on each day; without it the week strip is left out. */
+  schedule: VaultScheduleData | null;
   /** Today as "YYYY-MM-DD" in the planner's timezone. */
   today: string;
   busy: boolean;
@@ -20,7 +23,7 @@ interface Props {
 }
 
 /** The quarter's Super Objective with its ring, and the week's seven days showing which block owns OT. */
-export function PlanHeader({ quarter, objectives, streams, today, busy, onSaveObjective }: Props) {
+export function PlanHeader({ quarter, objectives, streams, schedule, today, busy, onSaveObjective }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const year = quarter.quarter.slice(0, 4);
@@ -56,10 +59,11 @@ export function PlanHeader({ quarter, objectives, streams, today, busy, onSaveOb
           </div>
         }
       />
-      {days.length > 0 && (
+      {days.length > 0 && schedule && (
         <ol className="-mt-2 mb-8 grid max-w-xl grid-cols-7 gap-1.5 sm:gap-2" aria-label="Days of the week and the block that owns OT">
           {days.map((d) => {
-            const owner = otStreamFor(new Date(`${d}T12:00:00Z`), "UTC", streams);
+            const ownerId = slotOwnerFor(schedule, new Date(`${d}T12:00:00Z`));
+            const owner = streams.find((s) => s.id === ownerId);
             const isToday = d === today;
             if (!owner) return null;
             return (

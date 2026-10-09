@@ -1,21 +1,27 @@
 import { CalculationMethod, Coordinates, Madhab, PrayerTimes } from "adhan";
-import { BLOCK_COLORS } from "@/lib/vault-constants";
 
 export interface ScheduleBlockData {
   block: string;
   start: string;
   end: string;
   what: string;
+  /** The stream that owns this slot (shown on the Overview), if the schedule names one. */
+  stream?: string | null;
 }
 
 export interface ScheduleMeta {
   city: string | null;
-  lat: number;
-  lon: number;
+  lat: number | null;
+  lon: number | null;
   tz: string;
   method: string;
   madhab: string;
+  /** Weekdays ("mon".."sun") that use the weekend schedule. */
+  weekend_days: string[];
 }
+
+/** Prayer times need a location; a new account has none until it sets one in Settings. */
+export const hasLocation = (meta: ScheduleMeta) => meta.lat != null && meta.lon != null;
 
 export interface VaultScheduleData {
   meta: ScheduleMeta;
@@ -27,24 +33,14 @@ export const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"] as const;
 export type Prayer = (typeof PRAYERS)[number];
 export type DayType = "weekday" | "weekend";
 
-// Scheduling blocks: ONE Thing and OPS are merged into "ot", and the weekend
-// Planning/Reflection slot is its own block. Colours reuse the vote palette.
-export const ROUTINE_BLOCKS = {
-  soul: { label: "Soul", color: BLOCK_COLORS.soul },
-  body: { label: "Body", color: BLOCK_COLORS.body },
-  ot: { label: "OT", color: BLOCK_COLORS.ops },
-  planning: { label: "Planning", color: BLOCK_COLORS.onething },
-  distribution: { label: "Distribution", color: BLOCK_COLORS.distribution },
-  fnf: { label: "FnF", color: BLOCK_COLORS.fnf },
-  sleep: { label: "Sleep", color: BLOCK_COLORS.sleep },
-} as const;
-export type RoutineBlock = keyof typeof ROUTINE_BLOCKS;
+export type RoutineBlock = string; // a key of the user's blocks (see useBlocks)
 
 export interface ResolvedBlock {
   block: RoutineBlock;
   startMin: number; // 0..1439
   endMin: number; // startMin < endMin <= startMin + 1440 (may exceed 1440 when crossing midnight)
   what: string;
+  stream: string | null;
 }
 
 export interface ResolvedDay {
@@ -96,12 +92,13 @@ export function dateInTz(date: Date, tz: string): string {
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export function dayTypeFor(date: Date, tz: string): DayType {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long" }).format(date);
-  return weekday === "Friday" || weekday === "Saturday" ? "weekend" : "weekday";
+export function dayTypeFor(date: Date, tz: string, weekendDays: string[]): DayType {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(date).toLowerCase().slice(0, 3);
+  return weekendDays.includes(weekday) ? "weekend" : "weekday";
 }
 
 export function computePrayerMinutes(meta: ScheduleMeta, date: Date) {
+  if (meta.lat == null || meta.lon == null) throw new Error("set your location in Settings");
   const method = METHODS[meta.method.toLowerCase()];
   if (!method) throw new Error(`unknown prayer method '${meta.method}'`);
   const params = method();
@@ -109,7 +106,7 @@ export function computePrayerMinutes(meta: ScheduleMeta, date: Date) {
 
   const [y, m, d] = ymdInTz(date, meta.tz);
   // adhan reads the calendar date from local getters, so build the date at local noon.
-  const times = new PrayerTimes(new Coordinates(meta.lat, meta.lon), new Date(y, m - 1, d, 12), params);
+  const times = new PrayerTimes(new Coordinates(meta.lat as number, meta.lon as number), new Date(y, m - 1, d, 12), params);
   const at = (t: Date) => minutesInTz(t, meta.tz);
   return {
     sunrise: at(times.sunrise),
@@ -120,7 +117,7 @@ export function computePrayerMinutes(meta: ScheduleMeta, date: Date) {
   };
 }
 
-function resolveTime(value: string, anchors: Record<string, number>): number {
+export function resolveTime(value: string, anchors: Record<string, number>): number {
   const match = TIME_RE.exec(value);
   if (!match) throw new Error(`invalid time '${value}'`);
   if (match[1] !== undefined) return Number(match[1]) * 60 + Number(match[2]);
@@ -129,7 +126,7 @@ function resolveTime(value: string, anchors: Record<string, number>): number {
 }
 
 /** Overlap check on the circular 24h timeline. */
-function findOverlaps(blocks: ResolvedBlock[]): string[] {
+export function findOverlaps(blocks: ResolvedBlock[]): string[] {
   const warnings: string[] = [];
   for (let i = 0; i < blocks.length; i++) {
     for (let j = i + 1; j < blocks.length; j++) {
@@ -144,9 +141,10 @@ function findOverlaps(blocks: ResolvedBlock[]): string[] {
   return warnings;
 }
 
-export function resolveDay(schedule: VaultScheduleData, date: Date): ResolvedDay {
+/** `known` is the set of block keys the user has; empty means "do not check". */
+export function resolveDay(schedule: VaultScheduleData, date: Date, known: ReadonlySet<string>): ResolvedDay {
   const { meta } = schedule;
-  const dayType = dayTypeFor(date, meta.tz);
+  const dayType = dayTypeFor(date, meta.tz, meta.weekend_days ?? ["fri", "sat"]);
   const rows = schedule.days[dayType]?.length ? schedule.days[dayType] : schedule.days.weekday ?? [];
   const { prayers, sunrise } = computePrayerMinutes(meta, date);
   const anchors = { ...prayers, sunrise };
@@ -158,8 +156,8 @@ export function resolveDay(schedule: VaultScheduleData, date: Date): ResolvedDay
       const startMin = resolveTime(row.start, anchors);
       let endMin = resolveTime(row.end, anchors);
       if (endMin <= startMin) endMin += 1440; // crosses midnight
-      if (!(row.block in ROUTINE_BLOCKS)) throw new Error(`unknown block '${row.block}'`);
-      blocks.push({ block: row.block as RoutineBlock, startMin, endMin, what: row.what });
+      if (known.size > 0 && !known.has(row.block)) throw new Error(`unknown block '${row.block}'`);
+      blocks.push({ block: row.block, startMin, endMin, what: row.what, stream: row.stream ?? null });
     } catch (err) {
       warnings.push(`${row.block}: ${(err as Error).message}`);
     }
@@ -175,4 +173,11 @@ export function formatMinutes(min: number): string {
 
 export function nowMinutes(now: Date, tz: string): number {
   return minutesInTz(now, tz);
+}
+
+/** The stream that owns the schedule's slot on `date`: the first row of that day's schedule that names one. */
+export function slotOwnerFor(schedule: VaultScheduleData, date: Date): string | null {
+  const type = dayTypeFor(date, schedule.meta.tz, schedule.meta.weekend_days ?? ["fri", "sat"]);
+  const rows = schedule.days[type]?.length ? schedule.days[type] : schedule.days.weekday ?? [];
+  return rows.find((r) => r.stream)?.stream ?? null;
 }

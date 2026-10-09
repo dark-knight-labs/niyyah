@@ -21,7 +21,7 @@ const RAIL_KEY = "niyyah-plan-rail";
 
 /** Plan: the Super Objective, the week, and each block's goal, small domino, pipeline and notebook in one place. */
 export default function PlanPage() {
-  const { loading, owner, quarter, quarterError, pipelines, objectives, notebooks, streams, error, reload } = usePlanner();
+  const { loading, owner, quarter, quarterError, pipelines, objectives, notebooks, schedule, streams, error, reload } = usePlanner();
   // The page renders a spinner until the plan loads, so reading the browser here cannot cause a hydration mismatch.
   const [picked, setPicked] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("stream")));
   const [collapsed, setCollapsed] = useState(() => {
@@ -80,7 +80,7 @@ export default function PlanPage() {
 
   return (
     <div className="w-full">
-      <PlanHeader quarter={quarter} objectives={objectives} streams={streams} today={dateInTz(now, PLANNER_TZ)} busy={busy}
+      <PlanHeader quarter={quarter} objectives={objectives} streams={streams} schedule={schedule} today={dateInTz(now, PLANNER_TZ)} busy={busy}
         onSaveObjective={(text) => run(() => vaultApi.setSuperObjective(text, quarter.objective_ar))} />
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 

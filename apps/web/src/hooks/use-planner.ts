@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { vaultApi } from "@/lib/vault-api";
+import { VaultScheduleData } from "@/lib/routine";
 import { StreamMeta, toMeta } from "@/lib/streams";
 import { NotebooksData, PipelinesData, QuarterData, VaultObjectivesData } from "@/lib/vault-types";
 
@@ -18,6 +19,8 @@ export interface Planner {
   objectives: VaultObjectivesData | null;
   /** Ideas, meetings, links and blockers per stream; null until loaded (the planner works without it). */
   notebooks: NotebooksData | null;
+  /** The weekly schedule: which stream owns the slot on each day of the week strip. */
+  schedule: VaultScheduleData | null;
   /** The live blocks (quarter goal and pipeline), in quarter-note order; archived ones are left out. */
   streams: StreamMeta[];
   error: string | null;
@@ -37,6 +40,7 @@ export function usePlanner(): Planner {
   const [pipelines, setPipelines] = useState<PipelinesData | null>(null);
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const [notebooks, setNotebooks] = useState<NotebooksData | null>(null);
+  const [schedule, setSchedule] = useState<VaultScheduleData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -44,12 +48,13 @@ export function usePlanner(): Planner {
       const access = await vaultApi.editAccess();
       setOwner(access.allowed);
       if (!access.allowed) return;
-      const [q, p, o, n] = await Promise.allSettled([vaultApi.quarter(), vaultApi.pipelines(), vaultApi.objectives(), vaultApi.notebooks()]);
+      const [q, p, o, n, sc] = await Promise.allSettled([vaultApi.quarter(), vaultApi.pipelines(), vaultApi.objectives(), vaultApi.notebooks(), vaultApi.schedule()]);
       if (q.status === "fulfilled") { setQuarter(q.value); setQuarterError(null); }
       else setQuarterError((q.reason as ApiError).status === 404 ? "This quarter's note is not in the synced vault yet." : message(q.reason, "Could not load the quarter."));
       if (p.status === "fulfilled") setPipelines(p.value);
       if (o.status === "fulfilled") setObjectives(o.value);
       if (n.status === "fulfilled") setNotebooks(n.value);
+      if (sc.status === "fulfilled") setSchedule(sc.value);
       setError(p.status === "rejected" || o.status === "rejected" ? "Could not load the plan. The API may be unreachable." : null);
     } catch (err) {
       setError(message(err, "Could not reach the API."));
@@ -66,5 +71,5 @@ export function usePlanner(): Planner {
 
   const streams = useMemo(() => (pipelines?.streams ?? []).map(toMeta), [pipelines]);
 
-  return { loading, owner, quarter, quarterError, pipelines, objectives, notebooks, streams, error, reload };
+  return { loading, owner, quarter, quarterError, pipelines, objectives, notebooks, schedule, streams, error, reload };
 }

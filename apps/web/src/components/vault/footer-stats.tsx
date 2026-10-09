@@ -1,4 +1,5 @@
-import { BLOCK_COLORS, BLOCK_LABELS, BLOCK_ORDER, resolveModeColor } from "@/lib/vault-constants";
+import { useBlocks } from "@/lib/blocks";
+import { resolveModeColor } from "@/lib/vault-constants";
 import { VaultMonthData, VaultStreaksData } from "@/lib/vault-types";
 
 interface FooterStatsProps {
@@ -9,6 +10,7 @@ interface FooterStatsProps {
 }
 
 export function FooterStats({ stacked, month, streaks }: FooterStatsProps) {
+  const blocks = useBlocks();
   return (
     <div className={`grid grid-cols-1 gap-3 ${stacked ? "" : "md:grid-cols-2"}`}>
       <div className="border border-[var(--border)] bg-[var(--surface)] rounded-xl p-3.5">
@@ -50,16 +52,17 @@ export function FooterStats({ stacked, month, streaks }: FooterStatsProps) {
           <p className="text-xs text-[var(--muted-foreground)]">current / best</p>
         </div>
         <div className="space-y-1">
-          {BLOCK_ORDER.map((block) => {
+          {blocks.list.filter((b) => b.counts_for_stars).map((b) => {
+            const block = b.key;
             const entry = streaks?.streaks[block];
             if (streaks && !entry) return null; // block never voted (e.g. legacy or merged)
             const current = entry?.current ?? 0;
-            const color = BLOCK_COLORS[block];
+            const color = blocks.color(block);
             return (
               <div key={block} className="flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                  <span style={{ color }}>{BLOCK_LABELS[block]}</span>
+                  <span style={{ color }}>{b.label}</span>
                 </span>
                 <span className="font-mono tabular-nums text-[var(--muted-foreground)]">
                   {current} / {entry?.longest ?? 0}

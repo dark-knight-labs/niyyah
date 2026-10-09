@@ -1,8 +1,9 @@
 "use client";
 
+import { useBlocks } from "@/lib/blocks";
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ROUTINE_BLOCKS, ResolvedDay, formatMinutes } from "@/lib/routine";
+import { ResolvedDay, formatMinutes } from "@/lib/routine";
 import { duration, formatDuration } from "@/lib/ring";
 import { VaultEvent } from "@/lib/vault-types";
 import { RingGraphic } from "@/components/routine/ring-graphic";
@@ -16,6 +17,7 @@ interface Props {
 
 /** Only the clock, filling the screen, every block labelled beside it. Esc or the button leaves. */
 export function FullScreenClock({ day, nowMin, onClose, events }: Props) {
+  const blocks = useBlocks();
   const [hover, setHover] = useState<number | null>(null);
   const [portrait, setPortrait] = useState(false);
   const close = useRef(onClose);
@@ -53,8 +55,8 @@ export function FullScreenClock({ day, nowMin, onClose, events }: Props) {
           </svg>
           <ul className="mx-auto grid w-full max-w-md gap-4 pb-6">
             {day.blocks.map((b) => (
-              <li key={`${b.block}-${b.startMin}`} className="border-l-4 pl-3" style={{ borderColor: ROUTINE_BLOCKS[b.block].color }}>
-                <p className="font-bold">{ROUTINE_BLOCKS[b.block].label}</p>
+              <li key={`${b.block}-${b.startMin}`} className="border-l-4 pl-3" style={{ borderColor: blocks.color(b.block) }}>
+                <p className="font-bold">{blocks.label(b.block)}</p>
                 <p className="text-sm text-[var(--muted-foreground)]">{formatMinutes(b.startMin)} – {formatMinutes(b.endMin)}</p>
                 <p className="text-sm text-[var(--muted-foreground)]">{formatDuration(duration(b))}</p>
                 <p className="text-sm">{b.what}</p>

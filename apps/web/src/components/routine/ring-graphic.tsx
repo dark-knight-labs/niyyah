@@ -1,9 +1,10 @@
 "use client";
 
-import { PRAYERS, ROUTINE_BLOCKS, ResolvedDay, formatMinutes } from "@/lib/routine";
+import { useBlocks } from "@/lib/blocks";
+import { PRAYERS, ResolvedDay, formatMinutes } from "@/lib/routine";
 import { VaultEvent } from "@/lib/vault-types";
 import {
-  RING_NAMES, currentBlock, duration, formatDuration, isPast, nameFits, nextPrayer, onBottomHalf, ringGeometry,
+  currentBlock, duration, formatDuration, isPast, nameFits, nextPrayer, onBottomHalf, ringGeometry,
 } from "@/lib/ring";
 
 const LABEL_GAP = 92;
@@ -40,6 +41,7 @@ export interface RingGraphicProps {
 
 /** The 24h ring: slices, names on the slices, now marker, clock. Meant to sit inside an <svg>. */
 export function RingGraphic(p: RingGraphicProps) {
+  const blocks = useBlocks();
   const { day, nowMin, cx, cy, r, t, hover } = p;
   const g = ringGeometry(cx, cy, r);
   const current = currentBlock(day, nowMin);
@@ -47,7 +49,7 @@ export function RingGraphic(p: RingGraphicProps) {
   const elapsed = current ? (((nowMin - current.startMin) % 1440) + 1440) % 1440 : 0;
   // Hover keeps the ring's size: the hovered slice glows and brightens while the others ease back.
   const slice = (i: number): React.CSSProperties => ({
-    filter: hover === i ? `drop-shadow(0 0 7px ${ROUTINE_BLOCKS[day.blocks[i].block].color}aa)` : "none",
+    filter: hover === i ? `drop-shadow(0 0 7px color-mix(in srgb, ${blocks.color(day.blocks[i].block)} 67%, transparent))` : "none",
     transition: "opacity .45s ease, filter .45s ease",
     pointerEvents: "none",
   });
@@ -65,22 +67,22 @@ export function RingGraphic(p: RingGraphicProps) {
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--muted)" strokeWidth={t} />
 
       {day.blocks.map((b, i) => (
-        <path key={`s-${b.block}-${b.startMin}`} d={g.arc(b.startMin, b.endMin)} fill="none" stroke={ROUTINE_BLOCKS[b.block].color}
+        <path key={`s-${b.block}-${b.startMin}`} d={g.arc(b.startMin, b.endMin)} fill="none" stroke={blocks.color(b.block)}
           strokeWidth={b === current ? t + 6 : t} style={{ ...slice(i), opacity: b === current && hover === null ? 0.3 : opacityOf(i) }} />
       ))}
       {/* the part of the current slice already passed is solid; the rest stays faded */}
       {current && hover === null && elapsed > 0 && (
-        <path d={g.arc(current.startMin, current.startMin + elapsed)} fill="none" stroke={ROUTINE_BLOCKS[current.block].color} strokeWidth={t + 6} style={{ pointerEvents: "none" }} />
+        <path d={g.arc(current.startMin, current.startMin + elapsed)} fill="none" stroke={blocks.color(current.block)} strokeWidth={t + 6} style={{ pointerEvents: "none" }} />
       )}
 
       {day.blocks.map((b, i) => {
-        if (!nameFits(b, r, p.nameSize * 0.57)) return null;
+        if (!nameFits(b, r, p.nameSize * 0.57, blocks.ring(b.block))) return null;
         const id = `${p.idPrefix}-n${i}`;
         return (
           <g key={`n-${b.block}-${b.startMin}`} style={{ transition: "opacity .45s ease", pointerEvents: "none", opacity: hover !== null && hover !== i ? 0.45 : 1 }}>
             <path id={id} d={onBottomHalf(b) ? g.arcBackwards(b.startMin, b.endMin) : g.arc(b.startMin, b.endMin)} fill="none" />
             <text fontSize={p.nameSize} fontWeight={800} letterSpacing=".05em" fill="#fff" style={{ dominantBaseline: "central" }}>
-              <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">{RING_NAMES[b.block]}</textPath>
+              <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">{blocks.ring(b.block)}</textPath>
             </text>
           </g>
         );
@@ -125,7 +127,7 @@ export function RingGraphic(p: RingGraphicProps) {
       {p.centre === "block" && current ? (
         <>
           <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.42} textAnchor="middle" fontSize={p.clockSize * 0.3} fontWeight={800} fill="var(--foreground)">
-            {ROUTINE_BLOCKS[current.block].label}
+            {blocks.label(current.block)}
           </text>
           <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.78} textAnchor="middle" fontSize={p.clockSize * 0.25} fill="var(--muted-foreground)">
             {formatDuration(duration(current) - elapsed)} left
@@ -140,7 +142,7 @@ export function RingGraphic(p: RingGraphicProps) {
       {/* fixed hit areas: the slices move when hovered, so hover must not depend on them */}
       {day.blocks.map((b, i) => (
         <path key={`h-${b.block}-${b.startMin}`} d={g.arc(b.startMin, b.endMin)} fill="none" stroke="transparent" strokeWidth={t + 12}
-          pointerEvents="stroke" tabIndex={0} role="img" aria-label={`${ROUTINE_BLOCKS[b.block].label}, ${formatMinutes(b.startMin)} to ${formatMinutes(b.endMin)}, ${formatDuration(duration(b))}, ${b.what}`}
+          pointerEvents="stroke" tabIndex={0} role="img" aria-label={`${blocks.label(b.block)}, ${formatMinutes(b.startMin)} to ${formatMinutes(b.endMin)}, ${formatDuration(duration(b))}, ${b.what}`}
           style={{ cursor: "pointer", outline: "none" }}
           onPointerMove={(e) => p.onHover(i, { x: e.clientX, y: e.clientY })}
           onPointerLeave={() => p.onHover(null)}
@@ -179,6 +181,7 @@ export const timedEvents = (events?: VaultEvent[]) =>
   (events ?? []).filter((e) => e.start_min !== null && e.end_min !== null && e.end_min > e.start_min);
 
 function SideLabels(p: RingGraphicProps & { g: ReturnType<typeof ringGeometry> }) {
+  const blocks = useBlocks();
   const { day, cx, r, t, g } = p;
   const entries = day.blocks.map((b, i) => {
     const mid = ((b.startMin + b.endMin) / 2) % 1440;
@@ -197,12 +200,12 @@ function SideLabels(p: RingGraphicProps & { g: ReturnType<typeof ringGeometry> }
       {placed.map(({ b, i, ax, ay, y, right }) => {
         const colX = right ? cx + r + t / 2 + 86 : cx - r - t / 2 - 86;
         const anchor = right ? "start" : "end";
-        const color = ROUTINE_BLOCKS[b.block].color;
+        const color = blocks.color(b.block);
         const opacity = p.hover !== null && p.hover !== i ? 0.35 : 1;
         return (
           <g key={`l-${b.block}-${b.startMin}`} style={{ transition: "opacity .45s ease", opacity }}>
             <polyline points={`${ax},${ay} ${colX + (right ? -28 : 28)},${y - 5} ${colX + (right ? -20 : 20)},${y - 5}`} fill="none" stroke={color} strokeWidth={1.5} opacity={0.7} />
-            <text x={colX} y={y} textAnchor={anchor} fontSize={20} fontWeight={800} fill="var(--foreground)">{ROUTINE_BLOCKS[b.block].label}</text>
+            <text x={colX} y={y} textAnchor={anchor} fontSize={20} fontWeight={800} fill="var(--foreground)">{blocks.label(b.block)}</text>
             <text textAnchor={anchor} fontSize={15} fill="var(--muted-foreground)">
               <tspan x={colX} y={y + 22}>{formatMinutes(b.startMin)} – {formatMinutes(b.endMin)}</tspan>
               <tspan x={colX} y={y + 41}>{formatDuration(duration(b))}</tspan>

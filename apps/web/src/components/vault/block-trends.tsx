@@ -1,4 +1,4 @@
-import { BLOCK_COLORS, BLOCK_LABELS, BLOCK_ORDER } from "@/lib/vault-constants";
+import { useBlocks } from "@/lib/blocks";
 import { VaultBlocksSeriesData } from "@/lib/vault-types";
 
 interface BlockTrendsProps {
@@ -6,6 +6,7 @@ interface BlockTrendsProps {
 }
 
 export function BlockTrends({ series }: BlockTrendsProps) {
+  const blocks = useBlocks();
   if (!series) return null;
 
   return (
@@ -15,15 +16,16 @@ export function BlockTrends({ series }: BlockTrendsProps) {
         <p className="text-xs text-[var(--muted-foreground)]">the long view</p>
       </div>
       <div className="space-y-1">
-        {BLOCK_ORDER.map((block) => {
+        {blocks.list.filter((b) => b.counts_for_stars).map((b) => {
+          const block = b.key;
           const values = series.blocks[block] ?? [];
           if (values.every((v) => v === null)) return null; // e.g. legacy blocks in a post-merge range
           const avg = series.averages[block] ?? 0;
-          const color = BLOCK_COLORS[block];
+          const color = blocks.color(block);
           return (
             <div key={block} className="flex items-center gap-3">
               <span className="text-xs w-24 shrink-0" style={{ color }}>
-                {BLOCK_LABELS[block]}
+                {b.label}
               </span>
               <div className="chart-grid flex-1 flex items-end gap-px h-5 rounded-sm">
                 {values.map((v, i) =>

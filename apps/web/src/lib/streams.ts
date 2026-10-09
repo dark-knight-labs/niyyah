@@ -52,13 +52,6 @@ export const MONTH_LABEL: Record<MonthKey, string> = {
   jul: "Jul", aug: "Aug", sep: "Sep", oct: "Oct", nov: "Nov", dec: "Dec",
 };
 
-/** Fri and Sat are the weekend: the OT slot belongs to Alisha Noor, otherwise to Kahf (or the first stream if either is gone). */
-export function otStreamFor(date: Date, tz: string, streams: StreamMeta[]): StreamMeta | undefined {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(date);
-  const wanted = weekday === "Fri" || weekday === "Sat" ? "alisha" : "kahf";
-  return streams.find((s) => s.id === wanted) ?? streams[0];
-}
-
 /** The question the ONE Thing method asks at every level of the chain. */
 export function focusingQuestion(stream: StreamMeta): string {
   return `What's the ONE thing I can do for ${stream.label} such that by doing it everything else becomes easier or unnecessary?`;

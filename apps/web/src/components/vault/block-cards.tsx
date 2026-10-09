@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { BLOCK_COLORS, BLOCK_LABELS, blocksForDay } from "@/lib/vault-constants";
+import { useBlocks } from "@/lib/blocks";
 import { VaultDayData } from "@/lib/vault-types";
 
 interface BlockCardsProps {
@@ -7,19 +7,21 @@ interface BlockCardsProps {
 }
 
 export function BlockCards({ today }: BlockCardsProps) {
+  const blocks = useBlocks();
   return (
     <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-7 gap-1.5">
-      {blocksForDay(today?.blocks).map((block) => {
+      {blocks.forDay(today?.blocks).filter((b) => b.counts_for_stars).map((b) => {
+        const block = b.key;
         const stars = today?.blocks[block] ?? 0;
-        const color = BLOCK_COLORS[block];
+        const color = blocks.color(block);
         return (
           <div
             key={block}
             className="border border-[var(--border)] rounded-lg px-2 pt-1.5 pb-1.5"
-            style={{ backgroundColor: stars > 0 ? `${color}14` : "var(--surface)" }}
+            style={{ backgroundColor: stars > 0 ? `color-mix(in srgb, ${color} 8%, var(--surface))` : "var(--surface)" }}
           >
             <p className="text-xs font-semibold tracking-tight mb-1" style={{ color }}>
-              {BLOCK_LABELS[block]}
+              {b.label}
             </p>
             <div className="flex items-center gap-1">
               {/* Bullet-journal habit-tracker boxes: filled square = checked. */}

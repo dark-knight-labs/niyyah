@@ -1,8 +1,9 @@
 "use client";
 
+import { useBlocks } from "@/lib/blocks";
 import { Maximize2 } from "lucide-react";
 import { useState } from "react";
-import { ROUTINE_BLOCKS, ResolvedDay, formatMinutes } from "@/lib/routine";
+import { ResolvedDay, formatMinutes } from "@/lib/routine";
 import { VaultEvent } from "@/lib/vault-types";
 import { duration, formatDuration } from "@/lib/ring";
 import { FullScreenClock } from "@/components/routine/fullscreen-clock";
@@ -17,6 +18,7 @@ export interface RoutineRingProps {
 
 /** The 24h ring with a hover card per block and a button that opens the full-screen clock. */
 export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
+  const blocks = useBlocks();
   const [hover, setHover] = useState<number | null>(null);
   const [at, setAt] = useState({ x: 0, y: 0 });
   const [full, setFull] = useState(false);
@@ -40,9 +42,9 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
         <div role="tooltip" className="pointer-events-none fixed z-50 w-56 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-3 text-[0.8125rem] shadow-xl"
           style={{ left: Math.min(at.x + 14, (typeof window === "undefined" ? 9999 : window.innerWidth) - 240), top: at.y + 14 }}>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full" style={{ background: ROUTINE_BLOCKS[block.block].color }} />
-            <b className="flex-1 text-sm">{ROUTINE_BLOCKS[block.block].label}</b>
-            <span className="font-bold" style={{ color: ROUTINE_BLOCKS[block.block].color }}>{formatDuration(duration(block))}</span>
+            <span className="h-2 w-2 rounded-full" style={{ background: blocks.color(block.block) }} />
+            <b className="flex-1 text-sm">{blocks.label(block.block)}</b>
+            <span className="font-bold" style={{ color: blocks.color(block.block) }}>{formatDuration(duration(block))}</span>
           </div>
           <p className="mt-1 tabular-nums text-[var(--muted-foreground)]">{formatMinutes(block.startMin)} – {formatMinutes(block.endMin)}</p>
           <p className="mt-2 border-t border-[var(--border)] pt-2">{block.what}</p>

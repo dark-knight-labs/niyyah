@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
+import { useBlocks } from "@/lib/blocks";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, NotebooksData, VaultGoalsData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultTaskData } from "@/lib/vault-types";
-import { ROUTINE_BLOCKS, dateInTz, formatMinutes, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
-import { PLANNER_TZ, otStreamFor, toMeta } from "@/lib/streams";
+import { dateInTz, formatMinutes, hasLocation, nowMinutes, resolveDay, slotOwnerFor, VaultScheduleData } from "@/lib/routine";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
 import { CalendarCard } from "@/components/routine/calendar-card";
@@ -23,6 +24,7 @@ const REFRESH_MS = 60_000;
 
 /** Overview, the home page: the day's clock, lists and votes, with Now / Next / Someday across every block at the end. */
 export default function OverviewPage() {
+  const blocks = useBlocks();
   const [schedule, setSchedule] = useState<VaultScheduleData | null>(null);
   const [today, setToday] = useState<VaultDayData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,14 +75,16 @@ export default function OverviewPage() {
     return () => clearInterval(id);
   }, [load]);
 
+  const knownBlocks = useMemo(() => new Set(blocks.list.map((b) => b.key)), [blocks.list]);
+  const needsLocation = !!schedule && !hasLocation(schedule.meta);
   const resolved = useMemo(() => {
-    if (!schedule) return null;
+    if (!schedule || needsLocation) return null;
     try {
-      return { day: resolveDay(schedule, now), failure: null };
+      return { day: resolveDay(schedule, now, knownBlocks), failure: null };
     } catch (err) {
       return { day: null, failure: (err as Error).message };
     }
-  }, [schedule, now]);
+  }, [schedule, needsLocation, now, knownBlocks]);
 
   // Tasks, log lines and weekly objectives are private note text: only the vault owner's session can read them.
   const dayKey = schedule ? dateInTz(now, schedule.meta.tz) : null;
@@ -129,7 +133,7 @@ export default function OverviewPage() {
   const nowMin = schedule ? nowMinutes(now, schedule.meta.tz) : 0;
   const block = day ? currentBlock(day, nowMin) : undefined;
   const owner = canEdit && !!dayKey && !!day;
-  const slot = pipelines ? otStreamFor(now, PLANNER_TZ, pipelines.streams.map(toMeta)) : undefined;
+  const slotId = schedule ? slotOwnerFor(schedule, now) : null;
 
   return (
     <div className="mx-auto w-full max-w-[110rem]">
@@ -141,6 +145,13 @@ export default function OverviewPage() {
         </div>
       )}
       {calendarNote && <p role="status" className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs">{calendarNote}</p>}
+      {needsLocation && (
+        <div className="mx-auto max-w-xl rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
+          <h2 className="font-serif text-xl">Set your location</h2>
+          <p className="mt-2 text-sm text-[var(--muted-foreground)]">Prayer times anchor your clock. Add your city and calculation method in Settings.</p>
+          <Link href="/settings" className="mt-4 inline-block rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[var(--accent-fg)]">Open Settings</Link>
+        </div>
+      )}
       {schedule && day && (
         <>
           <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
@@ -156,14 +167,14 @@ export default function OverviewPage() {
                 <div>
                   <TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} />
                   <LogList day={dayKey} entries={log} onChanged={loadPrivate}
-                    section={block ? ROUTINE_BLOCKS[block.block].label : "Day"}
+                    section={block ? blocks.label(block.block) : "Day"}
                     span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
                 </div>
                 <div className="md:col-span-2 xl:col-span-1">
                   <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
                 </div>
               </div>
-              {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slot?.id} onChanged={loadPrivate} />}
+              {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slotId ?? undefined} onChanged={loadPrivate} />}
             </>
           ) : (
             <div className="mx-auto max-w-xl">
