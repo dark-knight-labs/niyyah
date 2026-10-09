@@ -36,7 +36,7 @@ export function MonthlyHeatmap({ month }: MonthlyHeatmapProps) {
           color everywhere on the page, not a separate percent-tier scale. */}
       <div className="grid grid-cols-[repeat(7,1.5rem)] gap-0.5">
         {WEEKDAY_LABELS.map((w, i) => (
-          <p key={`h-${i}`} className="text-center text-[0.5625rem] uppercase text-[var(--muted-foreground)] font-mono">
+          <p key={`h-${i}`} className="text-center text-micro uppercase text-[var(--muted-foreground)] font-mono">
             {w}
           </p>
         ))}
@@ -45,7 +45,7 @@ export function MonthlyHeatmap({ month }: MonthlyHeatmapProps) {
             <div
               key={day.date}
               title={`${day.date}: ${day.total}/${day.possible} · ${day.mode}`}
-              className="w-6 h-6 rounded-md flex items-center justify-center text-[0.5rem] font-mono tabular-nums relative transition-transform duration-150 hover:scale-125 hover:z-10"
+              className="w-6 h-6 rounded-md flex items-center justify-center text-micro font-mono tabular-nums relative transition-transform duration-150 hover:scale-125 hover:z-10"
               style={{
                 backgroundColor: resolveModeColor(day.mode),
                 color: "rgba(255,255,255,0.8)",

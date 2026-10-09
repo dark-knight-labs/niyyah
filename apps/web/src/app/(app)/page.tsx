@@ -6,13 +6,12 @@ import { ApiError } from "@/lib/api-client";
 import { useBlocks } from "@/lib/blocks";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { GoogleStatusData, NotebooksData, VaultGoalsData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultTaskData } from "@/lib/vault-types";
+import { GoogleStatusData, QuarterData, NotebooksData, VaultGoalsData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultTaskData } from "@/lib/vault-types";
 import { dateInTz, formatMinutes, hasLocation, nowMinutes, resolveDay, slotOwnerFor, VaultScheduleData } from "@/lib/routine";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
 import { CalendarCard } from "@/components/routine/calendar-card";
-import { DayHeader } from "@/components/routine/day-header";
-import { GoalCards } from "@/components/routine/goal-cards";
+import { TopBar } from "@/components/routine/top-bar";
 import { LogList } from "@/components/routine/log-list";
 import { NowCard } from "@/components/routine/now-card";
 import { RoutineRing } from "@/components/routine/routine-ring";
@@ -43,6 +42,7 @@ export default function OverviewPage() {
   const [pipelines, setPipelines] = useState<PipelinesData | null>(null);
   const [notebooks, setNotebooks] = useState<NotebooksData | null>(null);
   const [goals, setGoals] = useState<VaultGoalsData | null>(null);
+  const [quarter, setQuarter] = useState<QuarterData | null>(null);
   const now = useNow(30_000);
 
   const load = useCallback(() => {
@@ -97,6 +97,7 @@ export default function OverviewPage() {
     vaultApi.pipelines().then(setPipelines).catch(() => setPipelines(null));
     vaultApi.notebooks().then(setNotebooks).catch(() => setNotebooks(null));
     vaultApi.goals().then(setGoals).catch(() => setGoals(null));
+    vaultApi.quarter().then(setQuarter).catch(() => setQuarter(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
 
@@ -154,15 +155,15 @@ export default function OverviewPage() {
       )}
       {schedule && day && (
         <>
-          <DayHeader dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
-          {owner && goals && <GoalCards data={goals} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} />}
+          <TopBar dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday}
+            goals={owner ? goals?.items ?? null : null} quarter={owner ? quarter : null}
+            onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} onQuarter={setQuarter} />
           {owner ? (
             <>
-              <div className="mb-4"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
               <div className="mb-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[repeat(3,minmax(0,1fr))] xl:gap-8 md:items-start">
                 <div className="md:col-span-2 xl:col-span-1">
-                  <RoutineRing day={day} nowMin={nowMin} events={events?.events} />
-                  <NowCard day={day} nowMin={nowMin} />
+                  <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
+                  <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
                 </div>
                 <div>
                   <TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} />
@@ -174,13 +175,14 @@ export default function OverviewPage() {
                   <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
                 </div>
               </div>
+              <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
               {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slotId ?? undefined} onChanged={loadPrivate} />}
             </>
           ) : (
             <div className="mx-auto max-w-xl">
-              <RoutineRing day={day} nowMin={nowMin} />
+              <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} /></div>
               <div className="mt-6">
-                <NowCard day={day} nowMin={nowMin} />
+                <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
               </div>
             </div>
           )}

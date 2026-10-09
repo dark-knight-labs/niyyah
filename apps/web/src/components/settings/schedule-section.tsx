@@ -108,7 +108,7 @@ export function ScheduleSection({ draft, streams, onChange }: Props) {
             <text x={cx} y={cy - 2} textAnchor="middle" fontSize={22} fill="var(--foreground)" fontFamily="var(--font-serif)">{tab === "weekday" ? "Weekday" : "Weekend"}</text>
             <text x={cx} y={cy + 16} textAnchor="middle" fontSize={10.5} fill="var(--muted-foreground)">{slices.length} slots{example ? " · example prayers" : ""}</text>
           </svg>
-          <ul className="flex flex-wrap justify-center gap-x-2.5 gap-y-1 text-[0.71875rem] text-[var(--muted-foreground)]">
+          <ul className="flex flex-wrap justify-center gap-x-2.5 gap-y-1 text-small text-[var(--muted-foreground)]">
             {used.map((k) => <li key={k}><i className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: colorVar(byKey.get(k)?.color ?? "slate") }} />{byKey.get(k)?.ring_name ?? k}</li>)}
           </ul>
         </div>

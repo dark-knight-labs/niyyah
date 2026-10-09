@@ -68,7 +68,7 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-[68rem] pb-24">
-      <h1 className="font-serif text-[1.6rem] leading-tight">Settings</h1>
+      <h1 className="font-serif text-display leading-tight">Settings</h1>
       <p className="mb-5 mt-1 max-w-[62ch] text-sm text-[var(--muted-foreground)]">Where you are, the blocks of your day, the schedule on your clock and the calendars you read. Streams are edited on the Plan page.</p>
       <LocationSection meta={draft.meta} onChange={(meta) => set({ meta })} />
       <BlocksSection blocks={draft.blocks} onChange={(b) => set({ blocks: b })} usedKeys={new Set([...draft.weekday, ...draft.weekend].map((r) => r.block))} />

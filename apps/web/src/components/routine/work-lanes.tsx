@@ -43,19 +43,22 @@ function Item({ r, to, toLabel, tick, week, busy, onMove, onOpen }: ItemProps) {
       ) : (
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.meta.color }} aria-hidden="true" />
       )}
-      <button type="button" onClick={() => onOpen(r)} className="min-h-8 min-w-0 flex-1 break-words text-left text-[0.8125rem] leading-snug" aria-haspopup="dialog">{r.item.text}</button>
-      {r.item.product && <span className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">{r.item.product}</span>}
-      {r.item.focus === week && <span className="text-[0.6875rem] font-bold" style={{ color: r.meta.color }} title="This week's focus">★</span>}
-      {r.blocked && <span className="text-[0.625rem] font-bold uppercase text-[var(--destructive)]">blocked</span>}
+      <button type="button" onClick={() => onOpen(r)} className="min-h-8 min-w-0 flex-1 break-words text-left text-small leading-snug" aria-haspopup="dialog">{r.item.text}</button>
+      {r.item.product && <span className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">{r.item.product}</span>}
+      {r.item.focus === week && <span className="text-micro font-bold" style={{ color: r.meta.color }} title="This week's focus">★</span>}
+      {r.blocked && <span className="text-micro font-bold uppercase text-[var(--destructive)]">blocked</span>}
       <button type="button" disabled={busy} onClick={() => void onMove(r, to)} aria-label={`Move to ${toLabel}: ${r.item.text}`}
-        className="min-h-8 shrink-0 whitespace-nowrap rounded px-1.5 text-[0.6875rem] font-semibold text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--foreground)] disabled:opacity-50 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100">
+        className="min-h-8 shrink-0 whitespace-nowrap rounded px-1.5 text-micro font-semibold text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--foreground)] disabled:opacity-50 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100">
         → {toLabel}
       </button>
     </li>
   );
 }
 
-const TH = "px-2.5 py-1.5 text-left text-[0.625rem] font-extrabold uppercase tracking-[0.09em] text-[var(--muted-foreground)]";
+/** Someday items shown per block before "more". */
+const SOMEDAY_SHOWN = 3;
+
+const TH = "px-2.5 py-1.5 text-left text-micro font-extrabold uppercase tracking-[0.09em] text-[var(--muted-foreground)]";
 const TD = "border-t border-[var(--border)] px-2.5 py-1.5 align-top";
 
 /** Now, Next and Someday for every block, one table row per block. Someday is the pipeline's Backlog lane under another name. */
@@ -63,7 +66,8 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Row | null>(null);
-  const [allSomeday, setAllSomeday] = useState(false);
+  /** Blocks whose Someday list is open in full; the rest show the first few. */
+  const [moreOf, setMoreOf] = useState<Record<string, boolean>>({});
   /** Per block, the product its items are narrowed to (blocks without products never have one). */
   const [product, setProduct] = useState<Record<string, string | null>>({});
 
@@ -131,12 +135,12 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
                 <tr className={id === ot ? "bg-[var(--accent-light)]" : ""}>
                   <th scope="row" className={`${TD} text-left text-xs font-bold`}>
                     <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: meta.color }} aria-hidden="true" />{meta.label}
-                    {id === ot && <span className="mt-1 block w-fit rounded bg-[var(--surface)] px-1.5 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.05em] text-[var(--accent)]">OT today</span>}
+                    {id === ot && <span className="mt-1 block w-fit rounded bg-[var(--surface)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.05em] text-[var(--accent)]">OT today</span>}
                     {products.length > 0 && (
                       <span className="mt-1.5 flex flex-wrap gap-1" role="group" aria-label={`${meta.label} products`}>
                         {products.map((p) => (
                           <button key={p} type="button" aria-pressed={picked === p} onClick={() => setProduct((cur) => ({ ...cur, [id]: picked === p ? null : p }))}
-                            className="min-h-6 rounded-full border border-[var(--border)] px-2 text-[0.625rem] font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
+                            className="min-h-6 rounded-full border border-[var(--border)] px-2 text-micro font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
                             {p}
                           </button>
                         ))}
@@ -146,7 +150,13 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
                   <td className={TD}>{cell(by("now"), "next", "Next", true)}</td>
                   <td className={TD}>{cell(by("next"), "now", "Now")}</td>
                   <td className={TD}>
-                    {parked.length === 0 ? dash : allSomeday ? cell(parked, "next", "Next") : <span className="text-xs text-[var(--muted-foreground)]">{parked.length} parked</span>}
+                    {cell(moreOf[id] ? parked : parked.slice(0, SOMEDAY_SHOWN), "next", "Next")}
+                    {parked.length > SOMEDAY_SHOWN && (
+                      <button type="button" aria-expanded={!!moreOf[id]} onClick={() => setMoreOf((cur) => ({ ...cur, [id]: !cur[id] }))}
+                        className="-ml-1.5 mt-0.5 min-h-8 rounded-md px-1.5 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]">
+                        {moreOf[id] ? "Show less" : `+${parked.length - SOMEDAY_SHOWN} more`}
+                      </button>
+                    )}
                   </td>
                 </tr>
                 {open?.stream === id && (
@@ -162,12 +172,6 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
           </tbody>
         </table>
       </div>
-      {count("backlog") > 0 && (
-        <button type="button" onClick={() => setAllSomeday((v) => !v)} aria-expanded={allSomeday}
-          className="mt-1 min-h-9 text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
-          {allSomeday ? "▾ Hide Someday" : "▸ Show all Someday"}
-        </button>
-      )}
     </Section>
   );
 }

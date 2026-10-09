@@ -21,7 +21,7 @@ export function VaultHeader({ today, status }: VaultHeaderProps) {
             <div className="mt-0.5 flex items-baseline gap-2">
               <h1 className="heading-elegant text-xl leading-none">Today&rsquo;s Ledger</h1>
               {today && (
-                <span className="rounded-full border px-2 py-px text-[0.625rem] uppercase tracking-[0.18em]" style={{ borderColor: `${modeColor}55`, color: modeColor }}>
+                <span className="rounded-full border px-2 py-px text-micro uppercase tracking-[0.18em]" style={{ borderColor: `${modeColor}55`, color: modeColor }}>
                   {today.mode}
                 </span>
               )}

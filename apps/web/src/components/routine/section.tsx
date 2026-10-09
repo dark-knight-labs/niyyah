@@ -7,7 +7,7 @@ import { useState } from "react";
 export function Section({ title, aside, error, children }: { title: string; aside?: string; error?: string | null; children: React.ReactNode }) {
   return (
     <section className="mb-4" aria-label={title}>
-      <h2 className="mb-1.5 flex items-baseline justify-between text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
+      <h2 className="mb-1.5 flex items-baseline justify-between text-micro font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
         {title}
         {aside && <span className="text-xs font-medium normal-case tracking-normal">{aside}</span>}
       </h2>

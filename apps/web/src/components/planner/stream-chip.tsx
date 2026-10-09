@@ -15,7 +15,7 @@ export function StatusPill({ status }: { status: string }) {
   if (!status) return null;
   const active = status === "active";
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-[0.6875rem] font-bold ${active ? "bg-[var(--accent-light)] text-[var(--accent)]" : "bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
+    <span className={`rounded-full px-2.5 py-0.5 text-micro font-bold ${active ? "bg-[var(--accent-light)] text-[var(--accent)]" : "bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
       {status}
     </span>
   );
@@ -24,7 +24,7 @@ export function StatusPill({ status }: { status: string }) {
 /** A month checkpoint tag, tinted in the stream's colour. */
 export function MonthTag({ label, color, muted }: { label: string; color?: string; muted?: boolean }) {
   return (
-    <span className="rounded-md px-1.5 py-px text-[0.6875rem] font-bold tabular-nums"
+    <span className="rounded-md px-1.5 py-px text-micro font-bold tabular-nums"
       style={muted ? { background: "var(--muted)", color: "var(--muted-foreground)" } : { color, background: `color-mix(in srgb, ${color} 14%, var(--background))` }}>
       {label}
     </span>

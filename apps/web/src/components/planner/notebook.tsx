@@ -152,7 +152,7 @@ function Entry({ entry, meta, busy, onSave, onRemove, onPromote }: {
   return (
     <li className="grid gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 sm:p-4" style={{ borderLeft: `3px solid ${color}` }}>
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-[0.6875rem] font-extrabold uppercase tracking-[0.08em]" style={{ color }}>
+        <p className="flex items-center gap-1.5 text-micro font-extrabold uppercase tracking-[0.08em]" style={{ color }}>
           <k.icon size={13} aria-hidden="true" /> {k.label}
           {entry.kind === "blocker" && !entry.open && <span className="rounded bg-[var(--muted)] px-1.5 py-px normal-case tracking-normal text-[var(--muted-foreground)]">cleared</span>}
           <span className="font-medium normal-case tracking-normal text-[var(--muted-foreground)]">{entry.date}</span>
@@ -175,7 +175,7 @@ function Entry({ entry, meta, busy, onSave, onRemove, onPromote }: {
         </form>
       ) : (
         <>
-          <h3 className="break-words text-[0.9375rem] font-bold leading-snug">{entry.title}</h3>
+          <h3 className="break-words text-sm font-bold leading-snug">{entry.title}</h3>
           {entry.body && <p className="whitespace-pre-wrap break-words text-sm leading-relaxed"><Linked text={entry.body} /></p>}
         </>
       )}

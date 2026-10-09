@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
-// Self-hosted Public Sans (variable) and JetBrains Mono via fontsource — no build-time Google Fonts
-// fetch, which the CI build network can't reach.
+// Self-hosted fonts via fontsource (the CI build network cannot reach Google Fonts).
+// Geist and Geist Mono are the interface and data faces; Fraunces is the display serif.
+// Public Sans and JetBrains Mono stay only for the 24-hour clock and the Now card, whose look is fixed.
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import "@fontsource-variable/public-sans";
 import "@fontsource/jetbrains-mono/500.css";
-// Handwritten accent face for journal-style headings/annotations (weights
-// used: 400 body, 700 for emphasis) — same self-hosting reasoning as above.
-import "@fontsource/caveat/400.css";
-import "@fontsource/caveat/700.css";
-// Elegant display serif for page/section headings (weights used: 300
-// light for body headings, 400 for the odd emphasis case).
 import "@fontsource/fraunces/300.css";
 import "@fontsource/fraunces/400.css";
 import "@fontsource/fraunces/500.css";

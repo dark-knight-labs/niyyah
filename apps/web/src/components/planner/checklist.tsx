@@ -67,8 +67,8 @@ export function Checklist({ items, label, title, busy, onToggle, onChange, place
     <div role="group" aria-label={label} className="grid gap-0.5">
       {(title || progress) && (
         <div className="flex items-baseline justify-between gap-3">
-          {title ? <span className="text-[0.6875rem] font-bold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">{title}</span> : <span />}
-          {progress && shown.length > 0 && <span ref={count} className={`font-mono text-[0.71875rem] tabular-nums ${done === shown.length ? "font-semibold text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}>{done} / {shown.length}</span>}
+          {title ? <span className="text-micro font-bold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">{title}</span> : <span />}
+          {progress && shown.length > 0 && <span ref={count} className={`font-mono text-small tabular-nums ${done === shown.length ? "font-semibold text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}>{done} / {shown.length}</span>}
         </div>
       )}
       {progress && shown.length > 0 && (
@@ -88,13 +88,13 @@ export function Checklist({ items, label, title, busy, onToggle, onChange, place
           >{item.text}</span>
           {onChange && (
             <button type="button" aria-label={`Remove: ${item.text}`} onClick={() => remove(item)}
-              className="rounded px-1.5 text-[0.9375rem] leading-none text-[var(--muted-foreground)] opacity-0 hover:text-[var(--destructive)] focus-visible:opacity-100 group-hover:opacity-100">×</button>
+              className="rounded px-1.5 text-sm leading-none text-[var(--muted-foreground)] opacity-0 hover:text-[var(--destructive)] focus-visible:opacity-100 group-hover:opacity-100">×</button>
           )}
         </div>
       ))}
       {onChange && (
         <label className="flex items-center gap-2.5 py-1 text-[var(--muted-foreground)]">
-          <span className="w-[0.875rem] text-center text-[0.9375rem] leading-none" aria-hidden="true">+</span>
+          <span className="w-[0.875rem] text-center text-sm leading-none" aria-hidden="true">+</span>
           <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={placeholder} maxLength={400} aria-label={`${label}: add a line`}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
             className="min-w-0 flex-1 border-0 border-b border-transparent bg-transparent py-0.5 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)] focus:border-[var(--accent)]" />

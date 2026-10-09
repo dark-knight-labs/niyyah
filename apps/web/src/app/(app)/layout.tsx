@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { logout } from "@/lib/auth";
@@ -28,6 +28,51 @@ const nav = [
   { href: "/vault", label: "Vault", icon: Activity },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+/** The ring-and-dot mark: the 24-hour ring with its gap, and the intention at the centre. */
+function NiyyahMark() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 28 28" fill="none" aria-hidden="true" className="shrink-0">
+      <circle cx="14" cy="14" r="10" stroke="currentColor" strokeWidth="2.4" strokeDasharray="46 17" strokeLinecap="round" transform="rotate(-70 14 14)" />
+      <circle cx="14" cy="14" r="3" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Account avatar at the foot of the sidebar; opens a small menu with the email, Settings and Sign out. */
+function AccountMenu({ email, collapsed }: { email: string; collapsed: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  const item = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-small hover:bg-[var(--muted)]";
+  return (
+    <div ref={ref} className="relative border-t border-[var(--border)] pt-3">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} aria-label="Account"
+        className={`flex w-full items-center gap-2.5 rounded-lg p-1 hover:bg-[var(--muted)] ${collapsed ? "justify-center" : ""}`}>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[var(--border)] bg-[var(--muted)] text-xs font-semibold uppercase">{email.slice(0, 1)}</span>
+        {!collapsed && <span className="min-w-0 truncate text-xs text-[var(--muted-foreground)]">{email}</span>}
+      </button>
+      {open && (
+        <div role="menu" className="absolute bottom-2 left-full z-30 ml-2 w-52 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-xl">
+          <p className="truncate px-2 py-1.5 text-xs text-[var(--muted-foreground)]">{email}</p>
+          <Link href="/settings" role="menuitem" onClick={() => setOpen(false)} className={item}><Settings size={14} aria-hidden="true" />Settings</Link>
+          <button type="button" role="menuitem" onClick={logout} className={item}><LogOut size={14} aria-hidden="true" />Sign out</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -81,14 +126,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div>
-          <div className="mb-6 flex min-h-10 items-center">
-            {!collapsed && (
-              <Link href="/vault" className="block min-w-0">
-                <h1 className="text-lg font-bold tracking-tight">Niyyah</h1>
-                <p className="text-xs text-[var(--muted-foreground)]" dir="rtl">نِيَّة</p>
-              </Link>
-            )}
-          </div>
+          <Link href="/" aria-label="Niyyah" title="Niyyah" className={`mb-6 flex min-h-10 items-center gap-2.5 text-[var(--accent)] ${collapsed ? "justify-center" : "px-1"}`}>
+            <NiyyahMark />
+            {!collapsed && <span className="font-serif text-lg font-medium leading-none text-[var(--foreground)]">Niyyah</span>}
+          </Link>
           <nav className="space-y-1">
             {nav.map((item) => {
               const active = pathname === item.href;
@@ -120,21 +161,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         >
           {collapsed ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
         </button>
-        <div className="border-t border-[var(--border)] pt-4">
-          {!collapsed && (
-            <p className="text-xs text-[var(--muted-foreground)] truncate mb-2">{user.email}</p>
-          )}
-          <button
-            onClick={logout}
-            title={collapsed ? "Sign out" : undefined}
-            className={`flex items-center gap-2 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors active:scale-95 ${
-              collapsed ? "justify-center w-full" : ""
-            }`}
-          >
-            <LogOut size={14} className="shrink-0" />
-            {!collapsed && "Sign out"}
-          </button>
-        </div>
+        <AccountMenu email={user.email} collapsed={collapsed} />
       </aside>
 
       <main className="min-w-0 flex-1 overflow-x-clip px-4 pb-24 pt-6 sm:px-6 md:pb-8 xl:px-10">
@@ -146,7 +173,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           const active = pathname === item.href;
           return (
             <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
-              className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-[0.6875rem] font-semibold ${active ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}>
+              className={`flex min-h-12 min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-2 text-micro font-semibold ${active ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}>
               <item.icon size={19} aria-hidden="true" />
               {item.label}
             </Link>

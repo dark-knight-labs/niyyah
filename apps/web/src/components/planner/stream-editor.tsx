@@ -20,7 +20,7 @@ const STATUSES = ["active", "committed", "paused"] as const;
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").replace(/^[^a-z]+/, "").slice(0, 24);
 
 const field = "min-h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm placeholder:text-[var(--muted-foreground)]";
-const label = "mb-1.5 block text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]";
+const label = "mb-1.5 block text-micro font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]";
 
 /** Add a stream (Finance, Errands…) or edit one: name, colour, icon. Its goal and month lines are edited on the stream's own page. */
 export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props) {
@@ -92,7 +92,7 @@ export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props)
 
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Status</span>
+          <span className="text-micro font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Status</span>
           <select className="min-h-10 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>

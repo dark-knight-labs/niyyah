@@ -30,7 +30,7 @@ export function MonthTrack({ months, checkpoints, current, color, busy, onToggle
                 {state === "now" && <circle cx="8" cy="8" r="7.5" fill={color} fillOpacity="0.2" />}
                 <circle cx="8" cy="8" r="4.5" fill={state === "past" ? color : "var(--background)"} stroke={color} strokeWidth="2" strokeOpacity={state === "next" ? 0.4 : 1} />
               </svg>
-              <span className="text-[0.6875rem] font-extrabold uppercase tracking-[0.12em]" style={{ color: state === "next" ? "var(--muted-foreground)" : color }}>
+              <span className="text-micro font-extrabold uppercase tracking-[0.12em]" style={{ color: state === "next" ? "var(--muted-foreground)" : color }}>
                 {MONTH_LABEL[month]}{state === "now" ? " · now" : ""}
               </span>
               <span className="hidden h-px flex-1 sm:block" style={{ background: color, opacity: state === "next" ? 0.15 : 0.4 }} aria-hidden="true" />

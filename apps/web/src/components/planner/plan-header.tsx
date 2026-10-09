@@ -31,7 +31,7 @@ function WeekTicks({ week, weeks }: { week: number; weeks: number }) {
           <span key={i} className="flex-1 rounded-full bg-current" style={{ height: i + 1 === week ? 6 : 3, opacity: i + 1 === week ? 1 : i + 1 < week ? 0.55 : 0.16 }} />
         ))}
       </div>
-      <p className="whitespace-nowrap text-[0.78125rem] text-[var(--muted-foreground)]">Week <b className="font-mono font-bold tabular-nums text-[var(--foreground)]">{week}</b> of <span className="font-mono tabular-nums">{weeks}</span></p>
+      <p className="whitespace-nowrap text-small text-[var(--muted-foreground)]">Week <b className="font-mono font-bold tabular-nums text-[var(--foreground)]">{week}</b> of <span className="font-mono tabular-nums">{weeks}</span></p>
     </div>
   );
 }
@@ -85,9 +85,9 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
             return (
               <li key={d} className="min-w-0 rounded-xl border border-[var(--border)] px-1 py-2 text-center"
                 style={{ borderTop: `3px solid ${owner?.color ?? "var(--border)"}`, background: isToday ? "var(--accent-light)" : "var(--surface)", outline: isToday ? "2px solid var(--accent)" : undefined, outlineOffset: -1 }}>
-                <span className="block text-[0.625rem] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">{fmtDay(d, { weekday: "short" })}</span>
-                <b className="block text-[0.875rem] tabular-nums">{fmtDay(d, { day: "numeric" })}</b>
-                <span className="block truncate text-[0.625rem] font-bold" style={{ color: owner?.color ?? "var(--muted-foreground)" }}>{owner ? owner.label.split(" ")[0] : "·"}</span>
+                <span className="block text-micro font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">{fmtDay(d, { weekday: "short" })}</span>
+                <b className="block text-sm tabular-nums">{fmtDay(d, { day: "numeric" })}</b>
+                <span className="block truncate text-micro font-bold" style={{ color: owner?.color ?? "var(--muted-foreground)" }}>{owner ? owner.label.split(" ")[0] : "·"}</span>
               </li>
             );
           })}

@@ -101,7 +101,7 @@ export function CalendarCard({ day, data, status, onChanged }: { day: string | n
       ) : (
         <ul>
           {data.events.map((e, i) => (
-            <li key={`${e.calendar}-${e.title}-${i}`} className="flex gap-3 border-b border-[var(--border)] py-1.5 text-[0.8125rem]" style={{ borderLeft: `3px solid ${e.color ?? "var(--border)"}`, paddingLeft: 10 }}>
+            <li key={`${e.calendar}-${e.title}-${i}`} className="flex gap-3 border-b border-[var(--border)] py-1.5 text-small" style={{ borderLeft: `3px solid ${e.color ?? "var(--border)"}`, paddingLeft: 10 }}>
               <span className="w-[6.5rem] shrink-0 tabular-nums text-[var(--muted-foreground)]">
                 {e.all_day || e.start_min === null || e.end_min === null ? "All day" : `${formatMinutes(e.start_min)}–${formatMinutes(e.end_min)}`}
               </span>

@@ -34,9 +34,10 @@
   --warn: #a8741a;
   --warn-light: #f5ead2;
 
-  --font-sans: "Public Sans Variable", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --font-hand: "Caveat", "Segoe Print", cursive;
+  --font-sans: "Geist Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+  /* The 24-hour clock and the Now card keep their own faces. */
+  --font-clock: "Public Sans Variable", system-ui, -apple-system, sans-serif;
   --font-serif: "Fraunces", Georgia, serif;
 }
 
@@ -81,7 +82,13 @@
   --color-destructive: var(--destructive);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-hand: var(--font-hand);
+  /* Type scale: 11 · 12 · 13 · 14 · 18 · 28. Tailwind's xs (12), sm (14) and lg (18) are the middle steps. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 0.875rem;
+  --text-small: 0.8125rem;
+  --text-small--line-height: 1.125rem;
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.125rem;
   --font-serif: var(--font-serif);
   --radius: var(--radius);
 }
@@ -103,6 +110,10 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "tnum" 1;
+}
+h1, h2, h3 {
+  text-wrap: balance;
 }
 
 :focus-visible {
@@ -111,8 +122,11 @@ body {
   border-radius: 4px;
 }
 
-.font-hand {
-  font-family: var(--font-hand);
+.font-clock {
+  font-family: var(--font-clock);
+}
+.font-clock .font-mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 /* Elegant, editorial heading system (retail-boutique register) — a light
