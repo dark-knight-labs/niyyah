@@ -5,7 +5,7 @@ import pytest
 async def test_fixture_gives_an_imported_user_in_db_mode(db_client):
     client, today = db_client
     day = (await client.get("/api/v1/vault/today")).json()
-    assert day["mode"] == "full" and day["blocks"] == {"soul": 2, "body": 1}
+    assert day["mode"] == "full" and day["blocks"] == {"soul": 2, "body": 1, "ot": 0, "distribution": 0, "fnf": 0, "sleep": 0}
 
 
 V = "/api/v1/vault"
@@ -16,7 +16,7 @@ async def test_vote_updates_the_day_totals(db_client):
     client, today = db_client
     res = await client.put(f"{V}/day/{today}/vote", json={"block": "body", "stars": 3})
     assert res.status_code == 200 and res.json()["commit"] == "db"
-    assert res.json()["day"]["blocks"] == {"soul": 2, "body": 3} and res.json()["day"]["total"] == 5
+    assert res.json()["day"]["blocks"]["body"] == 3 and res.json()["day"]["total"] == 5
 
 
 @pytest.mark.asyncio
@@ -24,8 +24,8 @@ async def test_vote_rejects_bad_input_with_the_vault_messages(db_client):
     client, today = db_client
     bad = await client.put(f"{V}/day/{today}/vote", json={"block": "nope", "stars": 1})
     assert bad.status_code == 422 and "unknown block" in bad.json()["detail"]
-    missing = await client.put(f"{V}/day/{today}/vote", json={"block": "ops", "stars": 1})
-    assert missing.status_code == 422 and "no vote lines" in missing.json()["detail"]
+    legacy = await client.put(f"{V}/day/{today}/vote", json={"block": "ops", "stars": 1})
+    assert legacy.status_code == 422 and "unknown block" in legacy.json()["detail"]  # not one of this user's blocks
     assert (await client.put(f"{V}/day/{today}/vote", json={"block": "soul", "stars": 4})).status_code == 422
 
 
@@ -33,18 +33,18 @@ async def test_vote_rejects_bad_input_with_the_vault_messages(db_client):
 async def test_mode_change_recomputes_possible(db_client):
     client, today = db_client
     res = await client.put(f"{V}/day/{today}/mode", json={"mode": "yellow"})
-    assert res.json()["day"]["mode"] == "yellow" and res.json()["day"]["possible"] == 14
+    assert res.json()["day"]["mode"] == "yellow" and res.json()["day"]["possible"] == 12
     assert (await client.put(f"{V}/day/{today}/mode", json={"mode": "party"})).status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_a_missing_day_is_created_from_the_latest_layout(db_client):
+async def test_a_missing_day_is_created_from_the_current_blocks(db_client):
     from datetime import timedelta
     client, today = db_client
     day = today - timedelta(days=4)
     res = await client.put(f"{V}/day/{day}/vote", json={"block": "body", "stars": 2})
     assert res.status_code == 200
-    assert res.json()["day"]["blocks"] == {"soul": 0, "body": 2} and res.json()["day"]["mode"] == "full"
+    assert res.json()["day"]["blocks"] == {"soul": 0, "body": 2, "ot": 0, "distribution": 0, "fnf": 0, "sleep": 0} and res.json()["day"]["mode"] == "full"
 
 
 @pytest.mark.asyncio
@@ -103,3 +103,14 @@ async def test_writes_only_touch_the_callers_rows(db_client):
     res = await client.put(f"{V}/tasks", json={"path": "", "line": mine["line"], "hash": "", "done": True}, headers=other)
     assert res.status_code == 422  # not found for them
     assert (await client.get(f"{V}/day/{today}/tasks")).json()[0]["done"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_block_added_later_joins_the_day_on_its_first_vote(db_client):
+    client, today = db_client
+    blocks = (await client.get(f"{V}/config/blocks")).json()["blocks"]
+    blocks.append({"key": "reading", "label": "Reading", "ring_name": "READ", "color": "lime", "counts_for_stars": True, "archived": False})
+    assert (await client.put(f"{V}/config/blocks", json={"blocks": blocks})).status_code == 200
+    res = await client.put(f"{V}/day/{today}/vote", json={"block": "reading", "stars": 2})
+    day = res.json()["day"]
+    assert res.status_code == 200 and day["blocks"]["reading"] == 2 and day["total"] == 4 and day["possible"] == round(21 * 7 / 7)

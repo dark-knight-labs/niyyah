@@ -59,7 +59,7 @@ async def scenario(client, today):
     results = []
     results.append(ok(await client.put(f"{V}/day/{d}/mode", json={"mode": "yellow"})))
     results.append(ok(await client.put(f"{V}/day/{d}/vote", json={"block": "body", "stars": 3})))
-    results.append(ok(await client.put(f"{V}/day/{d}/vote", json={"block": "ops", "stars": 1})))
+    results.append(ok(await client.put(f"{V}/day/{d}/vote", json={"block": "nope", "stars": 1})))
     results.append(ok(await client.post(f"{V}/day/{d}/notes", json={"section": "OT", "span": "06:00-16:03", "text": "Shipped the router"})))
     results.append(ok(await client.post(f"{V}/day/{d}/tasks", json={"text": "Call   the bank"})))
     tasks = (await client.get(f"{V}/day/{d}/tasks")).json()

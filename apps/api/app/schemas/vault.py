@@ -52,6 +52,7 @@ class ScheduleBlockResponse(BaseModel):
     start: str
     end: str
     what: str
+    stream: str | None = None
 
 
 class VaultScheduleResponse(BaseModel):
@@ -382,3 +383,44 @@ class NotebookBlockerIn(PipelineRefIn):
 
 class PipelineBlockedByIn(PipelineRefIn):
     ids: list[str]
+
+
+class BlockConfig(BaseModel):
+    key: str
+    label: str
+    ring_name: str
+    color: str
+    counts_for_stars: bool
+    archived: bool
+
+
+class BlocksConfigResponse(BaseModel):
+    blocks: list[BlockConfig]
+
+
+class BlocksConfigIn(BaseModel):
+    blocks: list[BlockConfig]
+
+
+class ScheduleRowIn(BaseModel):
+    block: str
+    start: str
+    end: str
+    what: str = ""
+    stream: str | None = None
+
+
+class ScheduleMetaIn(BaseModel):
+    city: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    tz: str
+    method: str
+    madhab: str
+    weekend_days: list[str]
+
+
+class ScheduleConfigIn(BaseModel):
+    meta: ScheduleMetaIn
+    weekday: list[ScheduleRowIn]
+    weekend: list[ScheduleRowIn]

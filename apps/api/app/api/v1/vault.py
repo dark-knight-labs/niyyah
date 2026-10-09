@@ -67,7 +67,11 @@ from app.schemas.vault import (
     VaultWeekResponse,
     VaultSyncStatus,
     GoalsResponse,
+    BlocksConfigIn,
+    BlocksConfigResponse,
+    ScheduleConfigIn,
 )
+from app.services.planner_defaults import DEFAULT_BLOCKS, LEGACY_WEEKEND_DAYS, legacy_stream
 from app.services.vault_parser import CANONICAL_BLOCKS
 from app.services.vault_schedule import parse_schedule
 from app.services import google_calendar
@@ -77,7 +81,7 @@ from app.services.vault_git import Edit, VaultWriteError, commit_edits
 from app.services.vault_sync import sync_vault, vault_status
 from app.services.vault_goals import GOALS_PATH, parse_goals
 from app.services.vault_objectives import objectives_path, parse_objectives, update_objective, week_for
-from app.services import planner_day, planner_store, planner_work, vault_notebook, vault_pipeline
+from app.services import planner_blocks, planner_config, planner_day, planner_store, planner_work, vault_notebook, vault_pipeline
 from app.services.vault_notebook import notebook_path, parse_notebook
 from app.services.vault_pipeline import NOW_LIMIT, STALE_DAYS, parse_pipeline, pipeline_path
 from app.services.vault_quarter import (
@@ -200,10 +204,11 @@ async def get_blocks(
     votes_by_date = {day.date: {v.block: v.stars for v in day.block_votes} for day in day_rows}
     date_range = [start + timedelta(days=i) for i in range(days)]
 
-    series: dict[str, list[int | None]] = {block: [] for block in CANONICAL_BLOCKS}
+    block_keys = await planner_blocks.counted_keys(db, user.id, include_archived=True) if _db_mode() else CANONICAL_BLOCKS
+    series: dict[str, list[int | None]] = {block: [] for block in block_keys}
     for d in date_range:
         day_votes = votes_by_date.get(d, {})
-        for block in CANONICAL_BLOCKS:
+        for block in block_keys:
             series[block].append(day_votes.get(block))
 
     averages: dict[str, float] = {}
@@ -251,8 +256,8 @@ async def get_schedule(user: User | None = Depends(get_optional_user), db: Async
         raise HTTPException(status_code=404, detail="Calendar/Schedule.md not found in vault checkout")
     parsed = parse_schedule(note.read_text(encoding="utf-8"))
     return VaultScheduleResponse(
-        meta=parsed.meta,
-        days={name: [asdict(b) for b in blocks] for name, blocks in parsed.days.items()},
+        meta={**parsed.meta, "weekend_days": LEGACY_WEEKEND_DAYS},
+        days={name: [{**asdict(b), "stream": legacy_stream(b.block, name)} for b in blocks] for name, blocks in parsed.days.items()},
         errors=parsed.errors,
     )
 
@@ -385,6 +390,36 @@ async def _save(day: date, apply, message: str, db: AsyncSession) -> EditRespons
     await sync_vault(db)  # refresh the DB copy so /vault/today shows the change at once
     found = await _get_day(db, day)
     return EditResponse(commit=commit, day=_day_to_response(found) if found else None)
+
+
+@router.get("/config/blocks", response_model=BlocksConfigResponse)
+async def get_blocks_config(user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
+    """The user's blocks. In vault mode, the owner's defaults, public like the schedule they belong to."""
+    if _db_mode():
+        if user is None:
+            raise HTTPException(status_code=401, detail="Sign in to see your blocks")
+        return BlocksConfigResponse(blocks=await planner_blocks.list_blocks(db, user.id))
+    return BlocksConfigResponse(blocks=DEFAULT_BLOCKS)
+
+
+@router.put("/config/blocks", response_model=BlocksConfigResponse)
+async def put_blocks_config(data: BlocksConfigIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if not _db_mode():
+        raise HTTPException(status_code=501, detail="Blocks are edited in the vault until STORAGE_BACKEND=db")
+    await _db_run(db, lambda: planner_blocks.replace_blocks(db, user.id, [b.model_dump() for b in data.blocks]))
+    return BlocksConfigResponse(blocks=await planner_blocks.list_blocks(db, user.id))
+
+
+@router.put("/config/schedule", response_model=VaultScheduleResponse)
+async def put_schedule_config(data: ScheduleConfigIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if not _db_mode():
+        raise HTTPException(status_code=501, detail="The schedule is edited in the vault until STORAGE_BACKEND=db")
+    today = _local_now().date()
+    streams = await planner_store.streams_for(db, user.id, today)
+    ids = {s.id for s in streams}
+    await _db_run(db, lambda: planner_config.replace_schedule(
+        db, user.id, data.meta.model_dump(), [r.model_dump() for r in data.weekday], [r.model_dump() for r in data.weekend], ids))
+    return await planner_store.schedule(db, user.id)
 
 
 @router.get("/edit-access", response_model=EditAccessResponse)

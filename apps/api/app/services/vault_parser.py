@@ -103,6 +103,11 @@ def possible_for(mode: str, blocks) -> int:
     return possible
 
 
+def possible_for_count(mode: str, count: int) -> int:
+    """Star ceiling for `count` counted blocks: the mode's table value is for seven blocks."""
+    return round(MODE_META.get(mode, MODE_META["full"])["possible"] * count / 7)
+
+
 def parse_daily_note(content: str, note_date: date) -> ParsedDay:
     frontmatter, body = _split_frontmatter(content)
     mode = frontmatter.get("mode", "full")

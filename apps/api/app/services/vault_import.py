@@ -13,11 +13,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
+    PlannerBlock, Goal, LogEntry, NotebookEntry, PipelineItem, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
     WeekObjective,
 )
 from app.models.vault import VaultBlockVote, VaultDay
 from app.services.vault_calendar import sources
+from app.services.planner_defaults import DEFAULT_BLOCKS, LEGACY_WEEKEND_DAYS, legacy_stream
 from app.services.vault_goals import GOALS_PATH, parse_goals
 from app.services.vault_notebook import _new_id as new_entry_id, parse_notebook
 from app.services.vault_objectives import parse_objectives
@@ -35,7 +36,7 @@ _COLUMN = {"📅": "due_on", "⏳": "scheduled_on", "🛫": "start_on"}
 _QUARTER = re.compile(r"^\d{4}-Q[1-4]$")
 _WEEK = re.compile(r"^\d{4}-W\d{2}$")
 
-USER_TABLES = (PlannerCalendarFeed, Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem, NotebookEntry,
+USER_TABLES = (PlannerBlock, PlannerCalendarFeed, Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem, NotebookEntry,
                PlannerScheduleSetting, PlannerScheduleBlock)
 
 
@@ -195,9 +196,25 @@ def _schedule(root: Path, user_id: int, report: ImportReport) -> tuple[list[Plan
     parsed = parse_schedule(note.read_text(encoding="utf-8"))
     report.errors += [f"Schedule.md: {e}" for e in parsed.errors]
     meta = json.loads(json.dumps(parsed.meta, default=str))
-    blocks = [PlannerScheduleBlock(user_id=user_id, day_type=day, block=b.block, start=b.start, end=b.end, what=b.what, position=n)
+    meta["weekend_days"] = list(LEGACY_WEEKEND_DAYS)
+    blocks = [PlannerScheduleBlock(user_id=user_id, day_type=day, block=b.block, start=b.start, end=b.end, what=b.what, stream=legacy_stream(b.block, day), position=n)
               for day, listed in parsed.days.items() for n, b in enumerate(listed)]
     return [PlannerScheduleSetting(user_id=user_id, meta=meta)], blocks
+
+
+def _blocks(user_id: int, days: list[VaultDay], schedule_rows: list[PlannerScheduleBlock]) -> list[PlannerBlock]:
+    """Blocks seen in the notes' votes and the schedule, labelled from the owner's defaults where the key is known."""
+    voted = {v.block for d in days for v in d.block_votes}
+    scheduled = {r.block for r in schedule_rows}
+    known = {b["key"]: b for b in DEFAULT_BLOCKS}
+    order = [b["key"] for b in DEFAULT_BLOCKS if b["key"] in voted | scheduled]
+    order += sorted((voted | scheduled) - set(known))
+    rows = []
+    for position, key in enumerate(order):
+        d = known.get(key) or {"label": key.replace("-", " ").title(), "ring_name": key[:6].upper(), "color": "slate", "archived": False}
+        rows.append(PlannerBlock(user_id=user_id, key=key, label=d["label"], ring_name=d["ring_name"], color=d["color"],
+                                 counts_for_stars=key in voted, position=position, archived=bool(d.get("archived"))))
+    return rows
 
 
 async def _wipe(db: AsyncSession, user_id: int) -> None:
@@ -223,6 +240,7 @@ async def import_vault(db: AsyncSession, user_id: int, root: Path, today: date) 
         "pipeline_items": _pipelines(root, user_id, today, report),
         "notebook_entries": _notebooks(root, user_id, report),
         "schedule_blocks": schedule_blocks,
+        "blocks": _blocks(user_id, days, schedule_blocks),
         "calendar_feeds": [PlannerCalendarFeed(user_id=user_id, name=f["name"], url=f["url"], color=f["color"], email=f["email"], position=n)
                            for n, f in enumerate(sources(root))],
     }

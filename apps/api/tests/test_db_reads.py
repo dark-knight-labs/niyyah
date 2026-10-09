@@ -59,9 +59,9 @@ async def test_db_day_endpoints_return_the_imported_votes(auth_client: AsyncClie
         await import_vault(db, user_id, tmp_path, today)
     monkeypatch.setattr(settings, "storage_backend", "db")
     day = await _get(auth_client, "/api/v1/vault/today")
-    assert day["mode"] == "full" and day["blocks"] == {"soul": 2, "body": 1} and day["total"] == 3
+    assert day["mode"] == "full" and day["blocks"] == {"soul": 2, "body": 1, "ot": 0, "distribution": 0, "fnf": 0, "sleep": 0} and day["total"] == 3
     week = await _get(auth_client, "/api/v1/vault/week")
-    assert len(week["days"]) == 2 and week["totals"] == {"soul": 4, "body": 2}
+    assert len(week["days"]) == 2 and week["totals"] == {"soul": 4, "body": 2, "ot": 0, "distribution": 0, "fnf": 0, "sleep": 0}
     streaks = await _get(auth_client, "/api/v1/vault/streaks")
     assert streaks["streaks"]["soul"] == {"current": 2, "longest": 2}
 

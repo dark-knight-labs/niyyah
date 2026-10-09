@@ -24,7 +24,7 @@ async def test_import_copies_every_kind_of_note(tmp_path):
         assert report.errors == []
         assert report.counts == {
             "days": 2, "log_entries": 4, "tasks": 3, "goals": 2, "quarters": 1, "quarter_streams": 3,
-            "objectives": 2, "pipeline_items": 4, "notebook_entries": 2, "schedule_blocks": 3, "calendar_feeds": 0,
+            "objectives": 2, "pipeline_items": 4, "notebook_entries": 2, "schedule_blocks": 4, "calendar_feeds": 0, "blocks": 7,
         }
         tasks = (await db.execute(select(Task).where(Task.user_id == 1).order_by(Task.position))).scalars().all()
         assert [(t.text, t.done) for t in tasks] == [("Pay invoice", False), ("Renew domain", True), ("Future thing", False)]
@@ -49,7 +49,7 @@ async def test_import_twice_does_not_duplicate(tmp_path):
                 Task: "tasks", LogEntry: "log_entries", PipelineItem: "pipeline_items", NotebookEntry: "notebook_entries",
                 QuarterStream: "quarter_streams", PlannerScheduleBlock: "schedule_blocks", VaultDay: "days"}[model]]
         votes = (await db.execute(select(func.count()).select_from(VaultBlockVote))).scalar_one()
-        assert votes == 4  # two days, two voted blocks each; the first import's votes were removed
+        assert votes == 12  # two days, six blocks each; the first import's votes were removed
 
 
 @pytest.mark.asyncio

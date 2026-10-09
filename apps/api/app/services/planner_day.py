@@ -10,7 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from app.models.planner import LogEntry, Task
 from app.models.vault import VaultBlockVote, VaultDay
-from app.services.vault_parser import BLOCK_ALIASES, CANONICAL_BLOCKS, MODE_META, possible_for
+from app.services import planner_blocks
+from app.services.vault_parser import BLOCK_ALIASES, MODE_META, possible_for_count
 from app.services.vault_tasks import line_hash
 from app.services.vault_write import _one_line
 
@@ -24,17 +25,15 @@ async def _find_day(db, user_id: int, day: date) -> VaultDay | None:
 
 
 async def _day(db, user_id: int, day: date) -> VaultDay:
-    """The day's row; a missing day is created with the latest day's blocks (all zero stars), like a fresh daily note."""
+    """The day's row; a missing day is created from the user's current counted blocks (all zero stars)."""
     row = await _find_day(db, user_id, day)
     if row is not None:
         return row
-    latest = (await db.execute(select(VaultDay).where(VaultDay.user_id == user_id)
-                               .order_by(VaultDay.date.desc()).limit(1).options(selectinload(VaultDay.block_votes)))).scalar_one_or_none()
-    if latest is None:
-        raise ValueError("there is no daily note to copy the layout from")
-    blocks = [v.block for v in latest.block_votes]
-    row = VaultDay(user_id=user_id, date=day, mode="full", possible=possible_for("full", set(blocks)), total=0, focus=None, log=None)
-    row.block_votes = [VaultBlockVote(block=b, stars=0) for b in blocks]
+    keys = await planner_blocks.counted_keys(db, user_id)
+    if not keys:
+        raise ValueError("add a block that counts for stars in Settings first")
+    row = VaultDay(user_id=user_id, date=day, mode="full", possible=possible_for_count("full", len(keys)), total=0, focus=None, log=None)
+    row.block_votes = [VaultBlockVote(block=b, stars=0) for b in keys]
     db.add(row)
     await db.flush()
     return row
@@ -45,20 +44,22 @@ async def set_mode(db, user_id: int, day: date, mode: str) -> VaultDay:
         raise ValueError(f"unknown mode '{mode}'")
     row = await _day(db, user_id, day)
     row.mode = mode
-    row.possible = possible_for(mode, {v.block for v in row.block_votes})
+    row.possible = possible_for_count(mode, len(row.block_votes))
     return row
 
 
 async def set_vote(db, user_id: int, day: date, block: str, stars: int) -> VaultDay:
     block = BLOCK_ALIASES.get(block.lower(), block.lower())
-    if block not in CANONICAL_BLOCKS:
+    if block not in await planner_blocks.counted_keys(db, user_id, include_archived=True):
         raise ValueError(f"unknown block '{block}'")
     if not 0 <= stars <= 3:
         raise ValueError("stars must be 0-3")
     row = await _day(db, user_id, day)
     vote = next((v for v in row.block_votes if v.block == block), None)
-    if vote is None:
-        raise ValueError(f"no vote lines for '{block}' in this note")
+    if vote is None:  # a block added after this day was created joins it on its first vote
+        vote = VaultBlockVote(block=block, stars=0)
+        row.block_votes.append(vote)
+        row.possible = possible_for_count(row.mode, len(row.block_votes))
     vote.stars = stars
     row.total = sum(v.stars for v in row.block_votes)
     return row

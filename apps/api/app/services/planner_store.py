@@ -117,8 +117,8 @@ async def schedule(db: AsyncSession, user_id: int) -> dict | None:
     rows = await _all(db, select(PlannerScheduleBlock).where(PlannerScheduleBlock.user_id == user_id).order_by(PlannerScheduleBlock.position))
     days: dict[str, list[dict]] = {}
     for r in rows:
-        days.setdefault(r.day_type, []).append({"block": r.block, "start": r.start, "end": r.end, "what": r.what})
-    return {"meta": dict(setting.meta), "days": days, "errors": []}
+        days.setdefault(r.day_type, []).append({"block": r.block, "start": r.start, "end": r.end, "what": r.what, "stream": r.stream})
+    return {"meta": {"weekend_days": ["sat", "sun"], **setting.meta}, "days": days, "errors": []}
 
 
 async def calendar_feeds(db: AsyncSession, user_id: int) -> list[dict]:

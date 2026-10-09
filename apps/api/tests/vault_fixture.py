@@ -28,6 +28,26 @@ possible: 21
 > - [ ] ⭐⭐ Average
 > - [ ] ⭐⭐⭐ Best
 
+> [!ot]+ OT
+> - [ ] ⭐ Bare Minimum
+> - [ ] ⭐⭐ Average
+> - [ ] ⭐⭐⭐ Best
+
+> [!distribution]+ Distribution
+> - [ ] ⭐ Bare Minimum
+> - [ ] ⭐⭐ Average
+> - [ ] ⭐⭐⭐ Best
+
+> [!fnf]+ FnF
+> - [ ] ⭐ Bare Minimum
+> - [ ] ⭐⭐ Average
+> - [ ] ⭐⭐⭐ Best
+
+> [!sleep]+ Sleep
+> - [ ] ⭐ Bare Minimum
+> - [ ] ⭐⭐ Average
+> - [ ] ⭐⭐⭐ Best
+
 ## Focus
 - Ship the router
 
@@ -106,6 +126,7 @@ madhab: hanafi
 | Block | Start | End | What |
 |---|---|---|---|
 | soul | fajr | sunrise | Quran |
+| planning | 09:00 | 10:30 | Planning |
 """
 
 
