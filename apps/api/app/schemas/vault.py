@@ -424,3 +424,16 @@ class ScheduleConfigIn(BaseModel):
     meta: ScheduleMetaIn
     weekday: list[ScheduleRowIn]
     weekend: list[ScheduleRowIn]
+
+
+class FeedIn(BaseModel):
+    name: str
+    url: str
+
+
+class FeedResponse(BaseModel):
+    id: int
+    name: str
+    host: str
+    color: str | None = None
+    email: str | None = None

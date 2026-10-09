@@ -70,6 +70,8 @@ from app.schemas.vault import (
     BlocksConfigIn,
     BlocksConfigResponse,
     ScheduleConfigIn,
+    FeedIn,
+    FeedResponse,
 )
 from app.services.planner_defaults import DEFAULT_BLOCKS, LEGACY_WEEKEND_DAYS, legacy_stream
 from app.services.vault_parser import CANONICAL_BLOCKS
@@ -420,6 +422,28 @@ async def put_schedule_config(data: ScheduleConfigIn, user: User = Depends(requi
     await _db_run(db, lambda: planner_config.replace_schedule(
         db, user.id, data.meta.model_dump(), [r.model_dump() for r in data.weekday], [r.model_dump() for r in data.weekend], ids))
     return await planner_store.schedule(db, user.id)
+
+
+@router.get("/config/feeds", response_model=list[FeedResponse])
+async def get_feeds(user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    return await planner_config.list_feeds(db, user.id) if _db_mode() else []
+
+
+@router.post("/config/feeds", response_model=FeedResponse)
+async def post_feed(data: FeedIn, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if not _db_mode():
+        raise HTTPException(status_code=501, detail="Calendars are set in the vault until STORAGE_BACKEND=db")
+    await _db_run(db, lambda: planner_config.add_feed(db, user.id, data.name, data.url))
+    return (await planner_config.list_feeds(db, user.id))[-1]
+
+
+@router.delete("/config/feeds/{feed_id}", status_code=204)
+async def delete_feed(feed_id: int, user: User = Depends(require_planner_user), db: AsyncSession = Depends(get_db)):
+    if not _db_mode():
+        raise HTTPException(status_code=501, detail="Calendars are set in the vault until STORAGE_BACKEND=db")
+    if not await planner_config.remove_feed(db, user.id, feed_id):
+        raise HTTPException(status_code=404, detail="no such calendar")
+    await db.commit()
 
 
 @router.get("/edit-access", response_model=EditAccessResponse)

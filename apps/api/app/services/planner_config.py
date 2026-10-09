@@ -1,9 +1,12 @@
 """Saving a user's schedule settings; validation mirrors what the web app can resolve."""
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import delete, select
+from urllib.parse import urlparse
 
-from app.models.planner import PlannerBlock, PlannerScheduleBlock, PlannerScheduleSetting
+from sqlalchemy import delete, func, select
+
+from app.models.planner import PlannerBlock, PlannerCalendarFeed, PlannerScheduleBlock, PlannerScheduleSetting
+from app.services.planner_defaults import STARTER_BLOCKS, STARTER_META, STARTER_WEEKDAY, STARTER_WEEKEND
 from app.services.vault_schedule import _valid_time
 
 METHODS = {"karachi", "mwl", "isna", "egyptian", "ummalqura", "dubai", "qatar", "kuwait", "singapore", "turkey", "tehran", "moonsighting"}
@@ -69,6 +72,49 @@ async def replace_schedule(db, user_id: int, meta: dict, weekday: list[dict], we
         setting.meta = clean_meta
     await db.execute(delete(PlannerScheduleBlock).where(PlannerScheduleBlock.user_id == user_id))
     for day_type, rows in days.items():
+        for position, r in enumerate(rows):
+            db.add(PlannerScheduleBlock(user_id=user_id, day_type=day_type, position=position, **r))
+    await db.flush()
+
+
+def _host(url: str) -> str:
+    return urlparse(url).hostname or ""
+
+
+async def list_feeds(db, user_id: int) -> list[dict]:
+    rows = (await db.execute(select(PlannerCalendarFeed).where(PlannerCalendarFeed.user_id == user_id)
+                             .order_by(PlannerCalendarFeed.position))).scalars().all()
+    return [{"id": r.id, "name": r.name, "host": _host(r.url), "color": r.color, "email": r.email} for r in rows]
+
+
+async def add_feed(db, user_id: int, name: str, url: str) -> None:
+    name, url = " ".join(name.split()), url.strip()
+    parsed = urlparse(url)
+    if not name or len(name) > 120:
+        raise ValueError("give the calendar a name of 1-120 characters")
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise ValueError("the calendar address must start with https://")
+    top = (await db.execute(select(func.max(PlannerCalendarFeed.position)).where(PlannerCalendarFeed.user_id == user_id))).scalar()
+    db.add(PlannerCalendarFeed(user_id=user_id, name=name, url=url, color=None, email=None, position=0 if top is None else top + 1))
+    await db.flush()
+
+
+async def remove_feed(db, user_id: int, feed_id: int) -> bool:
+    row = (await db.execute(select(PlannerCalendarFeed).where(PlannerCalendarFeed.user_id == user_id,
+                                                              PlannerCalendarFeed.id == feed_id))).scalar_one_or_none()
+    if row is None:
+        return False
+    await db.delete(row)
+    await db.flush()
+    return True
+
+
+async def seed_new_user(db, user_id: int) -> None:
+    """The starter template: blocks, settings (no location yet) and a prayer-anchored weekday and weekend."""
+    for position, b in enumerate(STARTER_BLOCKS):
+        db.add(PlannerBlock(user_id=user_id, position=position, **b))
+    db.add(PlannerScheduleSetting(user_id=user_id, meta=dict(STARTER_META)))
+    for day_type, rows in (("weekday", STARTER_WEEKDAY), ("weekend", STARTER_WEEKEND)):
         for position, r in enumerate(rows):
             db.add(PlannerScheduleBlock(user_id=user_id, day_type=day_type, position=position, **r))
     await db.flush()

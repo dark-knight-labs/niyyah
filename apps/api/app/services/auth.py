@@ -19,6 +19,9 @@ async def register_user(db: AsyncSession, email: str, password: str, tz: str = "
     db.add(user)
     await db.flush()
     db.add(UserSettings(user_id=user.id))
+    if settings.storage_backend == "db":  # a new account in db mode starts from the starter template
+        from app.services.planner_config import seed_new_user
+        await seed_new_user(db, user.id)
     await db.commit()
     await db.refresh(user)
     return user
