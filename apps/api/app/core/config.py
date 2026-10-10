@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     api_public_url: str = "http://localhost:8000"
     web_public_url: str = "http://localhost:3000"
 
+    # Comma-separated "module:Class" plugins to load, in addition to installed packages that register a "niyyah.plugins" entry point.
+    plugins: str = ""
+
     # For tests, swap asyncpg → aiosqlite
     test_database_url: str = "sqlite+aiosqlite:///./test.db"
 
