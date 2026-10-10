@@ -50,3 +50,10 @@ class BrokenRoutersPlugin(FakePlugin):
 
     def routers(self):
         raise ValueError("boom")
+
+
+class ParamOverlapPlugin(FakePlugin):
+    name = "param-overlap"
+
+    def routers(self):
+        return [_router("/auth/{item_id}")]
