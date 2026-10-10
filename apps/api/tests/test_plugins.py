@@ -59,13 +59,13 @@ def test_zero_plugins_routes_equal_core_plus_plugins_endpoint():
         assert flat_routes(app.routes) == expected
 
 
-async def test_zero_plugins_endpoint_is_empty_and_authenticated(auth_client, client):
-    resp = await auth_client.get("/api/v1/plugins")
+async def test_zero_plugins_endpoint_is_empty_and_authenticated(plugin_client):
+    c = await plugin_client([])  # isolated from installed niyyah-* packages and PLUGINS
+    resp = await c.get("/api/v1/plugins")
     assert resp.status_code == 200
     assert resp.json() == []
-    anon = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
-    assert (await anon.get("/api/v1/plugins")).status_code == MISSING_HEADER_STATUS
-    await anon.aclose()
+    del c.headers["Authorization"]
+    assert (await c.get("/api/v1/plugins")).status_code == MISSING_HEADER_STATUS
 
 
 async def test_fake_plugin_mounted_and_listed(plugin_client):
