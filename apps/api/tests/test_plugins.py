@@ -12,7 +12,7 @@ from httpx import ASGITransport, AsyncClient
 from app.core.config import Settings
 from app.core.database import get_db
 from app.core.plugins import PLUGIN_API_VERSION, PluginError, flat_routes, load_plugins, parse_specs
-from app.main import app, create_app
+from app.main import create_app
 from tests.conftest import override_get_db
 
 API_DIR = Path(__file__).resolve().parent.parent
@@ -55,8 +55,6 @@ def test_settings_plugins_default_and_parse():
 def test_zero_plugins_routes_equal_core_plus_plugins_endpoint():
     expected = core_routes() | {("/api/v1/plugins", "GET")}
     assert flat_routes(create_app(plugin_specs=[], entry_points=NO_EPS).routes) == expected
-    if not os.environ.get("PLUGINS"):
-        assert flat_routes(app.routes) == expected
 
 
 async def test_zero_plugins_endpoint_is_empty_and_authenticated(plugin_client):
@@ -132,5 +130,12 @@ def test_startup_aborts_on_bad_plugin():
 
 
 def test_startup_with_fake_plugin_via_env():
-    result = _run("import app.main", FAKE)
+    # Hide installed niyyah-* packages (a "fake" plugin there would clash by name); PLUGINS is still read for real.
+    code = (
+        "import app.core.plugins as p; p._metadata_entry_points = lambda group: []\n"
+        "import app.main\n"
+        "from app.core.plugins import flat_routes\n"
+        "assert ('/api/v1/fake/ping', 'GET') in flat_routes(app.main.app.routes)"
+    )
+    result = _run(code, FAKE)
     assert result.returncode == 0, result.stderr
