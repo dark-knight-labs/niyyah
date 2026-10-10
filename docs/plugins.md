@@ -62,6 +62,10 @@ For development and CI of a plugin, check out core at a pinned commit and set `P
 
 `GET /api/v1/plugins` (authenticated) returns `[{"name": ..., "api_version": ...}]` for the loaded plugins.
 
+## Known limitation
+
+Collision detection compares normalized (path, method) pairs. Core routes are registered first and win, so a plugin route with a path parameter (e.g. `GET /api/v1/x/{id}`) that overlaps a literal core route (`GET /api/v1/x/today`) loads without error and is unreachable for that literal. Give your plugin its own prefix (e.g. `/api/v1/<plugin-name>/...`).
+
 ## Deferred
 
 - **Web slots or declarative panels.** There is no consumer yet, and it would add a schema and touch the web build. For now the web calls plugin routes through `api-client.ts`.
