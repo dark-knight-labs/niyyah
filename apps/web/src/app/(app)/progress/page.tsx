@@ -81,7 +81,7 @@ export default function ProgressPage() {
       <header className="mb-3.5 flex flex-wrap items-end justify-between gap-x-5 gap-y-2">
         <div>
           <p className="flex items-center gap-2 text-micro font-bold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">
-            <span className="pulse-dot h-[7px] w-[7px] rounded-full" style={{ background: todayDay ? resolveModeColor(todayDay.mode) : "var(--accent)" }} aria-hidden="true" />
+            <span className="pulse-dot h-[7px] w-[7px] rounded-none" style={{ background: todayDay ? resolveModeColor(todayDay.mode) : "var(--accent)" }} aria-hidden="true" />
             {todayDay ? `Today ${todayDay.total}/${todayDay.possible} · ${todayDay.pct}%` : "Today not logged yet"}
           </p>
           <h1 className="mt-0.5 font-serif text-[1.75rem] font-medium leading-tight">Progress</h1>
@@ -108,7 +108,7 @@ export default function ProgressPage() {
       {modes.length > 0 && (
         <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-micro font-medium text-[var(--muted-foreground)]">
           <span className="font-sans font-bold uppercase tracking-[0.09em]">Modes</span>
-          {modes.map(([m, c]) => <span key={m} className="inline-flex items-center gap-1.5"><i className="h-1.5 w-1.5 rounded-full" style={{ background: resolveModeColor(m) }} aria-hidden="true" />{m} <b className="font-medium text-[var(--foreground)]">{c}</b></span>)}
+          {modes.map(([m, c]) => <span key={m} className="inline-flex items-center gap-1.5"><i className="h-1.5 w-1.5 rounded-none" style={{ background: resolveModeColor(m) }} aria-hidden="true" />{m} <b className="font-medium text-[var(--foreground)]">{c}</b></span>)}
         </p>
       )}
 

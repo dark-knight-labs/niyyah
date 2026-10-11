@@ -86,7 +86,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all", comp
         <div role="group" aria-label="Filter" className="flex flex-wrap gap-1.5">
           {[{ id: "all" as const, label: "All", n: entries.length }, ...KINDS.map((k) => ({ id: k.id, label: k.label, n: entries.filter((e) => e.kind === k.id).length })).filter((k) => k.n > 0)].map((f) => (
             <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
-              className="min-h-8 rounded-full border border-[var(--border)] px-3 text-xs font-bold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
+              className="min-h-8 rounded-none border border-[var(--border)] px-3 text-xs font-bold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
               {f.label} <span className="tabular-nums font-medium">{f.n}</span>
             </button>
           ))}
@@ -104,7 +104,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all", comp
       </div>
 
       <aside className={compact ? "grid gap-3" : "grid gap-3 lg:sticky lg:top-4"}>
-        <section aria-label="Blockers" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 sm:p-4">
+        <section aria-label="Blockers" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3">
           <SectionTitle title="Blockers" />
           {blockers.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">Nothing is holding this stream.</p>}
           <ul className="grid gap-2.5">
@@ -121,7 +121,7 @@ export function Notebook({ meta, entries, busy, run, initialFilter = "all", comp
             ))}
           </ul>
         </section>
-        <section aria-label="Links" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 sm:p-4">
+        <section aria-label="Links" className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3">
           <SectionTitle title="Links" />
           {links.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">Links from your notes appear here.</p>}
           <ul className="grid gap-2">
@@ -150,7 +150,7 @@ function Entry({ entry, meta, busy, onSave, onRemove, onPromote }: {
   const btn = "grid h-9 w-9 place-items-center rounded-lg text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
   const promotable = entry.kind === "idea" || entry.kind === "meeting";
   return (
-    <li className="grid gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3.5 sm:p-4" style={{ borderLeft: `3px solid ${color}` }}>
+    <li className="grid gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3" style={{ borderLeft: `3px solid ${color}` }}>
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-micro font-extrabold uppercase tracking-[0.08em]" style={{ color }}>
           <k.icon size={13} aria-hidden="true" /> {k.label}

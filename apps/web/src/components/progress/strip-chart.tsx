@@ -66,7 +66,7 @@ export function StripChart({ map, dates, blocks, selected, onSelect }: { map: Da
 
         {blocks.map((b) => (
           <div key={b.key} className="flex h-5 items-center">
-            <span className={label}><i className="h-[7px] w-[7px] rounded-full" style={{ background: b.color }} />{b.label}</span>
+            <span className={label}><i className="h-[7px] w-[7px] rounded-none" style={{ background: b.color }} />{b.label}</span>
             <svg viewBox={`0 0 ${W} 20`} preserveAspectRatio="none" className="h-full min-w-0 flex-1" aria-hidden="true">
               {cols.map((c, i) => {
                 const a = blockAvg(map, c, b.key);

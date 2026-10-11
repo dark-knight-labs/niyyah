@@ -60,7 +60,7 @@ export function BlocksSection({ blocks, onChange, usedKeys }: Props) {
                 <button type="button" disabled={i === active.length - 1} onClick={() => move(b.key, 1)} aria-label={`Move ${b.label} down`} className="px-1 text-micro leading-none text-[var(--muted-foreground)] hover:text-[var(--foreground)] disabled:opacity-30">▼</button>
               </span>
               <button type="button" aria-label={`Colour of ${b.label}`} onClick={() => setPicking(picking === b.key ? null : b.key)}
-                className="h-[1.375rem] w-[1.375rem] rounded-full border-2 border-[var(--surface)] shadow-[0_0_0_1px_var(--border)]" style={{ background: colorVar(b.color) }} />
+                className="h-[1.375rem] w-[1.375rem] rounded-none border-2 border-[var(--surface)] shadow-[0_0_0_1px_var(--border)]" style={{ background: colorVar(b.color) }} />
               <input className={FIELD} value={b.label} aria-label="Block name" aria-invalid={!b.label.trim()} onChange={(e) => update(b.key, { label: e.target.value })} />
               <input className={`${FIELD} font-mono max-sm:col-start-3`} value={b.ring_name} maxLength={6} aria-label="Short name on the clock" onChange={(e) => update(b.key, { ring_name: e.target.value.toUpperCase() })} />
               <div className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--muted-foreground)]">
@@ -73,7 +73,7 @@ export function BlocksSection({ blocks, onChange, usedKeys }: Props) {
               <div role="group" aria-label="Pick a colour" className="flex flex-wrap gap-1.5 pb-2 pl-9">
                 {COLOR_KEYS.map((c) => (
                   <button key={c} type="button" aria-label={c} aria-pressed={b.color === c} onClick={() => { update(b.key, { color: c }); setPicking(null); }}
-                    className="h-5 w-5 rounded-full border-2 border-[var(--surface)] shadow-[0_0_0_1px_var(--border)] aria-pressed:shadow-[0_0_0_2px_var(--foreground)]" style={{ background: colorVar(c) }} />
+                    className="h-5 w-5 rounded-none border-2 border-[var(--surface)] shadow-[0_0_0_1px_var(--border)] aria-pressed:shadow-[0_0_0_2px_var(--foreground)]" style={{ background: colorVar(c) }} />
                 ))}
               </div>
             )}
@@ -87,7 +87,7 @@ export function BlocksSection({ blocks, onChange, usedKeys }: Props) {
           <ul>
             {archived.map((b) => (
               <li key={b.key} className="flex items-center gap-2 border-t border-[var(--border)] py-1.5 text-sm opacity-75 first:border-t-0">
-                <span className="h-[1.125rem] w-[1.125rem] rounded-full" style={{ background: colorVar(b.color) }} aria-hidden="true" />
+                <span className="h-[1.125rem] w-[1.125rem] rounded-none" style={{ background: colorVar(b.color) }} aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate">{b.label} <span className="ml-1 rounded bg-[var(--muted)] px-1.5 py-0.5 text-micro font-bold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">history only</span></span>
                 <button type="button" onClick={() => update(b.key, { archived: false })} className="min-h-8 rounded-lg px-2 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)]">Restore</button>
               </li>

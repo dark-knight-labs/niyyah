@@ -28,7 +28,7 @@ function WeekTicks({ week, weeks }: { week: number; weeks: number }) {
     <div className="flex w-full items-center gap-3 text-[var(--accent)] sm:hidden" role="img" aria-label={`Week ${week} of ${weeks}`}>
       <div className="flex h-2 flex-1 items-center gap-[3px]" aria-hidden="true">
         {Array.from({ length: weeks }, (_, i) => (
-          <span key={i} className="flex-1 rounded-full bg-current" style={{ height: i + 1 === week ? 6 : 3, opacity: i + 1 === week ? 1 : i + 1 < week ? 0.55 : 0.16 }} />
+          <span key={i} className="flex-1 rounded-none bg-current" style={{ height: i + 1 === week ? 6 : 3, opacity: i + 1 === week ? 1 : i + 1 < week ? 0.55 : 0.16 }} />
         ))}
       </div>
       <p className="whitespace-nowrap text-small text-[var(--muted-foreground)]">Week <b className="font-mono font-bold tabular-nums text-[var(--foreground)]">{week}</b> of <span className="font-mono tabular-nums">{weeks}</span></p>

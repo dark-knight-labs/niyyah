@@ -67,7 +67,7 @@ export default function SettingsPage() {
   const set = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
 
   return (
-    <div className="mx-auto max-w-[68rem] pb-24">
+    <div className="w-full pb-24">
       <h1 className="font-serif text-display leading-tight">Settings</h1>
       <p className="mb-5 mt-1 max-w-[62ch] text-sm text-[var(--muted-foreground)]">Where you are, the blocks of your day, the schedule on your clock and the calendars you read. Streams are edited on the Plan page.</p>
       <LocationSection meta={draft.meta} onChange={(meta) => set({ meta })} />
