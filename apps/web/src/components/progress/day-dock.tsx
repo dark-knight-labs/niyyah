@@ -35,7 +35,7 @@ export function DayDock({ date, day, isToday, onStep, onToday, canPrev, canNext 
   const half = Math.ceil(list.length / 2);
   const row = (key: string, label: string, color: string) => (
     <div key={key} className="flex min-h-[34px] items-center gap-2 border-t border-[var(--border)] text-sm first:border-t-0">
-      <i className="h-2 w-2 rounded-full" style={{ background: color }} aria-hidden="true" />
+      <i className="h-2 w-2 rounded-none" style={{ background: color }} aria-hidden="true" />
       <span className="flex-1 font-medium">{label}</span>
       <Pips value={day.blocks[key] ?? 0} color={color} />
       <span className="w-3 text-right font-mono text-xs text-[var(--muted-foreground)]">{day.blocks[key] ?? 0}</span>
@@ -53,7 +53,7 @@ export function DayDock({ date, day, isToday, onStep, onToday, canPrev, canNext 
           <span className="font-mono text-sm">{day.pct}%</span>
         </div>
         <span className="mt-1.5 inline-flex items-center gap-1.5 rounded bg-[var(--muted)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">
-          <i className="h-1.5 w-1.5 rounded-full" style={{ background: resolveModeColor(day.mode) }} aria-hidden="true" />{day.mode} mode
+          <i className="h-1.5 w-1.5 rounded-none" style={{ background: resolveModeColor(day.mode) }} aria-hidden="true" />{day.mode} mode
         </span>
         {nav}
       </div>

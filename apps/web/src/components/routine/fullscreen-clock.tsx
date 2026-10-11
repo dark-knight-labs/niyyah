@@ -44,7 +44,7 @@ export function FullScreenClock({ day, nowMin, onClose, events }: Props) {
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-[var(--background)] p-4" role="dialog" aria-label="Full screen clock">
-      <button onClick={onClose} className="fixed right-4 top-4 z-10 flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--background)] px-3.5 text-[0.8125rem] font-semibold hover:bg-[var(--muted)]">
+      <button onClick={onClose} className="fixed right-4 top-4 z-10 flex min-h-11 items-center gap-1.5 rounded-none border border-[var(--border)] bg-[var(--background)] px-3.5 text-[0.8125rem] font-semibold hover:bg-[var(--muted)]">
         <X size={14} /> Close
       </button>
       {portrait ? (

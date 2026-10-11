@@ -100,7 +100,7 @@ export default function PlanPage() {
           <div className="pointer-events-none absolute inset-y-0 -right-3 z-10 hidden w-6 lg:block">
             <button type="button" onClick={toggleRail} aria-expanded={!collapsed} aria-label={collapsed ? "Expand the stream list" : "Collapse the stream list"}
               title={collapsed ? "Expand the stream list" : "Collapse the stream list"}
-              className="pointer-events-auto sticky top-[calc(50vh-0.75rem)] grid h-6 w-6 place-items-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition-colors hover:border-[var(--border-strong,var(--muted-foreground))] hover:text-[var(--foreground)] active:scale-90">
+              className="pointer-events-auto sticky top-[calc(50vh-0.75rem)] grid h-6 w-6 place-items-center rounded-none border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition-colors hover:border-[var(--border-strong,var(--muted-foreground))] hover:text-[var(--foreground)] active:scale-90">
               {collapsed ? <ChevronRight size={13} aria-hidden="true" /> : <ChevronLeft size={13} aria-hidden="true" />}
             </button>
           </div>

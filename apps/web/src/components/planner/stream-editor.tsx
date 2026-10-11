@@ -64,7 +64,7 @@ export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props)
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Colour">
             {quarter.colors.map((c) => (
               <button key={c} type="button" role="radio" aria-checked={c === color} aria-label={c} onClick={() => setColor(c)}
-                className="grid h-9 w-9 place-items-center rounded-full border-2 transition active:scale-90"
+                className="grid h-9 w-9 place-items-center rounded-none border-2 transition active:scale-90"
                 style={{ background: colorVar(c), borderColor: c === color ? "var(--foreground)" : "transparent" }}>
                 {c === color && <Check size={15} className="text-white" aria-hidden="true" />}
               </button>
