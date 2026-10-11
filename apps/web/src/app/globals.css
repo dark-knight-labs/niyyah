@@ -126,10 +126,7 @@ h1, h2, h3 {
 }
 
 .font-clock {
-  font-family: var(--font-clock);
-}
-.font-clock .font-mono {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-family: var(--font-mono);
 }
 
 /* Mono micro-label: nav, strips, field labels, counts. */

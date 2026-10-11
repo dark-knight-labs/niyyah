@@ -44,7 +44,7 @@ export function VotesPanel({ day, today, onSaved, current }: Props) {
             <div key={block} role="group" aria-label={`${b.label} vote`}
               className={`flex min-h-10 min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-3 pr-1 transition-opacity ${current && current !== block ? "opacity-60" : ""}`}>
               <span className="flex min-w-0 items-center gap-2 text-small font-semibold">
-                <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
+                <i className="h-2 w-2 shrink-0" style={{ background: color }} aria-hidden="true" />
                 <span className="truncate">{b.label}</span>
               </span>
               <span className="flex shrink-0">

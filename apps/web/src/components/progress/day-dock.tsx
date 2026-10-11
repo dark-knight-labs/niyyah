@@ -10,7 +10,7 @@ const STARS = 3;
 function Pips({ value, color }: { value: number; color: string }) {
   return (
     <span className="flex gap-[3px]" aria-hidden="true">
-      {Array.from({ length: STARS }, (_, i) => <i key={i} className="block h-3 w-3 rounded-[2px] border" style={i < value ? { background: color, borderColor: color } : { borderColor: "var(--border)" }} />)}
+      {Array.from({ length: STARS }, (_, i) => <i key={i} className="block h-3 w-3 rounded-none border" style={i < value ? { background: color, borderColor: color } : { borderColor: "var(--border)" }} />)}
     </span>
   );
 }
