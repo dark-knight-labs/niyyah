@@ -124,6 +124,9 @@ BLOCKER_ID = re.compile(r"^[a-z0-9]{4,16}$")
 
 PRODUCT = re.compile(r"\s*\[product::\s*([^\]]*?)\s*\]")
 
+# #dns, #home-lab: a tag typed in the text. Month names stay checkpoints (#oct), and #12 is an issue number, not a tag.
+HASHTAG = re.compile(r"(?:^|(?<=\s))#(?!(?:" + "|".join(MONTHS) + r")\b)([A-Za-z][\w-]*)")
+
 MAX_PRODUCTS = 8
 MAX_PRODUCT_CHARS = 100
 
