@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from app.models.planner import NotebookEntry, PipelineItem, Quarter, QuarterStream, WeekObjective
 from app.services.rules import (
-    BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, MONTHS, PRODUCT, SLUG, clean_entry, clean_products, clean_item,
+    BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, HASHTAG, MONTHS, PRODUCT, SLUG, clean_entry, clean_products, clean_item,
     make_stream, new_id, one_line_field, quarter_months, validate_field, week_for, weekly_streams,
 )
 
@@ -30,11 +30,15 @@ async def _next_position(db, user_id: int, stream: str) -> int:
 
 
 def _split_product(text: str) -> tuple[str, list[str]]:
-    """('Wire it [product:: Router, Switch]') -> ('Wire it', ['Router', 'Switch']): products are a field of the item, not part of its text."""
-    found = PRODUCT.search(text)
-    if not found:
-        return text, []
-    return PRODUCT.sub("", text).strip(), clean_products(found.group(1).split(","))
+    """('Wire it #router [product:: DNS, Switch]') -> ('Wire it', ['DNS', 'Switch', 'router']): products are a field of the item, not part of its text.
+
+    A tag is either `#word` (no spaces) or a `[product:: a, b]` list (spaces allowed). Month tags such as #oct are left for the checkpoint."""
+    listed = PRODUCT.search(text)
+    tags = listed.group(1).split(",") if listed else []
+    text = PRODUCT.sub("", text)
+    tags += HASHTAG.findall(text)
+    text = " ".join(HASHTAG.sub("", text).split())
+    return text, clean_products(tags)
 
 
 def _description(text: str) -> str:

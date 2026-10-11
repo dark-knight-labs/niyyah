@@ -31,7 +31,14 @@ interface BoardProps {
 /** One block's pipeline: Now, Next and Someday lanes, a box to add items, and the done list. */
 export function PipelineBoard({ stream, meta, pipelines, blockers, busy, run, stacked }: BoardProps) {
   const [draft, setDraft] = useState("");
-  const items = pipelines.streams.find((s) => s.stream === stream)?.items ?? [];
+  const [tag, setTag] = useState<string | null>(null);
+  const all = pipelines.streams.find((s) => s.stream === stream)?.items ?? [];
+  // The stream's products: every tag on its items, most used first. Picking one narrows all lanes to it.
+  const tally = new Map<string, number>();
+  for (const i of all) for (const p of i.products ?? []) tally.set(p, (tally.get(p) ?? 0) + 1);
+  const tags = [...tally.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+  const picked = tag && tally.has(tag) ? tag : null;
+  const items = picked ? all.filter((i) => (i.products ?? []).includes(picked)) : all;
   const doneItems = items.filter((i) => i.lane === "done").reverse();
   const staleCount = items.filter((i) => i.stale).length;
   const lines = parseDraft(draft);
@@ -46,6 +53,17 @@ export function PipelineBoard({ stream, meta, pipelines, blockers, busy, run, st
 
   return (
     <>
+      {tags.length > 0 && (
+        <div role="group" aria-label={`${meta.label} products`} className="mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="mono mr-1 text-[var(--muted-foreground)]">Products</span>
+          {[null, ...tags].map((t) => (
+            <button key={t ?? "all"} type="button" aria-pressed={picked === t} onClick={() => setTag(t)}
+              className="mono min-h-6 border border-[var(--rule)] px-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
+              {t === null ? `All ${all.length}` : `#${t} ${tally.get(t)}`}
+            </button>
+          ))}
+        </div>
+      )}
       <div className={`grid gap-4 ${stacked ? "" : "lg:grid-cols-3"}`}>
         {LANES.map((lane) => {
           const laneItems = items.filter((i) => i.lane === lane.id);
@@ -79,9 +97,9 @@ export function PipelineBoard({ stream, meta, pipelines, blockers, busy, run, st
       {staleCount > 0 && <p className="mt-3 text-xs text-[var(--warn)]">{staleCount} without a checkpoint for {pipelines.stale_days}+ days. If no month needs it, it may not be a domino.</p>}
 
       <section className="mt-8 max-w-3xl" aria-label="Add to Someday">
-        <SectionTitle title="Add to Someday" aside="one item per line · indent lines under it for a description · end a line with #oct #nov or #dec" />
+        <SectionTitle title="Add to Someday" aside="one item per line · #dns #router tag a product · #oct #nov #dec set the checkpoint · indent for a description" />
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} aria-label="New items"
-          placeholder={"PRODUCT - ISSUE|POC|MEETING|FEATURE - Title #nov\n  Description on indented lines under the title.\n  Repro, links, context.\n\nPaste a whole list; each unindented line is one item."}
+          placeholder={"PRODUCT - ISSUE|POC|MEETING|FEATURE - Title #dns #nov\n  Description on indented lines under the title.\n  Repro, links, context.\n\nPaste a whole list; each unindented line is one item."}
           className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5 text-sm placeholder:text-[var(--muted-foreground)]" />
         <button type="button" onClick={() => void add()} disabled={busy || lines.length === 0}
           className="mt-2 min-h-11 rounded-xl bg-[var(--accent)] px-5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">
@@ -131,7 +149,9 @@ interface CardProps {
 
 function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove, onTag, onRemove, onOne, onRename, onDescribe }: CardProps) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(item.text);
+  // Editing shows the tags back as #word (or [product:: a b] when a tag has a space), so saving keeps them.
+  const withTags = () => [item.text, ...(item.products ?? []).map((p) => (/\s/.test(p) ? `[product:: ${p}]` : `#${p}`))].join(" ");
+  const [draft, setDraft] = useState(withTags);
   const [noting, setNoting] = useState(false);
   const [notes, setNotes] = useState(item.description);
   const [open, setOpen] = useState(false);
@@ -144,13 +164,14 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
   return (
     <li className="grid gap-2.5 rounded-xl border bg-[var(--background)] p-3" style={{ borderColor: isOne ? meta.color : "var(--border)", boxShadow: isOne ? `inset 0 0 0 1px ${meta.color}` : undefined }}>
       {editing ? (
-        <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (draft.trim() && draft.trim() !== item.text) void onRename(draft.trim()).then(() => setEditing(false)); else setEditing(false); }}>
+        <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (draft.trim() && draft.trim() !== withTags()) void onRename(draft.trim()).then(() => setEditing(false)); else setEditing(false); }}>
           <input autoFocus value={draft} maxLength={300} aria-label="Edit item" onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
             className="min-h-10 min-w-0 flex-1 rounded-lg border border-[var(--accent)] bg-[var(--background)] px-2.5 text-sm" />
           <button type="submit" aria-label="Save" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-[var(--accent)] hover:bg-[var(--muted)]"><Check size={16} /></button>
         </form>
       ) : (
-        <p className="break-words text-sm leading-snug">{item.text}</p>
+        <p className="break-words text-sm leading-snug">{item.text}
+          {(item.products ?? []).map((p) => <span key={p} className="mono ml-1.5 inline-block border border-[var(--rule)] px-1 py-px align-middle text-[var(--muted-foreground)]">#{p}</span>)}</p>
       )}
       {noting ? (
         <form className="grid gap-1.5" onSubmit={(e) => { e.preventDefault(); void onDescribe(notes).then(() => setNoting(false)); }}>
@@ -218,7 +239,7 @@ function ItemCard({ item, meta, week, busy, staleDays, blockers, onBlock, onMove
               <OctagonAlert size={14} style={item.blocked_by.length ? { color: "var(--destructive)" } : undefined} />
             </button>
           )}
-          <button type="button" className={btn} disabled={busy} aria-label="Edit" title="Edit" onClick={() => { setDraft(item.text); setEditing(true); }}><Pencil size={14} /></button>
+          <button type="button" className={btn} disabled={busy} aria-label="Edit" title="Edit" onClick={() => { setDraft(withTags()); setEditing(true); }}><Pencil size={14} /></button>
           {onOne && !isOne && <button type="button" className={btn} disabled={busy} aria-label="Make this the week's one thing" title="Make this the week's one thing" onClick={onOne}><Star size={15} /></button>}
           {at > 0 && <button type="button" className={btn} disabled={busy} aria-label="Promote" title="Promote" onClick={() => onMove(order[at - 1])}><ArrowUp size={15} /></button>}
           {at < 2 && <button type="button" className={btn} disabled={busy} aria-label="Demote" title="Demote" onClick={() => onMove(order[at + 1])}><ArrowDown size={15} /></button>}

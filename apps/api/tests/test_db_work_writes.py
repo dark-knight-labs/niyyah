@@ -229,3 +229,16 @@ async def test_typed_products_replace_the_list_on_rename(db_client):
     await client.put(f"{V}/pipeline/text", json=_ref("studio", router, text="Wire it [product:: Edge, Core]"))
     items, _ = await _pipeline(client)
     assert next(i for i in items if i["text"] == "Wire it")["products"] == ["Edge", "Core"]
+
+
+@pytest.mark.asyncio
+async def test_hashtags_become_products_and_months_stay_checkpoints(db_client):
+    client, _ = db_client
+    await client.post(f"{V}/pipeline/studio/items",
+                      json={"texts": ["Cut over #dns #Router fix issue #12 [product:: Home Lab] #nov"], "lane": "next"})
+    items, _ = await _pipeline(client)
+    new = items[-1]
+    assert (new["text"], new["products"], new["checkpoint"]) == ("Cut over fix issue #12", ["Home Lab", "dns", "Router"], "nov")
+    await client.put(f"{V}/pipeline/text", json=_ref("studio", new, text="Cut over #infra"))
+    items, _ = await _pipeline(client)
+    assert next(i for i in items if i["text"] == "Cut over")["products"] == ["infra"]
