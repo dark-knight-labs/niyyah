@@ -59,8 +59,8 @@ export function RingGraphic(p: RingGraphicProps) {
     return b === current ? 1 : isPast(b, nowMin) ? 0.4 : 0.75;
   };
 
-  const [nx1, ny1] = g.point(r - t / 2 - 8, nowMin);
-  const [nx2, ny2] = g.point(r + t / 2 + 8, nowMin);
+  const [nx1, ny1] = g.point(r - t / 2 - 4, nowMin);
+  const [nx2, ny2] = g.point(r + t / 2 + 7, nowMin);
 
   return (
     <>
@@ -163,14 +163,12 @@ export function RingGraphic(p: RingGraphicProps) {
           onClick={(ev) => p.onHoverEvent?.(i, { x: ev.clientX, y: ev.clientY })} />
       ))}
 
-      {/* now marker */}
+      {/* now marker: a hairline across the band with a small square head outside it, haloed by the background so it reads on any slice */}
       <g pointerEvents="none">
-        <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--background)" strokeWidth={6} strokeLinecap="round" />
-        <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--foreground)" strokeWidth={2.5} strokeLinecap="round" />
-        <circle cx={nx2} cy={ny2} r={9} fill="var(--foreground)" opacity={0.15}>
-          <animate attributeName="r" values="6;12;6" dur="2.4s" repeatCount="indefinite" />
-        </circle>
-        <circle cx={nx2} cy={ny2} r={5.5} fill="var(--foreground)" stroke="var(--background)" strokeWidth={2.5} />
+        <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--background)" strokeWidth={4.5} strokeLinecap="butt" />
+        <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--foreground)" strokeWidth={1.5} strokeLinecap="butt" />
+        <rect x={nx2 - 3.5} y={ny2 - 3.5} width={7} height={7} transform={`rotate(45 ${nx2} ${ny2})`} fill="var(--foreground)" stroke="var(--background)" strokeWidth={1.5} />
+        <circle cx={nx1} cy={ny1} r={1.5} fill="var(--foreground)" />
       </g>
     </>
   );
