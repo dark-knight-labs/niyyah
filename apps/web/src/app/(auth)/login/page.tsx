@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/lib/auth";
+import { AuthSheet } from "@/components/auth/auth-sheet";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -27,46 +28,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold tracking-tight">Niyyah</h1>
-          <p className="text-sm text-[var(--muted-foreground)] mt-1" dir="rtl">نِيَّة</p>
-          <p className="text-sm text-[var(--muted-foreground)] mt-2">Intentional living</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-sm text-[var(--destructive)] text-center">{error}</p>}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-3 py-2 border border-[var(--border)] bg-[var(--background)] rounded text-sm focus:outline-none focus:border-[var(--accent)]"
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-3 py-2 border border-[var(--border)] bg-[var(--background)] rounded text-sm focus:outline-none focus:border-[var(--accent)]"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 bg-[var(--accent)] text-white rounded text-sm font-medium hover:opacity-90 disabled:opacity-50"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-[var(--muted-foreground)] mt-4">
-          No account?{" "}
-          <Link href="/register" className="text-[var(--accent)] hover:underline">Register</Link>
-        </p>
-      </div>
-    </div>
+    <AuthSheet eyebrow="Sign in / your notebook" title={<>Your day is <span>waiting.</span></>} lead="Sign in to open today's plan, the ring and your progress. Your data stays in your own account." facts={[["Account","Per user"],["Transport","TLS"]]} alt={<>No account? <Link href="/register">Register</Link></>}>
+      <form onSubmit={handleSubmit}>
+        {error && <p className="sheet-err" role="alert">{error}</p>}
+        <div className="sheet-field"><label className="mono" htmlFor="email">Email</label>
+          <input id="email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+        <div className="sheet-field"><label className="mono" htmlFor="password">Password</label>
+          <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
+        <button type="submit" disabled={loading} className="sheet-go mono"><span>{loading ? "Signing in..." : "Sign in"}</span><span aria-hidden="true">→</span></button>
+      </form>
+    </AuthSheet>
   );
 }
