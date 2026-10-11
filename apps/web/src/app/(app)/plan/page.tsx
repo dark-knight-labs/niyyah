@@ -12,7 +12,7 @@ import { PipelineBoard } from "@/components/planner/pipeline-board";
 import { ObjectiveCarousel, objectiveChips, quarterPace, usePinned } from "@/components/routine/objective-carousel";
 import { PlanHeader } from "@/components/planner/plan-header";
 import { SmallDomino } from "@/components/planner/small-domino";
-import { StatusPill, StreamIcon } from "@/components/planner/stream-chip";
+import { StatusPill } from "@/components/planner/stream-chip";
 import { StreamEditor } from "@/components/planner/stream-editor";
 import { dateInTz } from "@/lib/routine";
 import { PLANNER_TZ } from "@/lib/streams";
@@ -94,7 +94,7 @@ export default function PlanPage() {
       )}
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
-      <div className={`grid gap-6 ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[13rem_minmax(0,1fr)]"}`}>
+      <div className={`grid gap-4 ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[12rem_minmax(0,1fr)]"}`}>
         <div className="relative min-w-0">
           {/* The handle rides the rail's right edge at the middle of the screen (not the middle of a short list), and only exists where the rail does. */}
           <div className="pointer-events-none absolute inset-y-0 -right-3 z-10 hidden w-6 lg:block">
@@ -105,15 +105,15 @@ export default function PlanPage() {
             </button>
           </div>
         <nav aria-label="Streams" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:p-0 [&::-webkit-scrollbar]:hidden">
-          <p className={`hidden min-h-10 items-center px-2.5 text-micro font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)] ${collapsed ? "" : "lg:flex"}`}>Streams</p>
+          <p className={`mono hidden min-h-8 items-center px-2.5 text-[var(--muted-foreground)] ${collapsed ? "" : "lg:flex"}`}>Streams</p>
           {streams.map((s) => {
             const on = s.id === meta?.id;
             const blocked = blockedCount(s.id);
             return (
               <button key={s.id} type="button" onClick={() => pick(s.id)} aria-current={on ? "true" : undefined} title={s.label}
-                className={`flex min-h-11 shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-semibold transition hover:bg-[var(--muted)] ${collapsed ? "lg:justify-center lg:px-0" : ""}`}
-                style={on ? { background: `color-mix(in srgb, ${s.color} 12%, var(--background))` } : undefined}>
-                <s.icon size={16} style={{ color: s.color }} aria-hidden="true" className="shrink-0" />
+                className={`flex min-h-8 shrink-0 items-center gap-2.5 border-l-2 border-transparent px-2.5 text-left text-small font-medium transition hover:bg-[var(--muted)] aria-[current=true]:border-[var(--accent)] aria-[current=true]:bg-[var(--muted)] ${collapsed ? "lg:justify-center lg:px-0" : ""}`}
+                >
+                <span className="h-2 w-2 shrink-0" style={{ background: s.color }} aria-hidden="true" />
                 <span className={collapsed ? "lg:sr-only" : "min-w-0 flex-1 truncate"}>{s.label}</span>
                 {!collapsed && (
                   <span className="shrink-0 text-micro font-medium tabular-nums text-[var(--muted-foreground)]">
@@ -124,14 +124,14 @@ export default function PlanPage() {
             );
           })}
           <button type="button" onClick={() => setEditing("new")} aria-label="Add a stream" title="Add a stream"
-            className={`flex min-h-11 shrink-0 items-center gap-2.5 rounded-lg px-2.5 text-sm font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--accent)] ${collapsed ? "lg:justify-center lg:px-0" : ""}`}>
+            className={`flex min-h-8 shrink-0 items-center gap-2.5 px-2.5 text-small font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--accent)] ${collapsed ? "lg:justify-center lg:px-0" : ""}`}>
             <Plus size={16} aria-hidden="true" className="shrink-0" />
             <span className={collapsed ? "lg:sr-only" : ""}>Add a stream</span>
           </button>
         </nav>
         </div>
 
-        <div className="grid min-w-0 gap-6">
+        <div className="grid min-w-0 gap-4">
           {editing === "new" && <StreamEditor quarter={quarter} busy={busy} onCancel={() => setEditing(null)} onSave={(c, id) => save(id, c, true)} />}
           {!meta ? (
             editing !== "new" && <Notice>No streams yet. Use “Add a stream”.</Notice>
@@ -139,10 +139,10 @@ export default function PlanPage() {
             <StreamEditor quarter={quarter} stream={goal} busy={busy} onCancel={() => setEditing(null)} onSave={(c, id) => save(id, c, false)} />
           ) : (
             <>
-              <header className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] pb-4">
-                <StreamIcon stream={meta} size={40} />
+              <header className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] pb-2">
+                <span className="h-2.5 w-2.5 shrink-0" style={{ background: meta.color }} aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-extrabold uppercase tracking-[0.08em]" style={{ color: meta.color }}>{meta.label}</h2>
+                  <h2 className="mono" style={{ color: meta.color }}>{meta.label}</h2>
                   <p className="truncate text-xs text-[var(--muted-foreground)]">{meta.slot || "No slot set"}</p>
                 </div>
                 <StatusPill status={meta.status} />
@@ -152,7 +152,7 @@ export default function PlanPage() {
                 )}
               </header>
 
-              <section aria-label="Goal and small domino" className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-10">
+              <section aria-label="Goal and small domino" className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-6">
                 <div className="grid gap-6">
                   {goal && (
                     <Checklist title="Quarter goal" label={`${meta.label} quarter goal`} items={goal.goal_checklist} busy={busy} placeholder="Add a line to the goal"
@@ -166,7 +166,7 @@ export default function PlanPage() {
                   )}
                 </div>
                 <div>
-                  <p className="mb-1 text-micro font-extrabold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">Small domino · this week</p>
+                  <p className="mono mb-1 text-[var(--muted-foreground)]">Small domino · this week</p>
                   <SmallDomino meta={meta} objective={objective} pool={items.filter((i) => i.lane !== "done")} run={run}
                     onPick={(item) => void run(() => vaultApi.focusPipelineItem(meta.id, item))} />
                 </div>
@@ -179,13 +179,13 @@ export default function PlanPage() {
                 </div>
               )}
 
-              <div className="grid gap-8 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:items-start">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:items-start">
                 <section aria-label="Pipeline" className="min-w-0">
-                  <h2 className="mb-3 text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Pipeline</h2>
+                  <h2 className="mono mb-2 flex h-[30px] items-center border-b border-[var(--border)] text-[var(--foreground)]">Pipeline</h2>
                   <PipelineBoard key={meta.id} stream={meta.id} meta={meta} pipelines={pipelines} blockers={blockers} busy={busy} run={run} stacked />
                 </section>
                 <section aria-label="Notebook" className="min-w-0">
-                  <h2 className="mb-3 text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Notebook <span className="font-medium normal-case tracking-normal tabular-nums">· {entries.length}</span></h2>
+                  <h2 className="mono mb-2 flex h-[30px] items-center justify-between border-b border-[var(--border)] text-[var(--foreground)]">Notebook <span className="font-normal text-[var(--muted-foreground)]">{entries.length}</span></h2>
                   <Notebook key={meta.id} meta={meta} entries={entries} busy={busy} run={run} compact />
                 </section>
               </div>

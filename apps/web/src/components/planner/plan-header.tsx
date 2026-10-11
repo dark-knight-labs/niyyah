@@ -77,7 +77,7 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
         }
       />
       {days.length > 0 && schedule && (
-        <ol className="-mt-2 mb-8 grid max-w-xl grid-cols-7 gap-1.5 sm:gap-2" aria-label="Days of the week and the block that owns OT">
+        <ol className="-mt-2 mb-4 grid max-w-xl grid-cols-7 gap-1.5 sm:gap-2" aria-label="Days of the week and the block that owns OT">
           {days.map((d) => {
             const ownerId = slotOwnerFor(schedule, new Date(`${d}T12:00:00Z`));
             const owner = streams.find((s) => s.id === ownerId);

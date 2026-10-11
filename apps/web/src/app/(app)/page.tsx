@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api-client";
 import { useBlocks } from "@/lib/blocks";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { GoogleStatusData, QuarterData, NotebooksData, VaultGoalsData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultTaskData } from "@/lib/vault-types";
+import { GoogleStatusData, QuarterData, NotebooksData, VaultGoalsData, VaultObjectivesData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultTaskData } from "@/lib/vault-types";
 import { dateInTz, formatMinutes, hasLocation, nowMinutes, resolveDay, slotOwnerFor, VaultScheduleData } from "@/lib/routine";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
@@ -16,6 +16,7 @@ import { LogList } from "@/components/routine/log-list";
 import { NowCard } from "@/components/routine/now-card";
 import { RoutineRing } from "@/components/routine/routine-ring";
 import { TaskList } from "@/components/routine/task-list";
+import { ThisWeek } from "@/components/routine/this-week";
 import { VotesPanel } from "@/components/routine/votes-panel";
 import { WorkLanes } from "@/components/routine/work-lanes";
 
@@ -46,6 +47,7 @@ export default function OverviewPage() {
   const [notebooks, setNotebooks] = useState<NotebooksData | null>(null);
   const [goals, setGoals] = useState<VaultGoalsData | null>(null);
   const [quarter, setQuarter] = useState<QuarterData | null>(null);
+  const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const [side, setSide] = useState<(typeof SIDE_TABS)[number][0]>("tasks");
   const now = useNow(30_000);
 
@@ -102,6 +104,7 @@ export default function OverviewPage() {
     vaultApi.notebooks().then(setNotebooks).catch(() => setNotebooks(null));
     vaultApi.goals().then(setGoals).catch(() => setGoals(null));
     vaultApi.quarter().then(setQuarter).catch(() => setQuarter(null));
+    vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
 
@@ -164,7 +167,7 @@ export default function OverviewPage() {
             onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} />
           {owner ? (
             <>
-              <div className="mb-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[repeat(3,minmax(0,1fr))] xl:gap-6 md:items-start">
+              <div className="mb-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[repeat(4,minmax(0,1fr))] xl:gap-6 md:items-start">
                 <div className="md:col-span-2 xl:col-span-1">
                   <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
@@ -187,6 +190,7 @@ export default function OverviewPage() {
                   <div className={`${SIDE_PANEL} ${side === "calendar" ? "" : "md:hidden xl:block"}`}>
                     <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
                   </div>
+                  <div className={SIDE_PANEL}><ThisWeek quarter={quarter} objectives={objectives} /></div>
                 </div>
               </div>
               <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
