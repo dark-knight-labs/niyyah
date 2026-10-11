@@ -141,9 +141,9 @@ export default function OverviewPage() {
   const slotId = schedule ? slotOwnerFor(schedule, now) : null;
 
   return (
-    <div className="mx-auto w-full max-w-[110rem]">
+    <div className="w-full">
       {problems.length > 0 && (
-        <div className="mb-4 space-y-0.5 rounded-xl border border-[var(--destructive)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--destructive)]">
+        <div className="mb-4 space-y-0.5 border border-[var(--destructive)] bg-[var(--surface)] px-4 py-2 text-xs text-[var(--destructive)]">
           {problems.map((p) => (
             <p key={p}>{p}</p>
           ))}
@@ -164,7 +164,7 @@ export default function OverviewPage() {
             onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} />
           {owner ? (
             <>
-              <div className="mb-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[repeat(3,minmax(0,1fr))] xl:gap-8 md:items-start">
+              <div className="mb-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[repeat(3,minmax(0,1fr))] xl:gap-6 md:items-start">
                 <div className="md:col-span-2 xl:col-span-1">
                   <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>

@@ -7,9 +7,9 @@ import { useState } from "react";
 export function Section({ title, aside, error, children }: { title: string; aside?: string; error?: string | null; children: React.ReactNode }) {
   return (
     <section className="mb-4" aria-label={title}>
-      <h2 className="mb-1.5 flex items-baseline justify-between text-micro font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
+      <h2 className="mono mb-1.5 flex h-[30px] items-center justify-between border-b border-[var(--border)] text-[var(--foreground)]">
         {title}
-        {aside && <span className="text-xs font-medium normal-case tracking-normal">{aside}</span>}
+        {aside && <span className="font-normal text-[var(--muted-foreground)]">{aside}</span>}
       </h2>
       {error && <p className="mb-2 text-xs text-[var(--destructive)]">{error}</p>}
       {children}
@@ -37,8 +37,8 @@ export function AddForm({ placeholder, button, onAdd }: { placeholder: string; b
   return (
     <form onSubmit={submit} className="mt-1.5 flex gap-1.5">
       <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} maxLength={300} aria-label={placeholder}
-        className="min-h-9 min-w-0 flex-1 rounded-[0.375rem] border border-[var(--border)] bg-[var(--surface)] px-3 text-sm placeholder:text-[var(--muted-foreground)]" />
-      <button type="submit" disabled={busy || !text.trim()} className="min-h-9 rounded-[0.375rem] bg-[var(--accent)] px-3.5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">{button}</button>
+        className="min-h-9 min-w-0 flex-1 rounded-none border border-[var(--border)] bg-[var(--surface)] px-3 text-sm placeholder:text-[var(--muted-foreground)]" />
+      <button type="submit" disabled={busy || !text.trim()} className="min-h-9 rounded-none bg-[var(--accent)] px-3.5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">{button}</button>
     </form>
   );
 }

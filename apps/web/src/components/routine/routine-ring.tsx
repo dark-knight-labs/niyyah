@@ -45,7 +45,7 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
         <div role="tooltip" className="pointer-events-none fixed z-50 w-56 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-3 text-[0.8125rem] shadow-xl"
           style={{ left: Math.min(at.x + 14, (typeof window === "undefined" ? 9999 : window.innerWidth) - 240), top: at.y + 14 }}>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full" style={{ background: blocks.color(block.block) }} />
+            <span className="h-2 w-2" style={{ background: blocks.color(block.block) }} />
             <b className="flex-1 text-sm">{blocks.label(block.block)}</b>
             <span className="font-bold" style={{ color: blocks.color(block.block) }}>{formatDuration(duration(block))}</span>
           </div>
@@ -58,7 +58,7 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
         <div role="tooltip" className="pointer-events-none fixed z-50 w-60 rounded-xl border border-[var(--border)] bg-[var(--background)] px-3.5 py-3 text-[0.8125rem] shadow-xl"
           style={{ left: Math.min(at.x + 14, (typeof window === "undefined" ? 9999 : window.innerWidth) - 256), top: at.y + 14 }}>
           <div className="flex items-start gap-2">
-            <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: event.color ?? "var(--muted-foreground)" }} />
+            <span className="mt-1.5 h-2 w-2 shrink-0" style={{ background: event.color ?? "var(--muted-foreground)" }} />
             <b className="flex-1 break-words text-sm">{event.title}</b>
             <span className="font-bold">{formatDuration(event.end_min - event.start_min)}</span>
           </div>

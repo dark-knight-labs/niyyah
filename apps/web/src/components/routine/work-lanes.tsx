@@ -40,7 +40,7 @@ function Item({ r, to, toLabel, tick, week, busy, onMove, onOpen }: ItemProps) {
       {tick ? (
         <Checkbox checked={false} disabled={busy} label={`Done: ${r.item.text}`} onChange={() => void onMove(r, "done")} />
       ) : (
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.meta.color }} aria-hidden="true" />
+        <span className="h-2 w-2 shrink-0" style={{ background: r.meta.color }} aria-hidden="true" />
       )}
       <button type="button" onClick={() => onOpen(r)} className="min-h-8 min-w-0 flex-1 break-words text-left text-small leading-snug" aria-haspopup="dialog">{r.item.text}</button>
       {(r.item.products ?? []).map((p) => <span key={p} className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">{p}</span>)}
@@ -148,13 +148,13 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
                 <Fragment key={id}>
                 <tr className={id === ot ? "bg-[var(--accent-light)]" : ""}>
                   <th scope="row" className={`${TD} text-left text-xs font-bold`}>
-                    <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: meta.color }} aria-hidden="true" />{meta.label}
+                    <span className="mr-1.5 inline-block h-2 w-2" style={{ background: meta.color }} aria-hidden="true" />{meta.label}
                     {id === ot && <span className="mt-1 block w-fit rounded bg-[var(--surface)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.05em] text-[var(--accent)]">OT today</span>}
                     {products.length > 0 && (
                       <span className="mt-1.5 flex flex-wrap gap-1" role="group" aria-label={`${meta.label} products`}>
                         {products.map((p) => (
                           <button key={p} type="button" aria-pressed={picked === p} onClick={() => setProduct((cur) => ({ ...cur, [id]: picked === p ? null : p }))}
-                            className="min-h-6 rounded-full border border-[var(--border)] px-2 text-micro font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
+                            className="min-h-6 border border-[var(--border)] px-2 text-micro font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
                             {p} <span className="font-mono font-medium">{tally.get(p)}</span>
                           </button>
                         ))}

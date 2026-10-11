@@ -45,7 +45,7 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
 
   const face = (
     <>
-      <span className="h-2 w-2 shrink-0 rounded-full transition-colors" style={{ background: resolveModeColor(mode) }} aria-hidden="true" />
+      <span className="h-2 w-2 shrink-0 transition-colors" style={{ background: resolveModeColor(mode) }} aria-hidden="true" />
       <span className="grid text-left leading-tight">
         <span className={LABEL}>Mode</span>
         <span className="text-small font-semibold capitalize">{label}</span>
@@ -80,11 +80,11 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
         <ChevronDown size={13} aria-hidden="true" className={`ml-1 max-sm:ml-auto text-[var(--muted-foreground)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <ul role="listbox" aria-label="Day mode" className="absolute right-0 top-full z-30 mt-1 min-w-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[0_12px_30px_rgba(0,0,0,0.2)]">
+        <ul role="listbox" aria-label="Day mode" className="absolute right-0 top-full z-30 mt-1 min-w-full overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] py-1 shadow-xl">
           {MODES.map(([key, name], i) => (
             <li key={key} role="option" aria-selected={key === mode} onMouseEnter={() => setActive(i)} onClick={() => pick(key)}
               className={`flex min-h-9 cursor-pointer items-center gap-2.5 whitespace-nowrap px-3 text-small font-semibold ${i === active ? "bg-[var(--muted)]" : ""}`}>
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: resolveModeColor(key) }} aria-hidden="true" />
+              <span className="h-2 w-2 shrink-0" style={{ background: resolveModeColor(key) }} aria-hidden="true" />
               <span className="flex-1">{name}</span>
               {key === mode && <Check size={13} aria-hidden="true" className="text-[var(--accent)]" />}
             </li>
@@ -96,8 +96,8 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
 }
 
 /** Slim top bar: the quarter's objectives as a chip carousel (pinned first), then the date, the day's mode and the star total. */
-const CHIP = "relative flex min-h-11 items-center gap-2.5 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3";
-const LABEL = "text-micro font-bold uppercase tracking-[0.07em] text-[var(--muted-foreground)]";
+const CHIP = "relative flex min-h-11 items-center gap-2.5 overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--surface)] px-3";
+const LABEL = "mono text-[var(--muted-foreground)]";
 
 export function TopBar({ dateLabel, city, editDay, today, onSaved, goals, quarter, onTick }: Props) {
   const [error, setError] = useState<string | null>(null);

@@ -4,7 +4,7 @@ import { StreamMeta } from "@/lib/streams";
 export function StreamIcon({ stream, size = 36 }: { stream: StreamMeta; size?: number }) {
   const Icon = stream.icon;
   return (
-    <span className="grid shrink-0 place-items-center rounded-[0.625rem]"
+    <span className="grid shrink-0 place-items-center rounded-none"
       style={{ width: size, height: size, color: stream.color, background: `color-mix(in srgb, ${stream.color} 13%, var(--background))` }}>
       <Icon size={Math.round(size * 0.5)} strokeWidth={2} aria-hidden="true" />
     </span>

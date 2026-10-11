@@ -81,7 +81,7 @@ export function RingGraphic(p: RingGraphicProps) {
         return (
           <g key={`n-${b.block}-${b.startMin}`} style={{ transition: "opacity .45s ease", pointerEvents: "none", opacity: hover !== null && hover !== i ? 0.45 : 1 }}>
             <path id={id} d={onBottomHalf(b) ? g.arcBackwards(b.startMin, b.endMin) : g.arc(b.startMin, b.endMin)} fill="none" />
-            <text fontSize={p.nameSize} fontWeight={800} letterSpacing=".05em" fill="#fff" style={{ dominantBaseline: "central" }}>
+            <text fontSize={p.nameSize} fontWeight={500} letterSpacing=".12em" fill="#fff" style={{ dominantBaseline: "central" }}>
               <textPath href={`#${id}`} startOffset="50%" textAnchor="middle">{blocks.ring(b.block)}</textPath>
             </text>
           </g>
@@ -113,7 +113,7 @@ export function RingGraphic(p: RingGraphicProps) {
         return (
           <g key={name} pointerEvents="none">
             <circle cx={x} cy={y} r={3.5} fill="var(--foreground)" />
-            <text x={lx} y={ly + dy} textAnchor={anchor} fontSize={p.labelSize ?? 11} fontWeight={700} fill="var(--foreground)" style={{ textTransform: "capitalize" }}>
+            <text x={lx} y={ly + dy} textAnchor={anchor} fontSize={p.labelSize ?? 11} fontWeight={500} letterSpacing=".08em" fill="var(--foreground)" style={{ textTransform: "uppercase" }}>
               {name}<tspan fontWeight={500} fill="var(--muted-foreground)"> {formatMinutes(min)}</tspan>
             </text>
           </g>
@@ -123,10 +123,10 @@ export function RingGraphic(p: RingGraphicProps) {
       {p.sideLabels && <SideLabels {...p} g={g} />}
 
       {/* centre clock */}
-      <text x={cx} y={cy + p.clockSize * 0.18} textAnchor="middle" fontSize={p.clockSize} fontFamily="var(--font-serif)" fill="var(--foreground)">{formatMinutes(nowMin)}</text>
+      <text x={cx} y={cy + p.clockSize * 0.18} textAnchor="middle" fontSize={p.clockSize} fontFamily="var(--font-mono)" fontWeight={400} letterSpacing="-.04em" fill="var(--foreground)">{formatMinutes(nowMin)}</text>
       {p.centre === "block" && current ? (
         <>
-          <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.42} textAnchor="middle" fontSize={p.clockSize * 0.3} fontWeight={800} fill="var(--foreground)">
+          <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.42} textAnchor="middle" fontSize={p.clockSize * 0.2} fontWeight={500} letterSpacing=".1em" style={{ textTransform: "uppercase" }} fill="var(--foreground)">
             {blocks.label(current.block)}
           </text>
           <text x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * 0.78} textAnchor="middle" fontSize={p.clockSize * 0.25} fill="var(--muted-foreground)">
@@ -203,7 +203,7 @@ function SideLabels(p: RingGraphicProps & { g: ReturnType<typeof ringGeometry> }
         return (
           <g key={`l-${b.block}-${b.startMin}`} style={{ transition: "opacity .45s ease", opacity }}>
             <polyline points={`${ax},${ay} ${colX + (right ? -28 : 28)},${y - 5} ${colX + (right ? -20 : 20)},${y - 5}`} fill="none" stroke={color} strokeWidth={1.5} opacity={0.7} />
-            <text x={colX} y={y} textAnchor={anchor} fontSize={20} fontWeight={800} fill="var(--foreground)">{blocks.label(b.block)}</text>
+            <text x={colX} y={y} textAnchor={anchor} fontSize={20} fontWeight={500} letterSpacing=".1em" fill="var(--foreground)">{blocks.label(b.block)}</text>
             <text textAnchor={anchor} fontSize={15} fill="var(--muted-foreground)">
               <tspan x={colX} y={y + 22}>{formatMinutes(b.startMin)} – {formatMinutes(b.endMin)}</tspan>
               <tspan x={colX} y={y + 41}>{formatDuration(duration(b))}</tspan>
