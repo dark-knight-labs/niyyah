@@ -9,17 +9,25 @@ import { MonthTrack } from "@/components/planner/month-track";
 import { Notebook } from "@/components/planner/notebook";
 import { Notice, Spinner } from "@/components/planner/page-title";
 import { PipelineBoard } from "@/components/planner/pipeline-board";
-import { ObjectiveCarousel, objectiveChips, quarterPace, usePinned } from "@/components/routine/objective-carousel";
 import { PlanHeader } from "@/components/planner/plan-header";
 import { SmallDomino } from "@/components/planner/small-domino";
 import { StatusPill } from "@/components/planner/stream-chip";
 import { StreamEditor } from "@/components/planner/stream-editor";
 import { dateInTz } from "@/lib/routine";
-import { PLANNER_TZ } from "@/lib/streams";
+import { MONTH_LABEL, PLANNER_TZ } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { StreamChange } from "@/lib/vault-types";
 
 // v2: the stream list opens by default; an earlier collapsed choice is not carried over.
+/** A 30px mono strip that titles one cell of the stream sheet. */
+function Strip({ title, aside }: { title: string; aside?: string }) {
+  return (
+    <h3 className="mono flex h-[30px] items-center justify-between border-b border-[var(--border)] px-3 text-[var(--foreground)]">
+      {title}{aside && <span className="font-normal text-[var(--muted-foreground)]">{aside}</span>}
+    </h3>
+  );
+}
+
 const RAIL_KEY = "niyyah-plan-rail-v2";
 
 /** Plan: the Super Objective, the week, and each stream's goal, small domino, pipeline and notebook in one place. */
@@ -34,8 +42,6 @@ export default function PlanPage() {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const now = useNow(60_000);
-  const chips = objectiveChips(quarter, null, null, () => {}).map(({ href: _href, ...c }) => ({ ...c, onOpen: () => pick(c.id.replace("stream:", "")) }));
-  const { pinned, toggle, full } = usePinned(chips.map((c) => c.id));
 
   async function run(action: () => Promise<unknown>): Promise<boolean> {
     setProblem(null);
@@ -87,12 +93,6 @@ export default function PlanPage() {
     <div className="w-full">
       <PlanHeader quarter={quarter} objectives={objectives} streams={streams} schedule={schedule} today={dateInTz(now, PLANNER_TZ)} busy={busy}
         onSaveObjective={(text) => run(() => vaultApi.setSuperObjective(text, quarter.objective_ar))} />
-      {chips.length > 0 && (
-        <div className="mb-3 flex items-center gap-3 border-b border-[var(--border)] pb-2">
-          <span className="shrink-0 text-micro font-bold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">{quarter.quarter.slice(5)}</span>
-          <div className="min-w-0 flex-1"><ObjectiveCarousel chips={chips} pinned={pinned} onPin={toggle} pace={quarterPace(quarter, now)} full={full} /></div>
-        </div>
-      )}
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
       <div className={`grid gap-4 ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[12rem_minmax(0,1fr)]"}`}>
@@ -139,52 +139,54 @@ export default function PlanPage() {
             <StreamEditor quarter={quarter} stream={goal} busy={busy} onCancel={() => setEditing(null)} onSave={(c, id) => save(id, c, false)} />
           ) : (
             <>
-              <header className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] pb-2">
+              <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="h-2.5 w-2.5 shrink-0" style={{ background: meta.color }} aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <h2 className="mono" style={{ color: meta.color }}>{meta.label}</h2>
-                  <p className="truncate text-xs text-[var(--muted-foreground)]">{meta.slot || "No slot set"}</p>
-                </div>
+                <h2 className="text-[0.9375rem] font-medium">{meta.label}</h2>
+                <span className="min-w-0 truncate text-xs text-[var(--muted-foreground)]">{meta.slot || "No slot set"}</span>
                 <StatusPill status={meta.status} />
+                <span className="flex-1" />
+                {openBlockers.length > 0 && <span className="mono text-[var(--destructive)]" title={openBlockers.map((b) => b.title).join(" · ")}>{openBlockers.length} open blocker{openBlockers.length > 1 ? "s" : ""}</span>}
                 {goal && (
                   <button type="button" aria-label={`Edit ${meta.label}`} title="Edit the stream" onClick={() => setEditing(meta.id)}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"><Pencil size={15} /></button>
+                    className="mono inline-flex h-7 items-center gap-1.5 border border-[var(--rule)] px-2.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"><Pencil size={12} aria-hidden="true" />Edit</button>
                 )}
               </header>
 
-              <section aria-label="Goal and small domino" className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-6">
-                <div className="grid gap-6">
-                  {goal && (
-                    <Checklist title="Quarter goal" label={`${meta.label} quarter goal`} items={goal.goal_checklist} busy={busy} placeholder="Add a line to the goal"
-                      onToggle={(item, done) => run(() => vaultApi.tickStreamItem(meta.id, "goal", item.id, done))}
-                      onChange={(lines) => run(() => vaultApi.updateStream(meta.id, { goal_checklist: lines }))} />
-                  )}
-                  {goal && (
-                    <MonthTrack months={quarter.months} checkpoints={goal.checkpoints} current={quarter.current_month} color={meta.color} busy={busy}
-                      onToggle={(month, item, done) => run(() => vaultApi.tickStreamItem(meta.id, month, item.id, done))}
-                      onChange={(month, lines) => run(() => vaultApi.updateStream(meta.id, { month_checklists: { [month]: lines } }))} />
-                  )}
+              <section aria-label="Goal, months and small domino" className="grid border border-[var(--border)] bg-[var(--surface)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)]">
+                <div className="min-w-0">
+                  <Strip title="Quarter goal" />
+                  <div className="px-3 py-2">
+                    {goal && (
+                      <Checklist label={`${meta.label} quarter goal`} items={goal.goal_checklist} busy={busy} placeholder="Add a line to the goal"
+                        onToggle={(item, done) => run(() => vaultApi.tickStreamItem(meta.id, "goal", item.id, done))}
+                        onChange={(lines) => run(() => vaultApi.updateStream(meta.id, { goal_checklist: lines }))} />
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="mono mb-1 text-[var(--muted-foreground)]">Small domino · this week</p>
-                  <SmallDomino meta={meta} objective={objective} pool={items.filter((i) => i.lane !== "done")} run={run}
-                    onPick={(item) => void run(() => vaultApi.focusPipelineItem(meta.id, item))} />
+                <div className="min-w-0 border-t border-[var(--border)] lg:border-l lg:border-t-0">
+                  <Strip title="Months" aside={`${MONTH_LABEL[quarter.current_month]} is now`} />
+                  <div className="px-3 py-2">
+                    {goal && (
+                      <MonthTrack months={quarter.months} checkpoints={goal.checkpoints} current={quarter.current_month} color={meta.color} busy={busy}
+                        onToggle={(month, item, done) => run(() => vaultApi.tickStreamItem(meta.id, month, item.id, done))}
+                        onChange={(month, lines) => run(() => vaultApi.updateStream(meta.id, { month_checklists: { [month]: lines } }))} />
+                    )}
+                  </div>
+                </div>
+                <div className="min-w-0 border-t border-[var(--border)] lg:border-l lg:border-t-0">
+                  <Strip title="Small domino" aside="This week" />
+                  <div className="px-3 py-2">
+                    <SmallDomino meta={meta} objective={objective} pool={items.filter((i) => i.lane !== "done")} run={run}
+                      onPick={(item) => void run(() => vaultApi.focusPipelineItem(meta.id, item))} />
+                  </div>
                 </div>
               </section>
 
-              {openBlockers.length > 0 && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-[var(--destructive)] px-3.5 py-2.5 text-sm">
-                  <b className="text-[var(--destructive)]">{openBlockers.length} open blocker{openBlockers.length > 1 ? "s" : ""}</b>
-                  <span className="min-w-0 break-words text-[var(--muted-foreground)]">{openBlockers.map((b) => b.title).join(" · ")}</span>
-                </div>
-              )}
-
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] xl:items-start">
-                <section aria-label="Pipeline" className="min-w-0">
-                  <h2 className="mono mb-2 flex h-[30px] items-center border-b border-[var(--border)] text-[var(--foreground)]">Pipeline</h2>
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:items-start">
+                <section aria-label="Pipeline" className="min-w-0 border border-[var(--border)] bg-[var(--surface)] p-3">
                   <PipelineBoard key={meta.id} stream={meta.id} meta={meta} pipelines={pipelines} blockers={blockers} busy={busy} run={run} stacked />
                 </section>
-                <section aria-label="Notebook" className="min-w-0">
+                <section aria-label="Notebook" className="min-w-0 border border-[var(--border)] bg-[var(--surface)] p-3">
                   <h2 className="mono mb-2 flex h-[30px] items-center justify-between border-b border-[var(--border)] text-[var(--foreground)]">Notebook <span className="font-normal text-[var(--muted-foreground)]">{entries.length}</span></h2>
                   <Notebook key={meta.id} meta={meta} entries={entries} busy={busy} run={run} compact />
                 </section>

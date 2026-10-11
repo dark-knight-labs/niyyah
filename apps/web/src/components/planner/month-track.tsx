@@ -19,7 +19,7 @@ interface Props {
 export function MonthTrack({ months, checkpoints, current, color, busy, onToggle, onChange }: Props) {
   const here = Math.max(months.indexOf(current), 0);
   return (
-    <ol className="grid gap-5 sm:grid-cols-3 sm:gap-4">
+    <ol className="grid gap-3">
       {months.map((month, i) => {
         const state = i < here ? "past" : i === here ? "now" : "next";
         const items = checkpoints.find((c) => c.month === month)?.checklist ?? [];

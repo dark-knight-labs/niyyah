@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import { Pencil } from "lucide-react";
-import { DominoChain } from "@/components/planner/domino-chain";
 import { PageTitle } from "@/components/planner/page-title";
-import { QuarterRing } from "@/components/planner/quarter-ring";
 import { VaultScheduleData, slotOwnerFor } from "@/lib/routine";
 import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { fmtDay, weekDays } from "@/lib/week";
@@ -20,20 +18,6 @@ interface Props {
   today: string;
   busy: boolean;
   onSaveObjective: (text: string) => Promise<boolean>;
-}
-
-/** A phone's version of the quarter ring: one tick per week, passed weeks filled, this week tall, and the count at the right end. */
-function WeekTicks({ week, weeks }: { week: number; weeks: number }) {
-  return (
-    <div className="flex w-full items-center gap-3 text-[var(--accent)] sm:hidden" role="img" aria-label={`Week ${week} of ${weeks}`}>
-      <div className="flex h-2 flex-1 items-center gap-[3px]" aria-hidden="true">
-        {Array.from({ length: weeks }, (_, i) => (
-          <span key={i} className="flex-1 rounded-none bg-current" style={{ height: i + 1 === week ? 6 : 3, opacity: i + 1 === week ? 1 : i + 1 < week ? 0.55 : 0.16 }} />
-        ))}
-      </div>
-      <p className="whitespace-nowrap text-small text-[var(--muted-foreground)]">Week <b className="font-mono font-bold tabular-nums text-[var(--foreground)]">{week}</b> of <span className="font-mono tabular-nums">{weeks}</span></p>
-    </div>
-  );
 }
 
 /** The quarter's Super Objective with its ring, and the week's seven days showing which block owns OT. */
@@ -67,30 +51,35 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
         }
         sub={quarter.objective_ar ? <span dir="rtl" lang="ar" className="text-base">{quarter.objective_ar}</span> : undefined}
         visual={
-          <div className="flex w-full flex-wrap items-end justify-between gap-x-6 gap-y-2 sm:w-auto sm:flex-nowrap">
-          {days.length > 0 && schedule && <ol className="grid w-full grid-cols-7 gap-1 sm:w-[21rem]" aria-label="Days of the week and the block that owns OT">
-            {days.map((d) => {
-              const ownerId = slotOwnerFor(schedule, new Date(`${d}T12:00:00Z`));
-              const owner = streams.find((s) => s.id === ownerId);
-              const isToday = d === today;
-              return (
-                <li key={d} className="min-w-0 border border-[var(--border)] px-1 py-1 text-center leading-tight"
-                  style={{ borderTop: `2px solid ${owner?.color ?? "var(--border)"}`, background: isToday ? "var(--accent-light)" : "var(--surface)", outline: isToday ? "2px solid var(--accent)" : undefined, outlineOffset: -1 }}>
-                  <span className="block text-micro font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">{fmtDay(d, { weekday: "short" })}</span>
-                  <b className="block text-small tabular-nums">{fmtDay(d, { day: "numeric" })}</b>
-                  <span className="block truncate text-micro font-bold" style={{ color: owner?.color ?? "var(--muted-foreground)" }}>{owner ? owner.label.split(" ")[0] : "·"}</span>
-                </li>
-              );
-            })}
-          </ol>}
-            <div className="hidden items-end gap-4 text-[var(--accent)] sm:flex">
-              <DominoChain count={6} height={36} />
-              <QuarterRing week={quarter.week_of_quarter} weeks={quarter.weeks_in_quarter} label="WEEKS" size={76} />
+          <div className="grid gap-1.5 justify-items-end">
+            <p className="mono text-[var(--muted-foreground)]">Week <b className="font-medium tabular-nums text-[var(--foreground)]">{quarter.week_of_quarter}</b> of {quarter.weeks_in_quarter}</p>
+            <div className="flex h-[22px] w-full min-w-[14rem] items-end gap-[3px] text-[var(--accent)] sm:w-[14.5rem]" role="img" aria-label={`Week ${quarter.week_of_quarter} of ${quarter.weeks_in_quarter}`}>
+              {Array.from({ length: quarter.weeks_in_quarter }, (_, i) => (
+                <span key={i} className="flex-1 bg-current" style={{ height: i + 1 === quarter.week_of_quarter ? 18 : 7, opacity: i + 1 === quarter.week_of_quarter ? 1 : i + 1 < quarter.week_of_quarter ? 0.55 : 0.16 }} />
+              ))}
             </div>
-            <WeekTicks week={quarter.week_of_quarter} weeks={quarter.weeks_in_quarter} />
           </div>
         }
       />
+      {days.length > 0 && schedule && (
+        <ol className="mb-4 grid grid-cols-7 border border-[var(--border)] bg-[var(--surface)]" aria-label="Days of the week and the block that owns OT">
+          {days.map((d) => {
+            const ownerId = slotOwnerFor(schedule, new Date(`${d}T12:00:00Z`));
+            const owner = streams.find((s) => s.id === ownerId);
+            const isToday = d === today;
+            return (
+              <li key={d} className={`flex min-w-0 items-center gap-2 border-l border-[var(--border)] px-2.5 py-1.5 first:border-l-0 ${isToday ? "bg-[var(--accent-light)] shadow-[inset_0_-2px_0_var(--accent)]" : ""}`}>
+                <span className="mono text-[var(--muted-foreground)]">{fmtDay(d, { weekday: "short" })}</span>
+                <b className="text-small font-medium tabular-nums">{fmtDay(d, { day: "numeric" })}</b>
+                <span className="ml-auto flex min-w-0 items-center gap-1.5 text-xs text-[var(--muted-foreground)] max-sm:hidden">
+                  <span className="h-2 w-2 shrink-0" style={{ background: owner?.color ?? "var(--rule)" }} aria-hidden="true" />
+                  <span className="truncate">{owner ? owner.label.split(" ")[0] : "·"}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </>
   );
 }

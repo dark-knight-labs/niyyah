@@ -32,6 +32,7 @@ interface BoardProps {
 export function PipelineBoard({ stream, meta, pipelines, blockers, busy, run, stacked }: BoardProps) {
   const [draft, setDraft] = useState("");
   const [tag, setTag] = useState<string | null>(null);
+  const [laneId, setLaneId] = useState<Lane>("now");
   const all = pipelines.streams.find((s) => s.stream === stream)?.items ?? [];
   // The stream's products: every tag on its items, most used first. Picking one narrows all lanes to it.
   const tally = new Map<string, number>();
@@ -46,7 +47,7 @@ export function PipelineBoard({ stream, meta, pipelines, blockers, busy, run, st
   async function add() {
     if (!lines.length) return;
     await run(async () => {
-      await vaultApi.addPipelineItems(stream, lines.map((l) => l.text), "backlog", lines.map((l) => l.description));
+      await vaultApi.addPipelineItems(stream, lines.map((l) => l.text), laneId, lines.map((l) => l.description));
       setDraft("");
     });
   }
@@ -64,51 +65,53 @@ export function PipelineBoard({ stream, meta, pipelines, blockers, busy, run, st
           ))}
         </div>
       )}
-      <div className={`grid gap-4 ${stacked ? "" : "lg:grid-cols-3"}`}>
+      <div role="tablist" aria-label="Pipeline lanes" className="mb-2 flex h-[30px] border-b border-[var(--border)]">
         {LANES.map((lane) => {
-          const laneItems = items.filter((i) => i.lane === lane.id);
-          const over = lane.id === "now" && laneItems.length > pipelines.now_limit;
+          const n = items.filter((i) => i.lane === lane.id).length;
+          const over = lane.id === "now" && n > pipelines.now_limit;
           return (
-            <section key={lane.id} aria-label={lane.label} className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 sm:p-4">
-              <h2 className="mb-3 flex items-baseline justify-between px-1 text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
-                <span>{lane.label} <span className="font-medium normal-case tracking-normal">· {lane.hint}</span></span>
-                <span className="tabular-nums" style={over ? { color: "var(--warn)" } : undefined}>
-                  {lane.id === "now" ? `${laneItems.length} / ${pipelines.now_limit}` : laneItems.length}
-                </span>
-              </h2>
-              <ul className="grid gap-2">
-                {laneItems.length === 0 && <li className="px-1 py-2 text-sm text-[var(--muted-foreground)]">{lane.id === "now" ? "Nothing committed. Promote one from Next." : "Empty."}</li>}
-                {laneItems.map((item) => (
-                  <ItemCard key={item.line} item={item} meta={meta} week={pipelines.week} busy={busy} staleDays={pipelines.stale_days} blockers={blockers}
-                    onBlock={(ids) => run(() => vaultApi.blockPipelineItem(stream, item, ids))}
-                    onMove={(to) => run(() => vaultApi.movePipelineItem(stream, item, to))}
-                    onTag={(m) => run(() => vaultApi.tagPipelineItem(stream, item, m))}
-                    onRemove={() => run(() => vaultApi.removePipelineItem(stream, item))}
-                    onRename={(text) => run(() => vaultApi.renamePipelineItem(stream, item, text))}
-                    onDescribe={(text) => run(() => vaultApi.describePipelineItem(stream, item, text))}
-                    onOne={!meta.weekly ? undefined : () => run(() => vaultApi.focusPipelineItem(stream, item))} />
-                ))}
-              </ul>
-            </section>
+            <button key={lane.id} type="button" role="tab" aria-selected={laneId === lane.id} onClick={() => setLaneId(lane.id)} title={lane.hint}
+              className="mono flex items-center gap-2 border-r border-[var(--border)] px-3 text-[var(--muted-foreground)] hover:bg-[var(--muted)] aria-selected:text-[var(--foreground)] aria-selected:shadow-[inset_0_-2px_0_var(--accent)]">
+              {lane.label}
+              <span className="font-normal tabular-nums" style={over ? { color: "var(--warn)" } : undefined}>{lane.id === "now" ? `${n}/${pipelines.now_limit}` : n}</span>
+            </button>
           );
         })}
       </div>
+      {LANES.filter((lane) => lane.id === laneId).map((lane) => {
+        const laneItems = items.filter((i) => i.lane === lane.id);
+        return (
+          <ul key={lane.id} aria-label={lane.label} className="grid gap-1.5">
+            {laneItems.length === 0 && <li className="px-1 py-2 text-sm text-[var(--muted-foreground)]">{lane.id === "now" ? "Nothing committed. Promote one from Next." : "Empty."}</li>}
+            {laneItems.map((item) => (
+              <ItemCard key={item.line} item={item} meta={meta} week={pipelines.week} busy={busy} staleDays={pipelines.stale_days} blockers={blockers}
+                onBlock={(ids) => run(() => vaultApi.blockPipelineItem(stream, item, ids))}
+                onMove={(to) => run(() => vaultApi.movePipelineItem(stream, item, to))}
+                onTag={(m) => run(() => vaultApi.tagPipelineItem(stream, item, m))}
+                onRemove={() => run(() => vaultApi.removePipelineItem(stream, item))}
+                onRename={(text) => run(() => vaultApi.renamePipelineItem(stream, item, text))}
+                onDescribe={(text) => run(() => vaultApi.describePipelineItem(stream, item, text))}
+                onOne={!meta.weekly ? undefined : () => run(() => vaultApi.focusPipelineItem(stream, item))} />
+            ))}
+          </ul>
+        );
+      })}
 
       {staleCount > 0 && <p className="mt-3 text-xs text-[var(--warn)]">{staleCount} without a checkpoint for {pipelines.stale_days}+ days. If no month needs it, it may not be a domino.</p>}
 
-      <section className="mt-8 max-w-3xl" aria-label="Add to Someday">
-        <SectionTitle title="Add to Someday" aside="one item per line · #dns #router tag a product · #oct #nov #dec set the checkpoint · indent for a description" />
-        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} aria-label="New items"
+      <section className="mt-3" aria-label={`Add to ${LANES.find((l) => l.id === laneId)?.label}`}>
+        <SectionTitle title={`Add to ${LANES.find((l) => l.id === laneId)?.label}`} aside="one item per line · #dns #router tag a product · #oct #nov #dec set the checkpoint · indent for a description" />
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} aria-label="New items"
           placeholder={"PRODUCT - ISSUE|POC|MEETING|FEATURE - Title #dns #nov\n  Description on indented lines under the title.\n  Repro, links, context.\n\nPaste a whole list; each unindented line is one item."}
           className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5 text-sm placeholder:text-[var(--muted-foreground)]" />
         <button type="button" onClick={() => void add()} disabled={busy || lines.length === 0}
-          className="mt-2 min-h-11 rounded-xl bg-[var(--accent)] px-5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">
-          Add {lines.length > 1 ? `${lines.length} items` : "to Someday"}
+          className="mono mt-2 min-h-9 bg-[var(--accent)] px-4 text-[var(--accent-fg)] disabled:opacity-50">
+          Add {lines.length > 1 ? `${lines.length} items` : `to ${LANES.find((l) => l.id === laneId)?.label}`}
         </button>
       </section>
 
       {doneItems.length > 0 && (
-        <details className="group mt-8">
+        <details className="group mt-4">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
             <ChevronDown size={14} className="transition group-open:rotate-180" aria-hidden="true" /> Done · {doneItems.length}
           </summary>
