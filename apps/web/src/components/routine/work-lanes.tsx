@@ -43,7 +43,7 @@ function Item({ r, to, toLabel, tick, week, busy, onMove, onOpen }: ItemProps) {
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.meta.color }} aria-hidden="true" />
       )}
       <button type="button" onClick={() => onOpen(r)} className="min-h-8 min-w-0 flex-1 break-words text-left text-small leading-snug" aria-haspopup="dialog">{r.item.text}</button>
-      {r.item.product && <span className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">{r.item.product}</span>}
+      {(r.item.products ?? []).map((p) => <span key={p} className="shrink-0 rounded bg-[var(--muted)] px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.05em] text-[var(--muted-foreground)]">{p}</span>)}
       {r.item.focus === week && <span className="text-micro font-bold" style={{ color: r.meta.color }} title="This week's focus">★</span>}
       {r.blocked && <span className="text-micro font-bold uppercase text-[var(--destructive)]">blocked</span>}
       <button type="button" disabled={busy} onClick={() => void onMove(r, to)} aria-label={`Move to ${toLabel}: ${r.item.text}`}
@@ -136,9 +136,12 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
           </thead>
           <tbody>
             {blocks.map(({ id, meta, rows: all }) => {
-              const products = [...new Set(all.map((r) => r.item.product).filter((p): p is string => !!p))];
-              const picked = product[id] && products.includes(product[id] as string) ? product[id] : null;
-              const rows = picked ? all.filter((r) => r.item.product === picked) : all;
+              // An item with two tags is one row: it shows under either chip and counts once in the block.
+              const tally = new Map<string, number>();
+              for (const r of all) for (const p of r.item.products ?? []) tally.set(p, (tally.get(p) ?? 0) + 1);
+              const products = [...tally.keys()];
+              const picked = product[id] && tally.has(product[id] as string) ? product[id] : null;
+              const rows = picked ? all.filter((r) => (r.item.products ?? []).includes(picked)) : all;
               const by = (l: Lane) => rows.filter((r) => r.item.lane === l);
               const parked = by("backlog");
               return (
@@ -152,7 +155,7 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
                         {products.map((p) => (
                           <button key={p} type="button" aria-pressed={picked === p} onClick={() => setProduct((cur) => ({ ...cur, [id]: picked === p ? null : p }))}
                             className="min-h-6 rounded-full border border-[var(--border)] px-2 text-micro font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">
-                            {p}
+                            {p} <span className="font-mono font-medium">{tally.get(p)}</span>
                           </button>
                         ))}
                       </span>
@@ -194,7 +197,7 @@ function WorkDetail({ r, week, busy, onMove, onClose }: { r: Row; week: string; 
   const btn = "min-h-9 rounded-lg px-3 text-xs font-semibold disabled:opacity-50";
   const fields = [
     { label: "Status", value: LANE_LABEL[item.lane] },
-    ...(item.product ? [{ label: "Product", value: item.product }] : []),
+    ...(item.products?.length ? [{ label: "Products", value: item.products.join(", ") }] : []),
     ...(item.focus === week ? [{ label: "Focus", value: "This week's small domino" }] : []),
     ...(r.blocked ? [{ label: "Blocked", value: <span className="text-[var(--destructive)]">waiting on {item.blocked_by.join(", ")}</span> }] : []),
     ...(item.checkpoint ? [{ label: "Checkpoint", value: item.checkpoint.toUpperCase() }] : []),

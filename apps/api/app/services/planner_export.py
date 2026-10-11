@@ -75,7 +75,7 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
         "week_objectives": [{"week": o.week, "stream": o.stream, "text": o.text, "done": o.done, "checkpoint": o.checkpoint}
                             for o in await rows(WeekObjective, WeekObjective.week, WeekObjective.stream)],
         "pipeline_items": [{"id": p.id, "stream": p.stream, "lane": p.lane, "text": p.text, "description": p.description,
-                            "product": p.product, "checkpoint": p.checkpoint, "added_on": _iso(p.added_on), "done_on": _iso(p.done_on),
+                            "products": list(p.products or []), "product": (p.products or [None])[0], "checkpoint": p.checkpoint, "added_on": _iso(p.added_on), "done_on": _iso(p.done_on),
                             "focus_week": p.focus_week, "done": p.done, "blocked_by": list(p.blocked_by or [])}
                            for p in await rows(PipelineItem, PipelineItem.stream, PipelineItem.position)],
         "notebook_entries": [{"stream": n.stream, "id": n.ext_id, "kind": n.kind, "title": n.title, "body": n.body,

@@ -89,7 +89,7 @@ async def pipeline_items(db: AsyncSession, user_id: int, today: date) -> dict[st
     for r in rows:
         age = (today - r.added_on).days if r.added_on else 0
         out.setdefault(r.stream, []).append({
-            "product": r.product, "line": r.id, "hash": "", "text": r.text, "lane": r.lane, "checkpoint": r.checkpoint,
+            "products": list(r.products or []), "product": (r.products or [None])[0], "line": r.id, "hash": "", "text": r.text, "lane": r.lane, "checkpoint": r.checkpoint,
             "added": _iso(r.added_on), "done_on": _iso(r.done_on), "focus": r.focus_week, "done": r.done, "age_days": age,
             "description": r.description, "blocked_by": list(r.blocked_by or []),
             "stale": r.lane in ("next", "backlog") and r.checkpoint is None and age >= STALE_DAYS,

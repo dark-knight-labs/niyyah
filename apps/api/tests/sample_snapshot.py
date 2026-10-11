@@ -49,14 +49,14 @@ def sample_snapshot(today: date) -> dict:
             {"week": week, "stream": "shop", "text": "Launch page", "done": True, "checkpoint": None},
         ],
         "pipeline_items": [
-            {"stream": "studio", "lane": "now", "text": "Wire the router", "description": "Check the SFP module first.", "product": "Router",
+            {"stream": "studio", "lane": "now", "text": "Wire the router", "description": "Check the SFP module first.", "products": ["Router", "Studio"],
              "checkpoint": month, "added_on": iso(today - timedelta(days=2)), "done_on": None, "focus_week": week, "done": False,
              "blocked_by": [BLOCKER_ID]},
-            {"stream": "studio", "lane": "next", "text": "Plan the DNS cutover", "description": "", "product": None, "checkpoint": None,
+            {"stream": "studio", "lane": "next", "text": "Plan the DNS cutover", "description": "", "products": [], "checkpoint": None,
              "added_on": iso(today - timedelta(days=30)), "done_on": None, "focus_week": None, "done": False, "blocked_by": []},
-            {"stream": "studio", "lane": "backlog", "text": "Replace the switch", "description": "", "product": None, "checkpoint": None,
+            {"stream": "studio", "lane": "backlog", "text": "Replace the switch", "description": "", "products": [], "checkpoint": None,
              "added_on": None, "done_on": None, "focus_week": None, "done": False, "blocked_by": []},
-            {"stream": "studio", "lane": "done", "text": "Order the modem", "description": "", "product": None, "checkpoint": None,
+            {"stream": "studio", "lane": "done", "text": "Order the modem", "description": "", "products": [], "checkpoint": None,
              "added_on": iso(today - timedelta(days=30)), "done_on": iso(today), "focus_week": None, "done": True, "blocked_by": []},
         ],
         "notebook_entries": [

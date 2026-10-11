@@ -110,7 +110,7 @@ class PipelineItem(Base):
     lane: Mapped[str] = mapped_column(String(10), nullable=False)  # now | next | backlog | done
     text: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    product: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    products: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # tags: the parts of the block this belongs to
     checkpoint: Mapped[str | None] = mapped_column(String(3), nullable=True)
     added_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     done_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)

@@ -16,12 +16,12 @@ def _ref(stream, item, **extra):
 async def test_add_items_appends_to_a_lane(db_client):
     client, today = db_client
     res = await client.post(f"{V}/pipeline/studio/items",
-                            json={"texts": ["Buy cables [product:: Router] #nov", "  "], "lane": "next", "descriptions": ["Cat6\nshielded", ""]})
+                            json={"texts": ["Buy cables [product:: Router, router , Switch] #nov", "  "], "lane": "next", "descriptions": ["Cat6\nshielded", ""]})
     assert res.status_code == 200 and res.json()["commit"] == "db"
     items, _ = await _pipeline(client)
     new = items[-1]
-    assert (new["text"], new["lane"], new["product"], new["checkpoint"], new["description"]) == \
-        ("Buy cables", "next", "Router", "nov", "Cat6\nshielded")
+    assert (new["text"], new["lane"], new["products"], new["checkpoint"], new["description"]) == \
+        ("Buy cables", "next", ["Router", "Switch"], "nov", "Cat6\nshielded")
     assert new["added"] == today.isoformat() and new["age_days"] == 0
     assert (await client.post(f"{V}/pipeline/studio/items", json={"texts": [" "], "lane": "next"})).status_code == 422
     assert (await client.post(f"{V}/pipeline/studio/items", json={"texts": ["x"], "lane": "done"})).status_code == 422
@@ -45,13 +45,13 @@ async def test_move_stamps_done_and_reopens(db_client):
 
 
 @pytest.mark.asyncio
-async def test_text_keeps_product_dates_and_checkpoint(db_client):
+async def test_text_keeps_products_dates_and_checkpoint(db_client):
     client, today = db_client
     items, _ = await _pipeline(client)
-    router = next(i for i in items if i["product"] == "Router")
+    router = next(i for i in items if "Router" in i["products"])
     await client.put(f"{V}/pipeline/text", json=_ref("studio", router, text="Wire the new router"))
     items, _ = await _pipeline(client)
-    router = next(i for i in items if i["product"] == "Router")
+    router = next(i for i in items if "Router" in i["products"])
     assert router["text"] == "Wire the new router" and router["checkpoint"] is not None and router["focus"] is not None
 
 
@@ -211,3 +211,21 @@ async def test_notebook_edit_blocker_and_remove(db_client):
     await client.post(f"{V}/notebook/remove", json=_ref("studio", idea))
     assert all(e["kind"] != "idea" for e in await _notebook(client))
     assert (await client.post(f"{V}/notebook/remove", json=_ref("studio", idea))).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_old_clients_still_see_the_first_tag_as_product(db_client):
+    client, _ = db_client
+    items, _ = await _pipeline(client)
+    router = next(i for i in items if "Router" in i["products"])
+    assert router["product"] == router["products"][0]
+
+
+@pytest.mark.asyncio
+async def test_typed_products_replace_the_list_on_rename(db_client):
+    client, _ = db_client
+    items, _ = await _pipeline(client)
+    router = next(i for i in items if "Router" in i["products"])
+    await client.put(f"{V}/pipeline/text", json=_ref("studio", router, text="Wire it [product:: Edge, Core]"))
+    items, _ = await _pipeline(client)
+    assert next(i for i in items if i["text"] == "Wire it")["products"] == ["Edge", "Core"]

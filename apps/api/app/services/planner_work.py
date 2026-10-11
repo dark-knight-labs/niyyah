@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from app.models.planner import NotebookEntry, PipelineItem, Quarter, QuarterStream, WeekObjective
 from app.services.rules import (
-    BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, MONTHS, PRODUCT, SLUG, clean_entry, clean_item,
+    BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, MONTHS, PRODUCT, SLUG, clean_entry, clean_products, clean_item,
     make_stream, new_id, one_line_field, quarter_months, validate_field, week_for, weekly_streams,
 )
 
@@ -29,12 +29,12 @@ async def _next_position(db, user_id: int, stream: str) -> int:
     return 0 if top is None else top + 1
 
 
-def _split_product(text: str) -> tuple[str, str | None]:
-    """('Wire it [product:: Router]') -> ('Wire it', 'Router'): the product is a field of the item, not part of its text."""
+def _split_product(text: str) -> tuple[str, list[str]]:
+    """('Wire it [product:: Router, Switch]') -> ('Wire it', ['Router', 'Switch']): products are a field of the item, not part of its text."""
     found = PRODUCT.search(text)
     if not found:
-        return text, None
-    return PRODUCT.sub("", text).strip(), found.group(1) or None
+        return text, []
+    return PRODUCT.sub("", text).strip(), clean_products(found.group(1).split(","))
 
 
 def _description(text: str) -> str:
@@ -55,14 +55,14 @@ async def add_items(db, user_id: int, stream: str, texts: list[str], lane: str, 
     for text, note in zip(texts, notes):
         if not text.strip():
             continue
-        bare, product = _split_product(text)
+        bare, products = _split_product(text)
         title, month = clean_item(bare)
-        cleaned.append((title, product, month, _description(note)))
+        cleaned.append((title, products, month, _description(note)))
     if not cleaned:
         raise ValueError("nothing to add")
     position = await _next_position(db, user_id, stream)
-    for title, product, month, note in cleaned:
-        db.add(PipelineItem(user_id=user_id, stream=stream, lane=lane, text=title, description=note, product=product,
+    for title, products, month, note in cleaned:
+        db.add(PipelineItem(user_id=user_id, stream=stream, lane=lane, text=title, description=note, products=products,
                             checkpoint=month, added_on=today, done=False, blocked_by=[], position=position))
         position += 1
     await db.flush()
@@ -105,14 +105,14 @@ async def set_blocked_by(db, user_id: int, stream: str, item_id: int, ids: list[
 
 
 async def set_text(db, user_id: int, stream: str, item_id: int, text: str) -> None:
-    """Rename in place, keeping lane, dates and product; a #month typed in the text replaces the checkpoint."""
+    """Rename in place, keeping lane, dates and products; a #month typed in the text replaces the checkpoint."""
     row = await item_row(db, user_id, stream, item_id)
-    bare, typed_product = _split_product(text)
+    bare, typed_products = _split_product(text)
     title, typed_month = clean_item(bare)
     row.text = title
     row.checkpoint = typed_month or row.checkpoint
-    if typed_product:
-        row.product = typed_product
+    if typed_products:
+        row.products = typed_products
 
 
 async def focused_item(db, user_id: int, stream: str, week: str) -> PipelineItem | None:

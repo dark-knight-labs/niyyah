@@ -116,7 +116,8 @@ class SnapPipelineItem(_Loose):
     lane: str = Field(pattern=r"^(now|next|backlog|done)$")
     text: str
     description: str = ""
-    product: str | None = Field(default=None, max_length=100)
+    product: str | None = Field(default=None, max_length=100)  # older exports: a single tag; products wins
+    products: list[str] = Field(default=[], max_length=8)
     checkpoint: Month | None = None
     added_on: dt.date | None = None
     done_on: dt.date | None = None
