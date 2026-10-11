@@ -13,6 +13,8 @@ from typing import Protocol
 from fastapi import APIRouter
 
 PLUGIN_API_VERSION = 1
+# On a breaking change bump PLUGIN_API_VERSION and keep the previous number here for one release (N and N-1).
+SUPPORTED_API_VERSIONS = frozenset({1})
 ENTRY_POINT_GROUP = "niyyah.plugins"
 API_PREFIX = "/api/v1"
 
@@ -77,8 +79,9 @@ def _load_one(spec: str) -> Plugin:
     except AttributeError as exc:
         raise PluginError(f"Plugin {spec!r}: module {module_name!r} has no attribute {attr!r}") from exc
     version = getattr(cls, "api_version", None)
-    if version != PLUGIN_API_VERSION:
-        raise PluginError(f"Plugin {spec!r} targets plugin API version {version!r}; this core provides version {PLUGIN_API_VERSION}")
+    if version not in SUPPORTED_API_VERSIONS:
+        supported = ", ".join(str(v) for v in sorted(SUPPORTED_API_VERSIONS))
+        raise PluginError(f"Plugin {spec!r} targets plugin API version {version!r}; this core provides version {PLUGIN_API_VERSION} (supported: {supported})")
     try:
         plugin = cls()
     except Exception as exc:
