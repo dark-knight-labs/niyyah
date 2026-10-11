@@ -5,7 +5,7 @@ export function PageTitle({ eyebrow, title, sub, visual, action }: { eyebrow: st
       <div className="min-w-0 flex-[1_1_22rem]">
         <p className="mono text-[var(--muted-foreground)]">{eyebrow}</p>
         <h1 className="heading-elegant mt-1.5 text-lg leading-tight">{title}</h1>
-        {sub && <div className="mt-3 text-sm text-[var(--muted-foreground)]">{sub}</div>}
+        {sub && <div className="mt-1 text-sm text-[var(--muted-foreground)]">{sub}</div>}
         {action && <div className="mt-4">{action}</div>}
       </div>
       {visual}

@@ -61,38 +61,36 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
             <>
               {quarter.objective || "Set this quarter's Super Objective"}
               <button type="button" aria-label="Edit the Super Objective" title="Edit" onClick={() => { setDraft(quarter.objective); setEditing(true); }}
-                className="ml-2 inline-grid h-9 w-9 place-items-center rounded-lg align-middle text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"><Pencil size={16} /></button>
+                className="ml-2 inline-grid h-7 w-7 place-items-center align-middle text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"><Pencil size={14} /></button>
             </>
           )
         }
-        sub={quarter.objective_ar ? <span dir="rtl" lang="ar" className="text-xl">{quarter.objective_ar}</span> : undefined}
+        sub={quarter.objective_ar ? <span dir="rtl" lang="ar" className="text-base">{quarter.objective_ar}</span> : undefined}
         visual={
-          <>
-            <div className="hidden items-end gap-6 text-[var(--accent)] sm:flex">
-              <DominoChain count={6} height={72} />
-              <QuarterRing week={quarter.week_of_quarter} weeks={quarter.weeks_in_quarter} label={`OF ${quarter.weeks_in_quarter} WEEKS`} />
+          <div className="flex w-full flex-wrap items-end justify-between gap-x-6 gap-y-2 sm:w-auto sm:flex-nowrap">
+          {days.length > 0 && schedule && <ol className="grid w-full grid-cols-7 gap-1 sm:w-[21rem]" aria-label="Days of the week and the block that owns OT">
+            {days.map((d) => {
+              const ownerId = slotOwnerFor(schedule, new Date(`${d}T12:00:00Z`));
+              const owner = streams.find((s) => s.id === ownerId);
+              const isToday = d === today;
+              return (
+                <li key={d} className="min-w-0 border border-[var(--border)] px-1 py-1 text-center leading-tight"
+                  style={{ borderTop: `2px solid ${owner?.color ?? "var(--border)"}`, background: isToday ? "var(--accent-light)" : "var(--surface)", outline: isToday ? "2px solid var(--accent)" : undefined, outlineOffset: -1 }}>
+                  <span className="block text-micro font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">{fmtDay(d, { weekday: "short" })}</span>
+                  <b className="block text-small tabular-nums">{fmtDay(d, { day: "numeric" })}</b>
+                  <span className="block truncate text-micro font-bold" style={{ color: owner?.color ?? "var(--muted-foreground)" }}>{owner ? owner.label.split(" ")[0] : "·"}</span>
+                </li>
+              );
+            })}
+          </ol>}
+            <div className="hidden items-end gap-4 text-[var(--accent)] sm:flex">
+              <DominoChain count={6} height={36} />
+              <QuarterRing week={quarter.week_of_quarter} weeks={quarter.weeks_in_quarter} label="WEEKS" size={76} />
             </div>
             <WeekTicks week={quarter.week_of_quarter} weeks={quarter.weeks_in_quarter} />
-          </>
+          </div>
         }
       />
-      {days.length > 0 && schedule && (
-        <ol className="-mt-2 mb-4 grid max-w-xl grid-cols-7 gap-1.5 sm:gap-2" aria-label="Days of the week and the block that owns OT">
-          {days.map((d) => {
-            const ownerId = slotOwnerFor(schedule, new Date(`${d}T12:00:00Z`));
-            const owner = streams.find((s) => s.id === ownerId);
-            const isToday = d === today;
-            return (
-              <li key={d} className="min-w-0 rounded-xl border border-[var(--border)] px-1 py-2 text-center"
-                style={{ borderTop: `3px solid ${owner?.color ?? "var(--border)"}`, background: isToday ? "var(--accent-light)" : "var(--surface)", outline: isToday ? "2px solid var(--accent)" : undefined, outlineOffset: -1 }}>
-                <span className="block text-micro font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">{fmtDay(d, { weekday: "short" })}</span>
-                <b className="block text-sm tabular-nums">{fmtDay(d, { day: "numeric" })}</b>
-                <span className="block truncate text-micro font-bold" style={{ color: owner?.color ?? "var(--muted-foreground)" }}>{owner ? owner.label.split(" ")[0] : "·"}</span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
     </>
   );
 }
