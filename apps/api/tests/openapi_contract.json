@@ -1,0 +1,5942 @@
+{
+ "DELETE /api/v1/personas/{persona_id}": {
+  "params": [
+   "path:persona_id*"
+  ],
+  "request": null,
+  "response": null
+ },
+ "DELETE /api/v1/personas/{persona_id}/milestones/{milestone_id}": {
+  "params": [
+   "path:milestone_id*",
+   "path:persona_id*"
+  ],
+  "request": null,
+  "response": null
+ },
+ "DELETE /api/v1/principles/{principle_id}": {
+  "params": [
+   "path:principle_id*"
+  ],
+  "request": null,
+  "response": null
+ },
+ "DELETE /api/v1/schedule/{block_id}": {
+  "params": [
+   "path:block_id*"
+  ],
+  "request": null,
+  "response": null
+ },
+ "DELETE /api/v1/tokens/{token_id}": {
+  "params": [
+   "path:token_id*"
+  ],
+  "request": null,
+  "response": null
+ },
+ "DELETE /api/v1/tracker/check/{check_id}": {
+  "params": [
+   "path:check_id*"
+  ],
+  "request": null,
+  "response": null
+ },
+ "DELETE /api/v1/tracker/non-negotiables/{nn_id}": {
+  "params": [
+   "path:nn_id*"
+  ],
+  "request": null,
+  "response": null
+ },
+ "DELETE /api/v1/vault/config/feeds/{feed_id}": {
+  "params": [
+   "path:feed_id*"
+  ],
+  "request": null,
+  "response": null
+ },
+ "GET /api/v1/auth/me": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "email": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "locale": {
+     "type": "string"
+    },
+    "subscription_tier": {
+     "type": "string"
+    },
+    "timezone": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "email",
+    "id",
+    "locale",
+    "subscription_tier",
+    "timezone"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/dashboard": {
+  "params": [],
+  "request": null,
+  "response": null
+ },
+ "GET /api/v1/export": {
+  "params": [],
+  "request": null,
+  "response": null
+ },
+ "GET /api/v1/personas": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "arabic_name": {
+      "type": "string"
+     },
+     "color": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string"
+     },
+     "domain": {
+      "type": "string"
+     },
+     "eventually": {
+      "type": "string"
+     },
+     "guardrail": {
+      "type": "string"
+     },
+     "icon": {
+      "type": "string"
+     },
+     "id": {
+      "type": "integer"
+     },
+     "milestones": {
+      "items": {
+       "properties": {
+        "goal": {
+         "type": "string"
+        },
+        "id": {
+         "type": "integer"
+        },
+        "is_completed": {
+         "type": "boolean"
+        },
+        "persona_id": {
+         "type": "integer"
+        },
+        "target_date": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "goal",
+        "id",
+        "is_completed",
+        "persona_id",
+        "target_date"
+       ],
+       "type": "object"
+      },
+      "type": "array"
+     },
+     "name": {
+      "type": "string"
+     },
+     "one_thing": {
+      "type": "string"
+     },
+     "order": {
+      "type": "integer"
+     },
+     "points": {
+      "items": {
+       "type": "any"
+      },
+      "type": "array"
+     },
+     "ritual": {
+      "type": "string"
+     },
+     "updated_at": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "arabic_name",
+     "color",
+     "created_at",
+     "domain",
+     "eventually",
+     "guardrail",
+     "icon",
+     "id",
+     "name",
+     "one_thing",
+     "order",
+     "points",
+     "ritual",
+     "updated_at"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/personas/{persona_id}": {
+  "params": [
+   "path:persona_id*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "arabic_name": {
+     "type": "string"
+    },
+    "color": {
+     "type": "string"
+    },
+    "created_at": {
+     "type": "string"
+    },
+    "domain": {
+     "type": "string"
+    },
+    "eventually": {
+     "type": "string"
+    },
+    "guardrail": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "milestones": {
+     "items": {
+      "properties": {
+       "goal": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "is_completed": {
+        "type": "boolean"
+       },
+       "persona_id": {
+        "type": "integer"
+       },
+       "target_date": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "goal",
+       "id",
+       "is_completed",
+       "persona_id",
+       "target_date"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "name": {
+     "type": "string"
+    },
+    "one_thing": {
+     "type": "string"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "points": {
+     "items": {
+      "type": "any"
+     },
+     "type": "array"
+    },
+    "ritual": {
+     "type": "string"
+    },
+    "updated_at": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "arabic_name",
+    "color",
+    "created_at",
+    "domain",
+    "eventually",
+    "guardrail",
+    "icon",
+    "id",
+    "name",
+    "one_thing",
+    "order",
+    "points",
+    "ritual",
+    "updated_at"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/plugins": {
+  "params": [],
+  "request": null,
+  "response": null
+ },
+ "GET /api/v1/principles": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "arabic": {
+      "type": "string"
+     },
+     "created_at": {
+      "type": "string"
+     },
+     "icon": {
+      "type": "string"
+     },
+     "id": {
+      "type": "integer"
+     },
+     "meaning": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "order": {
+      "type": "integer"
+     },
+     "updated_at": {
+      "type": "string"
+     },
+     "verse": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "arabic",
+     "created_at",
+     "icon",
+     "id",
+     "meaning",
+     "name",
+     "order",
+     "updated_at",
+     "verse"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/schedule": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "activity": {
+      "type": "string"
+     },
+     "day_type": {
+      "type": "string"
+     },
+     "end_time": {
+      "type": "string"
+     },
+     "id": {
+      "type": "integer"
+     },
+     "is_prayer_block": {
+      "type": "boolean"
+     },
+     "order": {
+      "type": "integer"
+     },
+     "persona_id": {
+      "type": "integer"
+     },
+     "start_time": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "activity",
+     "day_type",
+     "end_time",
+     "id",
+     "is_prayer_block",
+     "order",
+     "persona_id",
+     "start_time"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/settings": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "latitude": {
+     "type": "number"
+    },
+    "longitude": {
+     "type": "number"
+    },
+    "prayer_calculation_method": {
+     "type": "string"
+    },
+    "super_objective": {
+     "type": "string"
+    },
+    "theme": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "latitude",
+    "longitude",
+    "prayer_calculation_method",
+    "super_objective",
+    "theme"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/tokens": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "created_at": {
+      "type": "string"
+     },
+     "id": {
+      "type": "integer"
+     },
+     "last_used_at": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "prefix": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "created_at",
+     "id",
+     "name",
+     "prefix"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/tracker/non-negotiables": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "category": {
+      "type": "string"
+     },
+     "id": {
+      "type": "integer"
+     },
+     "order": {
+      "type": "integer"
+     },
+     "streak": {
+      "properties": {
+       "current_streak": {
+        "type": "integer"
+       },
+       "last_check_date": {
+        "type": "string"
+       },
+       "longest_streak": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "current_streak",
+       "last_check_date",
+       "longest_streak"
+      ],
+      "type": "object"
+     },
+     "title": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "category",
+     "id",
+     "order",
+     "title"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/tracker/today": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "checks": {
+     "items": {
+      "properties": {
+       "check_date": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "is_completed": {
+        "type": "boolean"
+       },
+       "non_negotiable_id": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "check_date",
+       "id",
+       "is_completed",
+       "non_negotiable_id"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "date": {
+     "type": "string"
+    },
+    "non_negotiables": {
+     "items": {
+      "properties": {
+       "category": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "order": {
+        "type": "integer"
+       },
+       "streak": {
+        "properties": {
+         "current_streak": {
+          "type": "integer"
+         },
+         "last_check_date": {
+          "type": "string"
+         },
+         "longest_streak": {
+          "type": "integer"
+         }
+        },
+        "required": [
+         "current_streak",
+         "last_check_date",
+         "longest_streak"
+        ],
+        "type": "object"
+       },
+       "title": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "category",
+       "id",
+       "order",
+       "title"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "checks",
+    "date",
+    "non_negotiables"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/blocks": {
+  "params": [
+   "query:days"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "averages": {
+     "type": "object"
+    },
+    "blocks": {
+     "type": "object"
+    },
+    "range": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "averages",
+    "blocks",
+    "range"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/calendar/google/connect": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "url": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "url"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/calendar/google/status": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "configured": {
+     "type": "boolean"
+    },
+    "connected": {
+     "type": "boolean"
+    },
+    "email": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "configured",
+    "connected",
+    "email"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/config/blocks": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "blocks": {
+     "items": {
+      "properties": {
+       "archived": {
+        "type": "boolean"
+       },
+       "color": {
+        "type": "string"
+       },
+       "counts_for_stars": {
+        "type": "boolean"
+       },
+       "key": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "ring_name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "archived",
+       "color",
+       "counts_for_stars",
+       "key",
+       "label",
+       "ring_name"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "blocks"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/config/feeds": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "color": {
+      "type": "string"
+     },
+     "email": {
+      "type": "string"
+     },
+     "host": {
+      "type": "string"
+     },
+     "id": {
+      "type": "integer"
+     },
+     "name": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "host",
+     "id",
+     "name"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/vault/day/{day}/events": {
+  "params": [
+   "path:day*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "errors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "events": {
+     "items": {
+      "properties": {
+       "all_day": {
+        "type": "boolean"
+       },
+       "calendar": {
+        "type": "string"
+       },
+       "color": {
+        "type": "string"
+       },
+       "end_min": {
+        "type": "integer"
+       },
+       "location": {
+        "type": "string"
+       },
+       "meeting_url": {
+        "type": "string"
+       },
+       "start_min": {
+        "type": "integer"
+       },
+       "title": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "all_day",
+       "calendar",
+       "color",
+       "end_min",
+       "location",
+       "start_min",
+       "title"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "errors",
+    "events"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/day/{day}/log": {
+  "params": [
+   "path:day*"
+  ],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "hash": {
+      "type": "string"
+     },
+     "index": {
+      "type": "integer"
+     },
+     "text": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "hash",
+     "index",
+     "text"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/vault/day/{day}/tasks": {
+  "params": [
+   "path:day*"
+  ],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "done": {
+      "type": "boolean"
+     },
+     "hash": {
+      "type": "string"
+     },
+     "line": {
+      "type": "integer"
+     },
+     "path": {
+      "type": "string"
+     },
+     "text": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "done",
+     "hash",
+     "line",
+     "path",
+     "text"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/vault/edit-access": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "allowed": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "allowed"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/goals": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "items": {
+     "items": {
+      "properties": {
+       "caption": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "progress": {
+        "type": "integer"
+       },
+       "title": {
+        "type": "string"
+       },
+       "value": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "caption",
+       "progress",
+       "title",
+       "value"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "items"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/month": {
+  "params": [
+   "query:month*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "days": {
+     "items": {
+      "properties": {
+       "blocks": {
+        "type": "object"
+       },
+       "date": {
+        "type": "string"
+       },
+       "focus": {
+        "type": "string"
+       },
+       "log": {
+        "type": "string"
+       },
+       "mode": {
+        "type": "string"
+       },
+       "pct": {
+        "type": "integer"
+       },
+       "possible": {
+        "type": "integer"
+       },
+       "total": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "blocks",
+       "date",
+       "focus",
+       "log",
+       "mode",
+       "pct",
+       "possible",
+       "total"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "modes": {
+     "type": "object"
+    },
+    "month": {
+     "type": "string"
+    },
+    "month_pct": {
+     "type": "integer"
+    },
+    "totals": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "days",
+    "modes",
+    "month",
+    "month_pct",
+    "totals"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/notebooks": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "streams": {
+     "items": {
+      "properties": {
+       "color": {
+        "type": "string"
+       },
+       "entries": {
+        "items": {
+         "properties": {
+          "body": {
+           "type": "string"
+          },
+          "date": {
+           "type": "string"
+          },
+          "hash": {
+           "type": "string"
+          },
+          "id": {
+           "type": "string"
+          },
+          "kind": {
+           "type": "string"
+          },
+          "line": {
+           "type": "integer"
+          },
+          "open": {
+           "type": "boolean"
+          },
+          "title": {
+           "type": "string"
+          },
+          "url": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "body",
+          "date",
+          "hash",
+          "id",
+          "kind",
+          "line",
+          "open",
+          "title",
+          "url"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slot": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "weekly": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "color",
+       "entries",
+       "icon",
+       "name",
+       "slot",
+       "status",
+       "stream",
+       "weekly"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "streams"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/objectives": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "items": {
+     "items": {
+      "properties": {
+       "checkpoint": {
+        "type": "string"
+       },
+       "color": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "color",
+       "done",
+       "icon",
+       "name",
+       "stream",
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "period": {
+     "type": "string"
+    },
+    "week": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "items",
+    "period",
+    "week"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/pipelines": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "now_limit": {
+     "type": "integer"
+    },
+    "stale_days": {
+     "type": "integer"
+    },
+    "streams": {
+     "items": {
+      "properties": {
+       "color": {
+        "type": "string"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "items": {
+        "items": {
+         "properties": {
+          "added": {
+           "type": "string"
+          },
+          "age_days": {
+           "type": "integer"
+          },
+          "blocked_by": {
+           "items": {
+            "type": "string"
+           },
+           "type": "array"
+          },
+          "checkpoint": {
+           "type": "string"
+          },
+          "description": {
+           "type": "string"
+          },
+          "done": {
+           "type": "boolean"
+          },
+          "done_on": {
+           "type": "string"
+          },
+          "focus": {
+           "type": "string"
+          },
+          "hash": {
+           "type": "string"
+          },
+          "lane": {
+           "type": "string"
+          },
+          "line": {
+           "type": "integer"
+          },
+          "product": {
+           "type": "string"
+          },
+          "stale": {
+           "type": "boolean"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "added",
+          "age_days",
+          "checkpoint",
+          "done",
+          "done_on",
+          "focus",
+          "hash",
+          "lane",
+          "line",
+          "stale",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slot": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "weekly": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "color",
+       "icon",
+       "items",
+       "name",
+       "slot",
+       "status",
+       "stream",
+       "weekly"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "week": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "now_limit",
+    "stale_days",
+    "streams",
+    "week"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/quarter": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "colors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "current_month": {
+     "type": "string"
+    },
+    "ends": {
+     "type": "string"
+    },
+    "icons": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "months": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "objective": {
+     "type": "string"
+    },
+    "objective_ar": {
+     "type": "string"
+    },
+    "quarter": {
+     "type": "string"
+    },
+    "starts": {
+     "type": "string"
+    },
+    "streams": {
+     "items": {
+      "properties": {
+       "checkpoints": {
+        "items": {
+         "properties": {
+          "checklist": {
+           "items": {
+            "ref": "ChecklistItem"
+           },
+           "type": "array"
+          },
+          "month": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "month",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "color": {
+        "type": "string"
+       },
+       "goal": {
+        "type": "string"
+       },
+       "goal_checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slot": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "weekly": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "checkpoints",
+       "color",
+       "goal",
+       "icon",
+       "name",
+       "slot",
+       "status",
+       "stream",
+       "weekly"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "week_of_quarter": {
+     "type": "integer"
+    },
+    "weeks_in_quarter": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "colors",
+    "current_month",
+    "ends",
+    "icons",
+    "months",
+    "objective",
+    "objective_ar",
+    "quarter",
+    "starts",
+    "streams",
+    "week_of_quarter",
+    "weeks_in_quarter"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/schedule": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "days": {
+     "type": "object"
+    },
+    "errors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "meta": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "days",
+    "errors",
+    "meta"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/status": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "days": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "days"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/streaks": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "streaks": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "streaks"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/today": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "blocks": {
+     "type": "object"
+    },
+    "date": {
+     "type": "string"
+    },
+    "focus": {
+     "type": "string"
+    },
+    "log": {
+     "type": "string"
+    },
+    "mode": {
+     "type": "string"
+    },
+    "pct": {
+     "type": "integer"
+    },
+    "possible": {
+     "type": "integer"
+    },
+    "total": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "blocks",
+    "date",
+    "focus",
+    "log",
+    "mode",
+    "pct",
+    "possible",
+    "total"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/week": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "days": {
+     "items": {
+      "properties": {
+       "blocks": {
+        "type": "object"
+       },
+       "date": {
+        "type": "string"
+       },
+       "focus": {
+        "type": "string"
+       },
+       "log": {
+        "type": "string"
+       },
+       "mode": {
+        "type": "string"
+       },
+       "pct": {
+        "type": "integer"
+       },
+       "possible": {
+        "type": "integer"
+       },
+       "total": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "blocks",
+       "date",
+       "focus",
+       "log",
+       "mode",
+       "pct",
+       "possible",
+       "total"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "totals": {
+     "type": "object"
+    },
+    "week_pct": {
+     "type": "integer"
+    },
+    "week_possible": {
+     "type": "integer"
+    },
+    "week_total": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "days",
+    "totals",
+    "week_pct",
+    "week_possible",
+    "week_total"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /health": {
+  "params": [],
+  "request": null,
+  "response": null
+ },
+ "PATCH /api/v1/personas/{persona_id}": {
+  "params": [
+   "path:persona_id*"
+  ],
+  "request": {
+   "properties": {
+    "arabic_name": {
+     "type": "string"
+    },
+    "color": {
+     "type": "string"
+    },
+    "domain": {
+     "type": "string"
+    },
+    "eventually": {
+     "type": "string"
+    },
+    "guardrail": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "one_thing": {
+     "type": "string"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "points": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "ritual": {
+     "type": "string"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "arabic_name": {
+     "type": "string"
+    },
+    "color": {
+     "type": "string"
+    },
+    "created_at": {
+     "type": "string"
+    },
+    "domain": {
+     "type": "string"
+    },
+    "eventually": {
+     "type": "string"
+    },
+    "guardrail": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "milestones": {
+     "items": {
+      "properties": {
+       "goal": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "is_completed": {
+        "type": "boolean"
+       },
+       "persona_id": {
+        "type": "integer"
+       },
+       "target_date": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "goal",
+       "id",
+       "is_completed",
+       "persona_id",
+       "target_date"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "name": {
+     "type": "string"
+    },
+    "one_thing": {
+     "type": "string"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "points": {
+     "items": {
+      "type": "any"
+     },
+     "type": "array"
+    },
+    "ritual": {
+     "type": "string"
+    },
+    "updated_at": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "arabic_name",
+    "color",
+    "created_at",
+    "domain",
+    "eventually",
+    "guardrail",
+    "icon",
+    "id",
+    "name",
+    "one_thing",
+    "order",
+    "points",
+    "ritual",
+    "updated_at"
+   ],
+   "type": "object"
+  }
+ },
+ "PATCH /api/v1/principles/{principle_id}": {
+  "params": [
+   "path:principle_id*"
+  ],
+  "request": {
+   "properties": {
+    "arabic": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "meaning": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "verse": {
+     "type": "string"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "arabic": {
+     "type": "string"
+    },
+    "created_at": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "meaning": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "updated_at": {
+     "type": "string"
+    },
+    "verse": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "arabic",
+    "created_at",
+    "icon",
+    "id",
+    "meaning",
+    "name",
+    "order",
+    "updated_at",
+    "verse"
+   ],
+   "type": "object"
+  }
+ },
+ "PATCH /api/v1/schedule/{block_id}": {
+  "params": [
+   "path:block_id*"
+  ],
+  "request": {
+   "properties": {
+    "activity": {
+     "type": "string"
+    },
+    "day_type": {
+     "type": "string"
+    },
+    "end_time": {
+     "type": "string"
+    },
+    "is_prayer_block": {
+     "type": "boolean"
+    },
+    "persona_id": {
+     "type": "integer"
+    },
+    "start_time": {
+     "type": "string"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "activity": {
+     "type": "string"
+    },
+    "day_type": {
+     "type": "string"
+    },
+    "end_time": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "is_prayer_block": {
+     "type": "boolean"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "persona_id": {
+     "type": "integer"
+    },
+    "start_time": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "activity",
+    "day_type",
+    "end_time",
+    "id",
+    "is_prayer_block",
+    "order",
+    "persona_id",
+    "start_time"
+   ],
+   "type": "object"
+  }
+ },
+ "PATCH /api/v1/settings": {
+  "params": [],
+  "request": {
+   "properties": {
+    "latitude": {
+     "type": "number"
+    },
+    "longitude": {
+     "type": "number"
+    },
+    "prayer_calculation_method": {
+     "type": "string"
+    },
+    "super_objective": {
+     "type": "string"
+    },
+    "theme": {
+     "type": "string"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "latitude": {
+     "type": "number"
+    },
+    "longitude": {
+     "type": "number"
+    },
+    "prayer_calculation_method": {
+     "type": "string"
+    },
+    "super_objective": {
+     "type": "string"
+    },
+    "theme": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "latitude",
+    "longitude",
+    "prayer_calculation_method",
+    "super_objective",
+    "theme"
+   ],
+   "type": "object"
+  }
+ },
+ "PATCH /api/v1/tracker/non-negotiables/{nn_id}": {
+  "params": [
+   "path:nn_id*"
+  ],
+  "request": {
+   "properties": {
+    "category": {
+     "type": "string"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "category": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "streak": {
+     "properties": {
+      "current_streak": {
+       "type": "integer"
+      },
+      "last_check_date": {
+       "type": "string"
+      },
+      "longest_streak": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "current_streak",
+      "last_check_date",
+      "longest_streak"
+     ],
+     "type": "object"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "category",
+    "id",
+    "order",
+    "title"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/auth/login": {
+  "params": [],
+  "request": {
+   "properties": {
+    "email": {
+     "type": "string"
+    },
+    "password": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "email",
+    "password"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "access_token": {
+     "type": "string"
+    },
+    "refresh_token": {
+     "type": "string"
+    },
+    "token_type": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "access_token",
+    "refresh_token"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/auth/logout": {
+  "params": [],
+  "request": {
+   "properties": {
+    "refresh_token": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "refresh_token"
+   ],
+   "type": "object"
+  },
+  "response": null
+ },
+ "POST /api/v1/auth/refresh": {
+  "params": [],
+  "request": {
+   "properties": {
+    "refresh_token": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "refresh_token"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "access_token": {
+     "type": "string"
+    },
+    "refresh_token": {
+     "type": "string"
+    },
+    "token_type": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "access_token",
+    "refresh_token"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/auth/register": {
+  "params": [],
+  "request": {
+   "properties": {
+    "email": {
+     "type": "string"
+    },
+    "password": {
+     "type": "string"
+    },
+    "timezone": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "email",
+    "password"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "access_token": {
+     "type": "string"
+    },
+    "refresh_token": {
+     "type": "string"
+    },
+    "token_type": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "access_token",
+    "refresh_token"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/import": {
+  "params": [
+   "query:replace"
+  ],
+  "request": {
+   "properties": {
+    "blocks": {
+     "items": {
+      "properties": {
+       "archived": {
+        "type": "boolean"
+       },
+       "color": {
+        "type": "string"
+       },
+       "counts_for_stars": {
+        "type": "boolean"
+       },
+       "key": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "ring_name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "color",
+       "key",
+       "label",
+       "ring_name"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "days": {
+     "items": {
+      "properties": {
+       "date": {
+        "type": "string"
+       },
+       "focus": {
+        "type": "string"
+       },
+       "log": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "mode": {
+        "type": "string"
+       },
+       "possible": {
+        "type": "integer"
+       },
+       "total": {
+        "type": "integer"
+       },
+       "votes": {
+        "type": "object"
+       }
+      },
+      "required": [
+       "date",
+       "mode"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "feeds": {
+     "items": {
+      "properties": {
+       "color": {
+        "type": "string"
+       },
+       "email": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "url": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "name"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "goals": {
+     "items": {
+      "properties": {
+       "caption": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "progress": {
+        "type": "integer"
+       },
+       "title": {
+        "type": "string"
+       },
+       "value": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "title",
+       "value"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "notebook_entries": {
+     "items": {
+      "properties": {
+       "body": {
+        "type": "string"
+       },
+       "date": {
+        "type": "string"
+       },
+       "id": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "open": {
+        "type": "boolean"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "id",
+       "kind",
+       "stream",
+       "title"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "pipeline_items": {
+     "items": {
+      "properties": {
+       "added_on": {
+        "type": "string"
+       },
+       "blocked_by": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "checkpoint": {
+        "type": "string"
+       },
+       "description": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "done_on": {
+        "type": "string"
+       },
+       "focus_week": {
+        "type": "string"
+       },
+       "lane": {
+        "type": "string"
+       },
+       "product": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "lane",
+       "stream",
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "quarters": {
+     "items": {
+      "properties": {
+       "ends": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "objective": {
+        "type": "string"
+       },
+       "objective_ar": {
+        "type": "string"
+       },
+       "starts": {
+        "type": "string"
+       },
+       "streams": {
+        "items": {
+         "properties": {
+          "checkpoints": {
+           "items": {
+            "ref": "SnapCheckpoint"
+           },
+           "type": "array"
+          },
+          "color": {
+           "type": "string"
+          },
+          "goal": {
+           "type": "string"
+          },
+          "goal_checklist": {
+           "items": {
+            "ref": "SnapLine"
+           },
+           "type": "array"
+          },
+          "has_pipeline": {
+           "type": "boolean"
+          },
+          "icon": {
+           "type": "string"
+          },
+          "in_note": {
+           "type": "boolean"
+          },
+          "name": {
+           "type": "string"
+          },
+          "slot": {
+           "type": "string"
+          },
+          "slug": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string"
+          },
+          "weekly": {
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "color",
+          "icon",
+          "name",
+          "slug"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "label"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "schedule": {
+     "properties": {
+      "days": {
+       "type": "object"
+      },
+      "meta": {
+       "type": "object"
+      }
+     },
+     "required": [],
+     "type": "object"
+    },
+    "tasks": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "done_on": {
+        "type": "string"
+       },
+       "due_on": {
+        "type": "string"
+       },
+       "scheduled_on": {
+        "type": "string"
+       },
+       "source_path": {
+        "type": "string"
+       },
+       "start_on": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "version": {
+     "type": "integer"
+    },
+    "week_objectives": {
+     "items": {
+      "properties": {
+       "checkpoint": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "week": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "stream",
+       "week"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "version"
+   ],
+   "type": "object"
+  },
+  "response": null
+ },
+ "POST /api/v1/personas": {
+  "params": [],
+  "request": {
+   "properties": {
+    "arabic_name": {
+     "type": "string"
+    },
+    "color": {
+     "type": "string"
+    },
+    "domain": {
+     "type": "string"
+    },
+    "eventually": {
+     "type": "string"
+    },
+    "guardrail": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "one_thing": {
+     "type": "string"
+    },
+    "points": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "ritual": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "domain",
+    "name"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "arabic_name": {
+     "type": "string"
+    },
+    "color": {
+     "type": "string"
+    },
+    "created_at": {
+     "type": "string"
+    },
+    "domain": {
+     "type": "string"
+    },
+    "eventually": {
+     "type": "string"
+    },
+    "guardrail": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "milestones": {
+     "items": {
+      "properties": {
+       "goal": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "is_completed": {
+        "type": "boolean"
+       },
+       "persona_id": {
+        "type": "integer"
+       },
+       "target_date": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "goal",
+       "id",
+       "is_completed",
+       "persona_id",
+       "target_date"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "name": {
+     "type": "string"
+    },
+    "one_thing": {
+     "type": "string"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "points": {
+     "items": {
+      "type": "any"
+     },
+     "type": "array"
+    },
+    "ritual": {
+     "type": "string"
+    },
+    "updated_at": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "arabic_name",
+    "color",
+    "created_at",
+    "domain",
+    "eventually",
+    "guardrail",
+    "icon",
+    "id",
+    "name",
+    "one_thing",
+    "order",
+    "points",
+    "ritual",
+    "updated_at"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/personas/reorder": {
+  "params": [],
+  "request": {
+   "properties": {
+    "ids": {
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "ids"
+   ],
+   "type": "object"
+  },
+  "response": null
+ },
+ "POST /api/v1/personas/{persona_id}/milestones": {
+  "params": [
+   "path:persona_id*"
+  ],
+  "request": {
+   "properties": {
+    "goal": {
+     "type": "string"
+    },
+    "target_date": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "goal"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "goal": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "is_completed": {
+     "type": "boolean"
+    },
+    "persona_id": {
+     "type": "integer"
+    },
+    "target_date": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "goal",
+    "id",
+    "is_completed",
+    "persona_id",
+    "target_date"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/principles": {
+  "params": [],
+  "request": {
+   "properties": {
+    "arabic": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "meaning": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "verse": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "meaning",
+    "name"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "arabic": {
+     "type": "string"
+    },
+    "created_at": {
+     "type": "string"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "meaning": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "updated_at": {
+     "type": "string"
+    },
+    "verse": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "arabic",
+    "created_at",
+    "icon",
+    "id",
+    "meaning",
+    "name",
+    "order",
+    "updated_at",
+    "verse"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/schedule": {
+  "params": [],
+  "request": {
+   "properties": {
+    "activity": {
+     "type": "string"
+    },
+    "day_type": {
+     "type": "string"
+    },
+    "end_time": {
+     "type": "string"
+    },
+    "is_prayer_block": {
+     "type": "boolean"
+    },
+    "persona_id": {
+     "type": "integer"
+    },
+    "start_time": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "activity",
+    "end_time",
+    "persona_id",
+    "start_time"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "activity": {
+     "type": "string"
+    },
+    "day_type": {
+     "type": "string"
+    },
+    "end_time": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "is_prayer_block": {
+     "type": "boolean"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "persona_id": {
+     "type": "integer"
+    },
+    "start_time": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "activity",
+    "day_type",
+    "end_time",
+    "id",
+    "is_prayer_block",
+    "order",
+    "persona_id",
+    "start_time"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/tokens": {
+  "params": [],
+  "request": {
+   "properties": {
+    "name": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "created_at": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "last_used_at": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "prefix": {
+     "type": "string"
+    },
+    "token": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "created_at",
+    "id",
+    "name",
+    "prefix",
+    "token"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/tracker/check": {
+  "params": [],
+  "request": {
+   "properties": {
+    "check_date": {
+     "type": "string"
+    },
+    "non_negotiable_id": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "non_negotiable_id"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "check_date": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "is_completed": {
+     "type": "boolean"
+    },
+    "non_negotiable_id": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "check_date",
+    "id",
+    "is_completed",
+    "non_negotiable_id"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/tracker/non-negotiables": {
+  "params": [],
+  "request": {
+   "properties": {
+    "category": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "title"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "category": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "order": {
+     "type": "integer"
+    },
+    "streak": {
+     "properties": {
+      "current_streak": {
+       "type": "integer"
+      },
+      "last_check_date": {
+       "type": "string"
+      },
+      "longest_streak": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "current_streak",
+      "last_check_date",
+      "longest_streak"
+     ],
+     "type": "object"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "category",
+    "id",
+    "order",
+    "title"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/config/feeds": {
+  "params": [],
+  "request": {
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "url": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "name",
+    "url"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "color": {
+     "type": "string"
+    },
+    "email": {
+     "type": "string"
+    },
+    "host": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "name": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "host",
+    "id",
+    "name"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/day/{day}/events": {
+  "params": [
+   "path:day*"
+  ],
+  "request": {
+   "properties": {
+    "end": {
+     "type": "string"
+    },
+    "location": {
+     "type": "string"
+    },
+    "start": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "end",
+    "start",
+    "title"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "all_day": {
+     "type": "boolean"
+    },
+    "calendar": {
+     "type": "string"
+    },
+    "color": {
+     "type": "string"
+    },
+    "end_min": {
+     "type": "integer"
+    },
+    "location": {
+     "type": "string"
+    },
+    "meeting_url": {
+     "type": "string"
+    },
+    "start_min": {
+     "type": "integer"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "all_day",
+    "calendar",
+    "color",
+    "end_min",
+    "location",
+    "start_min",
+    "title"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/day/{day}/log/remove": {
+  "params": [
+   "path:day*"
+  ],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "index": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "index"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/day/{day}/notes": {
+  "params": [
+   "path:day*"
+  ],
+  "request": {
+   "properties": {
+    "section": {
+     "type": "string"
+    },
+    "span": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "section",
+    "span",
+    "text"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/day/{day}/tasks": {
+  "params": [
+   "path:day*"
+  ],
+  "request": {
+   "properties": {
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/notebook/remove": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/notebook/{stream}/entries": {
+  "params": [
+   "path:stream*"
+  ],
+  "request": {
+   "properties": {
+    "body": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/pipeline/remove": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/pipeline/{stream}/items": {
+  "params": [
+   "path:stream*"
+  ],
+  "request": {
+   "properties": {
+    "descriptions": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "lane": {
+     "type": "string"
+    },
+    "texts": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "texts"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/quarter/stream": {
+  "params": [],
+  "request": {
+   "properties": {
+    "checkpoints": {
+     "type": "object"
+    },
+    "color": {
+     "type": "string"
+    },
+    "goal": {
+     "type": "string"
+    },
+    "goal_checklist": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "month_checklists": {
+     "type": "object"
+    },
+    "name": {
+     "type": "string"
+    },
+    "slot": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "weekly": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "name",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "colors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "current_month": {
+     "type": "string"
+    },
+    "ends": {
+     "type": "string"
+    },
+    "icons": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "months": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "objective": {
+     "type": "string"
+    },
+    "objective_ar": {
+     "type": "string"
+    },
+    "quarter": {
+     "type": "string"
+    },
+    "starts": {
+     "type": "string"
+    },
+    "streams": {
+     "items": {
+      "properties": {
+       "checkpoints": {
+        "items": {
+         "properties": {
+          "checklist": {
+           "items": {
+            "ref": "ChecklistItem"
+           },
+           "type": "array"
+          },
+          "month": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "month",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "color": {
+        "type": "string"
+       },
+       "goal": {
+        "type": "string"
+       },
+       "goal_checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slot": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "weekly": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "checkpoints",
+       "color",
+       "goal",
+       "icon",
+       "name",
+       "slot",
+       "status",
+       "stream",
+       "weekly"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "week_of_quarter": {
+     "type": "integer"
+    },
+    "weeks_in_quarter": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "colors",
+    "current_month",
+    "ends",
+    "icons",
+    "months",
+    "objective",
+    "objective_ar",
+    "quarter",
+    "starts",
+    "streams",
+    "week_of_quarter",
+    "weeks_in_quarter"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/tasks/remove": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "path": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/config/blocks": {
+  "params": [],
+  "request": {
+   "properties": {
+    "blocks": {
+     "items": {
+      "properties": {
+       "archived": {
+        "type": "boolean"
+       },
+       "color": {
+        "type": "string"
+       },
+       "counts_for_stars": {
+        "type": "boolean"
+       },
+       "key": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "ring_name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "archived",
+       "color",
+       "counts_for_stars",
+       "key",
+       "label",
+       "ring_name"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "blocks"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "blocks": {
+     "items": {
+      "properties": {
+       "archived": {
+        "type": "boolean"
+       },
+       "color": {
+        "type": "string"
+       },
+       "counts_for_stars": {
+        "type": "boolean"
+       },
+       "key": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "ring_name": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "archived",
+       "color",
+       "counts_for_stars",
+       "key",
+       "label",
+       "ring_name"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "blocks"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/config/goals": {
+  "params": [],
+  "request": {
+   "properties": {
+    "items": {
+     "items": {
+      "properties": {
+       "caption": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "progress": {
+        "type": "integer"
+       },
+       "title": {
+        "type": "string"
+       },
+       "value": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "title",
+       "value"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "items"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "items": {
+     "items": {
+      "properties": {
+       "caption": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "progress": {
+        "type": "integer"
+       },
+       "title": {
+        "type": "string"
+       },
+       "value": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "caption",
+       "progress",
+       "title",
+       "value"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "items"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/config/schedule": {
+  "params": [],
+  "request": {
+   "properties": {
+    "meta": {
+     "properties": {
+      "city": {
+       "type": "string"
+      },
+      "lat": {
+       "type": "number"
+      },
+      "lon": {
+       "type": "number"
+      },
+      "madhab": {
+       "type": "string"
+      },
+      "method": {
+       "type": "string"
+      },
+      "tz": {
+       "type": "string"
+      },
+      "weekend_days": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      }
+     },
+     "required": [
+      "madhab",
+      "method",
+      "tz",
+      "weekend_days"
+     ],
+     "type": "object"
+    },
+    "weekday": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "end": {
+        "type": "string"
+       },
+       "start": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "what": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "block",
+       "end",
+       "start"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "weekend": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "end": {
+        "type": "string"
+       },
+       "start": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "what": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "block",
+       "end",
+       "start"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "meta",
+    "weekday",
+    "weekend"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "days": {
+     "type": "object"
+    },
+    "errors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "meta": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "days",
+    "errors",
+    "meta"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/day/{day}/log": {
+  "params": [
+   "path:day*"
+  ],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "index": {
+     "type": "integer"
+    },
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "index",
+    "text"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/day/{day}/mode": {
+  "params": [
+   "path:day*"
+  ],
+  "request": {
+   "properties": {
+    "mode": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "mode"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/day/{day}/vote": {
+  "params": [
+   "path:day*"
+  ],
+  "request": {
+   "properties": {
+    "block": {
+     "type": "string"
+    },
+    "stars": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "block",
+    "stars"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/goals/item": {
+  "params": [],
+  "request": {
+   "properties": {
+    "done": {
+     "type": "boolean"
+    },
+    "id": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "done",
+    "id"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "items": {
+     "items": {
+      "properties": {
+       "caption": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "progress": {
+        "type": "integer"
+       },
+       "title": {
+        "type": "string"
+       },
+       "value": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "caption",
+       "progress",
+       "title",
+       "value"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "items"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/notebook/blocker": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "open": {
+     "type": "boolean"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "open",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/notebook/entry": {
+  "params": [],
+  "request": {
+   "properties": {
+    "body": {
+     "type": "string"
+    },
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "body",
+    "line",
+    "stream",
+    "title"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/objectives": {
+  "params": [],
+  "request": {
+   "properties": {
+    "checkpoint": {
+     "any": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "string"
+      }
+     ]
+    },
+    "done": {
+     "type": "boolean"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "items": {
+     "items": {
+      "properties": {
+       "checkpoint": {
+        "type": "string"
+       },
+       "color": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "color",
+       "done",
+       "icon",
+       "name",
+       "stream",
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "period": {
+     "type": "string"
+    },
+    "week": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "items",
+    "period",
+    "week"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pipeline/blocked-by": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "ids": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "ids",
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pipeline/checkpoint": {
+  "params": [],
+  "request": {
+   "properties": {
+    "checkpoint": {
+     "any": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "string"
+      }
+     ]
+    },
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "checkpoint",
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pipeline/description": {
+  "params": [],
+  "request": {
+   "properties": {
+    "description": {
+     "type": "string"
+    },
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "description",
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pipeline/focus": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pipeline/move": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "lane": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "lane",
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pipeline/text": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "stream",
+    "text"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/quarter": {
+  "params": [],
+  "request": {
+   "properties": {
+    "arabic": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "colors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "current_month": {
+     "type": "string"
+    },
+    "ends": {
+     "type": "string"
+    },
+    "icons": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "months": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "objective": {
+     "type": "string"
+    },
+    "objective_ar": {
+     "type": "string"
+    },
+    "quarter": {
+     "type": "string"
+    },
+    "starts": {
+     "type": "string"
+    },
+    "streams": {
+     "items": {
+      "properties": {
+       "checkpoints": {
+        "items": {
+         "properties": {
+          "checklist": {
+           "items": {
+            "ref": "ChecklistItem"
+           },
+           "type": "array"
+          },
+          "month": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "month",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "color": {
+        "type": "string"
+       },
+       "goal": {
+        "type": "string"
+       },
+       "goal_checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slot": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "weekly": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "checkpoints",
+       "color",
+       "goal",
+       "icon",
+       "name",
+       "slot",
+       "status",
+       "stream",
+       "weekly"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "week_of_quarter": {
+     "type": "integer"
+    },
+    "weeks_in_quarter": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "colors",
+    "current_month",
+    "ends",
+    "icons",
+    "months",
+    "objective",
+    "objective_ar",
+    "quarter",
+    "starts",
+    "streams",
+    "week_of_quarter",
+    "weeks_in_quarter"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/quarter/stream": {
+  "params": [],
+  "request": {
+   "properties": {
+    "checkpoints": {
+     "type": "object"
+    },
+    "color": {
+     "type": "string"
+    },
+    "goal": {
+     "type": "string"
+    },
+    "goal_checklist": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "icon": {
+     "type": "string"
+    },
+    "month_checklists": {
+     "type": "object"
+    },
+    "name": {
+     "type": "string"
+    },
+    "slot": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "weekly": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "colors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "current_month": {
+     "type": "string"
+    },
+    "ends": {
+     "type": "string"
+    },
+    "icons": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "months": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "objective": {
+     "type": "string"
+    },
+    "objective_ar": {
+     "type": "string"
+    },
+    "quarter": {
+     "type": "string"
+    },
+    "starts": {
+     "type": "string"
+    },
+    "streams": {
+     "items": {
+      "properties": {
+       "checkpoints": {
+        "items": {
+         "properties": {
+          "checklist": {
+           "items": {
+            "ref": "ChecklistItem"
+           },
+           "type": "array"
+          },
+          "month": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "month",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "color": {
+        "type": "string"
+       },
+       "goal": {
+        "type": "string"
+       },
+       "goal_checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slot": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "weekly": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "checkpoints",
+       "color",
+       "goal",
+       "icon",
+       "name",
+       "slot",
+       "status",
+       "stream",
+       "weekly"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "week_of_quarter": {
+     "type": "integer"
+    },
+    "weeks_in_quarter": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "colors",
+    "current_month",
+    "ends",
+    "icons",
+    "months",
+    "objective",
+    "objective_ar",
+    "quarter",
+    "starts",
+    "streams",
+    "week_of_quarter",
+    "weeks_in_quarter"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/quarter/stream/item": {
+  "params": [],
+  "request": {
+   "properties": {
+    "done": {
+     "type": "boolean"
+    },
+    "id": {
+     "type": "string"
+    },
+    "scope": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "done",
+    "id",
+    "scope",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "colors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "current_month": {
+     "type": "string"
+    },
+    "ends": {
+     "type": "string"
+    },
+    "icons": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "months": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "objective": {
+     "type": "string"
+    },
+    "objective_ar": {
+     "type": "string"
+    },
+    "quarter": {
+     "type": "string"
+    },
+    "starts": {
+     "type": "string"
+    },
+    "streams": {
+     "items": {
+      "properties": {
+       "checkpoints": {
+        "items": {
+         "properties": {
+          "checklist": {
+           "items": {
+            "ref": "ChecklistItem"
+           },
+           "type": "array"
+          },
+          "month": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "month",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "color": {
+        "type": "string"
+       },
+       "goal": {
+        "type": "string"
+       },
+       "goal_checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "icon": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slot": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "weekly": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "checkpoints",
+       "color",
+       "goal",
+       "icon",
+       "name",
+       "slot",
+       "status",
+       "stream",
+       "weekly"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "week_of_quarter": {
+     "type": "integer"
+    },
+    "weeks_in_quarter": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "colors",
+    "current_month",
+    "ends",
+    "icons",
+    "months",
+    "objective",
+    "objective_ar",
+    "quarter",
+    "starts",
+    "streams",
+    "week_of_quarter",
+    "weeks_in_quarter"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/tasks": {
+  "params": [],
+  "request": {
+   "properties": {
+    "done": {
+     "type": "boolean"
+    },
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "path": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "done",
+    "line"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/tasks/text": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "path": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "text"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ }
+}

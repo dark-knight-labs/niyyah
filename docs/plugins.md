@@ -15,10 +15,11 @@ class Plugin(Protocol):
 ```
 
 - The class is instantiated with no arguments. Read configuration from the environment or `app.core.config.settings`.
-- `api_version` is read from the class before instantiation and must equal `PLUGIN_API_VERSION`. A mismatch stops startup with an error naming the plugin and both versions.
+- `api_version` is read from the class before instantiation and must be in `SUPPORTED_API_VERSIONS` (the current `PLUGIN_API_VERSION`, plus the previous one for one release after a breaking change). A mismatch stops startup with an error naming the plugin and both versions.
 - Routes should use `Depends(get_current_user)` from `app.core.deps` like core routes do.
 - A plugin whose routes clash with a core route, or another plugin's, on the same method and path (after `/api/v1`) stops startup. So does a duplicate plugin `name`.
-- Version policy: `PLUGIN_API_VERSION` changes only on a breaking change to this contract. Plugins pin the version they were written for; there is no compatibility shim.
+- Version policy: `PLUGIN_API_VERSION` changes only on a breaking change to this contract. Core then keeps the previous number in `SUPPORTED_API_VERSIONS` for one release (N and N-1) and drops it in the next. Plugins pin the version they were written for.
+- Contract tests (`apps/api/tests/test_plugin_contract.py`) fail CI on a breaking change: a removed or retyped response field, a newly required request field, a removed endpoint or parameter, or a renamed name in the import surface (`get_current_user`, `get_db`, `Base`, `settings`). Added fields pass. To make a deliberate break, bump the version, then regenerate the snapshot with `python -m tests.contract > tests/openapi_contract.json` in the same PR.
 - A bad spec, an import failure, a missing class, or an exception in the constructor or `routers()` stops startup with a `PluginError` naming the plugin. This is intended: fix it by unsetting `PLUGINS` or uninstalling the package.
 
 ## Enabling a plugin
