@@ -187,8 +187,8 @@ export interface PipelineItemData {
   done_on: string | null;
   /** Week label ("2026-W41") when this item is that week's small domino. */
   focus: string | null;
-  /** The part of the block this item belongs to; most blocks have none. */
-  product?: string | null;
+  /** The parts of the block this item belongs to (tags); most blocks have none. */
+  products?: string[];
   done: boolean;
   age_days: number;
   stale: boolean;

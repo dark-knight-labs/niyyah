@@ -20,7 +20,7 @@ def test_quarter_response_from_stored_data():
 def test_pipelines_response_skips_streams_without_a_pipeline():
     streams = [make_stream("studio"), make_stream("passive")]
     streams[1].goal = False  # a stream with no quarter goal and no pipeline
-    items = {"studio": [{"product": None, "line": 1, "hash": "", "text": "One", "lane": "now", "checkpoint": None, "added": None, "done_on": None,
+    items = {"studio": [{"products": [], "product": None, "line": 1, "hash": "", "text": "One", "lane": "now", "checkpoint": None, "added": None, "done_on": None,
                        "focus": None, "done": False, "age_days": 0, "description": "", "blocked_by": [], "stale": False}]}
     res = pipelines_response(streams, items, TODAY)
     assert [s.stream for s in res.streams] == ["studio"]

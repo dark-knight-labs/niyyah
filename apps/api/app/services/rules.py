@@ -124,6 +124,20 @@ BLOCKER_ID = re.compile(r"^[a-z0-9]{4,16}$")
 
 PRODUCT = re.compile(r"\s*\[product::\s*([^\]]*?)\s*\]")
 
+MAX_PRODUCTS = 8
+MAX_PRODUCT_CHARS = 100
+
+
+def clean_products(raw) -> list[str]:
+    """Trim, drop blanks, dedupe case-insensitively (first spelling wins), keep at most MAX_PRODUCTS."""
+    seen, tags = set(), []
+    for tag in raw or []:
+        tag = " ".join(str(tag).split())[:MAX_PRODUCT_CHARS]
+        if tag and tag.lower() not in seen:
+            seen.add(tag.lower())
+            tags.append(tag)
+    return tags[:MAX_PRODUCTS]
+
 BRACKET_MONTH = re.compile(r"\s*\[(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\]\s*$", re.IGNORECASE)
 
 def clean_item(text: str) -> tuple[str, str | None]:

@@ -11,7 +11,7 @@ from app.models.planner import (
 )
 from app.models.vault import VaultBlockVote, VaultDay
 from app.schemas.snapshot import Snapshot
-from app.services.rules import checklist_from_text, checklist_text, clean_checklist
+from app.services.rules import checklist_from_text, checklist_text, clean_checklist, clean_products
 
 USER_TABLES = (PlannerBlock, PlannerCalendarFeed, Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem,
                NotebookEntry, PlannerScheduleSetting, PlannerScheduleBlock)
@@ -92,7 +92,7 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
         streams += [_stream_row(user_id, q.label, s, n) for n, s in enumerate(q.streams)]
 
     pipeline = [PipelineItem(
-        user_id=user_id, stream=i.stream, lane=i.lane, text=i.text, description=i.description, product=i.product, checkpoint=i.checkpoint,
+        user_id=user_id, stream=i.stream, lane=i.lane, text=i.text, description=i.description, products=clean_products(i.products or ([i.product] if i.product else [])), checkpoint=i.checkpoint,
         added_on=i.added_on, done_on=i.done_on, focus_week=i.focus_week, done=i.done, blocked_by=i.blocked_by, position=n)
         for n, i in enumerate(snap.pipeline_items)]
     notebook = [NotebookEntry(user_id=user_id, stream=e.stream, ext_id=e.id, kind=e.kind, title=e.title, body=e.body, entry_date=e.date,

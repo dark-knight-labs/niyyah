@@ -44,3 +44,10 @@ async def test_planner_rows_round_trip():
         await db.commit()
         stream = await db.get(QuarterStream, 1)
         assert stream.checkpoints == [{"month": "oct", "text": "Router live"}]
+
+
+def test_clean_products_trims_dedupes_and_caps():
+    from app.services.rules import MAX_PRODUCTS, clean_products
+    assert clean_products(["  Router ", "router", "", "Switch"]) == ["Router", "Switch"]
+    assert len(clean_products([f"t{n}" for n in range(20)])) == MAX_PRODUCTS
+    assert clean_products(None) == []
