@@ -25,7 +25,7 @@ const PUBLIC_PATHS = ["/"];
 const nav = [
   { href: "/", label: "Overview", icon: Clock },
   { href: "/plan", label: "Plan", icon: ListChecks },
-  { href: "/vault", label: "Vault", icon: Activity },
+  { href: "/progress", label: "Progress", icon: Activity },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

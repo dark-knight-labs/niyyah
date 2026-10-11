@@ -3,7 +3,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { Checkbox } from "@/components/routine/checkbox";
 import { ItemDetail } from "@/components/routine/item-detail";
-import { Section } from "@/components/routine/section";
 import { StreamMeta, toMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { Lane, NotebooksData, PipelineItemData, PipelinesData } from "@/lib/vault-types";
@@ -58,6 +57,7 @@ function Item({ r, to, toLabel, tick, week, busy, onMove, onOpen }: ItemProps) {
 /** Someday items shown per block before "more". */
 const SOMEDAY_SHOWN = 3;
 
+const LANE_TABS = [["now", "Now"], ["next", "Next"], ["backlog", "Someday"]] as const;
 const TH = "px-2.5 py-1.5 text-left text-micro font-extrabold uppercase tracking-[0.09em] text-[var(--muted-foreground)]";
 const TD = "border-t border-[var(--border)] px-2.5 py-1.5 align-top";
 
@@ -66,6 +66,8 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<Row | null>(null);
+  /** Phones show one column at a time; wider screens show all three. */
+  const [shown, setShown] = useState<"now" | "next" | "backlog">("now");
   /** Blocks whose Someday list is open in full; the rest show the first few. */
   const [moreOf, setMoreOf] = useState<Record<string, boolean>>({});
   /** Per block, the product its items are narrowed to (blocks without products never have one). */
@@ -104,7 +106,7 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
     }
   }
 
-  const otLabel = blocks.find((b) => b.id === ot)?.meta.label;
+  const hide = (l: "now" | "next" | "backlog") => (shown === l ? "" : "max-md:hidden");
   const dash = <span className="text-[var(--border)]" aria-label="empty">·</span>;
   const cell = (rows: Row[], to: Lane, toLabel: string, tick?: boolean) =>
     rows.length === 0 ? dash : (
@@ -112,15 +114,24 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
     );
 
   return (
-    <Section title="Work" aside={otLabel ? `by block · ${otLabel} has OT today` : "by block"} error={error}>
-      <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
-        <table className="w-full min-w-[47.5rem] table-fixed border-collapse">
+    <section className="mb-4" aria-label="Work">
+      {error && <p className="mb-2 text-xs text-[var(--destructive)]">{error}</p>}
+      <div role="tablist" aria-label="Show one column" className="mb-2 flex gap-1.5 md:hidden">
+        {LANE_TABS.map(([lane, label]) => (
+          <button key={lane} type="button" role="tab" aria-selected={shown === lane} onClick={() => setShown(lane)}
+            className="min-h-9 flex-1 rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--muted-foreground)] aria-selected:border-[var(--foreground)] aria-selected:bg-[var(--foreground)] aria-selected:text-[var(--background)]">
+            {label} <span className="ml-0.5 font-mono font-medium">{count(lane)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="overflow-x-auto border border-[var(--border)]">
+        <table className="w-full table-fixed border-collapse md:min-w-[47.5rem]">
           <thead>
             <tr>
-              <th className={`${TH} w-36`}>Block</th>
-              <th className={TH}>Now <span className="ml-1 font-mono font-medium normal-case tracking-normal">{count("now")}</span></th>
-              <th className={TH}>Next <span className="ml-1 font-mono font-medium normal-case tracking-normal">{count("next")}</span></th>
-              <th className={TH}>Someday <span className="ml-1 font-mono font-medium normal-case tracking-normal">{count("backlog")}</span></th>
+              <th className={`${TH} w-28 md:w-36`}>Block</th>
+              <th className={`${TH} ${hide("now")}`}>Now <span className="ml-1 font-mono font-medium normal-case tracking-normal">{count("now")}</span></th>
+              <th className={`${TH} ${hide("next")}`}>Next <span className="ml-1 font-mono font-medium normal-case tracking-normal">{count("next")}</span></th>
+              <th className={`${TH} ${hide("backlog")}`}>Someday <span className="ml-1 font-mono font-medium normal-case tracking-normal">{count("backlog")}</span></th>
             </tr>
           </thead>
           <tbody>
@@ -147,9 +158,9 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
                       </span>
                     )}
                   </th>
-                  <td className={TD}>{cell(by("now"), "next", "Next", true)}</td>
-                  <td className={TD}>{cell(by("next"), "now", "Now")}</td>
-                  <td className={TD}>
+                  <td className={`${TD} ${hide("now")}`}>{cell(by("now"), "next", "Next", true)}</td>
+                  <td className={`${TD} ${hide("next")}`}>{cell(by("next"), "now", "Now")}</td>
+                  <td className={`${TD} ${hide("backlog")}`}>
                     {cell(moreOf[id] ? parked : parked.slice(0, SOMEDAY_SHOWN), "next", "Next")}
                     {parked.length > SOMEDAY_SHOWN && (
                       <button type="button" aria-expanded={!!moreOf[id]} onClick={() => setMoreOf((cur) => ({ ...cur, [id]: !cur[id] }))}
@@ -172,7 +183,7 @@ export function WorkLanes({ data, notebooks, ot, onChanged }: Props) {
           </tbody>
         </table>
       </div>
-    </Section>
+    </section>
   );
 }
 
