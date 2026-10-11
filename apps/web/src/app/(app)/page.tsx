@@ -20,6 +20,9 @@ import { VotesPanel } from "@/components/routine/votes-panel";
 import { WorkLanes } from "@/components/routine/work-lanes";
 
 const REFRESH_MS = 60_000;
+/** On tablets the three side panels are tabs, centred; on phones they stack and on wide screens they are columns. */
+const SIDE_TABS = [["tasks", "Tasks"], ["log", "Log"], ["calendar", "Calendar"]] as const;
+const SIDE_PANEL = "md:mx-auto md:w-full md:max-w-2xl xl:max-w-none";
 
 /** Overview, the home page: the day's clock, lists and votes, with Now / Next / Someday across every block at the end. */
 export default function OverviewPage() {
@@ -43,6 +46,7 @@ export default function OverviewPage() {
   const [notebooks, setNotebooks] = useState<NotebooksData | null>(null);
   const [goals, setGoals] = useState<VaultGoalsData | null>(null);
   const [quarter, setQuarter] = useState<QuarterData | null>(null);
+  const [side, setSide] = useState<(typeof SIDE_TABS)[number][0]>("tasks");
   const now = useNow(30_000);
 
   const load = useCallback(() => {
@@ -157,7 +161,7 @@ export default function OverviewPage() {
         <>
           <TopBar dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday}
             goals={owner ? goals?.items ?? null : null} quarter={owner ? quarter : null}
-            onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} onQuarter={setQuarter} />
+            onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} />
           {owner ? (
             <>
               <div className="mb-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[repeat(3,minmax(0,1fr))] xl:gap-8 md:items-start">
@@ -165,14 +169,24 @@ export default function OverviewPage() {
                   <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
                 </div>
-                <div>
-                  <TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} />
-                  <LogList day={dayKey} entries={log} onChanged={loadPrivate}
-                    section={block ? blocks.label(block.block) : "Day"}
-                    span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
-                </div>
-                <div className="md:col-span-2 xl:col-span-1">
-                  <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
+                <div className="grid gap-6 md:col-span-2 xl:contents">
+                  <div role="tablist" aria-label="Tasks, log and calendar" className="mx-auto hidden w-full max-w-2xl gap-1.5 md:flex xl:hidden">
+                    {SIDE_TABS.map(([key, label]) => (
+                      <button key={key} type="button" role="tab" aria-selected={side === key} onClick={() => setSide(key)}
+                        className="min-h-9 flex-1 rounded-lg border border-[var(--border)] px-3 text-xs font-semibold text-[var(--muted-foreground)] aria-selected:border-[var(--foreground)] aria-selected:bg-[var(--foreground)] aria-selected:text-[var(--background)]">{label}</button>
+                    ))}
+                  </div>
+                  <div className={`${SIDE_PANEL} ${side === "calendar" ? "md:hidden xl:block" : ""}`}>
+                    <div className={side === "tasks" ? "" : "md:hidden xl:block"}><TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} /></div>
+                    <div className={side === "log" ? "" : "md:hidden xl:block"}>
+                      <LogList day={dayKey} entries={log} onChanged={loadPrivate}
+                        section={block ? blocks.label(block.block) : "Day"}
+                        span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
+                    </div>
+                  </div>
+                  <div className={`${SIDE_PANEL} ${side === "calendar" ? "" : "md:hidden xl:block"}`}>
+                    <CalendarCard day={dayKey} data={events} status={google} onChanged={loadPrivate} />
+                  </div>
                 </div>
               </div>
               <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>

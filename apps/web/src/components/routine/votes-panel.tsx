@@ -31,29 +31,37 @@ export function VotesPanel({ day, today, onSaved, current }: Props) {
     }
   }
 
+  const list = blocks.forDay(today?.blocks).filter((b) => b.counts_for_stars);
   return (
-    <section aria-label="Votes" className="flex flex-wrap items-center justify-between gap-x-5 gap-y-1 border-y border-[var(--border)] py-1.5">
+    <section aria-label="Votes" className="grid gap-1.5">
       <h2 className="text-micro font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Votes</h2>
-      {blocks.forDay(today?.blocks).filter((b) => b.counts_for_stars).map((b) => {
-        const block = b.key;
-        const stars = today?.blocks[block] ?? 0;
-        return (
-          <div key={block} className={`flex items-center gap-1.5 text-xs font-semibold ${current && current !== block ? "opacity-60" : ""}`}>
-            <span className="h-2 w-2 rounded-full" style={{ background: blocks.color(block) }} />{b.label}
-            <div className="flex gap-0.5" role="group" aria-label={`${b.label} vote`}>
-              {[1, 2, 3].map((n) => (
-                <button key={n} disabled={busy} aria-pressed={stars === n} aria-label={`${b.label} ${n} stars`}
-                  onClick={() => void vote(block, stars === n ? 0 : n)}
-                  className="grid h-7 w-7 place-items-center rounded-md bg-[var(--muted)] text-micro font-bold text-[var(--muted-foreground)] transition disabled:opacity-60 aria-pressed:text-white"
-                  style={stars === n ? { background: blocks.color(block) } : undefined}>
-                  {n}
-                </button>
-              ))}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        {list.map((b) => {
+          const block = b.key;
+          const stars = today?.blocks[block] ?? 0;
+          const color = blocks.color(block);
+          return (
+            <div key={block} role="group" aria-label={`${b.label} vote`}
+              className={`flex min-h-10 min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-3 pr-1 transition-opacity ${current && current !== block ? "opacity-60" : ""}`}>
+              <span className="flex min-w-0 items-center gap-2 text-small font-semibold">
+                <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden="true" />
+                <span className="truncate">{b.label}</span>
+              </span>
+              <span className="flex shrink-0">
+                {[1, 2, 3].map((n) => (
+                  <button key={n} type="button" disabled={busy} aria-pressed={stars === n} aria-label={`${b.label} ${n} ${n === 1 ? "star" : "stars"}`}
+                    onClick={() => void vote(block, stars === n ? 0 : n)}
+                    className="group grid h-10 w-8 place-items-center disabled:opacity-60">
+                    <span className="grid h-6 w-6 place-items-center rounded-md bg-[var(--muted)] font-mono text-micro font-semibold text-[var(--muted-foreground)] transition-colors group-hover:bg-[var(--border)] group-aria-pressed:text-white"
+                      style={stars === n ? { background: color } : undefined}>{n}</span>
+                  </button>
+                ))}
+              </span>
             </div>
-          </div>
-        );
-      })}
-      {error && <p className="w-full text-xs text-[var(--destructive)]">{error}</p>}
+          );
+        })}
+      </div>
+      {error && <p className="text-xs text-[var(--destructive)]">{error}</p>}
     </section>
   );
 }

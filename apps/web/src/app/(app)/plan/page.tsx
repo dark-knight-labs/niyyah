@@ -9,6 +9,7 @@ import { MonthTrack } from "@/components/planner/month-track";
 import { Notebook } from "@/components/planner/notebook";
 import { Notice, Spinner } from "@/components/planner/page-title";
 import { PipelineBoard } from "@/components/planner/pipeline-board";
+import { ObjectiveCarousel, objectiveChips, quarterPace, usePinned } from "@/components/routine/objective-carousel";
 import { PlanHeader } from "@/components/planner/plan-header";
 import { SmallDomino } from "@/components/planner/small-domino";
 import { StatusPill, StreamIcon } from "@/components/planner/stream-chip";
@@ -32,6 +33,8 @@ export default function PlanPage() {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const now = useNow(60_000);
+  const chips = objectiveChips(quarter, null, null, () => {}).map(({ href: _href, ...c }) => ({ ...c, onOpen: () => pick(c.id.replace("stream:", "")) }));
+  const { pinned, toggle, full } = usePinned(chips.map((c) => c.id));
 
   async function run(action: () => Promise<unknown>): Promise<boolean> {
     setProblem(null);
@@ -83,6 +86,12 @@ export default function PlanPage() {
     <div className="w-full">
       <PlanHeader quarter={quarter} objectives={objectives} streams={streams} schedule={schedule} today={dateInTz(now, PLANNER_TZ)} busy={busy}
         onSaveObjective={(text) => run(() => vaultApi.setSuperObjective(text, quarter.objective_ar))} />
+      {chips.length > 0 && (
+        <div className="mb-6 flex items-center gap-3 border-y border-[var(--border)] py-2">
+          <span className="shrink-0 text-micro font-bold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">{quarter.quarter.slice(5)}</span>
+          <div className="min-w-0 flex-1"><ObjectiveCarousel chips={chips} pinned={pinned} onPin={toggle} pace={quarterPace(quarter, now)} full={full} /></div>
+        </div>
+      )}
       {(problem || error) && <p role="alert" className="mb-4 rounded-xl border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
       <div className={`grid gap-6 ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[13rem_minmax(0,1fr)]"}`}>

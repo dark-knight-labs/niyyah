@@ -6,6 +6,7 @@ const MOVED = [
   { source: "/quarter", destination: "/plan" },
   { source: "/week", destination: "/plan" },
   { source: "/pipelines", destination: "/plan" },
+  { source: "/vault", destination: "/progress" },
 ];
 
 const nextConfig: NextConfig = {
