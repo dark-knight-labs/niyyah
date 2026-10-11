@@ -19,7 +19,8 @@ import { PLANNER_TZ } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { StreamChange } from "@/lib/vault-types";
 
-const RAIL_KEY = "niyyah-plan-rail";
+// v2: the stream list opens by default; an earlier collapsed choice is not carried over.
+const RAIL_KEY = "niyyah-plan-rail-v2";
 
 /** Plan: the Super Objective, the week, and each stream's goal, small domino, pipeline and notebook in one place. */
 export default function PlanPage() {
@@ -87,7 +88,7 @@ export default function PlanPage() {
       <PlanHeader quarter={quarter} objectives={objectives} streams={streams} schedule={schedule} today={dateInTz(now, PLANNER_TZ)} busy={busy}
         onSaveObjective={(text) => run(() => vaultApi.setSuperObjective(text, quarter.objective_ar))} />
       {chips.length > 0 && (
-        <div className="mb-6 flex items-center gap-3 border-y border-[var(--border)] py-2">
+        <div className="mb-3 flex items-center gap-3 border-b border-[var(--border)] pb-2">
           <span className="shrink-0 text-micro font-bold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">{quarter.quarter.slice(5)}</span>
           <div className="min-w-0 flex-1"><ObjectiveCarousel chips={chips} pinned={pinned} onPin={toggle} pace={quarterPace(quarter, now)} full={full} /></div>
         </div>
@@ -96,16 +97,15 @@ export default function PlanPage() {
 
       <div className={`grid gap-4 ${collapsed ? "lg:grid-cols-[3.25rem_minmax(0,1fr)]" : "lg:grid-cols-[12rem_minmax(0,1fr)]"}`}>
         <div className="relative min-w-0">
-          {/* The handle rides the rail's right edge at the middle of the screen (not the middle of a short list), and only exists where the rail does. */}
-          <div className="pointer-events-none absolute inset-y-0 -right-3 z-10 hidden w-6 lg:block">
+        <nav aria-label="Streams" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:p-0 [&::-webkit-scrollbar]:hidden">
+          <div className={`hidden min-h-8 items-center ${collapsed ? "justify-center" : "justify-between px-2.5"} lg:flex`}>
+            {!collapsed && <p className="mono text-[var(--muted-foreground)]">Streams</p>}
             <button type="button" onClick={toggleRail} aria-expanded={!collapsed} aria-label={collapsed ? "Expand the stream list" : "Collapse the stream list"}
               title={collapsed ? "Expand the stream list" : "Collapse the stream list"}
-              className="pointer-events-auto sticky top-[calc(50vh-0.75rem)] grid h-6 w-6 place-items-center rounded-none border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition-colors hover:border-[var(--border-strong,var(--muted-foreground))] hover:text-[var(--foreground)] active:scale-90">
-              {collapsed ? <ChevronRight size={13} aria-hidden="true" /> : <ChevronLeft size={13} aria-hidden="true" />}
+              className="grid h-6 w-6 place-items-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]">
+              {collapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
             </button>
           </div>
-        <nav aria-label="Streams" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:mx-0 lg:grid lg:gap-0.5 lg:overflow-visible lg:p-0 [&::-webkit-scrollbar]:hidden">
-          <p className={`mono hidden min-h-8 items-center px-2.5 text-[var(--muted-foreground)] ${collapsed ? "" : "lg:flex"}`}>Streams</p>
           {streams.map((s) => {
             const on = s.id === meta?.id;
             const blocked = blockedCount(s.id);
