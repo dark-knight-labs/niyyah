@@ -24,6 +24,7 @@
 | `pipeline_items` | `id`, `stream`, `lane` (`now`, `next`, `backlog`, `done`), `text`, `description`, `products` (tag list), `product` (the first tag, for older readers), `checkpoint`, `added_on`, `done_on`, `focus_week`, `done`, `blocked_by` (notebook entry ids) |
 | `notebook_entries` | `stream`, `id`, `kind` (`idea`, `meeting`, `blocker`), `title`, `body`, `date`, `open` |
 | `days` | per day, oldest first: `date`, `mode`, `possible`, `total`, `focus`, `votes` (`{block: stars}`), `log` (list of lines) |
+| `habits` | `name`, `block` (a key from `blocks`), `anchor`, `per_week`, `minimum`, `stage` (`installing`, `rails`, `retired`), `stream`, `gate_pct`, `gate_weeks`, `trip_pct`, `trip_weeks`, `started_on`, `checks` (`{date: "done" or "min"}`); optional on import |
 | `tasks` | `id`, `text`, `done`, `due_on`, `scheduled_on`, `start_on`, `done_on`, `source_path` |
 
 Dates are ISO `YYYY-MM-DD`. Lists are in a stable order, so the same data always produces the same bytes and the same `ETag`.

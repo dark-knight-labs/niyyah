@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePlanner } from "@/hooks/use-planner";
 import { useNow } from "@/hooks/use-now";
+import { HabitBoard } from "@/components/planner/habit-board";
 import { CaptureBar } from "@/components/planner/capture-bar";
 import { Notice, Spinner } from "@/components/planner/page-title";
 import { PlanHeader } from "@/components/planner/plan-header";
@@ -13,7 +14,7 @@ import { Row, Tab, View, buildRows, tabOf } from "@/lib/plan-model";
 import { dateInTz } from "@/lib/routine";
 import { PLANNER_TZ } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
-import { StreamChange } from "@/lib/vault-types";
+import { HabitsData, StreamChange } from "@/lib/vault-types";
 
 /** A numbered mono strip that titles a section of the sheet. */
 function Strip({ n, title, aside }: { n: string; title: string; aside?: string }) {
@@ -36,7 +37,29 @@ export default function PlanPage() {
   const [problem, setProblem] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [habits, setHabits] = useState<HabitsData | null>(null);
+  const [habitPick, setHabitPick] = useState<number | null>(null);
   const now = useNow(60_000);
+
+  useEffect(() => {
+    if (owner) vaultApi.habits().then(setHabits).catch(() => setHabits(null));
+  }, [owner]);
+
+  /** Habit writes answer with the whole habit list, so the board needs no reload. */
+  async function runHabits(action: () => Promise<HabitsData>): Promise<boolean> {
+    setProblem(null);
+    setMessage("");
+    setBusy(true);
+    try {
+      setHabits(await action());
+      return true;
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "Could not save");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function run(action: () => Promise<unknown>): Promise<boolean> {
     setProblem(null);
@@ -96,6 +119,12 @@ export default function PlanPage() {
       {(problem || error) && <p role="alert" className="mb-4 border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
       <CaptureBar streams={streams} stream={stream} busy={busy} run={run}
+        onHabit={async (h) => {
+          let added = 0;
+          const ok = await runHabits(async () => { const d = await vaultApi.addHabit(h); added = d.habits.length; return d; });
+          if (ok) { setMessage("Habit added"); setHabitPick(null); document.getElementById("plan-habits")?.scrollIntoView({ block: "start", behavior: "smooth" }); }
+          return ok && added > 0;
+        }}
         onAdded={(tab, count) => { setViewState((v) => ({ ...v, tab, tag: null, kind: "all" })); setMessage(count > 1 ? `${count} items added` : "Added"); }} />
 
       {streams.length === 0 ? (
@@ -122,6 +151,13 @@ export default function PlanPage() {
               busy={busy} run={run} message={message} />
           </section>
         </>
+      )}
+
+      {habits && (
+        <section id="plan-habits" aria-label="Habits" className="mt-4 border border-[var(--border)] bg-[var(--surface)]">
+          <Strip n="03" title="Habits" aside={`${habits.habits.filter((h) => h.stage === "installing").length} installing · ${habits.habits.filter((h) => h.stage === "rails").length} on rails`} />
+          <HabitBoard data={habits} streams={streams} busy={busy} runHabits={runHabits} picked={habitPick} onPick={setHabitPick} />
+        </section>
       )}
     </div>
   );

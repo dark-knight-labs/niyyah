@@ -6,14 +6,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerScheduleBlock, PlannerScheduleSetting,
+    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
     Quarter, QuarterStream, Task, WeekObjective,
 )
 from app.models.vault import VaultBlockVote, VaultDay
 from app.schemas.snapshot import Snapshot
 from app.services.rules import checklist_from_text, checklist_text, clean_checklist, clean_products
 
-USER_TABLES = (PlannerBlock, PlannerCalendarFeed, Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem,
+USER_TABLES = (PlannerHabitCheck, PlannerHabit, PlannerBlock, PlannerCalendarFeed, Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem,
                NotebookEntry, PlannerScheduleSetting, PlannerScheduleBlock)
 
 
@@ -61,13 +61,14 @@ def _stream_row(user_id: int, label: str, s, position: int) -> QuarterStream:
 
 
 def _blocks(snap: Snapshot, user_id: int) -> list[PlannerBlock]:
-    """The snapshot's blocks, plus a plain block for any key its votes or schedule use that it does not list."""
+    """The snapshot's blocks, plus a plain block for any key its votes, schedule or habits use that it does not list."""
     listed = {b.key for b in snap.blocks}
     voted = {k for d in snap.days for k in d.votes}
     scheduled = {r.block for rows in (snap.schedule.days.values() if snap.schedule else []) for r in rows}
     rows = [PlannerBlock(user_id=user_id, key=b.key, label=b.label, ring_name=b.ring_name, color=b.color,
                          counts_for_stars=b.counts_for_stars, position=n, archived=b.archived) for n, b in enumerate(snap.blocks)]
-    for key in sorted((voted | scheduled) - listed):
+    habited = {h.block for h in snap.habits}
+    for key in sorted((voted | scheduled | habited) - listed):
         rows.append(PlannerBlock(user_id=user_id, key=key, label=key.replace("-", " ").title(), ring_name=key[:6].upper(), color="slate",
                                  counts_for_stars=key in voted, position=len(rows), archived=False))
     return rows
@@ -118,4 +119,15 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
     if snap.schedule:
         db.add(PlannerScheduleSetting(user_id=user_id, meta=snap.schedule.meta))
     await db.flush()
+
+    habits = [PlannerHabit(user_id=user_id, name=h.name, block=h.block, anchor=h.anchor, per_week=h.per_week, minimum=h.minimum, stage=h.stage,
+                           stream=h.stream, gate_pct=h.gate_pct, gate_weeks=h.gate_weeks, trip_pct=h.trip_pct, trip_weeks=h.trip_weeks,
+                           started_on=h.started_on, position=n) for n, h in enumerate(snap.habits)]
+    db.add_all(habits)
+    await db.flush()  # the habits get their ids, which the checks need
+    checks = [PlannerHabitCheck(user_id=user_id, habit_id=row.id, day=day, level=level)
+              for row, h in zip(habits, snap.habits) for day, level in h.checks.items()]
+    db.add_all(checks)
+    await db.flush()
+    groups["habits"], groups["habit_checks"] = habits, checks
     return {name: len(rows) for name, rows in groups.items()}

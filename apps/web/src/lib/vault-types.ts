@@ -249,3 +249,57 @@ export interface GoalIn { title: string; value: string; caption: string; progres
 
 export interface ApiTokenData { id: number; name: string; prefix: string; created_at: string; last_used_at: string | null }
 export interface NewApiToken extends ApiTokenData { token: string }
+
+export type HabitStage = "installing" | "rails" | "retired";
+export type HabitLevel = "done" | "min";
+export type Tripwire = "quiet" | "close" | "fired";
+
+export interface HabitWeek { start: string; count: number; pct: number; current: boolean }
+
+/** A repeating behaviour that lives in a day block (not a stream) and is checked off per day. */
+export interface HabitData {
+  id: number;
+  name: string;
+  /** A key of the user's day blocks (Settings), not a plan stream. */
+  block: string;
+  anchor: string;
+  /** Target days a week; 7 is daily. */
+  per_week: number;
+  /** The two-minute version; counts as showing up. */
+  minimum: string;
+  stage: HabitStage;
+  stream: string | null;
+  gate_pct: number;
+  gate_weeks: number;
+  trip_pct: number | null;
+  trip_weeks: number | null;
+  started_on: string;
+  today: HabitLevel | null;
+  streak: number;
+  gate_run: number;
+  gate_met: boolean;
+  /** Only for habits on rails with a tripwire written. */
+  tripwire: Tripwire | null;
+  /** The last 12 weeks, oldest first. */
+  weeks: HabitWeek[];
+  days: Record<string, HabitLevel>;
+}
+
+export interface HabitsData { today: string; installing_limit: number; habits: HabitData[] }
+
+export interface HabitFields {
+  name?: string;
+  block?: string;
+  anchor?: string;
+  per_week?: number;
+  minimum?: string;
+  stage?: HabitStage;
+  stream?: string;
+  clear_stream?: boolean;
+  gate_pct?: number;
+  gate_weeks?: number;
+  trip_pct?: number;
+  trip_weeks?: number;
+  /** Demote although the gate is not met. */
+  force?: boolean;
+}

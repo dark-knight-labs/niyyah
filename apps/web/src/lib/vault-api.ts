@@ -5,6 +5,9 @@ import {
   BlocksConfigData,
   FeedData,
   GoalIn,
+  HabitFields,
+  HabitLevel,
+  HabitsData,
   ScheduleConfigIn,
   VaultBlocksSeriesData,
   VaultDayData,
@@ -99,5 +102,11 @@ export const vaultApi = {
   feeds: () => api.get<FeedData[]>("/vault/config/feeds"),
   addFeed: (name: string, url: string) => api.post<FeedData>("/vault/config/feeds", { name, url }),
   removeFeed: (id: number) => api.delete(`/vault/config/feeds/${id}`),
+  habits: () => api.get<HabitsData>("/vault/habits"),
+  addHabit: (body: { name: string; block: string; anchor?: string; per_week?: number; minimum?: string; stream?: string }) =>
+    api.post<HabitsData>("/vault/habits", body),
+  updateHabit: (id: number, fields: HabitFields) => api.put<HabitsData>(`/vault/habits/${id}`, fields),
+  removeHabit: (id: number) => api.delete<HabitsData>(`/vault/habits/${id}`),
+  checkHabit: (id: number, day: string, level: HabitLevel | null) => api.put<HabitsData>(`/vault/habits/${id}/check`, { day, level }),
   status: () => api.get<DaysStatusData>("/vault/status"),
 };
