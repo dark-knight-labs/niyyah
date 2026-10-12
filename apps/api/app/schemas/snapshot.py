@@ -160,6 +160,29 @@ def _cap(limit: int):
     return Field(default=[], max_length=limit)
 
 
+class SnapHabit(_Loose):
+    name: str = Field(max_length=200)
+    block: str = Field(max_length=20)
+    anchor: str = Field(default="", max_length=60)
+    per_week: int = Field(default=7, ge=1, le=7)
+    minimum: str = Field(default="", max_length=120)
+    stage: str = Field(default="installing", pattern=r"^(installing|rails|retired)$")
+    stream: str | None = Field(default=None, max_length=24)
+    gate_pct: int = Field(default=80, ge=1, le=100)
+    gate_weeks: int = Field(default=8, ge=1, le=52)
+    trip_pct: int | None = Field(default=None, ge=1, le=100)
+    trip_weeks: int | None = Field(default=None, ge=1, le=26)
+    started_on: dt.date
+    checks: dict[dt.date, str] = {}
+
+    @field_validator("checks")
+    @classmethod
+    def _levels(cls, checks):
+        if set(checks.values()) - {"done", "min"}:
+            raise ValueError("a habit check is 'done' or 'min'")
+        return checks
+
+
 class Snapshot(_Loose):
     version: int
     blocks: list[SnapBlock] = _cap(60)
@@ -172,6 +195,7 @@ class Snapshot(_Loose):
     notebook_entries: list[SnapNotebookEntry] = _cap(20000)
     days: list[SnapDay] = _cap(20000)
     tasks: list[SnapTask] = _cap(50000)
+    habits: list[SnapHabit] = _cap(500)
 
     @field_validator("version")
     @classmethod

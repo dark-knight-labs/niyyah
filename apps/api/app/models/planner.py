@@ -185,3 +185,36 @@ class PlannerBlock(Base):
     counts_for_stars: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class PlannerHabit(Base):
+    """A small repeating behaviour that lives in a day block, with a life cycle: installing, on rails, retired."""
+    __tablename__ = "planner_habits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    block: Mapped[str] = mapped_column(String(20), nullable=False)  # a key of planner_blocks
+    anchor: Mapped[str] = mapped_column(String(60), default="", nullable=False)  # the cue: "After Fajr", "Asr to Maghrib"
+    per_week: Mapped[int] = mapped_column(Integer, default=7, nullable=False)  # 7 = daily
+    minimum: Mapped[str] = mapped_column(String(120), default="", nullable=False)  # the two-minute version
+    stage: Mapped[str] = mapped_column(String(10), default="installing", nullable=False)  # installing | rails | retired
+    stream: Mapped[str | None] = mapped_column(String(24), nullable=True)  # the goal it serves, if any
+    gate_pct: Mapped[int] = mapped_column(Integer, default=80, nullable=False)
+    gate_weeks: Mapped[int] = mapped_column(Integer, default=8, nullable=False)
+    trip_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)  # tripwire: written at demotion
+    trip_weeks: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    started_on: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class PlannerHabitCheck(Base):
+    """One habit done (or its minimum) on one day."""
+    __tablename__ = "planner_habit_checks"
+    __table_args__ = (UniqueConstraint("habit_id", "day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    habit_id: Mapped[int] = mapped_column(Integer, ForeignKey("planner_habits.id", ondelete="CASCADE"), nullable=False, index=True)
+    day: Mapped[dt.date] = mapped_column(Date, nullable=False)
+    level: Mapped[str] = mapped_column(String(4), nullable=False)  # done | min

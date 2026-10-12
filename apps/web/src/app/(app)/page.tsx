@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api-client";
 import { useBlocks } from "@/lib/blocks";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { GoogleStatusData, QuarterData, NotebooksData, VaultGoalsData, VaultObjectivesData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultTaskData } from "@/lib/vault-types";
+import { GoogleStatusData, QuarterData, NotebooksData, VaultGoalsData, VaultObjectivesData, PipelinesData, VaultDayData, VaultEventsData, VaultLogEntry, VaultTaskData, HabitsData } from "@/lib/vault-types";
 import { dateInTz, formatMinutes, hasLocation, nowMinutes, resolveDay, slotOwnerFor, VaultScheduleData } from "@/lib/routine";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
@@ -17,6 +17,7 @@ import { NowCard } from "@/components/routine/now-card";
 import { RoutineRing } from "@/components/routine/routine-ring";
 import { TaskList } from "@/components/routine/task-list";
 import { ThisWeek } from "@/components/routine/this-week";
+import { HabitsPanel } from "@/components/routine/habits-panel";
 import { VotesPanel } from "@/components/routine/votes-panel";
 import { WorkLanes } from "@/components/routine/work-lanes";
 
@@ -48,6 +49,7 @@ export default function OverviewPage() {
   const [goals, setGoals] = useState<VaultGoalsData | null>(null);
   const [quarter, setQuarter] = useState<QuarterData | null>(null);
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
+  const [habits, setHabits] = useState<HabitsData | null>(null);
   const [side, setSide] = useState<(typeof SIDE_TABS)[number][0]>("tasks");
   const now = useNow(30_000);
 
@@ -105,6 +107,7 @@ export default function OverviewPage() {
     vaultApi.goals().then(setGoals).catch(() => setGoals(null));
     vaultApi.quarter().then(setQuarter).catch(() => setQuarter(null));
     vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
+    vaultApi.habits().then(setHabits).catch(() => setHabits(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
 
@@ -193,6 +196,7 @@ export default function OverviewPage() {
                   <div className={SIDE_PANEL}><ThisWeek quarter={quarter} objectives={objectives} /></div>
                 </div>
               </div>
+              {habits && <div className="mb-5"><HabitsPanel day={dayKey} data={habits} today={today} onData={setHabits} onVoted={setToday} /></div>}
               <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
               {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slotId ?? undefined} onChanged={loadPrivate} />}
             </>

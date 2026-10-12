@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerScheduleBlock, PlannerScheduleSetting,
+    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
     Quarter, QuarterStream, Task, WeekObjective,
 )
 from app.models.user import User
@@ -60,6 +60,14 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
              "votes": {v.block: v.stars for v in sorted(d.block_votes, key=lambda v: v.block)}, "log": log.get(d.date, [])}
             for d in day_rows]
 
+    habit_checks: dict[int, dict[str, str]] = {}
+    for c in await rows(PlannerHabitCheck, PlannerHabitCheck.day):
+        habit_checks.setdefault(c.habit_id, {})[c.day.isoformat()] = c.level
+    habits = [{"name": h.name, "block": h.block, "anchor": h.anchor, "per_week": h.per_week, "minimum": h.minimum, "stage": h.stage,
+               "stream": h.stream, "gate_pct": h.gate_pct, "gate_weeks": h.gate_weeks, "trip_pct": h.trip_pct, "trip_weeks": h.trip_weeks,
+               "started_on": _iso(h.started_on), "checks": habit_checks.get(h.id, {})}
+              for h in await rows(PlannerHabit, PlannerHabit.position, PlannerHabit.id)]
+
     return {
         "version": FORMAT_VERSION,
         "user": {"email": user.email, "timezone": user.timezone},
@@ -85,6 +93,7 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
         "tasks": [{"id": t.id, "text": t.text, "done": t.done, "due_on": _iso(t.due_on), "scheduled_on": _iso(t.scheduled_on),
                    "start_on": _iso(t.start_on), "done_on": _iso(t.done_on), "source_path": t.source_path}
                   for t in await rows(Task, Task.id)],
+        "habits": habits,
     }
 
 

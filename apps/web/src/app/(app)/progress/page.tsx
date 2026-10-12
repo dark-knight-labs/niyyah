@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { HabitWeeks } from "@/components/progress/habit-weeks";
 import { DayDock } from "@/components/progress/day-dock";
 import { StripChart } from "@/components/progress/strip-chart";
 import { useNow } from "@/hooks/use-now";
@@ -115,6 +116,7 @@ export default function ProgressPage() {
       <DayDock date={selected} day={map.get(selected)} isToday={selected === today}
         canPrev={idx > 0} canNext={idx >= 0 && idx < dates.length - 1}
         onStep={(by) => setPicked(dates[Math.max(0, Math.min(dates.length - 1, idx + by))])} onToday={() => setPicked(null)} />
+      <HabitWeeks />
       <p className="mt-3 text-xs text-[var(--muted-foreground)]">A good day is {GOOD_DAY_PCT}% or more of the possible stars. Consistency is the share of logged days that were good.</p>
     </div>
   );

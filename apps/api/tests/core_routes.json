@@ -240,6 +240,26 @@
   "PUT"
  ],
  [
+  "/api/v1/vault/habits",
+  "GET"
+ ],
+ [
+  "/api/v1/vault/habits",
+  "POST"
+ ],
+ [
+  "/api/v1/vault/habits/{habit_id}",
+  "DELETE"
+ ],
+ [
+  "/api/v1/vault/habits/{habit_id}",
+  "PUT"
+ ],
+ [
+  "/api/v1/vault/habits/{habit_id}/check",
+  "PUT"
+ ],
+ [
   "/api/v1/vault/month",
   "GET"
  ],

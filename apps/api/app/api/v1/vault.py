@@ -35,6 +35,10 @@ from app.schemas.vault import (
     GoalsResponse,
     GoogleConnectResponse,
     GoogleStatusResponse,
+    HabitCheckIn,
+    HabitFieldsIn,
+    HabitIn,
+    HabitsResponse,
     LogEntryIn,
     LogEntryRemoveIn,
     LogEntryResponse,
@@ -74,7 +78,7 @@ from app.schemas.vault import (
     VaultWeekResponse,
     VoteIn,
 )
-from app.services import google_calendar, planner_blocks, planner_config, planner_day, planner_store, planner_work
+from app.services import google_calendar, planner_blocks, planner_config, planner_day, planner_habits, planner_store, planner_work
 from app.services.calendar_events import events_for_day
 from app.services.google_calendar import GoogleCalendarError
 from app.services.planner_views import notebooks_response, objectives_response, pipelines_response, quarter_response
@@ -714,3 +718,46 @@ async def put_notebook_blocker(data: NotebookBlockerIn, user: User = Depends(get
 async def post_notebook_remove(data: PipelineRefIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     await _known_stream(db, user, data.stream, _local_now().date())
     return await _day_write(db, lambda: planner_work.remove_entry(db, user.id, data.stream, data.line))
+
+
+# --- Habits ---------------------------------------------------------------
+
+async def _habits(db: AsyncSession, user: User) -> HabitsResponse:
+    today = _local_now().date()
+    return HabitsResponse(today=today, installing_limit=planner_habits.INSTALLING_LIMIT,
+                          habits=await planner_habits.list_habits(db, user.id, today))
+
+
+@router.get("/habits", response_model=HabitsResponse)
+async def get_habits(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await _habits(db, user)
+
+
+@router.post("/habits", response_model=HabitsResponse)
+async def post_habit(data: HabitIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    await _db_run(db, lambda: planner_habits.add_habit(db, user.id, today, data.model_dump()))
+    return await _habits(db, user)
+
+
+@router.put("/habits/{habit_id}", response_model=HabitsResponse)
+async def put_habit(habit_id: int, data: HabitFieldsIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    fields = data.model_dump(exclude_none=True, exclude={"clear_stream", "force"})
+    if data.clear_stream:
+        fields["stream"] = None
+    await _db_run(db, lambda: planner_habits.update_habit(db, user.id, today, habit_id, fields, data.force))
+    return await _habits(db, user)
+
+
+@router.delete("/habits/{habit_id}", response_model=HabitsResponse)
+async def delete_habit(habit_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _db_run(db, lambda: planner_habits.remove_habit(db, user.id, habit_id))
+    return await _habits(db, user)
+
+
+@router.put("/habits/{habit_id}/check", response_model=HabitsResponse)
+async def put_habit_check(habit_id: int, data: HabitCheckIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    _check_day(data.day)
+    await _db_run(db, lambda: planner_habits.set_check(db, user.id, habit_id, data.day, data.level))
+    return await _habits(db, user)

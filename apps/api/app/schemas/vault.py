@@ -469,3 +469,69 @@ class FeedResponse(BaseModel):
     host: str
     color: str | None = None
     email: str | None = None
+
+
+class HabitWeek(BaseModel):
+    start: date
+    count: int
+    pct: int
+    current: bool
+
+
+class HabitResponse(BaseModel):
+    id: int
+    name: str
+    block: str
+    anchor: str
+    per_week: int
+    minimum: str
+    stage: str
+    stream: str | None = None
+    gate_pct: int
+    gate_weeks: int
+    trip_pct: int | None = None
+    trip_weeks: int | None = None
+    started_on: date
+    today: str | None = None
+    streak: int
+    gate_run: int
+    gate_met: bool
+    tripwire: str | None = None
+    weeks: list[HabitWeek]
+    days: dict[str, str]
+
+
+class HabitsResponse(BaseModel):
+    today: date
+    installing_limit: int
+    habits: list[HabitResponse]
+
+
+class HabitIn(BaseModel):
+    name: str
+    block: str
+    anchor: str = ""
+    per_week: int = 7
+    minimum: str = ""
+    stream: str | None = None
+
+
+class HabitFieldsIn(BaseModel):
+    name: str | None = None
+    block: str | None = None
+    anchor: str | None = None
+    per_week: int | None = None
+    minimum: str | None = None
+    stage: str | None = None
+    stream: str | None = None
+    gate_pct: int | None = None
+    gate_weeks: int | None = None
+    trip_pct: int | None = None
+    trip_weeks: int | None = None
+    clear_stream: bool = False
+    force: bool = False
+
+
+class HabitCheckIn(BaseModel):
+    day: date
+    level: str | None = None

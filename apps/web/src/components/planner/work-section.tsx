@@ -248,8 +248,8 @@ export function WorkSection({ streams, quarter, pipelines, notebooks, objectives
                       className={`h-10 w-8 text-[0.9375rem] ${one ? "text-[var(--warn)]" : "text-[var(--muted-foreground)] opacity-60 hover:text-[var(--warn)] hover:opacity-100"}`}>{one ? "★" : "☆"}</button>
                   ) : <span />}
                   <span className="mono hidden items-center gap-2 pr-2 text-[var(--muted-foreground)] md:flex"><span className="h-2 w-2 shrink-0" style={{ background: m?.color }} aria-hidden="true" /><span className="truncate">{m?.label}</span></span>
-                  <div className={`min-w-0 truncate pr-3 ${done || clearedBlocker ? "text-[var(--muted-foreground)] line-through" : ""}`}>
-                    <b className={`font-semibold ${blocked ? "text-[var(--destructive)]" : ""}`}>{title}</b>
+                  <div className={`min-w-0 truncate pr-3 text-small ${done || clearedBlocker ? "text-[var(--muted-foreground)] line-through" : ""}`}>
+                    <b className={`font-medium ${blocked ? "text-[var(--destructive)]" : ""}`}>{title}</b>
                     {snippet && <span className="text-[var(--muted-foreground)]"> — {snippet.split("\n")[0]}</span>}
                   </div>
                   <div className="hidden items-center gap-1.5 pr-3 md:flex">
