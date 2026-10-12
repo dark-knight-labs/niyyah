@@ -1,5 +1,6 @@
 "use client";
 
+import { Pick } from "@/components/planner/pick";
 import { Checkbox } from "@/components/routine/checkbox";
 import { EditableRow } from "@/components/routine/editable-row";
 import { StreamMeta } from "@/lib/streams";
@@ -26,15 +27,12 @@ export function SmallDomino({ meta, objective, pool, run, onPick }: Props) {
           onChange={() => void run(() => vaultApi.setObjective(meta.id, { done: !done }))} />}
         onSave={async (text) => { await run(() => vaultApi.setObjective(meta.id, { text })); }} />
       {!objective?.text && pool.length > 0 && (
-        <label className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--muted-foreground)]">
           <span>Pick from pipeline</span>
-          <select defaultValue="" aria-label={`Pick ${meta.label} objective from its pipeline`}
-            onChange={(e) => { const it = pool[Number(e.target.value)]; if (it) onPick(it); }}
-            className="min-h-9 max-w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-small text-[var(--foreground)]">
-            <option value="" disabled>Now, Next and Someday…</option>
-            {pool.map((it, idx) => <option key={it.line} value={idx}>{it.lane === "now" ? "★ " : ""}{it.text}</option>)}
-          </select>
-        </label>
+          <Pick value="" label={`Pick ${meta.label} objective from its pipeline`} placeholder="Now, Next and Someday" className="max-w-full"
+            options={pool.map((it, idx) => ({ value: String(idx), label: `${it.lane === "now" ? "★ " : ""}${it.text}` }))}
+            onChange={(v) => { const it = pool[Number(v)]; if (it) onPick(it); }} />
+        </div>
       )}
     </div>
   );
