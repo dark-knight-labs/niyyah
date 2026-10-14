@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useBlocks } from "@/lib/blocks";
 import { countsToday, gateLabel, suggestedStars } from "@/lib/habit";
@@ -15,12 +15,35 @@ interface Props {
   onVoted: (day: VaultDayData | null) => void;
 }
 
-/** Today's habits under the day block they live in. Ticking one updates the star count the block's habits suggest; one tap applies it. */
-export function HabitsPanel({ day, data, today, onData, onVoted }: Props) {
+/** How many days back the API lets a check or vote be edited (the week endpoint covers today and the six before). */
+const BACK_DAYS = 6;
+
+/** The day `back` days before `day` (both YYYY-MM-DD). */
+function shiftDay(day: string, back: number): string {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - back);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Habits under the day block they live in. Ticking one updates the star count the block's habits suggest; one tap applies it. The arrows step back through the last week so a missed day can be filled in. */
+export function HabitsPanel({ day: todayKey, data, today: todayData, onData, onVoted }: Props) {
   const blocks = useBlocks();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const live = data.habits.filter((h) => h.stage !== "retired");
+  const [back, setBack] = useState(0);
+  const [past, setPast] = useState<VaultDayData | null>(null);
+  const day = shiftDay(todayKey, back);
+  const isToday = back === 0;
+  const today = isToday ? todayData : past;
+  // A habit viewed on an earlier day shows that day's check in place of today's.
+  const live = data.habits.filter((h) => h.stage !== "retired").map((h) => (isToday ? h : { ...h, today: h.days[day] ?? null }));
+
+  useEffect(() => {
+    if (back === 0) return;
+    let stale = false;
+    vaultApi.week().then((w) => { if (!stale) setPast(w.days.find((d) => d.date === day) ?? null); }).catch(() => { if (!stale) setPast(null); });
+    return () => { stale = true; };
+  }, [back, day]);
 
   async function guard(work: () => Promise<void>) {
     setBusy(true);
@@ -28,7 +51,10 @@ export function HabitsPanel({ day, data, today, onData, onVoted }: Props) {
     try { await work(); } catch (err) { setError(err instanceof Error ? err.message : "Could not save"); } finally { setBusy(false); }
   }
   const check = (h: HabitData, level: HabitLevel | null) => guard(async () => onData(await vaultApi.checkHabit(h.id, day, level)));
-  const apply = (block: string, stars: number) => guard(async () => onVoted((await vaultApi.setVote(day, block, stars)).day));
+  const apply = (block: string, stars: number) => guard(async () => {
+    const saved = (await vaultApi.setVote(day, block, stars)).day;
+    if (isToday) onVoted(saved); else setPast(saved);
+  });
 
   const groups = [...blocks.list.map((b) => b.key), ...live.map((h) => h.block)]
     .filter((k, i, all) => all.indexOf(k) === i)
@@ -41,7 +67,11 @@ export function HabitsPanel({ day, data, today, onData, onVoted }: Props) {
     <section aria-label="Habits" className="border border-[var(--border)] bg-[var(--surface)]">
       <h2 className="mono flex h-11 items-center justify-between gap-4 border-b border-[var(--border)] px-4 text-[var(--muted-foreground)]">
         <span>Habits</span>
-        <span className="tabular-nums">{doneCount} of {due.length} today</span>
+        <span className="flex items-center gap-2 tabular-nums">
+          <button type="button" aria-label="Previous day" disabled={back >= BACK_DAYS} onClick={() => setBack(back + 1)} className="px-1.5 hover:text-[var(--foreground)] disabled:opacity-30">‹</button>
+          <span>{isToday ? "Today" : day}: {doneCount} of {due.length}</span>
+          <button type="button" aria-label="Next day" disabled={isToday} onClick={() => setBack(back - 1)} className="px-1.5 hover:text-[var(--foreground)] disabled:opacity-30">›</button>
+        </span>
       </h2>
       {groups.length === 0 && (
         <p className="px-4 py-3 text-small text-[var(--muted-foreground)]">No habits yet. Add one from the capture line on <Link href="/plan" className="underline">Plan</Link>.</p>
