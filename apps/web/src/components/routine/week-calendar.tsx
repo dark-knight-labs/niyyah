@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Plus, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Star, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatMinutes } from "@/lib/routine";
 import { formatDuration } from "@/lib/ring";
@@ -23,12 +23,17 @@ const px = (min: number) => (min / 60) * HOUR_PX;
 const snap = (min: number) => Math.round(min / SNAP) * SNAP;
 const hhmm = (min: number) => formatMinutes(Math.min(1439, Math.max(0, min)));
 
+/** What a pin is stored under: a Google event by its id, any other event by title, day and start, a task by day and text. */
+const eventPin = (day: string, e: VaultEvent) => `e:${e.id ?? `${e.title}|${day}|${e.start_min ?? "all"}`}`;
+const taskPin = (day: string, t: VaultTaskData) => `t:${day}|${t.text}`;
+
 /** The week Sunday to Saturday around `today`, its events and tasks per day, and the paging that changes it. */
 export function useWeek(today: string | null, refreshKey: number) {
   const [start, setStart] = useState<string | null>(null);
   const [data, setData] = useState<Record<string, DayData>>({});
   const [errors, setErrors] = useState<string[]>([]);
   const [change, setChange] = useState(0);
+  const [pins, setPins] = useState<string[]>([]);
   const first = start ?? (today ? sundayOf(today) : null);
   const thisWeek = today ? sundayOf(today) : null;
   const days = useMemo(() => (first ? weekDays(`${first}/${addDays(first, 6)}`) : []), [first]);
@@ -50,8 +55,20 @@ export function useWeek(today: string | null, refreshKey: number) {
     return () => { live = false; };
   }, [days, refreshKey, change]);
 
+  useEffect(() => {
+    let live = true;
+    vaultApi.pins().then((p) => live && setPins(p)).catch(() => {});
+    return () => { live = false; };
+  }, []);
+
   return {
-    days, data, errors, today, isThisWeek: first === thisWeek,
+    days, data, errors, today, isThisWeek: first === thisWeek, pins,
+    /** Mark an event or task important (or clear it); shows at once and settles on what the server says. */
+    togglePin: (key: string) => {
+      const pinned = !pins.includes(key);
+      setPins(pinned ? [...pins, key] : pins.filter((k) => k !== key));
+      vaultApi.setPin(key, pinned).then(setPins).catch(() => setPins(pins));
+    },
     go: (n: number) => setStart(addDays(first as string, 7 * n)),
     goToday: () => setStart(null),
     reload: () => setChange((c) => c + 1),
@@ -90,6 +107,21 @@ function ReconnectLink() {
   );
 }
 
+const day0 = (pick: string) => pick.slice(0, 10);
+
+/** One-line input in an all-day cell: Enter adds the task, Esc or leaving it empty cancels. */
+function AddTask({ day, onDone }: { day: string; onDone: (text: string | null) => void }) {
+  const [text, setText] = useState("");
+  const finished = useRef(false);
+  const finish = (value: string | null) => { if (!finished.current) { finished.current = true; onDone(value); } };
+  return (
+    <input autoFocus value={text} maxLength={300} placeholder="New task" aria-label={`New task for ${day}`} onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => { if (e.key === "Enter" && text.trim()) finish(text.trim()); if (e.key === "Escape") finish(null); }}
+      onBlur={() => finish(text.trim() || null)}
+      className="min-h-6 w-full min-w-0 border border-[var(--accent)] bg-[var(--background)] px-1 text-xs placeholder:text-[var(--muted-foreground)]" />
+  );
+}
+
 interface Placed { event: VaultEvent; key: string; lane: number; lanes: number; }
 
 /** Side-by-side lanes for events that overlap in time, so none hides another. */
@@ -124,6 +156,7 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
   const [draft, setDraft] = useState<{ day: string; start: string; end?: string } | null>(null);
   const [draw, setDraw] = useState<Draw | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -147,8 +180,16 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
   const lookup = new Map<string, VaultEvent>();
   days.forEach((day) => (data[day]?.events ?? []).forEach((e, i) => lookup.set(`${day}:${i}`, e)));
   const selected = picked ? lookup.get(picked) ?? null : null;
+  const isPinned = (key: string) => week.pins.includes(key);
+  const pinnedItems = days.flatMap((day) => [
+    ...(data[day]?.events ?? []).map((e, i) => ({ key: eventPin(day, e), label: e.title, when: `${fmtDay(day, { weekday: "short" })} ${e.all_day || e.start_min === null ? "" : formatMinutes(e.start_min)}`.trim(), pick: `${day}:${i}`, over: !!today && (day < today || (day === today && !e.all_day && (e.end_min as number) < nowMin)) })),
+    ...(data[day]?.tasks ?? []).filter((t) => !t.done).map((t) => ({ key: taskPin(day, t), label: t.text, when: `${fmtDay(day, { weekday: "short" })} task`, pick: null as string | null, over: !!today && day < today })),
+  ]).filter((p) => isPinned(p.key) && !p.over);
   const upcoming = today ? (data[today]?.events ?? []).filter((e) => !e.all_day && e.start_min !== null && e.start_min > nowMin).sort((a, b) => (a.start_min as number) - (b.start_min as number))[0] : undefined;
   const minuteAt = (el: HTMLElement, clientY: number) => Math.max(0, Math.min(1440, ((clientY - el.getBoundingClientRect().top) / HOUR_PX) * 60));
+
+  const whenText = (e: VaultEvent) => (e.all_day || e.start_min === null || e.end_min === null ? "All day" : `${formatMinutes(e.start_min)}–${formatMinutes(e.end_min)}`);
+  const eventTip = (day: string, e: VaultEvent, hint: string) => [`${isPinned(eventPin(day, e)) ? "★ " : ""}${e.title}`, whenText(e), `${e.calendar}${e.location ? ` · ${e.location}` : ""}`, hint].join("\n");
 
   function startDrag(e: React.DragEvent, ev: VaultEvent, day: string) {
     if (!ev.id) return;
@@ -220,19 +261,35 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
             const d = data[day];
             return (
               <div key={day} onDragOver={(e) => { if (drag.current?.allDay) { e.preventDefault(); setOver(`ad:${day}`); } }} onDragLeave={() => setOver(null)} onDrop={(e) => dropAllDay(e, day)}
-                className={`sticky top-[34px] z-20 flex max-h-[5.5rem] min-h-7 flex-col gap-0.5 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
+                onClick={(e) => { if (e.target === e.currentTarget) setAdding(day); }}
+                className={`group sticky top-[34px] z-20 flex max-h-[5.5rem] min-h-7 cursor-cell flex-col gap-0.5 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
                 {(d?.events ?? []).map((e, i) => e.all_day && (
                   <div key={i} role="button" tabIndex={0} draggable={!!e.id} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
-                    onClick={() => setPicked(`${day}:${i}`)} onKeyDown={(k) => k.key === "Enter" && setPicked(`${day}:${i}`)} title={e.id ? e.title : `${e.title} (read-only calendar)`} aria-pressed={picked === `${day}:${i}`}
-                    className={`truncate border-l-2 bg-[var(--muted)] px-1.5 text-xs font-medium ${e.id ? "cursor-grab" : ""} ${picked === `${day}:${i}` ? "outline outline-1 outline-[var(--foreground)]" : ""}`} style={{ borderColor: e.color ?? "var(--muted-foreground)" }}>{e.title}</div>
+                    onClick={() => setPicked(`${day}:${i}`)} onKeyDown={(k) => k.key === "Enter" && setPicked(`${day}:${i}`)} title={eventTip(day, e, e.id ? "Drag to another day to move" : "Read-only calendar")} aria-pressed={picked === `${day}:${i}`}
+                    className={`flex items-center gap-1 border-l-2 bg-[var(--muted)] px-1.5 text-xs font-medium ${e.id ? "cursor-grab" : "cursor-pointer"} ${picked === `${day}:${i}` ? "outline outline-1 outline-[var(--foreground)]" : ""}`} style={{ borderColor: e.color ?? "var(--muted-foreground)" }}>
+                    {isPinned(eventPin(day, e)) && <Star size={10} aria-label="Important" className="shrink-0 fill-[var(--accent)] text-[var(--accent)]" />}
+                    <span className="truncate">{e.title}</span>
+                  </div>
                 ))}
                 {(d?.tasks ?? []).map((t) => (
-                  <button key={`${t.path}:${t.line}`} type="button" title={`Task: ${t.text}`} onClick={() => void change(() => vaultApi.setTask(t, !t.done))}
-                    className={`flex items-center gap-1 truncate border border-dashed border-[var(--border)] px-1 text-left text-xs hover:bg-[var(--muted)] ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>
-                    <span className={`grid h-2.5 w-2.5 shrink-0 place-items-center border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} aria-hidden="true" />
-                    <span className="truncate">{t.text}</span>
-                  </button>
+                  <div key={`${t.path}:${t.line}`} className="group/task flex items-center border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
+                    <button type="button" title={`Task: ${t.text}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to tick it off`} onClick={() => void change(() => vaultApi.setTask(t, !t.done))}
+                      className={`flex min-w-0 flex-1 items-center gap-1 px-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>
+                      <span className={`grid h-2.5 w-2.5 shrink-0 place-items-center border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} aria-hidden="true" />
+                      <span className="truncate">{t.text}</span>
+                    </button>
+                    <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.text}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
+                      className={`grid h-4 w-4 shrink-0 place-items-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
+                      <Star size={11} className={isPinned(taskPin(day, t)) ? "fill-[var(--accent)] text-[var(--accent)]" : "text-[var(--muted-foreground)]"} />
+                    </button>
+                  </div>
                 ))}
+                {adding === day ? (
+                  <AddTask key="add" day={day} onDone={(text) => { setAdding(null); if (text) void change(() => vaultApi.addTask(day, text)); }} />
+                ) : (
+                  <button type="button" aria-label={`Add a task on ${fmtDay(day, { weekday: "long", day: "numeric", month: "long" })}`} title="Add a task for this day" onClick={() => setAdding(day)}
+                    className="flex h-4 items-center gap-0.5 px-0.5 text-micro text-[var(--muted-foreground)] opacity-40 hover:opacity-100 focus:opacity-100 group-hover:opacity-100"><Plus size={11} aria-hidden="true" />Task</button>
+                )}
               </div>
             );
           })}
@@ -258,11 +315,14 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
                 return (
                   <div key={key} role="button" tabIndex={0} draggable={!!e.id} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={() => { drag.current = null; }}
                     onPointerDown={(ev) => ev.stopPropagation()} onClick={() => { setPicked(key); setDraft(null); }} onKeyDown={(k) => k.key === "Enter" && setPicked(key)}
-                    aria-pressed={picked === key} title={e.id ? `${e.title}: drag to move` : `${e.title} (read-only calendar)`}
+                    aria-pressed={picked === key} title={eventTip(day, e, e.id ? "Drag to move" : "Read-only calendar")}
                     className={`absolute overflow-hidden border-l-2 px-1.5 py-0.5 text-left text-xs font-medium leading-[15px] ${e.id ? "cursor-grab" : "cursor-pointer"} ${picked === key ? "z-10 outline outline-1 outline-[var(--foreground)]" : ""}`}
                     style={{ top: px(e.start_min as number), height: Math.max(20, px((e.end_min as number) - (e.start_min as number)) - 2), left: `calc(${(100 * lane) / lanes}% + 2px)`, width: `calc(${100 / lanes}% - 4px)`,
                       borderColor: colour, background: `color-mix(in srgb, ${colour} 16%, var(--surface))` }}>
-                    <span className="block truncate">{e.title}</span>
+                    <span className="flex items-center gap-1">
+                      {isPinned(eventPin(day, e)) && <Star size={10} aria-label="Important" className="shrink-0 fill-[var(--accent)] text-[var(--accent)]" />}
+                      <span className="truncate">{e.title}</span>
+                    </span>
                     {long && <span className="block font-mono text-micro text-[var(--muted-foreground)]">{formatMinutes(e.start_min as number)}</span>}
                   </div>
                 );
@@ -277,6 +337,17 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
         </div>
       </div>
 
+      {pinnedItems.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-small" aria-label="Important">
+          <span className={`${MICRO} inline-flex items-center gap-1`}><Star size={11} aria-hidden="true" className="fill-[var(--accent)] text-[var(--accent)]" />Important</span>
+          {pinnedItems.map((p) => (
+            <button key={p.key} type="button" disabled={!p.pick} onClick={() => p.pick && setPicked(p.pick)} title={`${p.label}\n${p.when}`}
+              className="inline-flex min-h-7 max-w-[16rem] items-center gap-1.5 border border-[var(--border)] px-2 text-xs enabled:hover:bg-[var(--muted)]">
+              <span className="font-mono text-micro tabular-nums text-[var(--muted-foreground)]">{p.when}</span><span className="truncate font-medium">{p.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 border border-[var(--border)] px-3 py-1.5 text-small">
         {selected ? (
           <>
@@ -284,6 +355,10 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
             <span className="font-mono tabular-nums text-[var(--muted-foreground)]">{selected.all_day || selected.start_min === null || selected.end_min === null ? "All day" : `${formatMinutes(selected.start_min)}–${formatMinutes(selected.end_min)} · ${formatDuration(selected.end_min - selected.start_min)}`}</span>
             <span className="text-[var(--muted-foreground)]">{selected.calendar}{selected.location ? ` · ${selected.location}` : ""}{selected.id ? "" : " · read-only"}</span>
             <span className="flex-1" />
+            {(() => {
+              const key = eventPin(day0(picked as string), selected);
+              return <button type="button" aria-pressed={isPinned(key)} onClick={() => week.togglePin(key)} className={`inline-flex min-h-7 items-center gap-1 border border-[var(--border)] px-2.5 text-xs font-semibold hover:bg-[var(--muted)] ${isPinned(key) ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}><Star size={12} aria-hidden="true" className={isPinned(key) ? "fill-[var(--accent)]" : ""} />{isPinned(key) ? "Important" : "Mark important"}</button>;
+            })()}
             {selected.meeting_url && <a href={selected.meeting_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-7 items-center border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">Join {meetingName(selected.meeting_url)}</a>}
             {selected.id && <button type="button" onClick={() => { const id = selected.id as string; setPicked(null); void change(() => vaultApi.removeEvent(id)); }} className="min-h-7 border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--destructive)] hover:bg-[var(--muted)]">Delete</button>}
             <button type="button" onClick={() => setPicked(null)} className="min-h-7 px-2 text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)]">Close</button>

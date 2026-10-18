@@ -300,6 +300,14 @@
   "PUT"
  ],
  [
+  "/api/v1/vault/pins",
+  "GET"
+ ],
+ [
+  "/api/v1/vault/pins",
+  "PUT"
+ ],
+ [
   "/api/v1/vault/pipeline/blocked-by",
   "PUT"
  ],

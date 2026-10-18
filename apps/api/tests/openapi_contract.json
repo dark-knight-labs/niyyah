@@ -1448,6 +1448,16 @@
    "type": "object"
   }
  },
+ "GET /api/v1/vault/pins": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "type": "string"
+   },
+   "type": "array"
+  }
+ },
  "GET /api/v1/vault/pipelines": {
   "params": [],
   "request": null,
@@ -5616,6 +5626,30 @@
     "week"
    ],
    "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pins": {
+  "params": [],
+  "request": {
+   "properties": {
+    "key": {
+     "type": "string"
+    },
+    "pinned": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "key",
+    "pinned"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "items": {
+    "type": "string"
+   },
+   "type": "array"
   }
  },
  "PUT /api/v1/vault/pipeline/blocked-by": {

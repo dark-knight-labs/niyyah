@@ -38,7 +38,7 @@ export function TaskList({ day, tasks, onChanged }: Props) {
       ) : (
         <ul>
           {tasks.map((t) => (
-            <li key={`${t.path}:${t.line}`} className="border-b border-[var(--border)]">
+            <li key={`${t.path}:${t.line}`}>
               <EditableRow text={t.text} struck={t.done}
                 lead={<Checkbox checked={t.done} label={`Done: ${t.text}`} onChange={() => void save(() => vaultApi.setTask(t, !t.done))} />}
                 onSave={(text) => save(() => vaultApi.editTask(t, text))}

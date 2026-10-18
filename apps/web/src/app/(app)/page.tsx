@@ -194,10 +194,11 @@ export default function OverviewPage() {
             onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} />
           {owner ? (
             <>
-              <div className="mb-5 grid gap-6 md:items-start xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.7fr)_minmax(0,0.8fr)] xl:gap-6">
+              <div className="mb-5 grid gap-6 md:items-start xl:grid-cols-[minmax(0,0.9fr)_minmax(0,2.6fr)] xl:gap-6">
                 <div className="mx-auto w-full max-w-lg xl:max-w-none">
                   <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
+                  <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} onChanged={loadPrivate} /></div>
                 </div>
                 <section aria-label="Calendar, tasks and log" className="min-w-0">
                   <div role="tablist" aria-label="Calendar, tasks and log" className="mb-3 flex flex-wrap items-end gap-x-3 border-b border-[var(--border)]">
@@ -223,7 +224,6 @@ export default function OverviewPage() {
                       span={block ? `${formatMinutes(block.startMin)}-${formatMinutes(block.endMin)}` : "00:00-23:59"} />
                   </div>
                 </section>
-                <div className="mx-auto w-full max-w-lg xl:max-w-none"><ThisWeek quarter={quarter} objectives={objectives} onChanged={loadPrivate} /></div>
               </div>
               {habits && <div className="mb-5"><HabitsPanel day={dayKey} data={habits} today={today} onData={setHabits} onVoted={setToday} /></div>}
               <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>

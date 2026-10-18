@@ -114,3 +114,15 @@ async def test_a_block_added_later_joins_the_day_on_its_first_vote(db_client):
     res = await client.put(f"{V}/day/{today}/vote", json={"block": "reading", "stars": 2})
     day = res.json()["day"]
     assert res.status_code == 200 and day["blocks"]["reading"] == 2 and day["total"] == 5 and day["possible"] == 21
+
+
+@pytest.mark.asyncio
+async def test_tasks_can_be_planned_for_a_future_day_but_not_years_ahead(db_client):
+    from datetime import date, timedelta
+
+    client, today = db_client
+    soon = date.fromisoformat(str(today)) + timedelta(days=3)
+    assert (await client.post(f"{V}/day/{soon}/tasks", json={"text": "Book the dentist"})).status_code == 200
+    assert [t["text"] for t in (await client.get(f"{V}/day/{soon}/tasks")).json()] == ["Book the dentist"]
+    far = date.fromisoformat(str(today)) + timedelta(days=800)
+    assert (await client.post(f"{V}/day/{far}/tasks", json={"text": "x"})).status_code == 422
