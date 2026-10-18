@@ -148,5 +148,17 @@ async def set_task_text(db, user_id: int, task_id: int, text: str) -> None:
     (await _task(db, user_id, task_id)).text = label
 
 
+async def move_task(db, user_id: int, task_id: int, from_day: date, to_day: date) -> None:
+    """Move a task off `from_day`: each of its due, scheduled and start dates on that day follows it; with none there, it is scheduled on `to_day`."""
+    task = await _task(db, user_id, task_id)
+    moved = False
+    for field in ("due_on", "scheduled_on", "start_on"):
+        if getattr(task, field) == from_day:
+            setattr(task, field, to_day)
+            moved = True
+    if not moved:
+        task.scheduled_on = to_day
+
+
 async def remove_task(db, user_id: int, task_id: int) -> None:
     await db.delete(await _task(db, user_id, task_id))

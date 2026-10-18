@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Plus, Star, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Star, Trash2, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatMinutes } from "@/lib/routine";
 import { formatDuration } from "@/lib/ring";
@@ -9,9 +9,9 @@ import { GoogleStatusData, VaultEvent, VaultTaskData } from "@/lib/vault-types";
 import { addDays, fmtDay, sundayOf, weekDays } from "@/lib/week";
 import { AddEventForm, ConnectButton, meetingName } from "@/components/routine/calendar-parts";
 
-/** The grid shows the whole day. One hour is HOUR_PX tall; events snap to SNAP minutes when moved or drawn. */
+/** The grid shows the whole day. One hour is HOUR_PX tall (SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
 const HOUR_PX = 28;
-const GRID_PX = 24 * HOUR_PX;
+const SLEEP_PX = 5;
 const SNAP = 15;
 const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
 const BTN = "inline-flex min-h-8 items-center whitespace-nowrap border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
@@ -19,8 +19,24 @@ const BTN = "inline-flex min-h-8 items-center whitespace-nowrap border border-[v
 export interface DayData { events: VaultEvent[]; tasks: VaultTaskData[]; }
 export interface SleepSpan { from: number; to: number; }
 
-const px = (min: number) => (min / 60) * HOUR_PX;
+/** Vertical positions for a day column. `collapsed[h]` squeezes hour h to a thin strip. */
+function makeScale(collapsed: boolean[]) {
+  const heights = collapsed.map((c) => (c ? SLEEP_PX : HOUR_PX));
+  const tops = heights.map((_, h) => heights.slice(0, h).reduce((a, b) => a + b, 0));
+  const total = heights.reduce((a, b) => a + b, 0);
+  return {
+    heights, tops, total,
+    px: (min: number) => { const h = Math.min(23, Math.floor(min / 60)); return tops[h] + ((min - h * 60) / 60) * heights[h]; },
+    minuteAt: (y: number) => {
+      const clamped = Math.max(0, Math.min(total, y));
+      const found = tops.findIndex((t, i) => clamped < t + heights[i]);
+      const h = found < 0 ? 23 : found;
+      return Math.min(1440, h * 60 + ((clamped - tops[h]) / heights[h]) * 60);
+    },
+  };
+}
 const snap = (min: number) => Math.round(min / SNAP) * SNAP;
+const pad2 = (n: number) => String(n).padStart(2, "0");
 const hhmm = (min: number) => formatMinutes(Math.min(1439, Math.max(0, min)));
 
 /** What a pin is stored under: a Google event by its id, any other event by title, day and start, a task by day and text. */
@@ -62,7 +78,7 @@ export function useWeek(today: string | null, refreshKey: number) {
   }, []);
 
   return {
-    days, data, errors, today, isThisWeek: first === thisWeek, pins,
+    days, data, errors, today, isThisWeek: first === thisWeek, pins, setPins,
     /** Mark an event or task important (or clear it); shows at once and settles on what the server says. */
     togglePin: (key: string) => {
       const pinned = !pins.includes(key);
@@ -122,6 +138,23 @@ function AddTask({ day, onDone }: { day: string; onDone: (text: string | null) =
   );
 }
 
+/** A task's text edited in its chip: Enter saves, Esc cancels, the bin deletes it. */
+function EditTask({ text, onDone, onDelete }: { text: string; onDone: (text: string | null) => void; onDelete: () => void }) {
+  const [draft, setDraft] = useState(text);
+  const finished = useRef(false);
+  const finish = (value: string | null) => { if (!finished.current) { finished.current = true; onDone(value); } };
+  return (
+    <div className="flex items-center gap-0.5">
+      <input autoFocus value={draft} maxLength={300} aria-label="Edit task" onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") finish(draft.trim() && draft.trim() !== text ? draft.trim() : null); if (e.key === "Escape") finish(null); }}
+        onBlur={() => finish(draft.trim() && draft.trim() !== text ? draft.trim() : null)}
+        className="min-h-6 min-w-0 flex-1 border border-[var(--accent)] bg-[var(--background)] px-1 text-xs" />
+      <button type="button" aria-label="Delete task" title="Delete task" onMouseDown={(e) => e.preventDefault()} onClick={() => { finished.current = true; onDelete(); }}
+        className="grid h-6 w-6 shrink-0 place-items-center text-[var(--muted-foreground)] hover:text-[var(--destructive)]"><Trash2 size={12} aria-hidden="true" /></button>
+    </div>
+  );
+}
+
 interface Placed { event: VaultEvent; key: string; lane: number; lanes: number; }
 
 /** Side-by-side lanes for events that overlap in time, so none hides another. */
@@ -144,7 +177,7 @@ function place(day: string, events: VaultEvent[]): Placed[] {
   return out;
 }
 
-interface Drag { id: string; day: string; allDay: boolean; duration: number; grab: number; }
+interface Drag { id: string; day: string; allDay: boolean; duration: number; grab: number; task?: VaultTaskData; }
 interface Draw { day: string; from: number; to: number; }
 
 /** The week as a 24-hour grid: drag an event to move it, drag across an empty slot to draw a new one. Sleep is greyed out; tasks sit in the all-day row. */
@@ -157,9 +190,18 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
   const [draw, setDraw] = useState<Draw | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [sleepOpen, setSleepOpen] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+
+  // An hour collapses when every day of the week is asleep for all of it and no event touches it.
+  const collapsible = Array.from({ length: 24 }, (_, h) => days.length > 0 && days.every((day) =>
+    sleepFor(day).some((s) => s.from <= h * 60 && s.to >= (h + 1) * 60)
+    && !(data[day]?.events ?? []).some((e) => e.all_day || e.start_min === null || e.end_min === null ? false : e.start_min < (h + 1) * 60 && e.end_min > h * 60)));
+  const canCollapse = collapsible.some(Boolean);
+  const { px, minuteAt: scaleMinuteAt, heights, tops, total: GRID_PX } = makeScale(collapsible.map((c) => c && !sleepOpen));
 
   // Start scrolled to about three hours before now.
   const scrolled = useRef(false);
@@ -167,7 +209,7 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
     if (!days.length || !scroller.current || scrolled.current) return;
     scrolled.current = true;
     scroller.current.scrollTop = Math.max(0, px(nowMin) - 3 * HOUR_PX);
-  }, [days.length, nowMin]);
+  }, [days.length, nowMin, px]);
 
   const refresh = useCallback(() => { week.reload(); onChanged(); }, [week, onChanged]);
 
@@ -186,7 +228,7 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
     ...(data[day]?.tasks ?? []).filter((t) => !t.done).map((t) => ({ key: taskPin(day, t), label: t.text, when: `${fmtDay(day, { weekday: "short" })} task`, pick: null as string | null, over: !!today && day < today })),
   ]).filter((p) => isPinned(p.key) && !p.over);
   const upcoming = today ? (data[today]?.events ?? []).filter((e) => !e.all_day && e.start_min !== null && e.start_min > nowMin).sort((a, b) => (a.start_min as number) - (b.start_min as number))[0] : undefined;
-  const minuteAt = (el: HTMLElement, clientY: number) => Math.max(0, Math.min(1440, ((clientY - el.getBoundingClientRect().top) / HOUR_PX) * 60));
+  const minuteAt = (el: HTMLElement, clientY: number) => scaleMinuteAt(clientY - el.getBoundingClientRect().top);
 
   const whenText = (e: VaultEvent) => (e.all_day || e.start_min === null || e.end_min === null ? "All day" : `${formatMinutes(e.start_min)}–${formatMinutes(e.end_min)}`);
   const eventTip = (day: string, e: VaultEvent, hint: string) => [`${isPinned(eventPin(day, e)) ? "★ " : ""}${e.title}`, whenText(e), `${e.calendar}${e.location ? ` · ${e.location}` : ""}`, hint].join("\n");
@@ -194,9 +236,15 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
   function startDrag(e: React.DragEvent, ev: VaultEvent, day: string) {
     if (!ev.id) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    drag.current = { id: ev.id, day, allDay: ev.all_day, duration: ev.all_day ? 0 : (ev.end_min as number) - (ev.start_min as number), grab: ev.all_day ? 0 : ((e.clientY - rect.top) / HOUR_PX) * 60 };
+    drag.current = { id: ev.id, day, allDay: ev.all_day, duration: ev.all_day ? 0 : (ev.end_min as number) - (ev.start_min as number), grab: ev.all_day ? 0 : scaleMinuteAt(e.clientY - rect.top + px(ev.start_min as number)) - (ev.start_min as number) };
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", ev.id);
+  }
+
+  function startTaskDrag(e: React.DragEvent, task: VaultTaskData, day: string) {
+    drag.current = { id: String(task.line), day, allDay: true, duration: 0, grab: 0, task };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", task.text);
   }
 
   function dropTimed(e: React.DragEvent<HTMLDivElement>, day: string) {
@@ -214,7 +262,15 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
     setOver(null);
     const d = drag.current;
     drag.current = null;
-    if (d?.allDay && d.day !== day) void change(() => vaultApi.moveEvent(d.id, { day }));
+    if (!d?.allDay || d.day === day) return;
+    const task = d.task;
+    if (!task) return void change(() => vaultApi.moveEvent(d.id, { day }));
+    const from = taskPin(d.day, task);
+    const was = isPinned(from);
+    void change(async () => {
+      await vaultApi.moveTask(task, d.day, day);
+      if (was) await vaultApi.setPin(from, false).then(() => vaultApi.setPin(taskPin(day, task), true)).then(week.setPins);
+    });
   }
 
   /** Press on an empty slot and drag to draw an event; a plain click draws one hour. */
@@ -271,19 +327,25 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
                     <span className="truncate">{e.title}</span>
                   </div>
                 ))}
-                {(d?.tasks ?? []).map((t) => (
-                  <div key={`${t.path}:${t.line}`} className="group/task flex items-center border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
-                    <button type="button" title={`Task: ${t.text}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to tick it off`} onClick={() => void change(() => vaultApi.setTask(t, !t.done))}
-                      className={`flex min-w-0 flex-1 items-center gap-1 px-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>
-                      <span className={`grid h-2.5 w-2.5 shrink-0 place-items-center border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} aria-hidden="true" />
-                      <span className="truncate">{t.text}</span>
-                    </button>
-                    <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.text}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
-                      className={`grid h-4 w-4 shrink-0 place-items-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
-                      <Star size={11} className={isPinned(taskPin(day, t)) ? "fill-[var(--accent)] text-[var(--accent)]" : "text-[var(--muted-foreground)]"} />
-                    </button>
-                  </div>
-                ))}
+                {(d?.tasks ?? []).map((t) => {
+                  const id = `${t.path}:${t.line}`;
+                  return editing === id ? (
+                    <EditTask key={id} text={t.text} onDone={(text) => { setEditing(null); if (text) void change(() => vaultApi.editTask(t, text)); }}
+                      onDelete={() => { setEditing(null); void change(() => vaultApi.removeTask(t)); }} />
+                  ) : (
+                    <div key={id} draggable onDragStart={(ev) => startTaskDrag(ev, t, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
+                      title={`${t.text}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to edit · drag to another day to move`}
+                      className="group/task flex cursor-grab items-center border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
+                      <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.text}`} aria-pressed={t.done} onClick={() => void change(() => vaultApi.setTask(t, !t.done))}
+                        className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
+                      <button type="button" onClick={() => setEditing(id)} className={`min-w-0 flex-1 truncate py-0.5 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{t.text}</button>
+                      <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.text}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
+                        className={`grid h-4 w-4 shrink-0 place-items-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
+                        <Star size={11} className={isPinned(taskPin(day, t)) ? "fill-[var(--accent)] text-[var(--accent)]" : "text-[var(--muted-foreground)]"} />
+                      </button>
+                    </div>
+                  );
+                })}
                 {adding === day ? (
                   <AddTask key="add" day={day} onDone={(text) => { setAdding(null); if (text) void change(() => vaultApi.addTask(day, text)); }} />
                 ) : (
@@ -295,16 +357,17 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
           })}
 
           <div className="relative" style={{ height: GRID_PX }}>
-            {Array.from({ length: 24 }, (_, h) => h > 0 && (
-              <span key={h} className="absolute right-1 -translate-y-1.5 font-mono text-micro text-[var(--muted-foreground)]" style={{ top: h * HOUR_PX }}>{String(h).padStart(2, "0")}</span>
+            {Array.from({ length: 24 }, (_, h) => h > 0 && heights[h] === HOUR_PX && (
+              <span key={h} className="absolute right-1 -translate-y-1.5 font-mono text-micro text-[var(--muted-foreground)]" style={{ top: tops[h] }}>{pad2(h)}</span>
             ))}
           </div>
           {days.map((day) => (
             <div key={day} role="gridcell" aria-label={`${fmtDay(day, { weekday: "long", day: "numeric", month: "long" })}: drag on an empty slot to add an event`}
               className={`relative cursor-cell border-l border-[var(--border)] ${day === today ? "bg-[var(--accent-light)]" : ""}`}
-              style={{ height: GRID_PX, touchAction: "pan-x pan-y", backgroundImage: "linear-gradient(var(--border) 1px, transparent 1px)", backgroundSize: `100% ${HOUR_PX}px` }}
+              style={{ height: GRID_PX, touchAction: "pan-x pan-y" }}
               onPointerDown={(e) => startDraw(e, day)} onPointerMove={moveDraw} onPointerUp={endDraw} onPointerCancel={() => setDraw(null)}
               onDragOver={(e) => { if (drag.current && !drag.current.allDay) { e.preventDefault(); } }} onDrop={(e) => dropTimed(e, day)}>
+              {tops.map((t, h) => <div key={h} aria-hidden="true" className="pointer-events-none absolute inset-x-0 border-t border-[var(--border)]" style={{ top: t }} />)}
               {sleepFor(day).map((s, i) => (
                 <div key={i} aria-hidden="true" title="Sleep: keep clear" className="pointer-events-none absolute inset-x-0 bg-[var(--muted)] opacity-80"
                   style={{ top: px(s.from), height: px(s.to - s.from), backgroundImage: "repeating-linear-gradient(135deg, transparent 0 5px, var(--border) 5px 6px)" }} />
@@ -373,8 +436,9 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
                 <span className={MICRO}>in {formatDuration((upcoming.start_min as number) - nowMin)}</span>
                 {upcoming.meeting_url && <a href={upcoming.meeting_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-7 items-center border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">Join {meetingName(upcoming.meeting_url)}</a>}
               </>
-            ) : <span className="text-[var(--muted-foreground)]">{connected ? "Drag an event to move it, drag across an empty slot to add one." : "Connect Google Calendar to move or add events."} Grey hatching is sleep.</span>}
+            ) : <span className="text-[var(--muted-foreground)]">{connected ? "Drag an event to move it, drag across an empty slot to add one." : "Connect Google Calendar to move or add events."} Hatching is sleep.</span>}
             <span className="flex-1" />
+            {canCollapse && <button type="button" aria-pressed={sleepOpen} onClick={() => setSleepOpen(!sleepOpen)} className={BTN}>{sleepOpen ? "Collapse sleep" : "Expand sleep"}</button>}
             {connected && <button type="button" onClick={() => setDraft({ day: today ?? days[0], start: "09:00", end: "10:00" })} className={BTN}><Plus size={14} aria-hidden="true" />New event</button>}
           </>
         )}

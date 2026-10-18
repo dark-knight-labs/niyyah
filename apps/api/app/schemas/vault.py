@@ -115,6 +115,12 @@ class TaskTextIn(BaseModel):
     text: str
 
 
+class TaskMoveIn(BaseModel):
+    line: int
+    from_day: date
+    to_day: date
+
+
 class TaskRemoveIn(BaseModel):
     path: str = ""
     line: int

@@ -50,6 +50,7 @@ export const vaultApi = {
   addTask: (day: string, text: string) => api.post<VaultEditData>(`/vault/day/${day}/tasks`, { text }),
   setTask: (task: VaultTaskData, done: boolean) => api.put<VaultEditData>("/vault/tasks", { path: task.path, line: task.line, hash: task.hash, done }),
   editTask: (task: VaultTaskData, text: string) => api.put<VaultEditData>("/vault/tasks/text", { path: task.path, line: task.line, hash: task.hash, text }),
+  moveTask: (task: VaultTaskData, fromDay: string, toDay: string) => api.put<VaultEditData>("/vault/tasks/move", { line: task.line, from_day: fromDay, to_day: toDay }),
   removeTask: (task: VaultTaskData) => api.post<VaultEditData>("/vault/tasks/remove", { path: task.path, line: task.line, hash: task.hash }),
   pins: () => api.get<string[]>("/vault/pins"),
   setPin: (key: string, pinned: boolean) => api.put<string[]>("/vault/pins", { key, pinned }),

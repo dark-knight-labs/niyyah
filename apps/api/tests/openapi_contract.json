@@ -6743,6 +6743,79 @@
    "type": "object"
   }
  },
+ "PUT /api/v1/vault/tasks/move": {
+  "params": [],
+  "request": {
+   "properties": {
+    "from_day": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "to_day": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "from_day",
+    "line",
+    "to_day"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
  "PUT /api/v1/vault/tasks/text": {
   "params": [],
   "request": {
