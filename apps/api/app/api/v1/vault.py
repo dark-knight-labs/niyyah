@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user, get_optional_user
 from app.models.google import GoogleCredential
+from app.models.planner import PlannerPin
 from app.models.user import User
 from app.models.vault import VaultDay
 from app.schemas.vault import (
@@ -46,6 +47,7 @@ from app.schemas.vault import (
     LogEntryResponse,
     ModeIn,
     NoteIn,
+    PinIn,
     NotebookAddIn,
     NotebookBlockerIn,
     NotebookEditIn,
@@ -121,6 +123,13 @@ def _check_day(day: date) -> None:
     today = _local_now().date()
     if not today - timedelta(days=EDIT_WINDOW_DAYS) <= day <= today:
         raise HTTPException(status_code=422, detail=f"Only the last {EDIT_WINDOW_DAYS} days can be edited")
+
+
+def _check_task_day(day: date) -> None:
+    """Tasks can be planned ahead (up to a year), unlike the log and votes, which only cover days that have happened."""
+    today = _local_now().date()
+    if not today - timedelta(days=EDIT_WINDOW_DAYS) <= day <= today + timedelta(days=366):
+        raise HTTPException(status_code=422, detail="That day is out of range for a task")
 
 
 async def _db_run(db: AsyncSession, work):
@@ -309,6 +318,25 @@ async def delete_feed(feed_id: int, user: User = Depends(get_current_user), db: 
     await db.commit()
 
 
+@router.get("/pins", response_model=list[str])
+async def get_pins(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Keys of the events and tasks the user marked important."""
+    return list((await db.execute(select(PlannerPin.key).where(PlannerPin.user_id == user.id).order_by(PlannerPin.id))).scalars())
+
+
+@router.put("/pins", response_model=list[str])
+async def put_pin(data: PinIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Mark an event or task important, or clear the mark. Repeating either is harmless."""
+    where = (PlannerPin.user_id == user.id, PlannerPin.key == data.key)
+    existing = (await db.execute(select(PlannerPin).where(*where))).scalar_one_or_none()
+    if data.pinned and not existing:
+        db.add(PlannerPin(user_id=user.id, key=data.key))
+    elif existing and not data.pinned:
+        await db.delete(existing)
+    await db.commit()
+    return await get_pins(user, db)
+
+
 @router.get("/goals", response_model=GoalsResponse)
 async def get_goals(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Goal cards for the Overview header."""
@@ -378,7 +406,7 @@ async def post_task_remove(data: TaskRemoveIn, user: User = Depends(get_current_
 
 @router.post("/day/{day}/tasks", response_model=EditResponse)
 async def post_task(day: date, data: TaskIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    _check_day(day)
+    _check_task_day(day)
     return await _day_write(db, lambda: planner_day.add_task(db, user.id, day, data.text))
 
 

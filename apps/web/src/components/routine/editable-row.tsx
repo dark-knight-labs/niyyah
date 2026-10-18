@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Pencil, Trash2 } from "lucide-react";
+import { Check, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 interface Props {
@@ -46,10 +46,10 @@ export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, 
   }
 
   return (
-    <div className="group flex min-h-9 items-center gap-2">
+    <div className="flex min-h-9 items-center gap-1">
       {lead}
-      <span className={`min-w-0 flex-1 break-words text-small ${struck ? "text-[var(--muted-foreground)] line-through" : ""} ${text ? "" : "text-[var(--muted-foreground)]"}`}>{text || placeholder}</span>
-      <button aria-label="Edit" onClick={() => { setDraft(text); setEditing(true); }} className={`${icon} opacity-60 group-hover:opacity-100`}><Pencil size={15} /></button>
+      <button type="button" aria-label={`Edit: ${text || placeholder}`} title={text} onClick={() => { setDraft(text); setEditing(true); }}
+        className={`min-h-9 min-w-0 flex-1 break-words rounded-md px-1.5 text-left text-small hover:bg-[var(--muted)] ${struck ? "text-[var(--muted-foreground)] line-through" : ""} ${text ? "" : "text-[var(--muted-foreground)]"}`}>{text || placeholder}</button>
     </div>
   );
 }

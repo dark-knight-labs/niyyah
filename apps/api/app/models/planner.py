@@ -171,6 +171,16 @@ class PlannerCalendarFeed(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
+class PlannerPin(Base):
+    """An event or task the user marked important. `key` says which: "e:<event id or title|day|start>" or "t:<day>|<task text>"."""
+    __tablename__ = "planner_pins"
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_planner_pins_user_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    key: Mapped[str] = mapped_column(String(400), nullable=False)
+
+
 class PlannerBlock(Base):
     """A part of the user's day. Votes and schedule rows refer to it by key; archived blocks stay so history still resolves."""
     __tablename__ = "planner_blocks"

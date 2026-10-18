@@ -469,6 +469,11 @@ class ScheduleConfigIn(BaseModel):
     weekend: list[ScheduleRowIn]
 
 
+class PinIn(BaseModel):
+    key: str = Field(min_length=3, max_length=400, pattern=r"^[et]:")
+    pinned: bool
+
+
 class FeedIn(BaseModel):
     name: str
     url: str
