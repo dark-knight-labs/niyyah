@@ -4,8 +4,8 @@ The refresh token is stored by the caller and only ever sent to Google. Errors r
 message: never a token, a URL or Google's response body.
 """
 import time
-from datetime import datetime, timedelta, timezone
-from urllib.parse import urlencode
+from datetime import date, datetime, timedelta, timezone
+from urllib.parse import quote, urlencode
 
 import httpx
 from jose import JWTError, jwt
@@ -26,6 +26,13 @@ _access: dict[str, tuple[float, str]] = {}  # refresh token -> (monotonic expiry
 
 class GoogleCalendarError(Exception):
     """Google refused or could not be reached. str() is safe to show the owner."""
+
+
+class GoogleAuthExpired(GoogleCalendarError):
+    """The stored consent is no longer valid (revoked, or expired: Google drops refresh tokens after 7 days while the OAuth app is in Testing)."""
+
+    def __init__(self):
+        super().__init__("Google connection expired. Reconnect Google Calendar.")
 
 
 def configured() -> bool:
@@ -68,8 +75,16 @@ def build_auth_url(state: str) -> str:
 def _token_request(data: dict) -> dict:
     try:
         res = httpx.post(TOKEN_URL, data={"client_id": settings.google_client_id, "client_secret": settings.google_client_secret, **data}, timeout=TIMEOUT)
+        if res.status_code == 400 and data.get("grant_type") == "refresh_token":
+            try:
+                if res.json().get("error") == "invalid_grant":
+                    raise GoogleAuthExpired()
+            except ValueError:
+                pass
         res.raise_for_status()
         return res.json()
+    except GoogleAuthExpired:
+        raise
     except (httpx.HTTPError, ValueError) as exc:
         raise GoogleCalendarError(f"Google sign-in failed ({type(exc).__name__})") from None
 
@@ -96,11 +111,16 @@ def access_token(refresh_token: str) -> str:
     return token
 
 
-def _api(method: str, token: str, **kwargs) -> dict:
+def _api(method: str, token: str, event_id: str | None = None, **kwargs) -> dict:
+    url = EVENTS_URL if event_id is None else f"{EVENTS_URL}/{quote(event_id, safe='')}"
     try:
-        res = httpx.request(method, EVENTS_URL, headers={"Authorization": f"Bearer {token}"}, timeout=TIMEOUT, **kwargs)
+        res = httpx.request(method, url, headers={"Authorization": f"Bearer {token}"}, timeout=TIMEOUT, **kwargs)
+        if res.status_code == 401:
+            raise GoogleAuthExpired()
         res.raise_for_status()
-        return res.json()
+        return res.json() if res.content else {}
+    except GoogleAuthExpired:
+        raise
     except (httpx.HTTPError, ValueError) as exc:
         raise GoogleCalendarError(f"Google Calendar request failed ({type(exc).__name__})") from None
 
@@ -121,3 +141,16 @@ def list_events(token: str, day_start: datetime, day_end: datetime) -> list[dict
     """Events overlapping [day_start, day_end), recurrences expanded, in start order."""
     params = {"timeMin": day_start.isoformat(), "timeMax": day_end.isoformat(), "singleEvents": "true", "orderBy": "startTime", "maxResults": "250"}
     return _api("GET", token, params=params).get("items", [])
+
+
+def move_event(token: str, event_id: str, start: datetime | date, end: datetime | date, tz: str) -> dict:
+    """Change an event's time. Timed events take aware datetimes, all-day events dates (end exclusive)."""
+    if isinstance(start, datetime):
+        body = {"start": {"dateTime": start.isoformat(), "timeZone": tz}, "end": {"dateTime": end.isoformat(), "timeZone": tz}}
+    else:
+        body = {"start": {"date": start.isoformat()}, "end": {"date": end.isoformat()}}
+    return _api("PATCH", token, event_id, json=body)
+
+
+def delete_event(token: str, event_id: str) -> None:
+    _api("DELETE", token, event_id)

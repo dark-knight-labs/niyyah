@@ -17,6 +17,8 @@ import httpx
 import icalendar
 import recurring_ical_events
 
+from app.services.google_calendar import GoogleAuthExpired
+
 CACHE_SECONDS = 300
 FETCH_TIMEOUT = 10.0
 
@@ -95,6 +97,7 @@ def _google_entry(item: dict, source: dict, zone: ZoneInfo, day_start: datetime)
     start, end = item.get("start", {}), item.get("end", {})
     all_day = "dateTime" not in start
     entry = {
+        "id": item.get("id"),  # only events read through the Calendar API have one: they are the ones that can be moved
         "title": str(item.get("summary", "")).strip() or "(no title)",
         "calendar": source["name"],
         "color": source["color"],
@@ -138,8 +141,8 @@ def events_for_day(
             try:
                 items = google[1](day_start, day_end)
                 entries = [e for e in (_google_entry(i, source, zone, day_start) for i in items) if e]
-            except Exception as exc:  # name the calendar, never Google's response
-                errors.append(f"{source['name']}: {type(exc).__name__}")
+            except Exception as exc:  # name the calendar; only the fixed expired-consent text is shown, anything else is only named
+                errors.append(f"{source['name']}: {exc if isinstance(exc, GoogleAuthExpired) else type(exc).__name__}")
                 continue
             events.extend(entries)
             continue
@@ -155,6 +158,7 @@ def events_for_day(
             start = item.decoded("DTSTART")
             all_day = not isinstance(start, datetime)
             entry = {
+                "id": None,
                 "title": str(item.get("SUMMARY", "")).strip() or "(no title)",
                 "calendar": source["name"],
                 "color": source["color"],

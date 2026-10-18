@@ -56,6 +56,151 @@
   "request": null,
   "response": null
  },
+ "DELETE /api/v1/vault/events/{event_id}": {
+  "params": [
+   "path:event_id*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "ok": {
+     "type": "boolean"
+    }
+   },
+   "required": [],
+   "type": "object"
+  }
+ },
+ "DELETE /api/v1/vault/habits/{habit_id}": {
+  "params": [
+   "path:habit_id*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "habits": {
+     "items": {
+      "properties": {
+       "anchor": {
+        "type": "string"
+       },
+       "block": {
+        "type": "string"
+       },
+       "days": {
+        "type": "object"
+       },
+       "gate_met": {
+        "type": "boolean"
+       },
+       "gate_pct": {
+        "type": "integer"
+       },
+       "gate_run": {
+        "type": "integer"
+       },
+       "gate_weeks": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "minimum": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "per_week": {
+        "type": "integer"
+       },
+       "stage": {
+        "type": "string"
+       },
+       "started_on": {
+        "type": "string"
+       },
+       "streak": {
+        "type": "integer"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "today": {
+        "type": "string"
+       },
+       "trip_pct": {
+        "type": "integer"
+       },
+       "trip_weeks": {
+        "type": "integer"
+       },
+       "tripwire": {
+        "type": "string"
+       },
+       "weeks": {
+        "items": {
+         "properties": {
+          "count": {
+           "type": "integer"
+          },
+          "current": {
+           "type": "boolean"
+          },
+          "pct": {
+           "type": "integer"
+          },
+          "start": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "count",
+          "current",
+          "pct",
+          "start"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "anchor",
+       "block",
+       "days",
+       "gate_met",
+       "gate_pct",
+       "gate_run",
+       "gate_weeks",
+       "id",
+       "minimum",
+       "name",
+       "per_week",
+       "stage",
+       "started_on",
+       "streak",
+       "weeks"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "installing_limit": {
+     "type": "integer"
+    },
+    "today": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "habits",
+    "installing_limit",
+    "today"
+   ],
+   "type": "object"
+  }
+ },
  "GET /api/v1/auth/me": {
   "params": [],
   "request": null,
@@ -773,6 +918,9 @@
        "end_min": {
         "type": "integer"
        },
+       "id": {
+        "type": "string"
+       },
        "location": {
         "type": "string"
        },
@@ -942,6 +1090,134 @@
    },
    "required": [
     "items"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/habits": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "habits": {
+     "items": {
+      "properties": {
+       "anchor": {
+        "type": "string"
+       },
+       "block": {
+        "type": "string"
+       },
+       "days": {
+        "type": "object"
+       },
+       "gate_met": {
+        "type": "boolean"
+       },
+       "gate_pct": {
+        "type": "integer"
+       },
+       "gate_run": {
+        "type": "integer"
+       },
+       "gate_weeks": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "minimum": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "per_week": {
+        "type": "integer"
+       },
+       "stage": {
+        "type": "string"
+       },
+       "started_on": {
+        "type": "string"
+       },
+       "streak": {
+        "type": "integer"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "today": {
+        "type": "string"
+       },
+       "trip_pct": {
+        "type": "integer"
+       },
+       "trip_weeks": {
+        "type": "integer"
+       },
+       "tripwire": {
+        "type": "string"
+       },
+       "weeks": {
+        "items": {
+         "properties": {
+          "count": {
+           "type": "integer"
+          },
+          "current": {
+           "type": "boolean"
+          },
+          "pct": {
+           "type": "integer"
+          },
+          "start": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "count",
+          "current",
+          "pct",
+          "start"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "anchor",
+       "block",
+       "days",
+       "gate_met",
+       "gate_pct",
+       "gate_run",
+       "gate_weeks",
+       "id",
+       "minimum",
+       "name",
+       "per_week",
+       "stage",
+       "started_on",
+       "streak",
+       "weeks"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "installing_limit": {
+     "type": "integer"
+    },
+    "today": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "habits",
+    "installing_limit",
+    "today"
    ],
    "type": "object"
   }
@@ -1233,6 +1509,12 @@
           },
           "product": {
            "type": "string"
+          },
+          "products": {
+           "items": {
+            "type": "string"
+           },
+           "type": "array"
           },
           "stale": {
            "type": "boolean"
@@ -2288,6 +2570,58 @@
      },
      "type": "array"
     },
+    "habits": {
+     "items": {
+      "properties": {
+       "anchor": {
+        "type": "string"
+       },
+       "block": {
+        "type": "string"
+       },
+       "checks": {
+        "type": "object"
+       },
+       "gate_pct": {
+        "type": "integer"
+       },
+       "gate_weeks": {
+        "type": "integer"
+       },
+       "minimum": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "per_week": {
+        "type": "integer"
+       },
+       "stage": {
+        "type": "string"
+       },
+       "started_on": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "trip_pct": {
+        "type": "integer"
+       },
+       "trip_weeks": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "block",
+       "name",
+       "started_on"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
     "notebook_entries": {
      "items": {
       "properties": {
@@ -2355,6 +2689,12 @@
        },
        "product": {
         "type": "string"
+       },
+       "products": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
        },
        "stream": {
         "type": "string"
@@ -3108,6 +3448,9 @@
     "end_min": {
      "type": "integer"
     },
+    "id": {
+     "type": "string"
+    },
     "location": {
      "type": "string"
     },
@@ -3341,6 +3684,160 @@
    "required": [
     "commit",
     "day"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/habits": {
+  "params": [],
+  "request": {
+   "properties": {
+    "anchor": {
+     "type": "string"
+    },
+    "block": {
+     "type": "string"
+    },
+    "minimum": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "per_week": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "block",
+    "name"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "habits": {
+     "items": {
+      "properties": {
+       "anchor": {
+        "type": "string"
+       },
+       "block": {
+        "type": "string"
+       },
+       "days": {
+        "type": "object"
+       },
+       "gate_met": {
+        "type": "boolean"
+       },
+       "gate_pct": {
+        "type": "integer"
+       },
+       "gate_run": {
+        "type": "integer"
+       },
+       "gate_weeks": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "minimum": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "per_week": {
+        "type": "integer"
+       },
+       "stage": {
+        "type": "string"
+       },
+       "started_on": {
+        "type": "string"
+       },
+       "streak": {
+        "type": "integer"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "today": {
+        "type": "string"
+       },
+       "trip_pct": {
+        "type": "integer"
+       },
+       "trip_weeks": {
+        "type": "integer"
+       },
+       "tripwire": {
+        "type": "string"
+       },
+       "weeks": {
+        "items": {
+         "properties": {
+          "count": {
+           "type": "integer"
+          },
+          "current": {
+           "type": "boolean"
+          },
+          "pct": {
+           "type": "integer"
+          },
+          "start": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "count",
+          "current",
+          "pct",
+          "start"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "anchor",
+       "block",
+       "days",
+       "gate_met",
+       "gate_pct",
+       "gate_run",
+       "gate_weeks",
+       "id",
+       "minimum",
+       "name",
+       "per_week",
+       "stage",
+       "started_on",
+       "streak",
+       "weeks"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "installing_limit": {
+     "type": "integer"
+    },
+    "today": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "habits",
+    "installing_limit",
+    "today"
    ],
    "type": "object"
   }
@@ -4460,6 +4957,37 @@
    "type": "object"
   }
  },
+ "PUT /api/v1/vault/events/{event_id}": {
+  "params": [
+   "path:event_id*"
+  ],
+  "request": {
+   "properties": {
+    "day": {
+     "type": "string"
+    },
+    "end": {
+     "type": "string"
+    },
+    "start": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "day"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "ok": {
+     "type": "boolean"
+    }
+   },
+   "required": [],
+   "type": "object"
+  }
+ },
  "PUT /api/v1/vault/goals/item": {
   "params": [],
   "request": {
@@ -4530,6 +5058,323 @@
    },
    "required": [
     "items"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/habits/{habit_id}": {
+  "params": [
+   "path:habit_id*"
+  ],
+  "request": {
+   "properties": {
+    "anchor": {
+     "type": "string"
+    },
+    "block": {
+     "type": "string"
+    },
+    "clear_stream": {
+     "type": "boolean"
+    },
+    "force": {
+     "type": "boolean"
+    },
+    "gate_pct": {
+     "type": "integer"
+    },
+    "gate_weeks": {
+     "type": "integer"
+    },
+    "minimum": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "per_week": {
+     "type": "integer"
+    },
+    "stage": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "trip_pct": {
+     "type": "integer"
+    },
+    "trip_weeks": {
+     "type": "integer"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "habits": {
+     "items": {
+      "properties": {
+       "anchor": {
+        "type": "string"
+       },
+       "block": {
+        "type": "string"
+       },
+       "days": {
+        "type": "object"
+       },
+       "gate_met": {
+        "type": "boolean"
+       },
+       "gate_pct": {
+        "type": "integer"
+       },
+       "gate_run": {
+        "type": "integer"
+       },
+       "gate_weeks": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "minimum": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "per_week": {
+        "type": "integer"
+       },
+       "stage": {
+        "type": "string"
+       },
+       "started_on": {
+        "type": "string"
+       },
+       "streak": {
+        "type": "integer"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "today": {
+        "type": "string"
+       },
+       "trip_pct": {
+        "type": "integer"
+       },
+       "trip_weeks": {
+        "type": "integer"
+       },
+       "tripwire": {
+        "type": "string"
+       },
+       "weeks": {
+        "items": {
+         "properties": {
+          "count": {
+           "type": "integer"
+          },
+          "current": {
+           "type": "boolean"
+          },
+          "pct": {
+           "type": "integer"
+          },
+          "start": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "count",
+          "current",
+          "pct",
+          "start"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "anchor",
+       "block",
+       "days",
+       "gate_met",
+       "gate_pct",
+       "gate_run",
+       "gate_weeks",
+       "id",
+       "minimum",
+       "name",
+       "per_week",
+       "stage",
+       "started_on",
+       "streak",
+       "weeks"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "installing_limit": {
+     "type": "integer"
+    },
+    "today": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "habits",
+    "installing_limit",
+    "today"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/habits/{habit_id}/check": {
+  "params": [
+   "path:habit_id*"
+  ],
+  "request": {
+   "properties": {
+    "day": {
+     "type": "string"
+    },
+    "level": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "day"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "habits": {
+     "items": {
+      "properties": {
+       "anchor": {
+        "type": "string"
+       },
+       "block": {
+        "type": "string"
+       },
+       "days": {
+        "type": "object"
+       },
+       "gate_met": {
+        "type": "boolean"
+       },
+       "gate_pct": {
+        "type": "integer"
+       },
+       "gate_run": {
+        "type": "integer"
+       },
+       "gate_weeks": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "minimum": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "per_week": {
+        "type": "integer"
+       },
+       "stage": {
+        "type": "string"
+       },
+       "started_on": {
+        "type": "string"
+       },
+       "streak": {
+        "type": "integer"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "today": {
+        "type": "string"
+       },
+       "trip_pct": {
+        "type": "integer"
+       },
+       "trip_weeks": {
+        "type": "integer"
+       },
+       "tripwire": {
+        "type": "string"
+       },
+       "weeks": {
+        "items": {
+         "properties": {
+          "count": {
+           "type": "integer"
+          },
+          "current": {
+           "type": "boolean"
+          },
+          "pct": {
+           "type": "integer"
+          },
+          "start": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "count",
+          "current",
+          "pct",
+          "start"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "anchor",
+       "block",
+       "days",
+       "gate_met",
+       "gate_pct",
+       "gate_run",
+       "gate_weeks",
+       "id",
+       "minimum",
+       "name",
+       "per_week",
+       "stage",
+       "started_on",
+       "streak",
+       "weeks"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "installing_limit": {
+     "type": "integer"
+    },
+    "today": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "habits",
+    "installing_limit",
+    "today"
    ],
    "type": "object"
   }

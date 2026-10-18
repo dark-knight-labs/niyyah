@@ -104,6 +104,8 @@ export interface VaultObjectivesData {
 }
 
 export interface VaultEvent {
+  /** Google event id; only events that can be moved or deleted have one. */
+  id?: string | null;
   title: string;
   calendar: string;
   color: string | null;
