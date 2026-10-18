@@ -119,7 +119,7 @@ export function TopBar({ dateLabel, city, editDay, today, onSaved, goals, quarte
   }
 
   return (
-    <header className="mb-4 border-b border-[var(--border)] pb-3">
+    <header className="mb-2 border-b border-[var(--border)] pb-3">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
       <div className="min-w-0 flex-1 basis-[28rem]">
         {chips.length > 0 && <ObjectiveCarousel chips={chips} pinned={pinned} onPin={toggle} pace={pace} full={full} />}
