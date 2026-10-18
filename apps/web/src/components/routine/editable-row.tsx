@@ -11,12 +11,14 @@ interface Props {
   /** Left of the text: a checkbox, a time, a block name. */
   lead?: React.ReactNode;
   maxLength?: number;
+  /** No minimum height or extra padding, so rows stack like plain text lines. */
+  compact?: boolean;
   onSave: (text: string) => Promise<void>;
   onDelete?: () => Promise<void>;
 }
 
 /** One list row whose text can be edited in place (Enter saves, Esc cancels) and optionally deleted. */
-export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, onSave, onDelete }: Props) {
+export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, compact, onSave, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [busy, setBusy] = useState(false);
@@ -35,7 +37,7 @@ export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, 
 
   if (editing) {
     return (
-      <form className="flex min-h-9 items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) void run(() => onSave(draft.trim())); }}>
+      <form className={`flex items-center gap-2 ${compact ? "" : "min-h-9"}`} onSubmit={(e) => { e.preventDefault(); if (draft.trim()) void run(() => onSave(draft.trim())); }}>
         {lead}
         <input autoFocus value={draft} maxLength={maxLength} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
           aria-label="Edit text" className="min-h-8 min-w-0 flex-1 rounded-md border border-[var(--accent)] bg-[var(--background)] px-2.5 text-small" />
@@ -46,10 +48,10 @@ export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, 
   }
 
   return (
-    <div className="flex min-h-9 items-center gap-1">
+    <div className={`flex items-center gap-1 ${compact ? "" : "min-h-9"}`}>
       {lead}
       <button type="button" aria-label={`Edit: ${text || placeholder}`} title={text} onClick={() => { setDraft(text); setEditing(true); }}
-        className={`min-h-9 min-w-0 flex-1 break-words rounded-md px-1.5 text-left text-small hover:bg-[var(--muted)] ${struck ? "text-[var(--muted-foreground)] line-through" : ""} ${text ? "" : "text-[var(--muted-foreground)]"}`}>{text || placeholder}</button>
+        className={`${compact ? "px-1 py-0.5 leading-snug" : "min-h-9 px-1.5"} min-w-0 flex-1 break-words rounded-md text-left text-small hover:bg-[var(--muted)] ${struck ? "text-[var(--muted-foreground)] line-through" : ""} ${text ? "" : "text-[var(--muted-foreground)]"}`}>{text || placeholder}</button>
     </div>
   );
 }
