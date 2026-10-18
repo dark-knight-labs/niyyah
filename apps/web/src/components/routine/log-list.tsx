@@ -32,7 +32,7 @@ export function LogList({ day, entries, section, span, onChanged }: Props) {
   return (
     <Section title="Log" aside="what happened, timestamped" error={error}>
       {entries.length === 0 ? (
-        <p className="py-2 text-sm text-[var(--muted-foreground)]">Nothing logged yet.</p>
+        <p className="py-2 text-small text-[var(--muted-foreground)]">Nothing logged yet.</p>
       ) : (
         <ul>
           {[...entries].reverse().map((entry) => (

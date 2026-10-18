@@ -37,8 +37,8 @@ export function AddForm({ placeholder, button, onAdd }: { placeholder: string; b
   return (
     <form onSubmit={submit} className="mt-1.5 flex gap-1.5">
       <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} maxLength={300} aria-label={placeholder}
-        className="min-h-9 min-w-0 flex-1 rounded-none border border-[var(--border)] bg-[var(--surface)] px-3 text-sm placeholder:text-[var(--muted-foreground)]" />
-      <button type="submit" disabled={busy || !text.trim()} className="min-h-9 rounded-none bg-[var(--accent)] px-3.5 text-sm font-bold text-[var(--accent-fg)] disabled:opacity-50">{button}</button>
+        className="min-h-9 min-w-0 flex-1 rounded-none border border-[var(--border)] bg-[var(--surface)] px-3 text-small placeholder:text-[var(--muted-foreground)]" />
+      <button type="submit" disabled={busy || !text.trim()} className="min-h-9 rounded-none bg-[var(--accent)] px-3.5 text-small font-bold text-[var(--accent-fg)] disabled:opacity-50">{button}</button>
     </form>
   );
 }

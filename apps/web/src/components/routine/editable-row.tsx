@@ -38,7 +38,7 @@ export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, 
       <form className="flex min-h-9 items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) void run(() => onSave(draft.trim())); }}>
         {lead}
         <input autoFocus value={draft} maxLength={maxLength} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
-          aria-label="Edit text" className="min-h-8 min-w-0 flex-1 rounded-md border border-[var(--accent)] bg-[var(--background)] px-2.5 text-sm" />
+          aria-label="Edit text" className="min-h-8 min-w-0 flex-1 rounded-md border border-[var(--accent)] bg-[var(--background)] px-2.5 text-small" />
         <button type="submit" disabled={busy || !draft.trim()} aria-label="Save" className={icon}><Check size={16} /></button>
         {onDelete && <button type="button" disabled={busy} aria-label="Delete" onClick={() => void run(onDelete)} className={`${icon} hover:!text-[var(--destructive)]`}><Trash2 size={16} /></button>}
       </form>
@@ -48,7 +48,7 @@ export function EditableRow({ text, placeholder, struck, lead, maxLength = 300, 
   return (
     <div className="group flex min-h-9 items-center gap-2">
       {lead}
-      <span className={`min-w-0 flex-1 break-words text-sm ${struck ? "text-[var(--muted-foreground)] line-through" : ""} ${text ? "" : "text-[var(--muted-foreground)]"}`}>{text || placeholder}</span>
+      <span className={`min-w-0 flex-1 break-words text-small ${struck ? "text-[var(--muted-foreground)] line-through" : ""} ${text ? "" : "text-[var(--muted-foreground)]"}`}>{text || placeholder}</span>
       <button aria-label="Edit" onClick={() => { setDraft(text); setEditing(true); }} className={`${icon} opacity-60 group-hover:opacity-100`}><Pencil size={15} /></button>
     </div>
   );
