@@ -18,7 +18,7 @@ import { TaskList } from "@/components/routine/task-list";
 import { ThisWeek } from "@/components/routine/this-week";
 import { HabitsPanel } from "@/components/routine/habits-panel";
 import { VotesPanel } from "@/components/routine/votes-panel";
-import { WeekCalendar } from "@/components/routine/week-calendar";
+import { SleepSpan, useWeek, WeekCalendar, WeekToolbar } from "@/components/routine/week-calendar";
 import { WorkLanes } from "@/components/routine/work-lanes";
 
 const REFRESH_MS = 60_000;
@@ -52,6 +52,8 @@ export default function OverviewPage() {
   const [side, setSide] = useState<(typeof SIDE_TABS)[number][0]>("calendar");
   const [calendarKey, setCalendarKey] = useState(0);
   const now = useNow(30_000);
+  const dayToday = schedule ? dateInTz(now, schedule.meta.tz) : null;
+  const week = useWeek(canEdit ? dayToday : null, calendarKey);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -156,6 +158,17 @@ export default function OverviewPage() {
   const block = day ? currentBlock(day, nowMin) : undefined;
   const owner = canEdit && !!dayKey && !!day;
   const slotId = schedule ? slotOwnerFor(schedule, now) : null;
+  // Sleep blocks of any day of the week, as minute spans, so the grid can grey them out. UTC noon keeps the date in every timezone the schedule can use.
+  const sleepFor = (iso: string): SleepSpan[] => {
+    if (!schedule) return [];
+    try {
+      return resolveDay(schedule, new Date(`${iso}T12:00:00Z`), knownBlocks).blocks
+        .filter((b) => b.block === "sleep" || blocks.label(b.block).toLowerCase() === "sleep")
+        .flatMap((b) => (b.endMin > 1440 ? [{ from: b.startMin, to: 1440 }, { from: 0, to: b.endMin - 1440 }] : [{ from: b.startMin, to: b.endMin }]));
+    } catch {
+      return [];
+    }
+  };
 
   return (
     <div className="w-full">
@@ -187,20 +200,21 @@ export default function OverviewPage() {
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
                 </div>
                 <section aria-label="Calendar, tasks and log" className="min-w-0">
-                  <div role="tablist" aria-label="Calendar, tasks and log" className="mb-3 flex border-b border-[var(--border)]">
+                  <div role="tablist" aria-label="Calendar, tasks and log" className="mb-3 flex flex-wrap items-end gap-x-3 border-b border-[var(--border)]">
                     {SIDE_TABS.map(([key, label], i) => {
-                      const count = key === "calendar" ? `${events?.events.length ?? 0} today` : key === "tasks" ? `${tasks.filter((t) => t.done).length}/${tasks.length}` : `${log.length}`;
+                      const count = key === "calendar" ? `${events?.events.length ?? 0}` : key === "tasks" ? `${tasks.filter((t) => t.done).length}/${tasks.length}` : `${log.length}`;
                       return (
                         <button key={key} type="button" role="tab" id={`tab-${key}`} aria-selected={side === key} aria-controls={`panel-${key}`} onClick={() => setSide(key)}
-                          className="-mb-px flex min-h-10 items-center gap-2 border-b-2 border-transparent px-3.5 text-small font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] aria-selected:border-[var(--accent)] aria-selected:text-[var(--foreground)]">
+                          className="-mb-px flex min-h-10 items-center gap-2 whitespace-nowrap border-b-2 border-transparent px-3.5 text-small font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] aria-selected:border-[var(--accent)] aria-selected:text-[var(--foreground)]">
                           {label}<span className="font-mono text-micro font-normal tabular-nums text-[var(--muted-foreground)]">{count}</span>
                           <kbd className="hidden border border-[var(--border)] px-1 font-mono text-micro font-normal text-[var(--muted-foreground)] xl:inline">{i + 1}</kbd>
                         </button>
                       );
                     })}
+                                      {side === "calendar" && <WeekToolbar week={week} />}
                   </div>
                   <div role="tabpanel" id="panel-calendar" aria-labelledby="tab-calendar" hidden={side !== "calendar"}>
-                    <WeekCalendar today={dayKey} nowMin={nowMin} status={google} onChanged={loadPrivate} refreshKey={calendarKey} />
+                    <WeekCalendar week={week} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPrivate} />
                   </div>
                   <div role="tabpanel" id="panel-tasks" aria-labelledby="tab-tasks" hidden={side !== "tasks"}><TaskList day={dayKey} tasks={tasks} onChanged={loadPrivate} /></div>
                   <div role="tabpanel" id="panel-log" aria-labelledby="tab-log" hidden={side !== "log"}>

@@ -18,11 +18,11 @@ function plusHour(hhmm: string): string {
   return `${String(hour).padStart(2, "0")}${hhmm.slice(2)}`;
 }
 
-/** Add an event to Google Calendar (primary) for `day`, starting at `start` when a grid slot was clicked; the list reloads through `onChanged`. */
-export function AddEventForm({ day, start: initial, onChanged, onCancel }: { day: string; start?: string; onChanged: () => void; onCancel?: () => void }) {
+/** Add an event to Google Calendar (primary) for `day`, from `start` to `end` when a grid slot was drawn; the list reloads through `onChanged`. */
+export function AddEventForm({ day, start: initial, end: initialEnd, onChanged, onCancel }: { day: string; start?: string; end?: string; onChanged: () => void; onCancel?: () => void }) {
   const [title, setTitle] = useState("");
   const [start, setStart] = useState(initial ?? nextHalfHour);
-  const [end, setEnd] = useState(() => plusHour(initial ?? nextHalfHour()));
+  const [end, setEnd] = useState(() => initialEnd ?? plusHour(initial ?? nextHalfHour()));
   const [location, setLocation] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -22,7 +22,9 @@ from app.models.vault import VaultDay
 from app.schemas.vault import (
     BlocksConfigIn,
     BlocksConfigResponse,
+    CalendarEventChangeResponse,
     CalendarEventIn,
+    CalendarEventMoveIn,
     CalendarEventResponse,
     CalendarEventsResponse,
     DaysStatus,
@@ -497,6 +499,49 @@ async def post_event(day: date, data: CalendarEventIn, user: User = Depends(get_
         "start_min": int((start - midnight).total_seconds() // 60),
         "end_min": int((end - midnight).total_seconds() // 60),
     }
+
+
+async def _google_token(db: AsyncSession, user: User) -> str:
+    if not google_calendar.configured():
+        raise HTTPException(status_code=409, detail="Google Calendar is not set up on the server")
+    cred = await _credential(db, user)
+    if not cred:
+        raise HTTPException(status_code=409, detail="Connect Google Calendar first")
+    try:
+        return await asyncio.to_thread(google_calendar.access_token, cred.refresh_token)
+    except GoogleCalendarError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.put("/events/{event_id}", response_model=CalendarEventChangeResponse)
+async def move_event(event_id: str, data: CalendarEventMoveIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Move a Google Calendar event to another day and time (drag and drop). Timed events send start and end; all-day events send neither."""
+    if (data.start is None) != (data.end is None):
+        raise HTTPException(status_code=422, detail="Send both start and end, or neither for an all-day event")
+    if data.start is not None and data.end <= data.start:
+        raise HTTPException(status_code=422, detail="End must be after start")
+    token = await _google_token(db, user)
+    if data.start is None:
+        start, end = data.day, data.day + timedelta(days=1)
+    else:
+        zone = ZoneInfo(settings.app_timezone)
+        start, end = datetime.combine(data.day, clock.fromisoformat(data.start), zone), datetime.combine(data.day, clock.fromisoformat(data.end), zone)
+    try:
+        await asyncio.to_thread(google_calendar.move_event, token, event_id, start, end, settings.app_timezone)
+    except GoogleCalendarError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"ok": True}
+
+
+@router.delete("/events/{event_id}", response_model=CalendarEventChangeResponse)
+async def delete_event(event_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Delete a Google Calendar event."""
+    token = await _google_token(db, user)
+    try:
+        await asyncio.to_thread(google_calendar.delete_event, token, event_id)
+    except GoogleCalendarError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"ok": True}
 
 
 # --- Quarter, streams, weekly objectives and pipelines ------------------------------------------------------------
