@@ -69,6 +69,7 @@ from app.schemas.vault import (
     StreamItemTickIn,
     SuperObjectiveIn,
     TaskIn,
+    TaskMoveIn,
     TaskRemoveIn,
     TaskResponse,
     TaskTextIn,
@@ -397,6 +398,12 @@ async def put_task(data: TaskToggleIn, user: User = Depends(get_current_user), d
 @router.put("/tasks/text", response_model=EditResponse)
 async def put_task_text(data: TaskTextIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return await _day_write(db, lambda: planner_day.set_task_text(db, user.id, data.line, data.text))
+
+
+@router.put("/tasks/move", response_model=EditResponse)
+async def put_task_move(data: TaskMoveIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    _check_task_day(data.to_day)
+    return await _day_write(db, lambda: planner_day.move_task(db, user.id, data.line, data.from_day, data.to_day))
 
 
 @router.post("/tasks/remove", response_model=EditResponse)

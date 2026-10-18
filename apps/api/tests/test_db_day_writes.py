@@ -126,3 +126,20 @@ async def test_tasks_can_be_planned_for_a_future_day_but_not_years_ahead(db_clie
     assert [t["text"] for t in (await client.get(f"{V}/day/{soon}/tasks")).json()] == ["Book the dentist"]
     far = date.fromisoformat(str(today)) + timedelta(days=800)
     assert (await client.post(f"{V}/day/{far}/tasks", json={"text": "x"})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_a_task_moves_to_another_day(db_client):
+    from datetime import date, timedelta
+
+    client, today = db_client
+    soon = date.fromisoformat(str(today)) + timedelta(days=2)
+    await client.post(f"{V}/day/{today}/tasks", json={"text": "Move me"})
+    task = next(t for t in (await client.get(f"{V}/day/{today}/tasks")).json() if t["text"] == "Move me")
+    moved = await client.put(f"{V}/tasks/move", json={"line": task["line"], "from_day": str(today), "to_day": str(soon)})
+    assert moved.status_code == 200
+    assert "Move me" not in [t["text"] for t in (await client.get(f"{V}/day/{today}/tasks")).json()]
+    assert [t["text"] for t in (await client.get(f"{V}/day/{soon}/tasks")).json()] == ["Move me"]
+    far = date.fromisoformat(str(today)) + timedelta(days=800)
+    assert (await client.put(f"{V}/tasks/move", json={"line": task["line"], "from_day": str(soon), "to_day": str(far)})).status_code == 422
+    assert (await client.put(f"{V}/tasks/move", json={"line": 999999, "from_day": str(soon), "to_day": str(today)})).status_code == 422
