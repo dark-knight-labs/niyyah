@@ -34,7 +34,7 @@ export function TaskList({ day, tasks, onChanged }: Props) {
   return (
     <Section title="Tasks" aside={`${done} / ${tasks.length}`} error={error}>
       {tasks.length === 0 ? (
-        <p className="py-2 text-sm text-[var(--muted-foreground)]">Nothing due or scheduled today.</p>
+        <p className="py-2 text-small text-[var(--muted-foreground)]">Nothing due or scheduled today.</p>
       ) : (
         <ul>
           {tasks.map((t) => (

@@ -106,16 +106,12 @@ export function RingGraphic(p: RingGraphicProps) {
       {p.prayers && PRAYERS.map((name) => {
         const min = day.prayers[name];
         const [x, y] = g.point(r + t / 2 + 9, min);
-        const [lx, ly] = g.point(r + t / 2 + 20, min);
-        const deg = (min / 1440) * 360;
-        const anchor = deg > 20 && deg < 160 ? "start" : deg > 200 && deg < 340 ? "end" : "middle";
-        const dy = deg <= 20 || deg >= 340 ? -2 : deg >= 160 && deg <= 200 ? 10 : 4;
+        const [lx, ly] = g.point(r + t / 2 + 22, min);
         return (
-          <g key={name} pointerEvents="none">
+          <g key={name}>
+            <title>{`${name[0].toUpperCase()}${name.slice(1)} ${formatMinutes(min)}`}</title>
             <circle cx={x} cy={y} r={3.5} fill="var(--foreground)" />
-            <text x={lx} y={ly + dy} textAnchor={anchor} fontSize={p.labelSize ?? 11} fontWeight={500} letterSpacing=".08em" fill="var(--foreground)" style={{ textTransform: "uppercase" }}>
-              {name}<tspan fontWeight={500} fill="var(--muted-foreground)"> {formatMinutes(min)}</tspan>
-            </text>
+            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="central" fontSize={p.labelSize ?? 11} fontWeight={600} fill="var(--muted-foreground)" style={{ textTransform: "uppercase" }}>{name[0]}</text>
           </g>
         );
       })}
