@@ -232,6 +232,14 @@
   "GET"
  ],
  [
+  "/api/v1/vault/events/{event_id}",
+  "DELETE"
+ ],
+ [
+  "/api/v1/vault/events/{event_id}",
+  "PUT"
+ ],
+ [
   "/api/v1/vault/goals",
   "GET"
  ],

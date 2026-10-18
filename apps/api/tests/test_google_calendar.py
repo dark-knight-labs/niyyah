@@ -139,7 +139,7 @@ async def test_post_event_creates_and_returns_entry(auth_client: AsyncClient, mo
     monkeypatch.setattr(google_calendar, "insert_event", lambda *a: seen.setdefault("args", a))
     r = await auth_client.post(f"{API}/day/{_today()}/events", json={"title": " Dentist ", "start": "14:00", "end": "15:30", "location": "Clinic"})
     assert r.status_code == 200, r.text
-    assert r.json() == {"title": "Dentist", "calendar": "Google Calendar", "color": None, "all_day": False, "location": "Clinic", "meeting_url": None, "start_min": 840, "end_min": 930}
+    assert r.json() == {"id": None, "title": "Dentist", "calendar": "Google Calendar", "color": None, "all_day": False, "location": "Clinic", "meeting_url": None, "start_min": 840, "end_min": 930}
     token, title, start, end, tz, location = seen["args"]
     assert (token, title, tz, location) == ("at", "Dentist", "Asia/Dhaka", "Clinic")
     assert start.hour == 14 and end.minute == 30 and start.tzinfo is not None
@@ -219,3 +219,86 @@ def test_google_listing_failure_names_only_the_calendar():
         raise google_calendar.GoogleCalendarError("secret detail")
 
     assert calendar_events.events_for_day(date(2026, 10, 6), "Asia/Dhaka", feeds, ("me@gmail.com", boom)) == ([], ["Personal: GoogleCalendarError"])
+
+
+# --- expired consent, move and delete ----------------------------------------------------------------------------
+
+class _Res:
+    def __init__(self, status, body=None):
+        self.status_code, self._body = status, body
+
+    def json(self):
+        return self._body
+
+    def raise_for_status(self):
+        raise AssertionError("a handled status must not reach raise_for_status")
+
+
+def test_revoked_refresh_token_is_reported_as_expired(monkeypatch):
+    monkeypatch.setattr(google_calendar.httpx, "post", lambda *a, **k: _Res(400, {"error": "invalid_grant", "error_description": "Token has been expired or revoked."}))
+    with pytest.raises(google_calendar.GoogleAuthExpired) as err:
+        google_calendar.access_token("dead")
+    assert "Reconnect" in str(err.value) and "dead" not in str(err.value)
+
+
+def test_expired_google_feed_shows_reconnect_in_errors(monkeypatch):
+    def dead(start, end):
+        raise google_calendar.GoogleAuthExpired()
+
+    feeds = [{"name": "Personal", "url": "https://x", "color": None, "email": "me@gmail.com"}]
+    events, errors = calendar_events.events_for_day(date(2026, 10, 18), "Asia/Dhaka", feeds, ("me@gmail.com", dead))
+    assert events == [] and errors == ["Personal: Google connection expired. Reconnect Google Calendar."]
+
+
+def test_google_entry_carries_the_event_id():
+    zone = ZoneInfo("Asia/Dhaka")
+    item = {"id": "abc123", "summary": "Dentist", "start": {"dateTime": "2026-10-18T14:00:00+06:00"}, "end": {"dateTime": "2026-10-18T15:00:00+06:00"}}
+    entry = calendar_events._google_entry(item, {"name": "Personal", "color": None}, zone, datetime(2026, 10, 18, tzinfo=zone))
+    assert entry["id"] == "abc123" and entry["start_min"] == 840
+
+
+def test_move_event_payloads(monkeypatch):
+    sent = []
+    monkeypatch.setattr(google_calendar, "_api", lambda method, token, event_id=None, **kw: sent.append((method, token, event_id, kw)) or {})
+    start = datetime(2026, 10, 20, 9, 30, tzinfo=TZ)
+    google_calendar.move_event("tok", "ev/1", start, start + timedelta(hours=1), "Asia/Dhaka")
+    google_calendar.move_event("tok", "ev2", date(2026, 10, 21), date(2026, 10, 22), "Asia/Dhaka")
+    google_calendar.delete_event("tok", "ev3")
+    assert sent[0] == ("PATCH", "tok", "ev/1", {"json": {"start": {"dateTime": "2026-10-20T09:30:00+06:00", "timeZone": "Asia/Dhaka"}, "end": {"dateTime": "2026-10-20T10:30:00+06:00", "timeZone": "Asia/Dhaka"}}})
+    assert sent[1][3]["json"] == {"start": {"date": "2026-10-21"}, "end": {"date": "2026-10-22"}}
+    assert sent[2] == ("DELETE", "tok", "ev3", {})
+
+
+@pytest.mark.asyncio
+async def test_move_and_delete_routes(auth_client: AsyncClient, monkeypatch):
+    url = f"{API}/events/ev1"
+    body = {"day": "2026-10-20", "start": "09:30", "end": "10:30"}
+    assert (await auth_client.put(url, json=body)).status_code == 409  # not connected
+    await _connect(auth_client, monkeypatch)
+    monkeypatch.setattr(google_calendar, "access_token", lambda refresh: "at")
+    seen = []
+    monkeypatch.setattr(google_calendar, "move_event", lambda *a: seen.append(("move", a)))
+    monkeypatch.setattr(google_calendar, "delete_event", lambda *a: seen.append(("delete", a)))
+
+    assert (await auth_client.put(url, json={**body, "end": "09:30"})).status_code == 422
+    assert (await auth_client.put(url, json={"day": "2026-10-20", "start": "09:30"})).status_code == 422
+    assert (await auth_client.put(url, json=body)).json() == {"ok": True}
+    assert (await auth_client.put(url, json={"day": "2026-10-21"})).json() == {"ok": True}
+    assert (await auth_client.delete(url)).json() == {"ok": True}
+    kinds = [k for k, _ in seen]
+    assert kinds == ["move", "move", "delete"]
+    timed, allday = seen[0][1], seen[1][1]
+    assert timed[1] == "ev1" and timed[2] == datetime(2026, 10, 20, 9, 30, tzinfo=TZ) and timed[3] == datetime(2026, 10, 20, 10, 30, tzinfo=TZ)
+    assert allday[2] == date(2026, 10, 21) and allday[3] == date(2026, 10, 22)
+
+
+@pytest.mark.asyncio
+async def test_move_reports_expired_consent(auth_client: AsyncClient, monkeypatch):
+    await _connect(auth_client, monkeypatch)
+
+    def dead(refresh):
+        raise google_calendar.GoogleAuthExpired()
+
+    monkeypatch.setattr(google_calendar, "access_token", dead)
+    r = await auth_client.put(f"{API}/events/ev1", json={"day": "2026-10-20", "start": "09:30", "end": "10:30"})
+    assert r.status_code == 502 and "Reconnect" in r.json()["detail"]

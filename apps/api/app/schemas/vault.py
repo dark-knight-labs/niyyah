@@ -343,6 +343,7 @@ class PipelineDescriptionIn(PipelineRefIn):
 
 
 class CalendarEventResponse(BaseModel):
+    id: str | None = None  # Google event id; present only on events that can be moved or deleted
     title: str
     calendar: str
     color: str | None
@@ -358,6 +359,16 @@ class CalendarEventIn(BaseModel):
     start: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # local HH:MM
     end: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     location: str | None = Field(default=None, max_length=200)
+
+
+class CalendarEventMoveIn(BaseModel):
+    day: date
+    start: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # local HH:MM; both omitted = an all-day event
+    end: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+class CalendarEventChangeResponse(BaseModel):
+    ok: bool = True
 
 
 class GoogleStatusResponse(BaseModel):
