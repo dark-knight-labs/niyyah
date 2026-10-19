@@ -3,11 +3,8 @@
 import { Check, ChevronDown } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useNow } from "@/hooks/use-now";
-import { Checklist } from "@/components/planner/checklist";
 import { vaultApi } from "@/lib/vault-api";
-import { ObjectiveCarousel, objectiveChips, quarterPace, usePinned } from "@/components/routine/objective-carousel";
-import { QuarterData, VaultDayData, VaultGoal } from "@/lib/vault-types";
+import { VaultDayData } from "@/lib/vault-types";
 import { resolveModeColor } from "@/lib/vault-constants";
 
 const MODES = [
@@ -22,10 +19,6 @@ interface Props {
   editDay: string | null;
   today: VaultDayData | null;
   onSaved: (day: VaultDayData | null) => void;
-  /** Owner only: the goals from Settings and the quarter's streams, shown as objective chips. */
-  goals: VaultGoal[] | null;
-  quarter: QuarterData | null;
-  onTick: (id: string, done: boolean) => Promise<unknown>;
 }
 
 /** The day's mode: a chip that opens a short list (colour dot, name, tick on the current one). Arrow keys move, Enter picks, Esc closes. */
@@ -128,14 +121,9 @@ function useNavSlot(): HTMLElement | null {
   return useSyncExternalStore(() => () => {}, () => document.getElementById("nav-today"), () => null);
 }
 
-/** Slim objectives strip: the quarter's objectives as a one-line chip carousel (pinned first). */
-export function TopBar({ dateLabel, city, editDay, today, onSaved, goals, quarter, onTick }: Props) {
+/** The date, mode and stars strip; the quarter's goals live in the This week panel. */
+export function TopBar({ dateLabel, city, editDay, today, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
-  const opened = goals?.find((g) => g.title === open) ?? null;
-  const chips = objectiveChips(quarter, goals, open, setOpen);
-  const { pinned, toggle, full } = usePinned(chips.map((c) => c.id));
-  const pace = quarterPace(quarter, useNow(3_600_000));
   const slot = useNavSlot();
 
   async function setMode(next: string) {
@@ -154,12 +142,6 @@ export function TopBar({ dateLabel, city, editDay, today, onSaved, goals, quarte
     <header className="mb-2 border-b border-[var(--border)] pb-2">
       {slot && createPortal(<TodayFacts {...facts} />, slot)}
       <div className={`border-b border-[var(--border)] ${slot ? "md:hidden" : ""}`}><TodayFacts {...facts} /></div>
-      {chips.length > 0 && <ObjectiveCarousel chips={chips} pinned={pinned} onPin={toggle} pace={pace} full={full} />}
-      {opened && (
-        <div className="mt-3 border-t border-[var(--border)] pt-2.5">
-          <Checklist label={`${opened.title} checklist`} items={opened.checklist} onToggle={(item, done) => onTick(item.id, done)} />
-        </div>
-      )}
       {error && <p className="mt-2 text-xs text-[var(--destructive)]">{error}</p>}
     </header>
   );
