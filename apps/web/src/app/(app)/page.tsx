@@ -184,16 +184,14 @@ export default function OverviewPage() {
       )}
       {schedule && day && (
         <>
-          <TopBar dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday}
-            goals={owner ? goals?.items ?? null : null} quarter={owner ? quarter : null}
-            onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} />
+          <TopBar dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
           {owner ? (
             <>
-              <div className={`mb-5 grid gap-4 md:items-start ${expanded ? "" : "xl:grid-cols-[minmax(0,min(30rem,25.7%))_minmax(0,1fr)]"}`}>
+              <div className={`mb-5 grid gap-4 md:items-start ${expanded ? "" : "xl:grid-cols-[minmax(0,min(27rem,23.1%))_minmax(0,1fr)]"}`}>
                 <div className={`mx-auto w-full xl:max-w-none ${expanded === "calendar" ? "hidden" : expanded === "clock" ? "" : "max-w-lg"}`}>
                   <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} expanded={expanded === "clock"} onToggleExpand={() => toggle("clock")} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
-                  <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} onChanged={loadPlanner} /></div>
+                  <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} week={week} goals={goals?.items ?? null} onChanged={loadPlanner} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} /></div>
                 </div>
                 <section aria-label="Calendar" className={`min-w-0 ${expanded === "clock" ? "hidden" : ""}`}>
                   <div className="mb-2 flex min-h-8 items-center border-b border-[var(--border)] pb-1.5">
