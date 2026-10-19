@@ -47,30 +47,40 @@ const taskPin = (day: string, t: VaultTaskData) => `t:${day}|${t.text}`;
 /** The week Sunday to Saturday around `today`, its events and tasks per day, and the paging that changes it. */
 export function useWeek(today: string | null, refreshKey: number) {
   const [start, setStart] = useState<string | null>(null);
-  const [data, setData] = useState<Record<string, DayData>>({});
+  const [events, setEvents] = useState<Record<string, VaultEvent[]>>({});
+  const [tasks, setTasks] = useState<Record<string, VaultTaskData[]>>({});
   const [errors, setErrors] = useState<string[]>([]);
-  const [change, setChange] = useState(0);
+  const [eventChange, setEventChange] = useState(0);
+  const [taskChange, setTaskChange] = useState(0);
   const [pins, setPins] = useState<string[]>([]);
   const first = start ?? (today ? sundayOf(today) : null);
   const thisWeek = today ? sundayOf(today) : null;
   const days = useMemo(() => (first ? weekDays(`${first}/${addDays(first, 6)}`) : []), [first]);
+  const data = useMemo(() => Object.fromEntries(days.map((day) => [day, { events: events[day] ?? [], tasks: tasks[day] ?? [] }])) as Record<string, DayData>, [days, events, tasks]);
 
+  // Events come from outside calendars and take about a second a day; tasks are local and fast. They load apart so a task change never waits on, or repeats, the calendar fetch.
   useEffect(() => {
     if (!days.length) return;
     let live = true;
     Promise.all(days.map(async (day) => {
-      const [res, tasks] = await Promise.all([
-        vaultApi.events(day).catch(() => ({ events: [] as VaultEvent[], errors: ["Calendar: could not load"] })),
-        vaultApi.tasks(day).catch(() => [] as VaultTaskData[]),
-      ]);
-      return { day, events: res.events, errors: res.errors, tasks };
+      const res = await vaultApi.events(day).catch(() => ({ events: [] as VaultEvent[], errors: ["Calendar: could not load"] }));
+      return { day, events: res.events, errors: res.errors };
     })).then((all) => {
       if (!live) return;
-      setData(Object.fromEntries(all.map((a) => [a.day, { events: a.events, tasks: a.tasks }])));
+      setEvents(Object.fromEntries(all.map((a) => [a.day, a.events])));
       setErrors([...new Set(all.flatMap((a) => a.errors))]);
     });
     return () => { live = false; };
-  }, [days, refreshKey, change]);
+  }, [days, refreshKey, eventChange]);
+
+  useEffect(() => {
+    if (!days.length) return;
+    let live = true;
+    Promise.all(days.map(async (day) => [day, await vaultApi.tasks(day).catch(() => [] as VaultTaskData[])] as const)).then((all) => {
+      if (live) setTasks(Object.fromEntries(all));
+    });
+    return () => { live = false; };
+  }, [days, refreshKey, taskChange]);
 
   useEffect(() => {
     let live = true;
@@ -88,7 +98,10 @@ export function useWeek(today: string | null, refreshKey: number) {
     },
     go: (n: number) => setStart(addDays(first as string, 7 * n)),
     goToday: () => setStart(null),
-    reload: () => setChange((c) => c + 1),
+    /** Fetch events and tasks again. */
+    reload: () => { setEventChange((c) => c + 1); setTaskChange((c) => c + 1); },
+    /** Fetch only the tasks again. */
+    reloadTasks: () => setTaskChange((c) => c + 1),
   };
 }
 export type Week = ReturnType<typeof useWeek>;
@@ -211,8 +224,8 @@ interface Drag { id: string; day: string; allDay: boolean; duration: number; gra
 interface Draw { day: string; from: number; to: number; }
 
 /** The week as a 24-hour grid: drag an event to move it, drag across an empty slot to draw a new one. Sleep is greyed out; tasks sit in the all-day row. */
-export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged }: {
-  week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void;
+export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged }: {
+  week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void; onEventsChanged: () => void;
 }) {
   const { days, data, today } = week;
   const [picked, setPicked] = useState<string | null>(null);
@@ -241,12 +254,13 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     scroller.current.scrollTop = Math.max(0, px(nowMin) - 3 * HOUR_PX);
   }, [days.length, nowMin, px]);
 
-  const refresh = useCallback(() => { week.reload(); onChanged(); }, [week, onChanged]);
+  const refresh = useCallback(() => { week.reload(); onChanged(); onEventsChanged(); }, [week, onChanged, onEventsChanged]);
 
-  async function change(action: () => Promise<unknown>) {
+  /** Run a change, then fetch again only what it touched: a task change reloads tasks (fast), an event change reloads the calendar too (slow). */
+  async function change(action: () => Promise<unknown>, touches: "tasks" | "events" = "events") {
     setProblem(null);
     try { await action(); } catch (err) { setProblem(err instanceof Error ? err.message : "Could not save"); }
-    refresh();
+    if (touches === "tasks") { week.reloadTasks(); onChanged(); } else refresh();
   }
 
   const streamOf = (t: VaultTaskData) => streams.find((s) => s.id === t.stream);
@@ -301,7 +315,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     void change(async () => {
       await vaultApi.moveTask(task, d.day, day);
       if (was) await vaultApi.setPin(from, false).then(() => vaultApi.setPin(taskPin(day, task), true)).then(week.setPins);
-    });
+    }, "tasks");
   }
 
   /** Press on an empty slot and drag to draw an event; a plain click draws one hour. */
@@ -362,14 +376,14 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                   const id = `${t.path}:${t.line}`;
                   return editing === id ? (
                     <EditTask key={id} text={t.text} stream={t.stream} streams={streams}
-                      onDone={(text) => { setEditing(null); if (text) void change(() => vaultApi.editTask(t, text)); }}
-                      onStream={(next) => { setEditing(null); void change(() => vaultApi.setTaskStream(t, next)); }}
-                      onDelete={() => { setEditing(null); void change(() => vaultApi.removeTask(t)); }} />
+                      onDone={(text) => { setEditing(null); if (text) void change(() => vaultApi.editTask(t, text), "tasks"); }}
+                      onStream={(next) => { setEditing(null); void change(() => vaultApi.setTaskStream(t, next), "tasks"); }}
+                      onDelete={() => { setEditing(null); void change(() => vaultApi.removeTask(t), "tasks"); }} />
                   ) : (
                     <div key={id} draggable onDragStart={(ev) => startTaskDrag(ev, t, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
                       title={`${t.text}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to edit · drag to another day to move`}
                       className="group/task flex cursor-grab items-center border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
-                      <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.text}`} aria-pressed={t.done} onClick={() => void change(() => vaultApi.setTask(t, !t.done))}
+                      <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.text}`} aria-pressed={t.done} onClick={() => void change(() => vaultApi.setTask(t, !t.done), "tasks")}
                         className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
                       {streamOf(t) && <span aria-hidden="true" className="h-2 w-2 shrink-0" style={{ background: streamOf(t)?.color }} />}
                       <button type="button" onClick={() => setEditing(id)} className={`min-w-0 flex-1 truncate py-0.5 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{t.text}</button>
@@ -381,7 +395,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                   );
                 })}
                 {adding === day ? (
-                  <AddTask key="add" day={day} streams={streams} onDone={(text, stream) => { setAdding(null); if (text) void change(() => vaultApi.addTask(day, text, stream)); }} />
+                  <AddTask key="add" day={day} streams={streams} onDone={(text, stream) => { setAdding(null); if (text) void change(() => vaultApi.addTask(day, text, stream), "tasks"); }} />
                 ) : (
                   <button type="button" aria-label={`Add a task on ${fmtDay(day, { weekday: "long", day: "numeric", month: "long" })}`} title="Add a task for this day" onClick={() => setAdding(day)}
                     className="flex h-4 items-center gap-0.5 px-0.5 text-micro text-[var(--muted-foreground)] opacity-40 hover:opacity-100 focus:opacity-100 group-hover:opacity-100"><Plus size={11} aria-hidden="true" />Task</button>
