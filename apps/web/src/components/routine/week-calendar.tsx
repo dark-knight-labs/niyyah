@@ -114,7 +114,7 @@ function rangeLabel(first: string, last: string): string {
 }
 
 /** One row: add a task or event for today, previous / the week's range / next, expand, and a note when a calendar could not be read (with Reconnect when Google's consent expired). The range button returns to this week. */
-export function WeekToolbar({ week, status, expanded, onExpand, onAdded }: { week: Week; status: GoogleStatusData | null; expanded: boolean; onExpand: () => void; onAdded: () => void }) {
+export function WeekToolbar({ week, streams, status, expanded, onExpand, onAdded }: { week: Week; streams: StreamMeta[]; status: GoogleStatusData | null; expanded: boolean; onExpand: () => void; onAdded: () => void }) {
   const { days, errors } = week;
   if (!days.length) return null;
   const expired = errors.some((e) => e.includes("Reconnect"));
@@ -127,7 +127,7 @@ export function WeekToolbar({ week, status, expanded, onExpand, onAdded }: { wee
           {expired && <ReconnectLink />}
         </span>
       )}
-      {week.today && <QuickAdd day={week.today} connected={!!status?.connected} onAdded={onAdded} />}
+      {week.today && <QuickAdd day={week.today} connected={!!status?.connected} streams={streams} onAdded={onAdded} />}
       <span className="inline-flex shrink-0" role="group" aria-label="Week">
         <button type="button" onClick={() => week.go(-1)} aria-label="Previous week" className={`${BTN} px-1.5`}><ChevronLeft size={15} aria-hidden="true" /></button>
         <button type="button" onClick={week.goToday} disabled={week.isThisWeek} aria-label={`${rangeLabel(days[0], days[6])} ${fmtDay(days[6], { year: "numeric" })}${week.isThisWeek ? ", this week" : ", back to this week"}`} title={week.isThisWeek ? "This week" : "Back to this week"}
@@ -348,7 +348,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   return (
     <div>
       <div ref={scroller} className="max-h-[calc(100vh-14rem)] overflow-auto border border-[var(--border)]" role="grid" aria-label="Week schedule">
-        <div className="grid min-w-[40rem] grid-cols-[2.5rem_repeat(7,minmax(0,1fr))]">
+        <div className="grid min-w-[40rem]" style={{ gridTemplateColumns: `2.5rem ${days.map((d) => (d === today ? "minmax(0,2fr)" : "minmax(0,1fr)")).join(" ")}` }}>
           <div className="sticky top-0 z-20 h-[34px] border-b border-[var(--border)] bg-[var(--surface)]" />
           {days.map((day) => (
             <div key={day} className={`sticky top-0 z-20 flex h-[34px] items-baseline gap-1.5 border-b border-l border-[var(--border)] px-1.5 py-1.5 ${day === today ? "bg-[var(--accent-light)] shadow-[inset_0_-2px_0_var(--accent)]" : "bg-[var(--surface)]"}`}>
@@ -363,7 +363,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
             return (
               <div key={day} onDragOver={(e) => { if (drag.current?.allDay) { e.preventDefault(); setOver(`ad:${day}`); } }} onDragLeave={() => setOver(null)} onDrop={(e) => dropAllDay(e, day)}
                 onClick={(e) => { if (e.target === e.currentTarget) setAdding(day); }}
-                className={`group sticky top-[34px] z-20 flex max-h-[5.5rem] min-h-7 cursor-cell flex-col gap-0.5 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
+                className={`group sticky top-[34px] z-20 flex max-h-[16rem] min-h-16 cursor-cell flex-col gap-1 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
                 {(d?.events ?? []).map((e, i) => e.all_day && (
                   <div key={i} role="button" tabIndex={0} draggable={!!e.id} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
                     onClick={() => setPicked(`${day}:${i}`)} onKeyDown={(k) => k.key === "Enter" && setPicked(`${day}:${i}`)} title={eventTip(day, e, e.id ? "Drag to another day to move" : "Read-only calendar")} aria-pressed={picked === `${day}:${i}`}
@@ -382,11 +382,11 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                   ) : (
                     <div key={id} draggable onDragStart={(ev) => startTaskDrag(ev, t, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
                       title={`${t.text}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to edit · drag to another day to move`}
-                      className="group/task flex cursor-grab items-center border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
+                      className="group/task flex cursor-grab items-start border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
                       <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.text}`} aria-pressed={t.done} onClick={() => void change(() => vaultApi.setTask(t, !t.done), "tasks")}
                         className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
-                      {streamOf(t) && <span aria-hidden="true" className="h-2 w-2 shrink-0" style={{ background: streamOf(t)?.color }} />}
-                      <button type="button" onClick={() => setEditing(id)} className={`min-w-0 flex-1 truncate py-0.5 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{t.text}</button>
+                      {streamOf(t) && <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" style={{ background: streamOf(t)?.color }} />}
+                      <button type="button" onClick={() => setEditing(id)} className={`min-w-0 flex-1 line-clamp-2 break-words py-1 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{t.text}</button>
                       <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.text}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
                         className={`grid h-4 w-4 shrink-0 place-items-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
                         <Star size={11} className={isPinned(taskPin(day, t)) ? "fill-[var(--accent)] text-[var(--accent)]" : "text-[var(--muted-foreground)]"} />
