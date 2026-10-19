@@ -197,7 +197,7 @@ export default function OverviewPage() {
                 </div>
                 <section aria-label="Calendar" className={`min-w-0 ${expanded === "clock" ? "hidden" : ""}`}>
                   <div className="mb-2 flex min-h-8 items-center border-b border-[var(--border)] pb-1.5">
-                    <WeekToolbar week={week} status={google} expanded={expanded === "calendar"} onExpand={() => toggle("calendar")} onAdded={() => { week.reload(); loadToday(); loadPlanner(); }} />
+                    <WeekToolbar week={week} streams={quarter?.streams.map(toMeta) ?? []} status={google} expanded={expanded === "calendar"} onExpand={() => toggle("calendar")} onAdded={() => { week.reload(); loadToday(); loadPlanner(); }} />
                   </div>
                   <WeekCalendar week={week} streams={quarter?.streams.map(toMeta) ?? []} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPlanner} onEventsChanged={loadToday} />
                 </section>
