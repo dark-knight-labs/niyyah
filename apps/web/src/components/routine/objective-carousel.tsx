@@ -66,23 +66,21 @@ function Pace({ pct, pace }: { pct: number; pace: number }) {
   );
 }
 
-/** Two lines of the same two sizes as the date / mode / stars strip: block name with its progress, then the title; the block's colour is the bar along the chip's bottom edge. */
+/** One line: block name with its progress, then the title; the block's colour is the bar along the chip's bottom edge. */
 function Body({ c, pace }: { c: ObjectiveChip; pace: number | null }) {
   return (
-    <span className="flex min-w-0 items-center">
-      <span className="grid min-w-0 text-left leading-tight">
-        <span className="flex items-center gap-1.5 whitespace-nowrap text-micro font-bold uppercase tracking-[0.07em] text-[var(--muted-foreground)]">
-          <span className="truncate">{c.label}</span>
-          {c.pct !== null && <span className="font-mono font-medium normal-case tracking-normal tabular-nums">{c.pct}%</span>}
-          {c.pct !== null && pace !== null && <Pace pct={c.pct} pace={pace} />}
-        </span>
-        <span className="max-w-[16rem] truncate text-small font-semibold">{c.title}</span>
+    <span className="flex min-w-0 items-center gap-2 text-left">
+      <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-micro font-bold uppercase tracking-[0.07em] text-[var(--muted-foreground)]">
+        <span className="max-w-[8rem] truncate">{c.label}</span>
+        {c.pct !== null && <span className="font-mono font-medium normal-case tracking-normal tabular-nums">{c.pct}%</span>}
+        {c.pct !== null && pace !== null && <Pace pct={c.pct} pace={pace} />}
       </span>
+      <span className="max-w-[16rem] truncate text-small font-semibold">{c.title}</span>
     </span>
   );
 }
 
-const BODY = "block min-h-11 min-w-0 px-3 py-1.5 [@media(hover:none)]:pr-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--accent)]";
+const BODY = "block min-h-8 min-w-0 px-3 py-[5px] [@media(hover:none)]:pr-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--accent)]";
 
 /** Pinned objectives first, then (unless `pinnedOnly`) the rest dashed; an arrow shows only on a side with more chips off screen. */
 export function ObjectiveCarousel({ chips, pinned, onPin, pace, full, pinnedOnly = false }: { chips: ObjectiveChip[]; pinned: string[]; onPin: (id: string) => void; pace: number | null; full: boolean; pinnedOnly?: boolean }) {

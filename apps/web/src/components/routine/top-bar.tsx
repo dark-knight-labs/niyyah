@@ -1,7 +1,8 @@
 "use client";
 
 import { Check, ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useNow } from "@/hooks/use-now";
 import { Checklist } from "@/components/planner/checklist";
 import { vaultApi } from "@/lib/vault-api";
@@ -46,13 +47,11 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
   const face = (
     <>
       <span className="h-2 w-2 shrink-0 transition-colors" style={{ background: resolveModeColor(mode) }} aria-hidden="true" />
-      <span className="grid text-left leading-tight">
-        <span className={LABEL}>Mode</span>
-        <span className="text-small font-semibold capitalize">{label}</span>
-      </span>
+      <span className={LABEL}>Mode</span>
+      <span className="text-small font-semibold capitalize">{label}</span>
     </>
   );
-  if (!editable) return <div className={CHIP}>{face}</div>;
+  if (!editable) return <div className={FACT}>{face}</div>;
 
   function pick(key: string) {
     setOpen(false);
@@ -72,10 +71,10 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
   }
 
   return (
-    <div ref={root} className="relative" onKeyDown={onKey}>
+    <div ref={root} className="relative flex" onKeyDown={onKey}>
       <button ref={button} type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Day mode: ${label}`}
         onClick={() => { setActive(Math.max(current, 0)); setOpen(!open); }}
-        className={`${CHIP} w-full pr-2.5 transition-colors hover:bg-[var(--muted)] aria-expanded:border-[var(--muted-foreground)]`}>
+        className={`${FACT} w-full pr-2.5 transition-colors hover:bg-[var(--muted)]`}>
         {face}
         <ChevronDown size={13} aria-hidden="true" className={`ml-1 max-sm:ml-auto text-[var(--muted-foreground)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -95,18 +94,49 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
   );
 }
 
-/** Slim top bar: the quarter's objectives as a chip carousel (pinned first), then the date, the day's mode and the star total. */
-const CHIP = "relative flex min-h-11 items-center gap-2.5 overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--surface)] px-3";
+const FACT = "relative flex h-full min-h-9 items-center gap-2 whitespace-nowrap border-l border-[var(--border)] px-3.5";
 const LABEL = "mono text-[var(--muted-foreground)]";
 
+interface FactsProps { dateLabel: string; city: string | null; editDay: string | null; today: VaultDayData | null; onMode: (mode: string) => void; }
+
+/** Date, the day's mode and the star total as plain cells; they sit in the app's top bar, before the account. */
+function TodayFacts({ dateLabel, city, editDay, today, onMode }: FactsProps) {
+  return (
+    <div className="flex h-full items-stretch" role="group" aria-label="Today">
+      <div className={FACT} title={city ?? undefined}>
+        <span className={LABEL}>Date</span>
+        <span className="text-small font-semibold">{dateLabel}{city && <span className="hidden font-normal text-[var(--muted-foreground)] xl:inline"> · {city}</span>}</span>
+      </div>
+      {today && (
+        <>
+          <ModePicker mode={today.mode ?? "full"} editable={!!editDay} onChange={onMode} />
+          <div className={FACT} role="progressbar" aria-label="Stars today" aria-valuemin={0} aria-valuemax={today.possible} aria-valuenow={today.total}>
+            <span className={LABEL}>Stars</span>
+            <span className="text-small font-semibold"><b className="font-mono tabular-nums">{today.total}</b><span className="font-normal text-[var(--muted-foreground)]"> / <span className="font-mono tabular-nums">{today.possible}</span></span></span>
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-[var(--muted)]" aria-hidden="true">
+              <span className="absolute inset-y-0 left-0 bg-[var(--accent)] transition-[width] duration-[350ms]" style={{ width: `${today.possible ? Math.round((100 * today.total) / today.possible) : 0}%` }} />
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Where the app's top bar wants the facts (md and up); below md they sit under the objectives instead. */
+function useNavSlot(): HTMLElement | null {
+  return useSyncExternalStore(() => () => {}, () => document.getElementById("nav-today"), () => null);
+}
+
+/** Slim objectives strip: the quarter's objectives as a one-line chip carousel (pinned first). */
 export function TopBar({ dateLabel, city, editDay, today, onSaved, goals, quarter, onTick }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  const mode = today?.mode ?? null;
   const opened = goals?.find((g) => g.title === open) ?? null;
   const chips = objectiveChips(quarter, goals, open, setOpen);
   const { pinned, toggle, full } = usePinned(chips.map((c) => c.id));
   const pace = quarterPace(quarter, useNow(3_600_000));
+  const slot = useNavSlot();
 
   async function setMode(next: string) {
     if (!editDay) return;
@@ -118,35 +148,13 @@ export function TopBar({ dateLabel, city, editDay, today, onSaved, goals, quarte
     }
   }
 
+  const facts: FactsProps = { dateLabel, city, editDay, today, onMode: (m) => void setMode(m) };
+
   return (
-    <header className="mb-2 border-b border-[var(--border)] pb-3">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
-      <div className="min-w-0 flex-1 basis-[28rem]">
-        {chips.length > 0 && <ObjectiveCarousel chips={chips} pinned={pinned} onPin={toggle} pace={pace} full={full} />}
-      </div>
-      <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center" role="group" aria-label="Today">
-        <div className={`${CHIP} min-w-0`} title={city ?? undefined}>
-          <span className="grid leading-tight">
-            <span className={LABEL}>Date</span>
-            <span className="text-small font-semibold">{dateLabel}{city && <span className="font-normal text-[var(--muted-foreground)]"> · {city}</span>}</span>
-          </span>
-        </div>
-        {today && (
-          <>
-            <ModePicker mode={mode ?? "full"} editable={!!editDay} onChange={(m) => void setMode(m)} />
-            <div className={`${CHIP} col-span-2 sm:col-span-1`} role="progressbar" aria-label="Stars today" aria-valuemin={0} aria-valuemax={today.possible} aria-valuenow={today.total}>
-              <span className="grid leading-tight">
-                <span className={LABEL}>Stars</span>
-                <span className="text-small font-semibold"><b className="font-mono tabular-nums">{today.total}</b><span className="font-normal text-[var(--muted-foreground)]"> / <span className="font-mono tabular-nums">{today.possible}</span></span></span>
-              </span>
-              <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-[var(--muted)]" aria-hidden="true">
-                <span className="absolute inset-y-0 left-0 bg-[var(--accent)] transition-[width] duration-[350ms]" style={{ width: `${today.possible ? Math.round((100 * today.total) / today.possible) : 0}%` }} />
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-      </div>
+    <header className="mb-2 border-b border-[var(--border)] pb-2">
+      {slot && createPortal(<TodayFacts {...facts} />, slot)}
+      <div className={`border-b border-[var(--border)] ${slot ? "md:hidden" : ""}`}><TodayFacts {...facts} /></div>
+      {chips.length > 0 && <ObjectiveCarousel chips={chips} pinned={pinned} onPin={toggle} pace={pace} full={full} />}
       {opened && (
         <div className="mt-3 border-t border-[var(--border)] pt-2.5">
           <Checklist label={`${opened.title} checklist`} items={opened.checklist} onToggle={(item, done) => onTick(item.id, done)} />

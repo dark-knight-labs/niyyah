@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { vaultApi } from "@/lib/vault-api";
 import { fmtDay } from "@/lib/week";
@@ -84,4 +85,47 @@ export function meetingName(url: string): string {
   if (host.includes("zoom")) return "Zoom";
   if (host.includes("teams")) return "Teams";
   return "call";
+}
+
+/** One-line add for today: a task (needs nothing else) or a one-hour event from the chosen start (needs Google Calendar connected). */
+export function QuickAdd({ day, connected, onAdded }: { day: string; connected: boolean; onAdded: () => void }) {
+  const [kind, setKind] = useState<"task" | "event">("task");
+  const [title, setTitle] = useState("");
+  const [start, setStart] = useState(nextHalfHour);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const event = kind === "event";
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const text = title.trim();
+    if (!text) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (event) await vaultApi.addEvent(day, { title: text, start, end: plusHour(start), location: null });
+      else await vaultApi.addTask(day, text);
+      setTitle("");
+      onAdded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Could not add the ${kind}.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const KIND = "min-h-8 px-2.5 text-xs font-semibold aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)] text-[var(--muted-foreground)] disabled:opacity-40";
+  return (
+    <form onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-1.5" aria-label="Add to today">
+      <span className="inline-flex shrink-0 border border-[var(--border)]" role="group" aria-label="Add as">
+        <button type="button" aria-pressed={!event} onClick={() => setKind("task")} className={KIND}>Task</button>
+        <button type="button" aria-pressed={event} disabled={!connected} title={connected ? undefined : "Connect Google Calendar to add events"} onClick={() => setKind("event")} className={KIND}>Event</button>
+      </span>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={event ? 200 : 300} placeholder={event ? "New event today" : "New task today"} aria-label={event ? "Event title" : "Task title"}
+        className="min-h-8 min-w-0 flex-1 border border-[var(--border)] bg-[var(--surface)] px-2.5 text-small placeholder:text-[var(--muted-foreground)]" />
+      {event && <input type="time" value={start} onChange={(e) => setStart(e.target.value)} aria-label="Start time" className="min-h-8 w-[6.5rem] border border-[var(--border)] bg-[var(--surface)] px-2 text-small" />}
+      <button type="submit" disabled={busy || !title.trim() || (event && !start)} aria-label={`Add ${kind}`} className="inline-flex min-h-8 items-center gap-1 bg-[var(--accent)] px-3 text-xs font-bold text-[var(--accent-fg)] disabled:opacity-50"><Plus size={13} aria-hidden="true" />Add</button>
+      {error && <p role="alert" className="shrink-0 text-xs text-[var(--destructive)]">{error}</p>}
+    </form>
+  );
 }

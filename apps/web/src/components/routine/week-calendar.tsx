@@ -1,13 +1,13 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Plus, Star, Trash2, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus, Star, Trash2, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatMinutes } from "@/lib/routine";
 import { formatDuration } from "@/lib/ring";
 import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, VaultEvent, VaultTaskData } from "@/lib/vault-types";
 import { addDays, fmtDay, sundayOf, weekDays } from "@/lib/week";
-import { AddEventForm, ConnectButton, meetingName } from "@/components/routine/calendar-parts";
+import { AddEventForm, ConnectButton, meetingName, QuickAdd } from "@/components/routine/calendar-parts";
 
 /** The grid shows the whole day. One hour is HOUR_PX tall (SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
 const HOUR_PX = 28;
@@ -92,13 +92,20 @@ export function useWeek(today: string | null, refreshKey: number) {
 }
 export type Week = ReturnType<typeof useWeek>;
 
-/** One row: the week's range, previous / this week / next, and a note when a calendar could not be read (with Reconnect when Google's consent expired). */
-export function WeekToolbar({ week }: { week: Week }) {
+/** "18–24 Oct", or "28 Oct – 3 Nov" when the week spans two months. */
+function rangeLabel(first: string, last: string): string {
+  const month = (d: string) => fmtDay(d, { month: "short" });
+  const day = (d: string) => fmtDay(d, { day: "numeric" });
+  return month(first) === month(last) ? `${day(first)}–${day(last)} ${month(last)}` : `${day(first)} ${month(first)} – ${day(last)} ${month(last)}`;
+}
+
+/** One row: add a task or event for today, previous / the week's range / next, expand, and a note when a calendar could not be read (with Reconnect when Google's consent expired). The range button returns to this week. */
+export function WeekToolbar({ week, status, expanded, onExpand, onAdded }: { week: Week; status: GoogleStatusData | null; expanded: boolean; onExpand: () => void; onAdded: () => void }) {
   const { days, errors } = week;
   if (!days.length) return null;
   const expired = errors.some((e) => e.includes("Reconnect"));
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-2 pb-px max-sm:w-full max-sm:justify-end max-sm:pb-1">
+    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1.5 pb-px">
       {errors.length > 0 && (
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--destructive)]" title={errors.join("\n")}>
           <TriangleAlert size={13} aria-hidden="true" className="shrink-0" />
@@ -106,12 +113,16 @@ export function WeekToolbar({ week }: { week: Week }) {
           {expired && <ReconnectLink />}
         </span>
       )}
-      <span className={`hidden whitespace-nowrap text-small font-semibold ${errors.length ? "2xl:inline" : "lg:inline"}`}>{fmtDay(days[0], { day: "numeric", month: "short" })} – {fmtDay(days[6], { day: "numeric", month: "short", year: "numeric" })}</span>
-      <span className="inline-flex" role="group" aria-label="Week">
+      {week.today && <QuickAdd day={week.today} connected={!!status?.connected} onAdded={onAdded} />}
+      <span className="inline-flex shrink-0" role="group" aria-label="Week">
         <button type="button" onClick={() => week.go(-1)} aria-label="Previous week" className={`${BTN} px-1.5`}><ChevronLeft size={15} aria-hidden="true" /></button>
-        <button type="button" onClick={week.goToday} disabled={week.isThisWeek} className={`${BTN} border-x-0`}>This week</button>
+        <button type="button" onClick={week.goToday} disabled={week.isThisWeek} aria-label={`${rangeLabel(days[0], days[6])} ${fmtDay(days[6], { year: "numeric" })}${week.isThisWeek ? ", this week" : ", back to this week"}`} title={week.isThisWeek ? "This week" : "Back to this week"}
+          className={`${BTN} border-x-0 font-mono tabular-nums ${week.isThisWeek ? "!text-[var(--foreground)] !opacity-100" : ""}`}>{rangeLabel(days[0], days[6])}</button>
         <button type="button" onClick={() => week.go(1)} aria-label="Next week" className={`${BTN} px-1.5`}><ChevronRight size={15} aria-hidden="true" /></button>
       </span>
+      <button type="button" onClick={onExpand} aria-pressed={expanded} aria-label={expanded ? "Shrink calendar" : "Expand calendar over the clock"} title={expanded ? "Shrink" : "Expand"} className={`${BTN} px-1.5`}>
+        {expanded ? <Minimize2 size={14} aria-hidden="true" /> : <Maximize2 size={14} aria-hidden="true" />}
+      </button>
     </div>
   );
 }
@@ -302,7 +313,7 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
 
   return (
     <div>
-      <div ref={scroller} className="max-h-[min(40rem,calc(100vh-12rem))] overflow-auto border border-[var(--border)]" role="grid" aria-label="Week schedule">
+      <div ref={scroller} className="max-h-[calc(100vh-14rem)] overflow-auto border border-[var(--border)]" role="grid" aria-label="Week schedule">
         <div className="grid min-w-[40rem] grid-cols-[2.5rem_repeat(7,minmax(0,1fr))]">
           <div className="sticky top-0 z-20 h-[34px] border-b border-[var(--border)] bg-[var(--surface)]" />
           {days.map((day) => (
