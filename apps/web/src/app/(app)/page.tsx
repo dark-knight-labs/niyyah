@@ -44,6 +44,9 @@ export default function OverviewPage() {
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const [habits, setHabits] = useState<HabitsData | null>(null);
   const [calendarKey, setCalendarKey] = useState(0);
+  /** Which of the two panes fills both columns; null shows them side by side. */
+  const [expanded, setExpanded] = useState<"clock" | "calendar" | null>(null);
+  const toggle = (pane: "clock" | "calendar") => setExpanded((e) => (e === pane ? null : pane));
   const now = useNow(30_000);
   const dayToday = schedule ? dateInTz(now, schedule.meta.tz) : null;
   const week = useWeek(canEdit ? dayToday : null, calendarKey);
@@ -175,15 +178,15 @@ export default function OverviewPage() {
             onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} />
           {owner ? (
             <>
-              <div className="mb-5 grid gap-6 md:items-start xl:grid-cols-[minmax(0,0.9fr)_minmax(0,2.6fr)] xl:gap-6">
-                <div className="mx-auto w-full max-w-lg xl:max-w-none">
-                  <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
+              <div className={`mb-5 grid gap-4 md:items-start ${expanded ? "" : "xl:grid-cols-[minmax(0,min(30rem,25.7%))_minmax(0,1fr)]"}`}>
+                <div className={`mx-auto w-full xl:max-w-none ${expanded === "calendar" ? "hidden" : expanded === "clock" ? "" : "max-w-lg"}`}>
+                  <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} expanded={expanded === "clock"} onToggleExpand={() => toggle("clock")} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
                   <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} onChanged={loadPrivate} /></div>
                 </div>
-                <section aria-label="Calendar" className="min-w-0">
-                  <div className="mb-3 flex flex-wrap items-end justify-end gap-x-3 border-b border-[var(--border)] pb-1.5">
-                    <WeekToolbar week={week} />
+                <section aria-label="Calendar" className={`min-w-0 ${expanded === "clock" ? "hidden" : ""}`}>
+                  <div className="mb-2 flex min-h-8 items-center border-b border-[var(--border)] pb-1.5">
+                    <WeekToolbar week={week} status={google} expanded={expanded === "calendar"} onExpand={() => toggle("calendar")} onAdded={() => { week.reload(); loadPrivate(); }} />
                   </div>
                   <WeekCalendar week={week} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPrivate} />
                 </section>

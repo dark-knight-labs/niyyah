@@ -124,6 +124,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <span className="flex-1 md:hidden" />
+        {/* The Overview page puts the date, mode and stars here (see TopBar). */}
+        <div id="nav-today" className="hidden items-stretch md:flex" />
         <AccountMenu email={user.email} />
       </header>
 

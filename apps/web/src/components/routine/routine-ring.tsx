@@ -1,12 +1,11 @@
 "use client";
 
 import { useBlocks } from "@/lib/blocks";
-import { Maximize2 } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useState } from "react";
 import { ResolvedDay, formatMinutes } from "@/lib/routine";
 import { VaultEvent } from "@/lib/vault-types";
 import { duration, formatDuration } from "@/lib/ring";
-import { FullScreenClock } from "@/components/routine/fullscreen-clock";
 import { RingGraphic, timedEvents } from "@/components/routine/ring-graphic";
 
 export interface RoutineRingProps {
@@ -14,27 +13,28 @@ export interface RoutineRingProps {
   nowMin: number;
   /** Today's calendar events (owner only); drawn on the ring's inner lane. */
   events?: VaultEvent[];
+  /** The clock fills the page's columns (the calendar steps aside); the button toggles it. */
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
-/** The 24h ring with a hover card per block and a button that opens the full-screen clock. */
-export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
+/** The 24h ring with a hover card per block and a button that expands it over the calendar's column. */
+export function RoutineRing({ day, nowMin, events, expanded = false, onToggleExpand }: RoutineRingProps) {
   const blocks = useBlocks();
   const [hover, setHover] = useState<number | null>(null);
   const [at, setAt] = useState({ x: 0, y: 0 });
-  const [full, setFull] = useState(false);
   const [hoverEvent, setHoverEvent] = useState<number | null>(null);
   const block = hover === null ? null : day.blocks[hover];
   const event = hoverEvent === null ? null : timedEvents(events)[hoverEvent];
 
   return (
-    <div className="relative mx-auto w-full max-w-[30rem]">
-      <div className="flex min-h-8 items-center justify-between gap-3">
-        <span className="text-[0.6875rem] font-bold uppercase tracking-[0.09em] text-[var(--muted-foreground)]">Today&apos;s ring</span>
-        <button type="button" onClick={() => setFull(true)} aria-label="Full screen clock" title="Full screen"
-          className="relative inline-flex h-8 w-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-[var(--border)] bg-[var(--surface)] text-xs font-semibold text-[var(--muted-foreground)] transition-colors before:absolute before:-inset-0.5 hover:border-[var(--muted-foreground)]/40 hover:bg-[var(--muted)] hover:text-[var(--foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] active:scale-95 sm:w-auto sm:px-2.5">
-          <Maximize2 size={14} aria-hidden="true" /><span className="hidden sm:inline">Full screen</span>
+    <div className={`relative mx-auto w-full ${expanded ? "max-w-[min(100%,calc((100vh-9rem)*1.019))]" : "max-w-[30rem]"}`}>
+      {onToggleExpand && (
+        <button type="button" onClick={onToggleExpand} aria-pressed={expanded} aria-label={expanded ? "Shrink clock" : "Expand clock over the calendar"} title={expanded ? "Shrink" : "Expand"}
+          className="absolute right-0 top-0 z-10 grid h-8 w-8 place-items-center border border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--foreground)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+          {expanded ? <Minimize2 size={14} aria-hidden="true" /> : <Maximize2 size={14} aria-hidden="true" />}
         </button>
-      </div>
+      )}
       <svg viewBox="110 14 420 412" className="block h-auto w-full select-none" role="group" aria-label="24-hour routine ring">
         <RingGraphic day={day} nowMin={nowMin} cx={320} cy={220} r={148} t={36} height={440} nameSize={16} clockSize={60} labelSize={16}
           hover={hover} onHover={(i, p) => { setHover(i); if (p) setAt(p); }} prayers sideLabels={false} centre="block" idPrefix="ring" events={events}
@@ -67,7 +67,6 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
         </div>
       )}
 
-      {full && <FullScreenClock day={day} nowMin={nowMin} onClose={() => setFull(false)} events={events} />}
     </div>
   );
 }
