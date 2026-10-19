@@ -54,6 +54,8 @@ export interface VaultTaskData {
   hash: string;
   text: string;
   done: boolean;
+  /** The stream it belongs to (a stream id), if any. */
+  stream: string | null;
 }
 
 export interface VaultLogEntry {

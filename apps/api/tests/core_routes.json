@@ -388,6 +388,10 @@
   "POST"
  ],
  [
+  "/api/v1/vault/tasks/stream",
+  "PUT"
+ ],
+ [
   "/api/v1/vault/tasks/text",
   "PUT"
  ],

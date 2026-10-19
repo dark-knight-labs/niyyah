@@ -95,6 +95,7 @@ class TaskResponse(BaseModel):
     hash: str
     text: str
     done: bool
+    stream: str | None = None
 
 
 class TaskToggleIn(BaseModel):
@@ -106,6 +107,13 @@ class TaskToggleIn(BaseModel):
 
 class TaskIn(BaseModel):
     text: str
+    stream: str | None = None
+
+
+class TaskStreamIn(BaseModel):
+    """Put a task in a stream, or take it out of its stream with `stream` null."""
+    line: int
+    stream: str | None = None
 
 
 class TaskTextIn(BaseModel):

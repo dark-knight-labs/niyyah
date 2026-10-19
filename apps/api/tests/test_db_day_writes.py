@@ -143,3 +143,20 @@ async def test_a_task_moves_to_another_day(db_client):
     far = date.fromisoformat(str(today)) + timedelta(days=800)
     assert (await client.put(f"{V}/tasks/move", json={"line": task["line"], "from_day": str(soon), "to_day": str(far)})).status_code == 422
     assert (await client.put(f"{V}/tasks/move", json={"line": 999999, "from_day": str(soon), "to_day": str(today)})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_a_task_belongs_to_a_stream_that_can_change_any_time(db_client):
+    client, today = db_client
+    streams = (await client.get(f"{V}/quarter")).json()["streams"]
+    first, second = streams[0]["stream"], streams[1]["stream"]
+    assert (await client.post(f"{V}/day/{today}/tasks", json={"text": "Filed", "stream": first})).status_code == 200
+    assert (await client.post(f"{V}/day/{today}/tasks", json={"text": "Loose"})).status_code == 200
+    tasks = {t["text"]: t for t in (await client.get(f"{V}/day/{today}/tasks")).json()}
+    assert tasks["Filed"]["stream"] == first and tasks["Loose"]["stream"] is None
+    for stream in (second, None):
+        assert (await client.put(f"{V}/tasks/stream", json={"line": tasks["Filed"]["line"], "stream": stream})).status_code == 200
+        again = {t["text"]: t for t in (await client.get(f"{V}/day/{today}/tasks")).json()}
+        assert again["Filed"]["stream"] == stream
+    assert (await client.put(f"{V}/tasks/stream", json={"line": tasks["Loose"]["line"], "stream": "nope"})).status_code == 422
+    assert (await client.post(f"{V}/day/{today}/tasks", json={"text": "Bad", "stream": "nope"})).status_code == 422

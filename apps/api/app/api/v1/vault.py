@@ -70,6 +70,7 @@ from app.schemas.vault import (
     SuperObjectiveIn,
     TaskIn,
     TaskMoveIn,
+    TaskStreamIn,
     TaskRemoveIn,
     TaskResponse,
     TaskTextIn,
@@ -400,6 +401,12 @@ async def put_task_text(data: TaskTextIn, user: User = Depends(get_current_user)
     return await _day_write(db, lambda: planner_day.set_task_text(db, user.id, data.line, data.text))
 
 
+@router.put("/tasks/stream", response_model=EditResponse)
+async def put_task_stream(data: TaskStreamIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Put a task in a stream, or take it out of one (`stream` null). Change it any time."""
+    return await _day_write(db, lambda: planner_day.set_task_stream(db, user.id, data.line, data.stream))
+
+
 @router.put("/tasks/move", response_model=EditResponse)
 async def put_task_move(data: TaskMoveIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     _check_task_day(data.to_day)
@@ -414,7 +421,7 @@ async def post_task_remove(data: TaskRemoveIn, user: User = Depends(get_current_
 @router.post("/day/{day}/tasks", response_model=EditResponse)
 async def post_task(day: date, data: TaskIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     _check_task_day(day)
-    return await _day_write(db, lambda: planner_day.add_task(db, user.id, day, data.text))
+    return await _day_write(db, lambda: planner_day.add_task(db, user.id, day, data.text, data.stream))
 
 
 @router.get("/day/{day}/log", response_model=list[LogEntryResponse])
