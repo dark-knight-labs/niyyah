@@ -23,6 +23,7 @@ CACHE_SECONDS = 300
 FETCH_TIMEOUT = 10.0
 
 _cache: dict[str, tuple[float, bytes]] = {}
+_parsed: dict[str, tuple[bytes, icalendar.Calendar]] = {}  # parsing a large feed takes ~1s, so keep the result while its download is cached
 
 # Only https links to the common meeting hosts become a Join link: nothing else from an event is ever made clickable.
 _MEETING = re.compile(r"https://(?:[\w-]+\.)*(?:zoom\.us|zoomgov\.com|meet\.google\.com|teams\.microsoft\.com|teams\.live\.com)/[^\s<>\"')]+", re.IGNORECASE)
@@ -86,6 +87,16 @@ def _download(url: str) -> bytes:
     raise ValueError("the calendar address redirects too many times")
 
 
+def _calendar(url: str) -> icalendar.Calendar:
+    body = _download(url)
+    hit = _parsed.get(url)
+    if hit and hit[0] is body:
+        return hit[1]
+    calendar = icalendar.Calendar.from_ical(body)
+    _parsed[url] = (body, calendar)
+    return calendar
+
+
 def _minutes(moment: datetime, day_start: datetime) -> int:
     return max(0, min(1440, round((moment - day_start).total_seconds() / 60)))
 
@@ -147,7 +158,7 @@ def events_for_day(
             events.extend(entries)
             continue
         try:
-            calendar = icalendar.Calendar.from_ical(_download(source["url"]))
+            calendar = _calendar(source["url"])
             found = recurring_ical_events.of(calendar).between(day_start, day_end)
         except Exception as exc:  # network, bad feed or parse failure: say which calendar, never the URL
             errors.append(f"{source['name']}: {type(exc).__name__}")

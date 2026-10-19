@@ -95,11 +95,10 @@ export default function OverviewPage() {
 
   // Tasks and weekly objectives are private note text: only the vault owner's session can read them.
   const dayKey = schedule ? dateInTz(now, schedule.meta.tz) : null;
-  const loadPrivate = useCallback(() => {
+  // The calendar (today's events, Google status, the week grid) is slow, since it reads outside calendars; the rest is local and fast.
+  // Edits to a pipeline, goal or task reload only the planner, so they never repeat the calendar fetch.
+  const loadPlanner = useCallback(() => {
     if (!canEdit || !dayKey) return;
-    vaultApi.events(dayKey).then(setEvents).catch(() => setEvents(null));
-    setCalendarKey((k) => k + 1);
-    vaultApi.googleStatus().then(setGoogle).catch(() => setGoogle(null));
     vaultApi.pipelines().then(setPipelines).catch(() => setPipelines(null));
     vaultApi.notebooks().then(setNotebooks).catch(() => setNotebooks(null));
     vaultApi.goals().then(setGoals).catch(() => setGoals(null));
@@ -108,6 +107,17 @@ export default function OverviewPage() {
     vaultApi.habits().then(setHabits).catch(() => setHabits(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
+  const loadToday = useCallback(() => {
+    if (!canEdit || !dayKey) return;
+    vaultApi.events(dayKey).then(setEvents).catch(() => setEvents(null));
+  }, [canEdit, dayKey]);
+  const loadCalendar = useCallback(() => {
+    if (!canEdit || !dayKey) return;
+    loadToday();
+    setCalendarKey((k) => k + 1);
+    vaultApi.googleStatus().then(setGoogle).catch(() => setGoogle(null));
+  }, [canEdit, dayKey, loadToday]);
+  const loadPrivate = useCallback(() => { loadPlanner(); loadCalendar(); }, [loadPlanner, loadCalendar]);
 
   // Drop the ?calendar= param so a reload does not repeat the note.
   useEffect(() => {
@@ -183,18 +193,18 @@ export default function OverviewPage() {
                 <div className={`mx-auto w-full xl:max-w-none ${expanded === "calendar" ? "hidden" : expanded === "clock" ? "" : "max-w-lg"}`}>
                   <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} expanded={expanded === "clock"} onToggleExpand={() => toggle("clock")} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
-                  <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} onChanged={loadPrivate} /></div>
+                  <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} onChanged={loadPlanner} /></div>
                 </div>
                 <section aria-label="Calendar" className={`min-w-0 ${expanded === "clock" ? "hidden" : ""}`}>
                   <div className="mb-2 flex min-h-8 items-center border-b border-[var(--border)] pb-1.5">
-                    <WeekToolbar week={week} status={google} expanded={expanded === "calendar"} onExpand={() => toggle("calendar")} onAdded={() => { week.reload(); loadPrivate(); }} />
+                    <WeekToolbar week={week} status={google} expanded={expanded === "calendar"} onExpand={() => toggle("calendar")} onAdded={() => { week.reload(); loadToday(); loadPlanner(); }} />
                   </div>
-                  <WeekCalendar week={week} streams={quarter?.streams.map(toMeta) ?? []} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPrivate} />
+                  <WeekCalendar week={week} streams={quarter?.streams.map(toMeta) ?? []} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPlanner} onEventsChanged={loadToday} />
                 </section>
               </div>
               {habits && <div className="mb-5"><HabitsPanel day={dayKey} data={habits} today={today} onData={setHabits} onVoted={setToday} /></div>}
               <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
-              {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slotId ?? undefined} onChanged={loadPrivate} />}
+              {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slotId ?? undefined} onChanged={loadPlanner} />}
             </>
           ) : (
             <div className="mx-auto max-w-xl">
