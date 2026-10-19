@@ -1,0 +1,24 @@
+"""task tags
+
+Revision ID: b3d5f7a9c1e4
+Revises: a1c3e5b7d9f2
+Create Date: 2026-10-19 12:00:00
+"""
+from typing import Sequence, Union
+
+import sqlalchemy as sa
+from alembic import op
+
+revision: str = "b3d5f7a9c1e4"
+down_revision: Union[str, None] = "a1c3e5b7d9f2"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.add_column("planner_tasks", sa.Column("products", sa.JSON(), nullable=False, server_default="[]"))
+
+
+def downgrade() -> None:
+    with op.batch_alter_table("planner_tasks") as batch:
+        batch.drop_column("products")

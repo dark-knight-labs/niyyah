@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.models.planner import LogEntry, QuarterStream, Task
 from app.models.vault import VaultBlockVote, VaultDay
 from app.services import planner_blocks
-from app.services.rules import MODE_META, line_hash, one_line_note, possible_for_count
+from app.services.rules import MODE_META, line_hash, one_line_note, possible_for_count, split_tags
 
 TASK_GONE = "this task no longer exists; reload and try again"
 LOG_GONE = "this log entry changed; reload and try again"
@@ -121,6 +121,12 @@ def _label(text: str) -> str:
     return label
 
 
+def _task_fields(text: str) -> tuple[str, list[str]]:
+    """'Fix DNS #router' -> ('Fix DNS', ['router']): the task's text and its tags, like a pipeline item."""
+    bare, tags = split_tags(_label(text))
+    return _label(bare), tags
+
+
 async def _task(db, user_id: int, task_id: int) -> Task:
     task = (await db.execute(select(Task).where(Task.user_id == user_id, Task.id == task_id))).scalar_one_or_none()
     if task is None:
@@ -140,11 +146,11 @@ async def _known_stream(db, user_id: int, stream: str | None) -> str | None:
 
 
 async def add_task(db, user_id: int, day: date, text: str, stream: str | None = None) -> VaultDay:
-    label = _label(text)
+    label, tags = _task_fields(text)
     stream = await _known_stream(db, user_id, stream)
     row = await _day(db, user_id, day)
     top = (await db.execute(select(func.max(Task.position)).where(Task.user_id == user_id))).scalar()
-    db.add(Task(user_id=user_id, text=label, done=False, scheduled_on=day, stream=stream,
+    db.add(Task(user_id=user_id, text=label, products=tags, done=False, scheduled_on=day, stream=stream,
                 source_path=f"Calendar/Daily/{day.isoformat()}.md", position=0 if top is None else top + 1))
     return row
 
@@ -156,8 +162,10 @@ async def set_task_done(db, user_id: int, task_id: int, done: bool, today: date)
 
 
 async def set_task_text(db, user_id: int, task_id: int, text: str) -> None:
-    label = _label(text)
-    (await _task(db, user_id, task_id)).text = label
+    label, tags = _task_fields(text)
+    task = await _task(db, user_id, task_id)
+    task.text = label
+    task.products = tags
 
 
 async def set_task_stream(db, user_id: int, task_id: int, stream: str | None) -> None:

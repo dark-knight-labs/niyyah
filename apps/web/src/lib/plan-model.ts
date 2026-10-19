@@ -63,6 +63,11 @@ export function waitingOn(item: PipelineItemData, entries: NotebookEntryData[]):
   return item.blocked_by.map((id) => ({ id, found: entries.find((e) => e.id === id) })).filter((w) => !w.found || isOpenBlocker(w.found));
 }
 
+/** Text with its tags written back in the form the API reads: `#word`, or `[product:: two words]` when a tag has spaces. */
+export function tagged(text: string, tags: string[]): string {
+  return [text, ...tags.map((t) => (/\s/.test(t) ? `[product:: ${t}]` : `#${t}`))].join(" ");
+}
+
 /** Tags in use among the items of these rows, most used first. */
 export function tagTally(rows: Row[]): [string, number][] {
   const tally = new Map<string, number>();

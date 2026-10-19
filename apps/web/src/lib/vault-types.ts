@@ -56,6 +56,8 @@ export interface VaultTaskData {
   done: boolean;
   /** The stream it belongs to (a stream id), if any. */
   stream: string | null;
+  /** Tags, typed as #word in the text: the same system as the Plan page. */
+  products?: string[];
 }
 
 export interface VaultLogEntry {

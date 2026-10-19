@@ -132,7 +132,7 @@ export function QuickAdd({ day, connected, streams, onAdded }: { day: string; co
         <button type="button" aria-pressed={!event} onClick={() => setKind("task")} className={KIND}>Task</button>
         <button type="button" aria-pressed={event} disabled={!connected} title={connected ? undefined : "Connect Google Calendar to add events"} onClick={() => setKind("event")} className={KIND}>Event</button>
       </span>
-      <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={event ? 200 : 300} placeholder={event ? "New event" : "New task"} aria-label={event ? "Event title" : "Task title"}
+      <input id="quick-add-title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }} maxLength={event ? 200 : 300} placeholder={event ? "New event" : "New task #tag"} aria-label={event ? "Event title" : "Task title"}
         className="min-h-8 min-w-[8rem] flex-1 border border-[var(--border)] bg-[var(--surface)] px-2.5 text-small placeholder:text-[var(--muted-foreground)]" />
       <input type="date" value={date} onChange={(e) => setPicked(e.target.value || null)} aria-label="Date" className={`${FIELD} w-[9.5rem]`} />
       {event ? (

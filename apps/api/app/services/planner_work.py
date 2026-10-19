@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from app.models.planner import NotebookEntry, PipelineItem, Quarter, QuarterStream, WeekObjective
 from app.services.rules import (
-    BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, HASHTAG, MONTHS, PRODUCT, SLUG, clean_entry, clean_products, clean_item,
+    BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, HASHTAG, MONTHS, PRODUCT, SLUG, clean_entry, clean_products, clean_item, split_tags,
     make_stream, new_id, one_line_field, quarter_months, validate_field, week_for, weekly_streams,
 )
 
@@ -29,18 +29,6 @@ async def _next_position(db, user_id: int, stream: str) -> int:
     return 0 if top is None else top + 1
 
 
-def _split_product(text: str) -> tuple[str, list[str]]:
-    """('Wire it #router [product:: DNS, Switch]') -> ('Wire it', ['DNS', 'Switch', 'router']): products are a field of the item, not part of its text.
-
-    A tag is either `#word` (no spaces) or a `[product:: a, b]` list (spaces allowed). Month tags such as #oct are left for the checkpoint."""
-    listed = PRODUCT.search(text)
-    tags = listed.group(1).split(",") if listed else []
-    text = PRODUCT.sub("", text)
-    tags += HASHTAG.findall(text)
-    text = " ".join(HASHTAG.sub("", text).split())
-    return text, clean_products(tags)
-
-
 def _description(text: str) -> str:
     text = text.strip("\n").rstrip()
     if len(text) > MAX_DESCRIPTION_CHARS:
@@ -59,7 +47,7 @@ async def add_items(db, user_id: int, stream: str, texts: list[str], lane: str, 
     for text, note in zip(texts, notes):
         if not text.strip():
             continue
-        bare, products = _split_product(text)
+        bare, products = split_tags(text)
         title, month = clean_item(bare)
         cleaned.append((title, products, month, _description(note)))
     if not cleaned:
@@ -111,7 +99,7 @@ async def set_blocked_by(db, user_id: int, stream: str, item_id: int, ids: list[
 async def set_text(db, user_id: int, stream: str, item_id: int, text: str) -> None:
     """Rename in place, keeping lane, dates and products; a #month typed in the text replaces the checkpoint."""
     row = await item_row(db, user_id, stream, item_id)
-    bare, typed_products = _split_product(text)
+    bare, typed_products = split_tags(text)
     title, typed_month = clean_item(bare)
     row.text = title
     row.checkpoint = typed_month or row.checkpoint
@@ -180,7 +168,7 @@ async def sync_focus(db, user_id: int, stream: str, week: str, today: date, *, t
         if item:
             await set_text(db, user_id, stream, item.id, text)
             return
-        wanted = clean_item(_split_product(text)[0])[0].lower()
+        wanted = clean_item(split_tags(text)[0])[0].lower()
         same = (await db.execute(select(PipelineItem).where(
             PipelineItem.user_id == user_id, PipelineItem.stream == stream, PipelineItem.done.is_(False))
             .order_by(PipelineItem.position))).scalars().all()

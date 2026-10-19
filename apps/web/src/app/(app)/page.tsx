@@ -6,8 +6,9 @@ import { ApiError } from "@/lib/api-client";
 import { useBlocks } from "@/lib/blocks";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { GoogleStatusData, QuarterData, NotebooksData, VaultGoalsData, VaultObjectivesData, PipelinesData, VaultDayData, VaultEventsData, HabitsData } from "@/lib/vault-types";
-import { dateInTz, hasLocation, nowMinutes, resolveDay, slotOwnerFor, VaultScheduleData } from "@/lib/routine";
+import { GoogleStatusData, QuarterData, VaultGoalsData, VaultObjectivesData, VaultDayData, VaultEventsData, HabitsData } from "@/lib/vault-types";
+import { dateInTz, hasLocation, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
 import { TopBar } from "@/components/routine/top-bar";
@@ -17,7 +18,6 @@ import { ThisWeek } from "@/components/routine/this-week";
 import { HabitsPanel } from "@/components/routine/habits-panel";
 import { VotesPanel } from "@/components/routine/votes-panel";
 import { SleepSpan, useWeek, WeekCalendar, WeekToolbar } from "@/components/routine/week-calendar";
-import { WorkLanes } from "@/components/routine/work-lanes";
 import { toMeta } from "@/lib/streams";
 
 const REFRESH_MS = 60_000;
@@ -38,19 +38,26 @@ export default function OverviewPage() {
     if (!result) return null;
     return result === "connected" ? "Google Calendar connected." : "Could not connect Google Calendar. Try again.";
   });
-  const [pipelines, setPipelines] = useState<PipelinesData | null>(null);
-  const [notebooks, setNotebooks] = useState<NotebooksData | null>(null);
   const [goals, setGoals] = useState<VaultGoalsData | null>(null);
   const [quarter, setQuarter] = useState<QuarterData | null>(null);
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const [habits, setHabits] = useState<HabitsData | null>(null);
   const [calendarKey, setCalendarKey] = useState(0);
-  /** Which of the two panes fills both columns; null shows them side by side. */
-  const [expanded, setExpanded] = useState<"clock" | "calendar" | null>(null);
-  const toggle = (pane: "clock" | "calendar") => setExpanded((e) => (e === pane ? null : pane));
+  /** The left sidebar (clock, now, this week); hidden, the calendar takes the full width. */
+  const [sidebar, setSidebar] = useState(true);
   const now = useNow(30_000);
   const dayToday = schedule ? dateInTz(now, schedule.meta.tz) : null;
   const week = useWeek(canEdit ? dayToday : null, calendarKey);
+  useHotkeys({
+    "mod+b": () => setSidebar((v) => !v),
+    "[": () => week.go(-1),
+    "]": () => week.go(1),
+    t: week.goToday,
+    d: () => week.setShowDone(!week.showDone),
+    n: () => document.getElementById("quick-add-title")?.focus(),
+    "/": () => document.getElementById("quick-add-title")?.focus(),
+    Escape: () => week.setPicked(null),
+  });
 
   const load = useCallback(() => {
     vaultApi
@@ -99,8 +106,6 @@ export default function OverviewPage() {
   // Edits to a pipeline, goal or task reload only the planner, so they never repeat the calendar fetch.
   const loadPlanner = useCallback(() => {
     if (!canEdit || !dayKey) return;
-    vaultApi.pipelines().then(setPipelines).catch(() => setPipelines(null));
-    vaultApi.notebooks().then(setNotebooks).catch(() => setNotebooks(null));
     vaultApi.goals().then(setGoals).catch(() => setGoals(null));
     vaultApi.quarter().then(setQuarter).catch(() => setQuarter(null));
     vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
@@ -152,7 +157,6 @@ export default function OverviewPage() {
   const nowMin = schedule ? nowMinutes(now, schedule.meta.tz) : 0;
   const block = day ? currentBlock(day, nowMin) : undefined;
   const owner = canEdit && !!dayKey && !!day;
-  const slotId = schedule ? slotOwnerFor(schedule, now) : null;
   // Sleep blocks of any day of the week, as minute spans, so the grid can grey them out. UTC noon keeps the date in every timezone the schedule can use.
   const sleepFor = (iso: string): SleepSpan[] => {
     if (!schedule) return [];
@@ -187,22 +191,21 @@ export default function OverviewPage() {
           <TopBar dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
           {owner ? (
             <>
-              <div className={`mb-5 grid gap-4 md:items-start ${expanded ? "" : "xl:grid-cols-[minmax(0,min(27rem,23.1%))_minmax(0,1fr)]"}`}>
-                <div className={`mx-auto w-full xl:max-w-none ${expanded === "calendar" ? "hidden" : expanded === "clock" ? "" : "max-w-lg"}`}>
-                  <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} expanded={expanded === "clock"} onToggleExpand={() => toggle("clock")} /></div>
+              <div className={`mb-5 grid gap-4 md:items-start ${sidebar ? "xl:grid-cols-[minmax(0,min(27rem,23.1%))_minmax(0,1fr)]" : ""}`}>
+                <div className={`mx-auto w-full max-w-lg xl:max-w-none ${sidebar ? "" : "hidden"}`}>
+                  <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
                   <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} week={week} goals={goals?.items ?? null} onChanged={loadPlanner} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} /></div>
                 </div>
-                <section aria-label="Calendar" className={`min-w-0 ${expanded === "clock" ? "hidden" : ""}`}>
+                <section aria-label="Calendar" className="min-w-0">
                   <div className="mb-2 flex min-h-8 items-center border-b border-[var(--border)] pb-1.5">
-                    <WeekToolbar week={week} streams={quarter?.streams.map(toMeta) ?? []} status={google} expanded={expanded === "calendar"} onExpand={() => toggle("calendar")} onAdded={() => { week.reload(); loadToday(); loadPlanner(); }} />
+                    <WeekToolbar week={week} streams={quarter?.streams.map(toMeta) ?? []} status={google} sidebar={sidebar} onSidebar={() => setSidebar((v) => !v)} onAdded={() => { week.reload(); loadToday(); loadPlanner(); }} />
                   </div>
                   <WeekCalendar week={week} streams={quarter?.streams.map(toMeta) ?? []} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPlanner} onEventsChanged={loadToday} />
                 </section>
               </div>
               {habits && <div className="mb-5"><HabitsPanel day={dayKey} data={habits} today={today} onData={setHabits} onVoted={setToday} /></div>}
               <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
-              {pipelines && <WorkLanes data={pipelines} notebooks={notebooks} ot={slotId ?? undefined} onChanged={loadPlanner} />}
             </>
           ) : (
             <div className="mx-auto max-w-xl">
