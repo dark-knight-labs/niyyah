@@ -101,7 +101,7 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
     objectives = [WeekObjective(user_id=user_id, week=o.week, stream=o.stream, text=o.text, done=o.done, checkpoint=o.checkpoint)
                   for o in snap.week_objectives]
     tasks = [Task(user_id=user_id, text=t.text, done=t.done, due_on=t.due_on, scheduled_on=t.scheduled_on, start_on=t.start_on,
-                  done_on=t.done_on, source_path=t.source_path, stream=t.stream, position=n) for n, t in enumerate(snap.tasks)]
+                  done_on=t.done_on, source_path=t.source_path, stream=t.stream, products=clean_products(t.products), position=n) for n, t in enumerate(snap.tasks)]
     goals = [Goal(user_id=user_id, position=n, title=g.title, value=g.value, caption=g.caption, progress=g.progress,
                   checklist=clean_checklist([i.model_dump() for i in g.checklist])) for n, g in enumerate(snap.goals)]
     feeds = [PlannerCalendarFeed(user_id=user_id, name=f.name, url=f.url, color=f.color, email=f.email, position=n) for n, f in enumerate(f for f in snap.feeds if f.url)]

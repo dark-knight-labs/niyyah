@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useTheme } from "@/hooks/use-theme";
 import { logout } from "@/lib/auth";
 import { BlocksProvider } from "@/lib/blocks";
@@ -19,10 +20,10 @@ import {
 const PUBLIC_PATHS = ["/"];
 
 const nav = [
-  { href: "/", label: "Overview", icon: Clock },
-  { href: "/plan", label: "Plan", icon: ListChecks },
-  { href: "/progress", label: "Progress", icon: Activity },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/", label: "Overview", icon: Clock, key: "o" },
+  { href: "/plan", label: "Plan", icon: ListChecks, key: "p" },
+  { href: "/progress", label: "Progress", icon: Activity, key: "r" },
+  { href: "/settings", label: "Settings", icon: Settings, key: "s" },
 ];
 
 /** The ring-and-dot mark: the 24-hour ring with its gap, and the intention at the centre. */
@@ -83,7 +84,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isPublic = PUBLIC_PATHS.includes(pathname);
   const { user, loading } = useAuth(!isPublic);
+  const router = useRouter();
   useTheme();
+  // "g" then a letter goes to a page, like the hint on each tab says.
+  useHotkeys(user ? Object.fromEntries(nav.map((item) => [`g ${item.key}`, () => router.push(item.href)])) : {});
 
   if (loading) {
     return (
@@ -116,7 +120,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           {nav.map((item) => {
             const active = pathname === item.href;
             return (
-              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
+              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} title={`${item.label} (g ${item.key})`} aria-keyshortcuts={`g ${item.key}`}
                 className={`mono flex items-center border-r border-[var(--border)] px-4 ${active ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}>
                 {item.label}
               </Link>

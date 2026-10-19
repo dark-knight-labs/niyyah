@@ -160,3 +160,17 @@ async def test_a_task_belongs_to_a_stream_that_can_change_any_time(db_client):
         assert again["Filed"]["stream"] == stream
     assert (await client.put(f"{V}/tasks/stream", json={"line": tasks["Loose"]["line"], "stream": "nope"})).status_code == 422
     assert (await client.post(f"{V}/day/{today}/tasks", json={"text": "Bad", "stream": "nope"})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_task_tags_are_typed_as_hashtags_and_leave_the_text(db_client):
+    client, today = db_client
+    await client.post(f"{V}/day/{today}/tasks", json={"text": "Fix DNS #router #Lab [product:: Home net]"})
+    task = next(t for t in (await client.get(f"{V}/day/{today}/tasks")).json() if t["text"] == "Fix DNS")
+    assert task["products"] == ["Home net", "router", "Lab"]
+    await client.put(f"{V}/tasks/text", json={"line": task["line"], "text": "Fix DNS again #dns"})
+    task = next(t for t in (await client.get(f"{V}/day/{today}/tasks")).json() if t["line"] == task["line"])
+    assert task["text"] == "Fix DNS again" and task["products"] == ["dns"]
+    await client.put(f"{V}/tasks/text", json={"line": task["line"], "text": "Fix DNS again"})
+    again = next(t for t in (await client.get(f"{V}/day/{today}/tasks")).json() if t["line"] == task["line"])
+    assert again["products"] == []

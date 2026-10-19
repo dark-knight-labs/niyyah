@@ -1,7 +1,8 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus, Star, Trash2, TriangleAlert, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Plus, Star, Trash2, TriangleAlert, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { tagged } from "@/lib/plan-model";
 import { formatMinutes } from "@/lib/routine";
 import { StreamMeta } from "@/lib/streams";
 import { formatDuration } from "@/lib/ring";
@@ -54,6 +55,7 @@ export function useWeek(today: string | null, refreshKey: number) {
   const [taskChange, setTaskChange] = useState(0);
   const [pins, setPins] = useState<string[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
+  const [showDone, setShowDone] = useState(false);
   const first = start ?? (today ? sundayOf(today) : null);
   const thisWeek = today ? sundayOf(today) : null;
   const days = useMemo(() => (first ? weekDays(`${first}/${addDays(first, 6)}`) : []), [first]);
@@ -92,7 +94,7 @@ export function useWeek(today: string | null, refreshKey: number) {
   }, []);
 
   return {
-    days, data, errors, today, picked, setPicked, selected, isThisWeek: first === thisWeek, pins, setPins,
+    days, data, errors, today, picked, setPicked, selected, showDone, setShowDone, isThisWeek: first === thisWeek, pins, setPins,
     /** Mark an event or task important (or clear it); shows at once and settles on what the server says. */
     togglePin: (key: string) => {
       const pinned = !pins.includes(key);
@@ -116,13 +118,17 @@ function rangeLabel(first: string, last: string): string {
   return month(first) === month(last) ? `${day(first)}–${day(last)} ${month(last)}` : `${day(first)} ${month(first)} – ${day(last)} ${month(last)}`;
 }
 
-/** One row: add a task or event for today, previous / the week's range / next, expand, and a note when a calendar could not be read (with Reconnect when Google's consent expired). The range button returns to this week. */
-export function WeekToolbar({ week, streams, status, expanded, onExpand, onAdded }: { week: Week; streams: StreamMeta[]; status: GoogleStatusData | null; expanded: boolean; onExpand: () => void; onAdded: () => void }) {
+/** One row: add a task or event for today, previous / the week's range / next, the sidebar and done-task switches, and a note when a calendar could not be read (with Reconnect when Google's consent expired). The range button returns to this week. */
+export function WeekToolbar({ week, streams, status, sidebar, onSidebar, onAdded }: { week: Week; streams: StreamMeta[]; status: GoogleStatusData | null; sidebar: boolean; onSidebar: () => void; onAdded: () => void }) {
   const { days, errors } = week;
+  const doneCount = days.reduce((n, day) => n + (week.data[day]?.tasks ?? []).filter((t) => t.done).length, 0);
   if (!days.length) return null;
   const expired = errors.some((e) => e.includes("Reconnect"));
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1.5 pb-px">
+      <button type="button" onClick={onSidebar} aria-pressed={sidebar} aria-keyshortcuts="Control+B Meta+B" aria-label={sidebar ? "Hide the sidebar" : "Show the sidebar"} title={`${sidebar ? "Hide" : "Show"} the sidebar (⌘B)`} className={`${BTN} order-first px-1.5`}>
+        {sidebar ? <PanelLeftClose size={15} aria-hidden="true" /> : <PanelLeftOpen size={15} aria-hidden="true" />}
+      </button>
       {errors.length > 0 && (
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--destructive)]" title={errors.join("\n")}>
           <TriangleAlert size={13} aria-hidden="true" className="shrink-0" />
@@ -139,8 +145,8 @@ export function WeekToolbar({ week, streams, status, expanded, onExpand, onAdded
           className={`${BTN} border-x-0 font-mono tabular-nums ${week.isThisWeek ? "!text-[var(--foreground)] !opacity-100" : ""}`}>{rangeLabel(days[0], days[6])}</button>
         <button type="button" onClick={() => week.go(1)} aria-label="Next week" className={`${BTN} px-1.5`}><ChevronRight size={15} aria-hidden="true" /></button>
       </span>
-      <button type="button" onClick={onExpand} aria-pressed={expanded} aria-label={expanded ? "Shrink calendar" : "Expand calendar over the clock"} title={expanded ? "Shrink" : "Expand"} className={`${BTN} px-1.5`}>
-        {expanded ? <Minimize2 size={14} aria-hidden="true" /> : <Maximize2 size={14} aria-hidden="true" />}
+      <button type="button" onClick={() => week.setShowDone(!week.showDone)} aria-pressed={week.showDone} aria-keyshortcuts="d" title={`${week.showDone ? "Hide" : "Show"} done tasks (d)`} className={`${BTN} gap-1.5 aria-pressed:text-[var(--foreground)]`}>
+        Done <span className="font-mono tabular-nums">{doneCount}</span>
       </button>
     </div>
   );
@@ -152,17 +158,16 @@ function EventDetails({ event: e, pick, week, onChanged }: { event: VaultEvent; 
   const key = eventPin(pick.slice(0, 10), e);
   const pinned = week.pins.includes(key);
   const when = e.all_day || e.start_min === null || e.end_min === null ? "All day" : `${formatMinutes(e.start_min)}–${formatMinutes(e.end_min)} · ${formatDuration(e.end_min - e.start_min)}`;
-  const act = "inline-flex min-h-8 items-center gap-1 border border-[var(--border)] px-2.5 text-xs font-semibold hover:bg-[var(--muted)]";
+  const act = "inline-flex min-h-8 shrink-0 items-center gap-1 whitespace-nowrap border border-[var(--border)] px-2.5 text-xs font-semibold hover:bg-[var(--muted)]";
   async function remove() {
     setProblem(null);
     try { await vaultApi.removeEvent(e.id as string); week.setPicked(null); onChanged(); } catch (err) { setProblem(err instanceof Error ? err.message : "Could not delete"); }
   }
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-small" aria-label="Event details" role="group">
-      <span className="min-w-0 truncate font-semibold">{e.title}</span>
-      <span className="font-mono tabular-nums text-[var(--muted-foreground)]">{fmtDay(pick.slice(0, 10), { weekday: "short", day: "numeric", month: "short" })} · {when}</span>
-      <span className="min-w-0 truncate text-[var(--muted-foreground)]">{e.calendar}{e.location ? ` · ${e.location}` : ""}{e.id ? "" : " · read-only"}</span>
-      <span className="flex-1" />
+    <div className="flex min-w-0 flex-1 items-center gap-x-3 text-small" aria-label="Event details" role="group">
+      <span className="min-w-0 max-w-[16rem] shrink-0 truncate font-semibold">{e.title}</span>
+      <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-[var(--muted-foreground)]">{fmtDay(pick.slice(0, 10), { weekday: "short", day: "numeric", month: "short" })} · {when}</span>
+      <span className="min-w-0 flex-1 truncate text-[var(--muted-foreground)]">{e.calendar}{e.location && e.location !== e.meeting_url ? ` · ${e.location}` : ""}{e.id ? "" : " · read-only"}</span>
       <button type="button" aria-pressed={pinned} onClick={() => week.togglePin(key)} className={`${act} ${pinned ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}><Star size={12} aria-hidden="true" className={pinned ? "fill-[var(--accent)]" : ""} />{pinned ? "Important" : "Mark important"}</button>
       {e.meeting_url && <a href={e.meeting_url} target="_blank" rel="noopener noreferrer" className={`${act} text-[var(--accent)]`}>Join {meetingName(e.meeting_url)}</a>}
       {e.id && <button type="button" onClick={() => void remove()} className={`${act} text-[var(--destructive)]`}>Delete</button>}
@@ -209,6 +214,7 @@ function AddTask({ day, streams, onDone }: { day: string; streams: StreamMeta[];
 
 /** A task edited in its chip: Enter saves the text, Esc cancels, the bin deletes it, the stream menu moves it to another stream at once. */
 function EditTask({ text, stream, streams, onDone, onStream, onDelete }: {
+  /** The text with its #tags written in, so the tags edit like words. */
   text: string; stream: string | null; streams: StreamMeta[]; onDone: (text: string | null) => void; onStream: (stream: string | null) => void; onDelete: () => void;
 }) {
   const [draft, setDraft] = useState(text);
@@ -263,8 +269,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const [over, setOver] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const [sleepOpen, setSleepOpen] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
+    const [problem, setProblem] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -272,8 +277,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const collapsible = Array.from({ length: 24 }, (_, h) => days.length > 0 && days.every((day) =>
     sleepFor(day).some((s) => s.from <= h * 60 && s.to >= (h + 1) * 60)
     && !(data[day]?.events ?? []).some((e) => e.all_day || e.start_min === null || e.end_min === null ? false : e.start_min < (h + 1) * 60 && e.end_min > h * 60)));
-  const canCollapse = collapsible.some(Boolean);
-  const { px, minuteAt: scaleMinuteAt, heights, tops, total: GRID_PX } = makeScale(collapsible.map((c) => c && !sleepOpen));
+  const { px, minuteAt: scaleMinuteAt, heights, tops, total: GRID_PX } = makeScale(collapsible);
 
   // Start scrolled to about three hours before now.
   const scrolled = useRef(false);
@@ -398,21 +402,23 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                     <span className="truncate">{e.title}</span>
                   </div>
                 ))}
-                {(d?.tasks ?? []).map((t) => {
+                {(d?.tasks ?? []).filter((t) => week.showDone || !t.done).map((t) => {
                   const id = `${t.path}:${t.line}`;
                   return editing === id ? (
-                    <EditTask key={id} text={t.text} stream={t.stream} streams={streams}
+                    <EditTask key={id} text={tagged(t.text, t.products ?? [])} stream={t.stream} streams={streams}
                       onDone={(text) => { setEditing(null); if (text) void change(() => vaultApi.editTask(t, text), "tasks"); }}
                       onStream={(next) => { setEditing(null); void change(() => vaultApi.setTaskStream(t, next), "tasks"); }}
                       onDelete={() => { setEditing(null); void change(() => vaultApi.removeTask(t), "tasks"); }} />
                   ) : (
                     <div key={id} draggable onDragStart={(ev) => startTaskDrag(ev, t, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
-                      title={`${t.text}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to edit · drag to another day to move`}
+                      title={`${t.text}${(t.products ?? []).map((tag) => ` #${tag}`).join("")}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to edit · drag to another day to move`}
                       className="group/task flex cursor-grab items-start border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
                       <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.text}`} aria-pressed={t.done} onClick={() => void change(() => vaultApi.setTask(t, !t.done), "tasks")}
                         className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
                       {streamOf(t) && <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" style={{ background: streamOf(t)?.color }} />}
-                      <button type="button" onClick={() => setEditing(id)} className={`min-w-0 flex-1 line-clamp-2 break-words py-1 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{t.text}</button>
+                      <button type="button" onClick={() => setEditing(id)} className={`min-w-0 flex-1 line-clamp-2 break-words py-1 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>
+                        {t.text}{(t.products ?? []).map((tag) => <span key={tag} className="mono ml-1 text-[var(--muted-foreground)] no-underline">#{tag}</span>)}
+                      </button>
                       <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.text}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
                         className={`grid h-4 w-4 shrink-0 place-items-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
                         <Star size={11} className={isPinned(taskPin(day, t)) ? "fill-[var(--accent)] text-[var(--accent)]" : "text-[var(--muted-foreground)]"} />
@@ -485,20 +491,15 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
           ))}
         </div>
       )}
-      <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 border border-[var(--border)] px-3 py-1.5 text-small">
-            {upcoming && week.isThisWeek ? (
-              <>
-                <span className={MICRO}>Next up</span>
-                <span className="font-mono font-medium tabular-nums text-[var(--accent)]">{formatMinutes(upcoming.start_min as number)}</span>
-                <span className="min-w-0 truncate font-semibold">{upcoming.title}</span>
-                <span className={MICRO}>in {formatDuration((upcoming.start_min as number) - nowMin)}</span>
-                {upcoming.meeting_url && <a href={upcoming.meeting_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-7 items-center border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">Join {meetingName(upcoming.meeting_url)}</a>}
-              </>
-            ) : <span className="text-[var(--muted-foreground)]">{connected ? "Drag an event to move it, drag across an empty slot to add one." : "Connect Google Calendar to move or add events."} Hatching is sleep.</span>}
-            <span className="flex-1" />
-            {canCollapse && <button type="button" aria-pressed={sleepOpen} onClick={() => setSleepOpen(!sleepOpen)} className={BTN}>{sleepOpen ? "Collapse sleep" : "Expand sleep"}</button>}
-            {connected && <button type="button" onClick={() => setDraft({ day: today ?? days[0], start: "09:00", end: "10:00" })} className={BTN}><Plus size={14} aria-hidden="true" />New event</button>}
-      </div>
+      {upcoming && week.isThisWeek && (
+        <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 border border-[var(--border)] px-3 py-1.5 text-small">
+          <span className={MICRO}>Next up</span>
+          <span className="font-mono font-medium tabular-nums text-[var(--accent)]">{formatMinutes(upcoming.start_min as number)}</span>
+          <span className="min-w-0 truncate font-semibold">{upcoming.title}</span>
+          <span className={MICRO}>in {formatDuration((upcoming.start_min as number) - nowMin)}</span>
+          {upcoming.meeting_url && <a href={upcoming.meeting_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-7 items-center border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">Join {meetingName(upcoming.meeting_url)}</a>}
+        </div>
+      )}
       {problem && <p role="alert" className="mt-1.5 text-xs text-[var(--destructive)]">{problem}</p>}
 
       {connected && draft && (

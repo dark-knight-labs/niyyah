@@ -96,6 +96,7 @@ class TaskResponse(BaseModel):
     text: str
     done: bool
     stream: str | None = None
+    products: list[str] = []  # tags, typed as #word in the text
 
 
 class TaskToggleIn(BaseModel):

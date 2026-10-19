@@ -26,8 +26,8 @@ def _schema_before() -> str:
         text = str(CreateTable(table).compile(dialect=sa.dialects.sqlite.dialect()))
         if table.name == "planner_pipeline_items":
             text = text.replace("products JSON NOT NULL", "product VARCHAR(100)")
-        if table.name == "planner_tasks":  # the stream column and its index come with a later migration
-            text = text.replace("stream VARCHAR(24), ", "")
+        if table.name == "planner_tasks":  # the stream and products columns come with later migrations
+            text = text.replace("stream VARCHAR(24), ", "").replace("products JSON NOT NULL, ", "")
         ddl.append(text + ";")
     return "\n".join(ddl)
 

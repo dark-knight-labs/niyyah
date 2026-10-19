@@ -141,6 +141,18 @@ def clean_products(raw) -> list[str]:
             tags.append(tag)
     return tags[:MAX_PRODUCTS]
 
+def split_tags(text: str) -> tuple[str, list[str]]:
+    """('Wire it #router [product:: DNS, Switch]') -> ('Wire it', ['DNS', 'Switch', 'router']): tags are a field, not part of the text.
+
+    A tag is either `#word` (no spaces) or a `[product:: a, b]` list (spaces allowed). Month tags such as #oct are left for the checkpoint."""
+    listed = PRODUCT.search(text)
+    tags = listed.group(1).split(",") if listed else []
+    text = PRODUCT.sub("", text)
+    tags += HASHTAG.findall(text)
+    text = " ".join(HASHTAG.sub("", text).split())
+    return text, clean_products(tags)
+
+
 BRACKET_MONTH = re.compile(r"\s*\[(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\]\s*$", re.IGNORECASE)
 
 def clean_item(text: str) -> tuple[str, str | None]:
