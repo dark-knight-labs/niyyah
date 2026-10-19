@@ -24,6 +24,7 @@ class Task(Base):
     start_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True, index=True)
     done_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     source_path: Mapped[str | None] = mapped_column(String(500), nullable=True)  # the vault note it came from, if imported
+    stream: Mapped[str | None] = mapped_column(String(24), nullable=True, index=True)  # the stream it belongs to, if any
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 

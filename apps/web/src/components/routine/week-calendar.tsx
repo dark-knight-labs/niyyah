@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus, Star, Trash2, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatMinutes } from "@/lib/routine";
+import { StreamMeta } from "@/lib/streams";
 import { formatDuration } from "@/lib/ring";
 import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, VaultEvent, VaultTaskData } from "@/lib/vault-types";
@@ -136,30 +137,48 @@ function ReconnectLink() {
 
 const day0 = (pick: string) => pick.slice(0, 10);
 
-/** One-line input in an all-day cell: Enter adds the task, Esc or leaving it empty cancels. */
-function AddTask({ day, onDone }: { day: string; onDone: (text: string | null) => void }) {
-  const [text, setText] = useState("");
-  const finished = useRef(false);
-  const finish = (value: string | null) => { if (!finished.current) { finished.current = true; onDone(value); } };
+const STREAM_SELECT = "min-h-6 min-w-0 max-w-[45%] border border-[var(--border)] bg-[var(--background)] px-0.5 text-micro text-[var(--muted-foreground)]";
+
+/** The stream choice for a task: "No stream" or one of the quarter's streams. */
+function StreamSelect({ value, streams, onChange, label }: { value: string | null; streams: StreamMeta[]; onChange: (stream: string | null) => void; label: string }) {
   return (
-    <input autoFocus value={text} maxLength={300} placeholder="New task" aria-label={`New task for ${day}`} onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => { if (e.key === "Enter" && text.trim()) finish(text.trim()); if (e.key === "Escape") finish(null); }}
-      onBlur={() => finish(text.trim() || null)}
-      className="min-h-6 w-full min-w-0 border border-[var(--accent)] bg-[var(--background)] px-1 text-xs placeholder:text-[var(--muted-foreground)]" />
+    <select value={value ?? ""} aria-label={label} title="Stream" onChange={(e) => onChange(e.target.value || null)} className={STREAM_SELECT}>
+      <option value="">No stream</option>
+      {streams.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+    </select>
   );
 }
 
-/** A task's text edited in its chip: Enter saves, Esc cancels, the bin deletes it. */
-function EditTask({ text, onDone, onDelete }: { text: string; onDone: (text: string | null) => void; onDelete: () => void }) {
+/** A new task: text plus the stream it belongs to. Enter adds, Esc cancels; leaving the whole row adds what was typed. */
+function AddTask({ day, streams, onDone }: { day: string; streams: StreamMeta[]; onDone: (text: string | null, stream: string | null) => void }) {
+  const [text, setText] = useState("");
+  const [stream, setStream] = useState<string | null>(null);
+  const finished = useRef(false);
+  const finish = (value: string | null) => { if (!finished.current) { finished.current = true; onDone(value, stream); } };
+  return (
+    <div className="flex items-center gap-0.5" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) finish(text.trim() || null); }}>
+      <input autoFocus value={text} maxLength={300} placeholder="New task" aria-label={`New task for ${day}`} onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && text.trim()) finish(text.trim()); if (e.key === "Escape") finish(null); }}
+        className="min-h-6 w-full min-w-0 flex-1 border border-[var(--accent)] bg-[var(--background)] px-1 text-xs placeholder:text-[var(--muted-foreground)]" />
+      {streams.length > 0 && <StreamSelect value={stream} streams={streams} onChange={setStream} label="Stream for the new task" />}
+    </div>
+  );
+}
+
+/** A task edited in its chip: Enter saves the text, Esc cancels, the bin deletes it, the stream menu moves it to another stream at once. */
+function EditTask({ text, stream, streams, onDone, onStream, onDelete }: {
+  text: string; stream: string | null; streams: StreamMeta[]; onDone: (text: string | null) => void; onStream: (stream: string | null) => void; onDelete: () => void;
+}) {
   const [draft, setDraft] = useState(text);
   const finished = useRef(false);
   const finish = (value: string | null) => { if (!finished.current) { finished.current = true; onDone(value); } };
+  const changed = () => (draft.trim() && draft.trim() !== text ? draft.trim() : null);
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-0.5" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) finish(changed()); }}>
       <input autoFocus value={draft} maxLength={300} aria-label="Edit task" onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") finish(draft.trim() && draft.trim() !== text ? draft.trim() : null); if (e.key === "Escape") finish(null); }}
-        onBlur={() => finish(draft.trim() && draft.trim() !== text ? draft.trim() : null)}
+        onKeyDown={(e) => { if (e.key === "Enter") finish(changed()); if (e.key === "Escape") finish(null); }}
         className="min-h-6 min-w-0 flex-1 border border-[var(--accent)] bg-[var(--background)] px-1 text-xs" />
+      {streams.length > 0 && <StreamSelect value={stream} streams={streams} label="Stream of this task" onChange={(next) => { finished.current = true; onStream(next); }} />}
       <button type="button" aria-label="Delete task" title="Delete task" onMouseDown={(e) => e.preventDefault()} onClick={() => { finished.current = true; onDelete(); }}
         className="grid h-6 w-6 shrink-0 place-items-center text-[var(--muted-foreground)] hover:text-[var(--destructive)]"><Trash2 size={12} aria-hidden="true" /></button>
     </div>
@@ -192,8 +211,8 @@ interface Drag { id: string; day: string; allDay: boolean; duration: number; gra
 interface Draw { day: string; from: number; to: number; }
 
 /** The week as a 24-hour grid: drag an event to move it, drag across an empty slot to draw a new one. Sleep is greyed out; tasks sit in the all-day row. */
-export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
-  week: Week; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void;
+export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged }: {
+  week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void;
 }) {
   const { days, data, today } = week;
   const [picked, setPicked] = useState<string | null>(null);
@@ -230,6 +249,7 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
     refresh();
   }
 
+  const streamOf = (t: VaultTaskData) => streams.find((s) => s.id === t.stream);
   const lookup = new Map<string, VaultEvent>();
   days.forEach((day) => (data[day]?.events ?? []).forEach((e, i) => lookup.set(`${day}:${i}`, e)));
   const selected = picked ? lookup.get(picked) ?? null : null;
@@ -341,14 +361,17 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
                 {(d?.tasks ?? []).map((t) => {
                   const id = `${t.path}:${t.line}`;
                   return editing === id ? (
-                    <EditTask key={id} text={t.text} onDone={(text) => { setEditing(null); if (text) void change(() => vaultApi.editTask(t, text)); }}
+                    <EditTask key={id} text={t.text} stream={t.stream} streams={streams}
+                      onDone={(text) => { setEditing(null); if (text) void change(() => vaultApi.editTask(t, text)); }}
+                      onStream={(next) => { setEditing(null); void change(() => vaultApi.setTaskStream(t, next)); }}
                       onDelete={() => { setEditing(null); void change(() => vaultApi.removeTask(t)); }} />
                   ) : (
                     <div key={id} draggable onDragStart={(ev) => startTaskDrag(ev, t, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
-                      title={`${t.text}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to edit · drag to another day to move`}
+                      title={`${t.text}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to edit · drag to another day to move`}
                       className="group/task flex cursor-grab items-center border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
                       <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.text}`} aria-pressed={t.done} onClick={() => void change(() => vaultApi.setTask(t, !t.done))}
                         className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
+                      {streamOf(t) && <span aria-hidden="true" className="h-2 w-2 shrink-0" style={{ background: streamOf(t)?.color }} />}
                       <button type="button" onClick={() => setEditing(id)} className={`min-w-0 flex-1 truncate py-0.5 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{t.text}</button>
                       <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.text}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
                         className={`grid h-4 w-4 shrink-0 place-items-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
@@ -358,7 +381,7 @@ export function WeekCalendar({ week, nowMin, status, sleepFor, onChanged }: {
                   );
                 })}
                 {adding === day ? (
-                  <AddTask key="add" day={day} onDone={(text) => { setAdding(null); if (text) void change(() => vaultApi.addTask(day, text)); }} />
+                  <AddTask key="add" day={day} streams={streams} onDone={(text, stream) => { setAdding(null); if (text) void change(() => vaultApi.addTask(day, text, stream)); }} />
                 ) : (
                   <button type="button" aria-label={`Add a task on ${fmtDay(day, { weekday: "long", day: "numeric", month: "long" })}`} title="Add a task for this day" onClick={() => setAdding(day)}
                     className="flex h-4 items-center gap-0.5 px-0.5 text-micro text-[var(--muted-foreground)] opacity-40 hover:opacity-100 focus:opacity-100 group-hover:opacity-100"><Plus size={11} aria-hidden="true" />Task</button>

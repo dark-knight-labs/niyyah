@@ -18,6 +18,7 @@ import { HabitsPanel } from "@/components/routine/habits-panel";
 import { VotesPanel } from "@/components/routine/votes-panel";
 import { SleepSpan, useWeek, WeekCalendar, WeekToolbar } from "@/components/routine/week-calendar";
 import { WorkLanes } from "@/components/routine/work-lanes";
+import { toMeta } from "@/lib/streams";
 
 const REFRESH_MS = 60_000;
 
@@ -188,7 +189,7 @@ export default function OverviewPage() {
                   <div className="mb-2 flex min-h-8 items-center border-b border-[var(--border)] pb-1.5">
                     <WeekToolbar week={week} status={google} expanded={expanded === "calendar"} onExpand={() => toggle("calendar")} onAdded={() => { week.reload(); loadPrivate(); }} />
                   </div>
-                  <WeekCalendar week={week} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPrivate} />
+                  <WeekCalendar week={week} streams={quarter?.streams.map(toMeta) ?? []} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPrivate} />
                 </section>
               </div>
               {habits && <div className="mb-5"><HabitsPanel day={dayKey} data={habits} today={today} onData={setHabits} onVoted={setToday} /></div>}

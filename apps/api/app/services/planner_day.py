@@ -8,7 +8,7 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from app.models.planner import LogEntry, Task
+from app.models.planner import LogEntry, QuarterStream, Task
 from app.models.vault import VaultBlockVote, VaultDay
 from app.services import planner_blocks
 from app.services.rules import MODE_META, line_hash, one_line_note, possible_for_count
@@ -128,11 +128,23 @@ async def _task(db, user_id: int, task_id: int) -> Task:
     return task
 
 
-async def add_task(db, user_id: int, day: date, text: str) -> VaultDay:
+async def _known_stream(db, user_id: int, stream: str | None) -> str | None:
+    """A task's stream must be one the user has defined in some quarter; None means no stream."""
+    if stream is None:
+        return None
+    found = (await db.execute(select(QuarterStream.id).where(
+        QuarterStream.user_id == user_id, QuarterStream.slug == stream).limit(1))).first()
+    if found is None:
+        raise ValueError("unknown stream")
+    return stream
+
+
+async def add_task(db, user_id: int, day: date, text: str, stream: str | None = None) -> VaultDay:
     label = _label(text)
+    stream = await _known_stream(db, user_id, stream)
     row = await _day(db, user_id, day)
     top = (await db.execute(select(func.max(Task.position)).where(Task.user_id == user_id))).scalar()
-    db.add(Task(user_id=user_id, text=label, done=False, scheduled_on=day,
+    db.add(Task(user_id=user_id, text=label, done=False, scheduled_on=day, stream=stream,
                 source_path=f"Calendar/Daily/{day.isoformat()}.md", position=0 if top is None else top + 1))
     return row
 
@@ -146,6 +158,11 @@ async def set_task_done(db, user_id: int, task_id: int, done: bool, today: date)
 async def set_task_text(db, user_id: int, task_id: int, text: str) -> None:
     label = _label(text)
     (await _task(db, user_id, task_id)).text = label
+
+
+async def set_task_stream(db, user_id: int, task_id: int, stream: str | None) -> None:
+    task = await _task(db, user_id, task_id)
+    task.stream = await _known_stream(db, user_id, stream)
 
 
 async def move_task(db, user_id: int, task_id: int, from_day: date, to_day: date) -> None:

@@ -1003,6 +1003,9 @@
      "path": {
       "type": "string"
      },
+     "stream": {
+      "type": "string"
+     },
      "text": {
       "type": "string"
      }
@@ -2837,6 +2840,9 @@
        "start_on": {
         "type": "string"
        },
+       "stream": {
+        "type": "string"
+       },
        "text": {
         "type": "string"
        }
@@ -3637,6 +3643,9 @@
   ],
   "request": {
    "properties": {
+    "stream": {
+     "type": "string"
+    },
     "text": {
      "type": "string"
     }
@@ -6761,6 +6770,74 @@
     "from_day",
     "line",
     "to_day"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/tasks/stream": {
+  "params": [],
+  "request": {
+   "properties": {
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line"
    ],
    "type": "object"
   },

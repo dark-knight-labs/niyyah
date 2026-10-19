@@ -91,7 +91,7 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
                              for n in await rows(NotebookEntry, NotebookEntry.stream, NotebookEntry.position)],
         "days": days,
         "tasks": [{"id": t.id, "text": t.text, "done": t.done, "due_on": _iso(t.due_on), "scheduled_on": _iso(t.scheduled_on),
-                   "start_on": _iso(t.start_on), "done_on": _iso(t.done_on), "source_path": t.source_path}
+                   "start_on": _iso(t.start_on), "done_on": _iso(t.done_on), "source_path": t.source_path, "stream": t.stream}
                   for t in await rows(Task, Task.id)],
         "habits": habits,
     }

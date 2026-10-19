@@ -22,10 +22,12 @@ def _schema_before() -> str:
     from app.models import user, planner  # noqa: F401
 
     ddl = []
-    for table in (Base.metadata.tables["users"], Base.metadata.tables["planner_pipeline_items"]):
+    for table in (Base.metadata.tables["users"], Base.metadata.tables["planner_pipeline_items"], Base.metadata.tables["planner_tasks"]):
         text = str(CreateTable(table).compile(dialect=sa.dialects.sqlite.dialect()))
         if table.name == "planner_pipeline_items":
             text = text.replace("products JSON NOT NULL", "product VARCHAR(100)")
+        if table.name == "planner_tasks":  # the stream column and its index come with a later migration
+            text = text.replace("stream VARCHAR(24), ", "")
         ddl.append(text + ";")
     return "\n".join(ddl)
 

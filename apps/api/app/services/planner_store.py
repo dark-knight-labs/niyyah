@@ -40,7 +40,7 @@ async def day_tasks(db: AsyncSession, user_id: int, day: date) -> list[dict]:
     rows = await _all(db, select(Task).where(
         Task.user_id == user_id, or_(Task.due_on == day, Task.scheduled_on == day, Task.start_on == day))
         .order_by(func.coalesce(Task.source_path, ""), Task.position))
-    return [{"path": r.source_path or "", "line": r.id, "hash": "", "text": r.text, "done": r.done} for r in rows]
+    return [{"path": r.source_path or "", "line": r.id, "hash": "", "text": r.text, "done": r.done, "stream": r.stream} for r in rows]
 
 
 async def day_log(db: AsyncSession, user_id: int, day: date) -> list[dict]:
