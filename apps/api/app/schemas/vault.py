@@ -97,6 +97,7 @@ class TaskResponse(BaseModel):
     done: bool
     stream: str | None = None
     products: list[str] = []  # tags, typed as #word in the text
+    description: str = ""
 
 
 class TaskToggleIn(BaseModel):
@@ -122,6 +123,11 @@ class TaskTextIn(BaseModel):
     line: int
     hash: str = ""
     text: str
+
+
+class TaskDescriptionIn(BaseModel):
+    line: int
+    description: str = ""
 
 
 class TaskMoveIn(BaseModel):

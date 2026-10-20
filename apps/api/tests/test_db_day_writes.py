@@ -174,3 +174,15 @@ async def test_task_tags_are_typed_as_hashtags_and_leave_the_text(db_client):
     await client.put(f"{V}/tasks/text", json={"line": task["line"], "text": "Fix DNS again"})
     again = next(t for t in (await client.get(f"{V}/day/{today}/tasks")).json() if t["line"] == task["line"])
     assert again["products"] == []
+
+
+@pytest.mark.asyncio
+async def test_task_description_saves_and_is_capped(db_client):
+    client, today = db_client
+    await client.post(f"{V}/day/{today}/tasks", json={"text": "Write up"})
+    task = next(t for t in (await client.get(f"{V}/day/{today}/tasks")).json() if t["text"] == "Write up")
+    assert task["description"] == ""
+    assert (await client.put(f"{V}/tasks/description", json={"line": task["line"], "description": " Notes\nand links "})).status_code == 200
+    task = next(t for t in (await client.get(f"{V}/day/{today}/tasks")).json() if t["line"] == task["line"])
+    assert task["description"] == "Notes\nand links"
+    assert (await client.put(f"{V}/tasks/description", json={"line": task["line"], "description": "x" * 4001})).status_code == 422

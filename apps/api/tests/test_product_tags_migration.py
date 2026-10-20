@@ -27,7 +27,7 @@ def _schema_before() -> str:
         if table.name == "planner_pipeline_items":
             text = text.replace("products JSON NOT NULL", "product VARCHAR(100)")
         if table.name == "planner_tasks":  # the stream and products columns come with later migrations
-            text = text.replace("stream VARCHAR(24), ", "").replace("products JSON NOT NULL, ", "")
+            text = text.replace("stream VARCHAR(24), ", "").replace("products JSON NOT NULL, ", "").replace("description TEXT NOT NULL, ", "")
         ddl.append(text + ";")
     return "\n".join(ddl)
 

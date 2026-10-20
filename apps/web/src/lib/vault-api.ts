@@ -49,6 +49,7 @@ export const vaultApi = {
   tasks: (day: string) => api.get<VaultTaskData[]>(`/vault/day/${day}/tasks`),
   addTask: (day: string, text: string, stream: string | null = null) => api.post<VaultEditData>(`/vault/day/${day}/tasks`, { text, stream }),
   setTaskStream: (task: VaultTaskData, stream: string | null) => api.put<VaultEditData>("/vault/tasks/stream", { line: task.line, stream }),
+  describeTask: (task: VaultTaskData, description: string) => api.put<VaultEditData>("/vault/tasks/description", { line: task.line, description }),
   setTask: (task: VaultTaskData, done: boolean) => api.put<VaultEditData>("/vault/tasks", { path: task.path, line: task.line, hash: task.hash, done }),
   editTask: (task: VaultTaskData, text: string) => api.put<VaultEditData>("/vault/tasks/text", { path: task.path, line: task.line, hash: task.hash, text }),
   moveTask: (task: VaultTaskData, fromDay: string, toDay: string) => api.put<VaultEditData>("/vault/tasks/move", { line: task.line, from_day: fromDay, to_day: toDay }),

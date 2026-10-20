@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.models.planner import LogEntry, QuarterStream, Task
 from app.models.vault import VaultBlockVote, VaultDay
 from app.services import planner_blocks
-from app.services.rules import MODE_META, line_hash, one_line_note, possible_for_count, split_tags
+from app.services.rules import MODE_META, line_hash, one_line_note, possible_for_count, split_tags, MAX_DESCRIPTION_CHARS
 
 TASK_GONE = "this task no longer exists; reload and try again"
 LOG_GONE = "this log entry changed; reload and try again"
@@ -166,6 +166,12 @@ async def set_task_text(db, user_id: int, task_id: int, text: str) -> None:
     task = await _task(db, user_id, task_id)
     task.text = label
     task.products = tags
+
+
+async def set_task_description(db, user_id: int, task_id: int, text: str) -> None:
+    if len(text) > MAX_DESCRIPTION_CHARS:
+        raise ValueError(f"description is longer than {MAX_DESCRIPTION_CHARS} characters")
+    (await _task(db, user_id, task_id)).description = text.strip()
 
 
 async def set_task_stream(db, user_id: int, task_id: int, stream: str | None) -> None:

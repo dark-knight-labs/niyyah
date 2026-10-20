@@ -71,6 +71,7 @@ from app.schemas.vault import (
     TaskIn,
     TaskMoveIn,
     TaskStreamIn,
+    TaskDescriptionIn,
     TaskRemoveIn,
     TaskResponse,
     TaskTextIn,
@@ -399,6 +400,11 @@ async def put_task(data: TaskToggleIn, user: User = Depends(get_current_user), d
 @router.put("/tasks/text", response_model=EditResponse)
 async def put_task_text(data: TaskTextIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     return await _day_write(db, lambda: planner_day.set_task_text(db, user.id, data.line, data.text))
+
+
+@router.put("/tasks/description", response_model=EditResponse)
+async def put_task_description(data: TaskDescriptionIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await _day_write(db, lambda: planner_day.set_task_description(db, user.id, data.line, data.description))
 
 
 @router.put("/tasks/stream", response_model=EditResponse)
