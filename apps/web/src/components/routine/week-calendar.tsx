@@ -1,14 +1,14 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Plus, Star, Trash2, TriangleAlert, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Plus, Star, TriangleAlert, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { tagged } from "@/lib/plan-model";
 import { formatMinutes } from "@/lib/routine";
 import { StreamMeta } from "@/lib/streams";
 import { formatDuration } from "@/lib/ring";
 import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, VaultEvent, VaultTaskData } from "@/lib/vault-types";
 import { addDays, fmtDay, sundayOf, weekDays } from "@/lib/week";
+import { TaskCard } from "@/components/routine/task-card";
 import { AddEventForm, ConnectButton, meetingName, QuickAdd } from "@/components/routine/calendar-parts";
 
 /** The grid shows the whole day. One hour is HOUR_PX tall (SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
@@ -54,13 +54,17 @@ export function useWeek(today: string | null, refreshKey: number) {
   const [eventChange, setEventChange] = useState(0);
   const [taskChange, setTaskChange] = useState(0);
   const [pins, setPins] = useState<string[]>([]);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPickedRaw] = useState<string | null>(null);
+  const [pickedTask, setPickedTaskRaw] = useState<number | null>(null);
   const [showDone, setShowDone] = useState(false);
   const first = start ?? (today ? sundayOf(today) : null);
   const thisWeek = today ? sundayOf(today) : null;
   const days = useMemo(() => (first ? weekDays(`${first}/${addDays(first, 6)}`) : []), [first]);
   const data = useMemo(() => Object.fromEntries(days.map((day) => [day, { events: events[day] ?? [], tasks: tasks[day] ?? [] }])) as Record<string, DayData>, [days, events, tasks]);
 
+  const setPicked = (p: string | null) => { setPickedRaw(p); if (p) setPickedTaskRaw(null); };
+  const setPickedTask = (line: number | null) => { setPickedTaskRaw(line); if (line !== null) setPickedRaw(null); };
+  const selectedTask = pickedTask === null ? null : days.flatMap((day) => (tasks[day] ?? []).map((task) => ({ task, day }))).find((x) => x.task.line === pickedTask) ?? null;
   const selected = picked ? data[picked.slice(0, 10)]?.events[Number(picked.slice(11))] ?? null : null;
 
   // Events come from outside calendars and take about a second a day; tasks are local and fast. They load apart so a task change never waits on, or repeats, the calendar fetch.
@@ -94,14 +98,14 @@ export function useWeek(today: string | null, refreshKey: number) {
   }, []);
 
   return {
-    days, data, errors, today, picked, setPicked, selected, showDone, setShowDone, isThisWeek: first === thisWeek, pins, setPins,
+    days, data, errors, today, picked, setPicked, selected, selectedTask, setPickedTask, showDone, setShowDone, isThisWeek: first === thisWeek, pins, setPins,
     /** Mark an event or task important (or clear it); shows at once and settles on what the server says. */
     togglePin: (key: string) => {
       const pinned = !pins.includes(key);
       setPins(pinned ? [...pins, key] : pins.filter((k) => k !== key));
       vaultApi.setPin(key, pinned).then(setPins).catch(() => setPins(pins));
     },
-    go: (n: number) => { setPicked(null); setStart(addDays(first as string, 7 * n)); },
+    go: (n: number) => { setPicked(null); setPickedTask(null); setStart(addDays(first as string, 7 * n)); },
     goToday: () => { setPicked(null); setStart(null); },
     /** Fetch events and tasks again. */
     reload: () => { setEventChange((c) => c + 1); setTaskChange((c) => c + 1); },
@@ -212,27 +216,6 @@ function AddTask({ day, streams, onDone }: { day: string; streams: StreamMeta[];
   );
 }
 
-/** A task edited in its chip: Enter saves the text, Esc cancels, the bin deletes it, the stream menu moves it to another stream at once. */
-function EditTask({ text, stream, streams, onDone, onStream, onDelete }: {
-  /** The text with its #tags written in, so the tags edit like words. */
-  text: string; stream: string | null; streams: StreamMeta[]; onDone: (text: string | null) => void; onStream: (stream: string | null) => void; onDelete: () => void;
-}) {
-  const [draft, setDraft] = useState(text);
-  const finished = useRef(false);
-  const finish = (value: string | null) => { if (!finished.current) { finished.current = true; onDone(value); } };
-  const changed = () => (draft.trim() && draft.trim() !== text ? draft.trim() : null);
-  return (
-    <div className="flex items-center gap-0.5" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) finish(changed()); }}>
-      <input autoFocus value={draft} maxLength={300} aria-label="Edit task" onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") finish(changed()); if (e.key === "Escape") finish(null); }}
-        className="min-h-6 min-w-0 flex-1 border border-[var(--accent)] bg-[var(--background)] px-1 text-xs" />
-      {streams.length > 0 && <StreamSelect value={stream} streams={streams} label="Stream of this task" onChange={(next) => { finished.current = true; onStream(next); }} />}
-      <button type="button" aria-label="Delete task" title="Delete task" onMouseDown={(e) => e.preventDefault()} onClick={() => { finished.current = true; onDelete(); }}
-        className="grid h-6 w-6 shrink-0 place-items-center text-[var(--muted-foreground)] hover:text-[var(--destructive)]"><Trash2 size={12} aria-hidden="true" /></button>
-    </div>
-  );
-}
-
 interface Placed { event: VaultEvent; key: string; lane: number; lanes: number; }
 
 /** Side-by-side lanes for events that overlap in time, so none hides another. */
@@ -268,7 +251,6 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const [draw, setDraw] = useState<Draw | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
     const [problem, setProblem] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -302,7 +284,6 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     ...(data[day]?.events ?? []).map((e, i) => ({ key: eventPin(day, e), label: e.title, when: `${fmtDay(day, { weekday: "short" })} ${e.all_day || e.start_min === null ? "" : formatMinutes(e.start_min)}`.trim(), pick: `${day}:${i}`, over: !!today && (day < today || (day === today && !e.all_day && (e.end_min as number) < nowMin)) })),
     ...(data[day]?.tasks ?? []).filter((t) => !t.done).map((t) => ({ key: taskPin(day, t), label: t.text, when: `${fmtDay(day, { weekday: "short" })} task`, pick: null as string | null, over: !!today && day < today })),
   ]).filter((p) => isPinned(p.key) && !p.over);
-  const upcoming = today ? (data[today]?.events ?? []).filter((e) => !e.all_day && e.start_min !== null && e.start_min > nowMin).sort((a, b) => (a.start_min as number) - (b.start_min as number))[0] : undefined;
   const minuteAt = (el: HTMLElement, clientY: number) => scaleMinuteAt(clientY - el.getBoundingClientRect().top);
 
   const whenText = (e: VaultEvent) => (e.all_day || e.start_min === null || e.end_min === null ? "All day" : `${formatMinutes(e.start_min)}–${formatMinutes(e.end_min)}`);
@@ -377,6 +358,10 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
 
   return (
     <div>
+      {week.selectedTask && (
+        <TaskCard key={week.selectedTask.task.line} task={week.selectedTask.task} day={week.selectedTask.day} streams={streams} pinned={isPinned(taskPin(week.selectedTask.day, week.selectedTask.task))}
+          onPin={() => week.togglePin(taskPin(week.selectedTask!.day, week.selectedTask!.task))} change={(a) => change(a, "tasks")} onClose={() => week.setPickedTask(null)} />
+      )}
       <div ref={scroller} className="max-h-[calc(100vh-14rem)] overflow-auto border border-[var(--border)]" role="grid" aria-label="Week schedule">
         <div className="grid min-w-[40rem]" style={{ gridTemplateColumns: `1.5rem ${days.map((d) => (d === today ? "minmax(0,2fr)" : "minmax(0,1fr)")).join(" ")}` }}>
           <div className="sticky top-0 z-20 h-[34px] border-b border-[var(--border)] bg-[var(--surface)]" />
@@ -404,20 +389,15 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                 ))}
                 {(d?.tasks ?? []).filter((t) => week.showDone || !t.done).map((t) => {
                   const id = `${t.path}:${t.line}`;
-                  return editing === id ? (
-                    <EditTask key={id} text={tagged(t.text, t.products ?? [])} stream={t.stream} streams={streams}
-                      onDone={(text) => { setEditing(null); if (text) void change(() => vaultApi.editTask(t, text), "tasks"); }}
-                      onStream={(next) => { setEditing(null); void change(() => vaultApi.setTaskStream(t, next), "tasks"); }}
-                      onDelete={() => { setEditing(null); void change(() => vaultApi.removeTask(t), "tasks"); }} />
-                  ) : (
+                  return (
                     <div key={id} draggable onDragStart={(ev) => startTaskDrag(ev, t, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
-                      title={`${t.text}${(t.products ?? []).map((tag) => ` #${tag}`).join("")}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick to edit · drag to another day to move`}
-                      className="group/task flex cursor-grab items-start border border-dashed border-[var(--border)] text-xs hover:bg-[var(--muted)]">
+                      title={`${t.text}${(t.products ?? []).map((tag) => ` #${tag}`).join("")}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick for details · drag to another day to move`}
+                      className={`group/task flex cursor-grab items-start border border-dashed text-xs hover:bg-[var(--muted)] ${week.selectedTask?.task.line === t.line ? "border-[var(--foreground)]" : "border-[var(--border)]"}`}>
                       <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.text}`} aria-pressed={t.done} onClick={() => void change(() => vaultApi.setTask(t, !t.done), "tasks")}
                         className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
                       {streamOf(t) && <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" style={{ background: streamOf(t)?.color }} />}
-                      <button type="button" onClick={() => setEditing(id)} className={`min-w-0 flex-1 line-clamp-2 break-words py-1 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>
-                        {t.text}{(t.products ?? []).map((tag) => <span key={tag} className="mono ml-1 text-[var(--muted-foreground)] no-underline">#{tag}</span>)}
+                      <button type="button" onClick={() => week.setPickedTask(week.selectedTask?.task.line === t.line ? null : t.line)} aria-pressed={week.selectedTask?.task.line === t.line} className={`min-w-0 flex-1 line-clamp-2 break-words py-1 pr-1 text-left ${t.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>
+                        {t.text}{t.description ? <span aria-label="Has details" title="Has details" className="ml-1 text-[var(--muted-foreground)] no-underline">…</span> : null}{(t.products ?? []).map((tag) => <span key={tag} className="mono ml-1 text-[var(--muted-foreground)] no-underline">#{tag}</span>)}
                       </button>
                       <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.text}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
                         className={`grid h-4 w-4 shrink-0 place-items-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
@@ -489,15 +469,6 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
               <span className="font-mono text-micro tabular-nums text-[var(--muted-foreground)]">{p.when}</span><span className="truncate font-medium">{p.label}</span>
             </button>
           ))}
-        </div>
-      )}
-      {upcoming && week.isThisWeek && (
-        <div className="mt-2 flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 border border-[var(--border)] px-3 py-1.5 text-small">
-          <span className={MICRO}>Next up</span>
-          <span className="font-mono font-medium tabular-nums text-[var(--accent)]">{formatMinutes(upcoming.start_min as number)}</span>
-          <span className="min-w-0 truncate font-semibold">{upcoming.title}</span>
-          <span className={MICRO}>in {formatDuration((upcoming.start_min as number) - nowMin)}</span>
-          {upcoming.meeting_url && <a href={upcoming.meeting_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-7 items-center border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent-light)]">Join {meetingName(upcoming.meeting_url)}</a>}
         </div>
       )}
       {problem && <p role="alert" className="mt-1.5 text-xs text-[var(--destructive)]">{problem}</p>}

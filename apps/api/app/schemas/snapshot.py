@@ -156,6 +156,7 @@ class SnapTask(_Loose):
     source_path: str | None = Field(default=None, max_length=500)
     stream: str | None = Field(default=None, max_length=24)
     products: list[str] = []
+    description: str = Field(default="", max_length=4000)
 
 
 def _cap(limit: int):

@@ -139,7 +139,7 @@ export function TopBar({ dateLabel, city, editDay, today, onSaved }: Props) {
   const facts: FactsProps = { dateLabel, city, editDay, today, onMode: (m) => void setMode(m) };
 
   return (
-    <header className="mb-2 border-b border-[var(--border)] pb-2">
+    <header className={slot ? "md:-mt-4 md:mb-0 md:border-0 md:pb-0 mb-2 border-b border-[var(--border)] pb-2" : "mb-2 border-b border-[var(--border)] pb-2"}>
       {slot && createPortal(<TodayFacts {...facts} />, slot)}
       <div className={`border-b border-[var(--border)] ${slot ? "md:hidden" : ""}`}><TodayFacts {...facts} /></div>
       {error && <p className="mt-2 text-xs text-[var(--destructive)]">{error}</p>}

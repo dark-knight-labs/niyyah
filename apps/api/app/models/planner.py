@@ -26,6 +26,7 @@ class Task(Base):
     source_path: Mapped[str | None] = mapped_column(String(500), nullable=True)  # the vault note it came from, if imported
     stream: Mapped[str | None] = mapped_column(String(24), nullable=True, index=True)  # the stream it belongs to, if any
     products: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # tags, typed as #word in the text
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)  # details, like a Plan item's
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 

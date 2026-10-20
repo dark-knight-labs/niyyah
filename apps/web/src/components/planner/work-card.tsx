@@ -11,7 +11,7 @@ import { Lane, MonthKey, NotebookEntryData, QuarterStreamData } from "@/lib/vaul
 
 type Run = (action: () => Promise<unknown>) => Promise<boolean>;
 
-const label = "mono mb-1.5 block text-[var(--muted-foreground)]";
+export const label = "mono mb-1.5 block text-[var(--muted-foreground)]";
 const field = "w-full border border-[var(--rule)] bg-[var(--background)] px-2.5 py-2 text-small leading-relaxed outline-none focus:border-[var(--accent)]";
 const btn = "mono inline-flex min-h-9 items-center px-3.5 disabled:opacity-40";
 const solid = `${btn} bg-[var(--foreground)] text-[var(--background)] hover:opacity-90`;
@@ -19,7 +19,7 @@ const ghost = `${btn} border border-[var(--rule)] hover:bg-[var(--muted)]`;
 const danger = `${btn} border border-[var(--destructive)] text-[var(--destructive)] hover:bg-[var(--warn-light)]`;
 
 /** A title that saves when you leave it or press Enter. The key resets the draft when the row changes. */
-function TitleField({ value, busy, onSave }: { value: string; busy: boolean; onSave: (text: string) => void }) {
+export function TitleField({ value, busy, onSave }: { value: string; busy: boolean; onSave: (text: string) => void }) {
   const [draft, setDraft] = useState(value);
   const save = () => { const t = draft.trim(); if (t && t !== value) onSave(t); else setDraft(value); };
   return (
@@ -29,7 +29,7 @@ function TitleField({ value, busy, onSave }: { value: string; busy: boolean; onS
   );
 }
 
-function NotesField({ value, busy, rows, placeholder, onSave }: { value: string; busy: boolean; rows: number; placeholder: string; onSave: (text: string) => void }) {
+export function NotesField({ value, busy, rows, placeholder, onSave }: { value: string; busy: boolean; rows: number; placeholder: string; onSave: (text: string) => void }) {
   const [draft, setDraft] = useState(value);
   return (
     <textarea value={draft} rows={rows} maxLength={8000} disabled={busy} aria-label="Details" placeholder={placeholder} onChange={(e) => setDraft(e.target.value)}

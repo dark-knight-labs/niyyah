@@ -58,6 +58,8 @@ export interface VaultTaskData {
   stream: string | null;
   /** Tags, typed as #word in the text: the same system as the Plan page. */
   products?: string[];
+  /** Details, like a Plan item's. */
+  description?: string;
 }
 
 export interface VaultLogEntry {
