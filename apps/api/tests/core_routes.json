@@ -380,6 +380,10 @@
   "PUT"
  ],
  [
+  "/api/v1/vault/tasks/description",
+  "PUT"
+ ],
+ [
   "/api/v1/vault/tasks/move",
   "PUT"
  ],
