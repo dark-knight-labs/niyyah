@@ -12,7 +12,7 @@ import { TaskCard } from "@/components/routine/task-card";
 import { AddEventForm, ConnectButton, meetingName, QuickAdd } from "@/components/routine/calendar-parts";
 
 /** The grid shows the whole day. One hour is HOUR_PX tall (SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
-const HOUR_PX = 28;
+const HOUR_PX = 48;
 const SLEEP_PX = 5;
 const SNAP = 15;
 const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
