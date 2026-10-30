@@ -42,7 +42,7 @@
   --font-serif: "Fraunces", Georgia, serif;
 }
 
-/* The rounded-* scale: square in the paper skin, soft in the kahf skin (see :root[data-skin="kahf"]). */
+/* The rounded-* scale: square in the paper skin, soft in the admin skin (see :root[data-skin="admin"]). */
 :root { --r-xs: 0; --r-sm: 0; --r-md: 0; --r-lg: 0; --r-xl: 0; --r-2xl: 0; --r-3xl: 0; }
 
 [data-theme="dark"] {

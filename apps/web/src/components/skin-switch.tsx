@@ -18,8 +18,8 @@ export const SKINS = [
 type SkinId = (typeof SKINS)[number]["id"];
 const IDS = SKINS.map((s) => s.id);
 
-/** Runs before first paint: ?skin=<id> wins and is remembered; otherwise the remembered skin. "kahf" is the old name of "admin". */
-export const SKIN_BOOT = `try{var ids=${JSON.stringify(IDS)},k="${KEY}",q=new URLSearchParams(location.search).get("skin");if(q==="kahf")q="admin";if(q&&ids.indexOf(q)>=0)localStorage.setItem(k,q);var s=localStorage.getItem(k);if(s==="kahf")s="admin";if(s&&s!=="paper"&&ids.indexOf(s)>=0)document.documentElement.setAttribute("data-skin",s)}catch(e){}`;
+/** Runs before first paint: ?skin=<id> wins and is remembered; otherwise the remembered skin. */
+export const SKIN_BOOT = `try{var ids=${JSON.stringify(IDS)},k="${KEY}",q=new URLSearchParams(location.search).get("skin");if(q&&ids.indexOf(q)>=0)localStorage.setItem(k,q);var s=localStorage.getItem(k);if(s&&s!=="paper"&&ids.indexOf(s)>=0)document.documentElement.setAttribute("data-skin",s)}catch(e){}`;
 
 /** Skin picker fixed to the bottom-right corner. Remove once a skin wins. */
 export function SkinSwitch() {
