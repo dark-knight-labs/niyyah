@@ -12,7 +12,7 @@ import { TaskCard } from "@/components/routine/task-card";
 import { AddEventForm, ConnectButton, meetingName, QuickAdd } from "@/components/routine/calendar-parts";
 
 /** The grid shows the whole day. One hour is HOUR_PX tall (SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
-const HOUR_PX = 28;
+const HOUR_PX = 48;
 const SLEEP_PX = 5;
 const SNAP = 15;
 const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
@@ -440,19 +440,19 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                     onPointerDown={(ev) => ev.stopPropagation()} onClick={() => { setPicked(key); setDraft(null); }} onKeyDown={(k) => k.key === "Enter" && setPicked(key)}
                     aria-pressed={picked === key} title={eventTip(day, e, e.id ? "Drag to move" : "Read-only calendar")}
                     className={`absolute overflow-hidden border-l-2 px-1.5 py-0.5 text-left text-xs font-medium leading-[15px] ${e.id ? "cursor-grab" : "cursor-pointer"} ${picked === key ? "z-10 outline outline-1 outline-[var(--foreground)]" : ""}`}
-                    style={{ top: px(e.start_min as number), height: Math.max(20, px((e.end_min as number) - (e.start_min as number)) - 2), left: `calc(${(100 * lane) / lanes}% + 2px)`, width: `calc(${100 / lanes}% - 4px)`,
+                    style={{ top: px(e.start_min as number), height: Math.max(20, px(e.end_min as number) - px(e.start_min as number) - 2), left: `calc(${(100 * lane) / lanes}% + 2px)`, width: `calc(${100 / lanes}% - 4px)`,
                       borderColor: colour, background: `color-mix(in srgb, ${colour} 16%, var(--surface))` }}>
                     <span className="flex items-center gap-1">
                       {isPinned(eventPin(day, e)) && <Star size={10} aria-label="Important" className="shrink-0 fill-[var(--accent)] text-[var(--accent)]" />}
                       <span className="truncate">{e.title}</span>
                     </span>
-                    {long && <span className="block font-mono text-micro text-[var(--muted-foreground)]">{formatMinutes(e.start_min as number)}</span>}
+                    {long && <span className="block font-mono text-micro text-[var(--muted-foreground)]">{formatMinutes(e.start_min as number)}–{formatMinutes(e.end_min as number)}</span>}
                   </div>
                 );
               })}
               {draw?.day === day && (
                 <div className="pointer-events-none absolute inset-x-0.5 border border-[var(--accent)] bg-[var(--accent-light)]"
-                  style={{ top: px(Math.min(draw.from, draw.to)), height: Math.max(px(SNAP), px(Math.abs(draw.to - draw.from))) }} />
+                  style={{ top: px(Math.min(draw.from, draw.to)), height: Math.max(px(SNAP), px(Math.max(draw.from, draw.to)) - px(Math.min(draw.from, draw.to))) }} />
               )}
               {day === today && <div className="pointer-events-none absolute inset-x-0 z-10 border-t border-[var(--destructive)]" style={{ top: px(nowMin) }}><span className="absolute -left-px -top-[4px] h-[7px] w-[7px] bg-[var(--destructive)]" /></div>}
             </div>
