@@ -9,7 +9,14 @@ import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/fraunces/300.css";
 import "@fontsource/fraunces/400.css";
 import "@fontsource/fraunces/500.css";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-sans/700.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
 import "./globals.css";
+import { SkinSwitch, SKIN_BOOT } from "@/components/skin-switch";
 
 export const metadata: Metadata = {
   title: "Niyyah - Muslim Productivity",
@@ -18,8 +25,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="antialiased min-h-screen">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: SKIN_BOOT }} /></head>
+      <body className="antialiased min-h-screen">{children}<SkinSwitch /></body>
     </html>
   );
 }

@@ -42,6 +42,9 @@
   --font-serif: "Fraunces", Georgia, serif;
 }
 
+/* The rounded-* scale: square in the paper skin, soft in the kahf skin (see :root[data-skin="kahf"]). */
+:root { --r-xs: 0; --r-sm: 0; --r-md: 0; --r-lg: 0; --r-xl: 0; --r-2xl: 0; --r-3xl: 0; }
+
 [data-theme="dark"] {
   color-scheme: dark;
 
@@ -72,6 +75,44 @@
   --warn-light: #3a2f17;
 }
 
+/* A/B skin: the Kahf ID admin look (blue-gray, IBM Plex, soft corners) as a second set of the same tokens. Switch with ?skin=kahf / ?skin=paper or the corner button; independent of light/dark. */
+:root[data-skin="kahf"] {
+  --background: #f5f8fc;
+  --surface: #ffffff;
+  --foreground: #1a2333;
+  --muted: #eef3fa;
+  --muted-foreground: #5a6880;
+  --border: #e4eaf4;
+  --rule: #d3deee;
+  --accent: #1a6dc4;
+  --accent-fg: #ffffff;
+  --accent-light: #f0f6ff;
+  --destructive: #e03535;
+  --warn: #c47a1a;
+  --warn-light: #fffcf0;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 9px; --r-xl: 14px; --r-2xl: 16px; --r-3xl: 18px;
+}
+:root[data-skin="kahf"][data-theme="dark"] {
+  --background: #0f1624;
+  --surface: #161f31;
+  --foreground: #e6ecf5;
+  --muted: #1d2740;
+  --muted-foreground: #8a99b3;
+  --border: #26324a;
+  --rule: #34425e;
+  --accent: #5ea2ec;
+  --accent-fg: #0b1a2e;
+  --accent-light: #172a46;
+  --destructive: #f08080;
+  --warn: #e0b15a;
+  --warn-light: #3a2f17;
+}
+/* Kahf labels are IBM Plex Sans uppercase, not mono; data keeps font-mono. */
+:root[data-skin="kahf"] .mono { font-family: var(--font-sans); font-weight: 600; letter-spacing: 0.08em; }
+:root[data-skin="kahf"] .font-clock { font-family: var(--font-mono); }
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
@@ -94,7 +135,7 @@
   --font-serif: var(--font-serif);
   --radius: var(--radius);
   /* Square edges everywhere: every rounded-* utility resolves to 0. rounded-full stays for avatars and dots. */
-  --radius-xs: 0; --radius-sm: 0; --radius-md: 0; --radius-lg: 0; --radius-xl: 0; --radius-2xl: 0; --radius-3xl: 0;
+  --radius-xs: var(--r-xs); --radius-sm: var(--r-sm); --radius-md: var(--r-md); --radius-lg: var(--r-lg); --radius-xl: var(--r-xl); --radius-2xl: var(--r-2xl); --radius-3xl: var(--r-3xl);
 }
 
 /* Root size stays at the browser default (16px); sizes are rem so a user's own zoom setting still applies. */
