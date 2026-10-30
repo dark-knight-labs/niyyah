@@ -15,6 +15,8 @@ import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-sans/700.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/archivo";
 import "./globals.css";
 import { SkinSwitch, SKIN_BOOT } from "@/components/skin-switch";
 
