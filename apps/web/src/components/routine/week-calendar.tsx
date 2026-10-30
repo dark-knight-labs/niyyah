@@ -11,9 +11,14 @@ import { addDays, fmtDay, sundayOf, weekDays } from "@/lib/week";
 import { TaskCard } from "@/components/routine/task-card";
 import { AddEventForm, ConnectButton, meetingName, QuickAdd } from "@/components/routine/calendar-parts";
 
-/** The grid shows the whole day. One hour is HOUR_PX tall (SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
+/** The grid shows the whole day. One hour is as tall as fits the window (HOUR_PX before it is measured, never under MIN_HOUR_PX or over MAX_HOUR_PX; SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
 const HOUR_PX = 48;
+const MIN_HOUR_PX = 24;
+const MAX_HOUR_PX = 96;
 const SLEEP_PX = 5;
+/** Space left under the grid, and the sticky day header above the all-day row. */
+const BOTTOM_GAP = 16;
+const HEADER_PX = 34;
 const SNAP = 15;
 const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
 const BTN = "inline-flex min-h-8 items-center whitespace-nowrap border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
@@ -22,8 +27,8 @@ export interface DayData { events: VaultEvent[]; tasks: VaultTaskData[]; }
 export interface SleepSpan { from: number; to: number; }
 
 /** Vertical positions for a day column. `collapsed[h]` squeezes hour h to a thin strip. */
-function makeScale(collapsed: boolean[]) {
-  const heights = collapsed.map((c) => (c ? SLEEP_PX : HOUR_PX));
+function makeScale(collapsed: boolean[], hourPx: number) {
+  const heights = collapsed.map((c) => (c ? SLEEP_PX : hourPx));
   const tops = heights.map((_, h) => heights.slice(0, h).reduce((a, b) => a + b, 0));
   const total = heights.reduce((a, b) => a + b, 0);
   return {
@@ -259,15 +264,34 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const collapsible = Array.from({ length: 24 }, (_, h) => days.length > 0 && days.every((day) =>
     sleepFor(day).some((s) => s.from <= h * 60 && s.to >= (h + 1) * 60)
     && !(data[day]?.events ?? []).some((e) => e.all_day || e.start_min === null || e.end_min === null ? false : e.start_min < (h + 1) * 60 && e.end_min > h * 60)));
-  const { px, minuteAt: scaleMinuteAt, heights, tops, total: GRID_PX } = makeScale(collapsible);
+  const collapsedCount = collapsible.filter(Boolean).length;
+
+  // Fit the window: the scroller fills the space below its top edge, and an hour is whatever height lets all 24 (less collapsed sleep) fit under the sticky header and all-day row. Too small a window scrolls instead.
+  const [box, setBox] = useState<{ height: number; hour: number } | null>(null);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const fit = () => {
+      const height = Math.max(320, Math.floor(window.innerHeight - el.getBoundingClientRect().top - BOTTOM_GAP));
+      const allDay = el.querySelector<HTMLElement>("[data-allday]")?.offsetHeight ?? 0;
+      const open = 24 - collapsedCount;
+      const hour = Math.max(MIN_HOUR_PX, Math.min(MAX_HOUR_PX, Math.floor((height - 2 - HEADER_PX - allDay - collapsedCount * SLEEP_PX) / Math.max(1, open))));
+      setBox((b) => (b && b.height === height && b.hour === hour ? b : { height, hour }));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [collapsedCount, data, adding, week.selectedTask, week.picked, problem]);
+  const hourPx = box?.hour ?? HOUR_PX;
+  const { px, minuteAt: scaleMinuteAt, heights, tops, total: GRID_PX } = makeScale(collapsible, hourPx);
 
   // Start scrolled to about three hours before now.
   const scrolled = useRef(false);
   useEffect(() => {
-    if (!days.length || !scroller.current || scrolled.current) return;
+    if (!days.length || !box || !scroller.current || scrolled.current) return;
     scrolled.current = true;
-    scroller.current.scrollTop = Math.max(0, px(nowMin) - 3 * HOUR_PX);
-  }, [days.length, nowMin, px]);
+    scroller.current.scrollTop = Math.max(0, px(nowMin) - 3 * hourPx);
+  }, [days.length, box, nowMin, px, hourPx]);
 
   const refresh = useCallback(() => { week.reload(); onChanged(); onEventsChanged(); }, [week, onChanged, onEventsChanged]);
 
@@ -362,7 +386,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
         <TaskCard key={week.selectedTask.task.line} task={week.selectedTask.task} day={week.selectedTask.day} streams={streams} pinned={isPinned(taskPin(week.selectedTask.day, week.selectedTask.task))}
           onPin={() => week.togglePin(taskPin(week.selectedTask!.day, week.selectedTask!.task))} change={(a) => change(a, "tasks")} onClose={() => week.setPickedTask(null)} />
       )}
-      <div ref={scroller} className="max-h-[calc(100vh-14rem)] overflow-auto border border-[var(--border)]" role="grid" aria-label="Week schedule">
+      <div ref={scroller} className="overflow-auto border border-[var(--border)]" style={{ maxHeight: box ? box.height : "calc(100vh - 14rem)" }} role="grid" aria-label="Week schedule">
         <div className="grid min-w-[40rem]" style={{ gridTemplateColumns: `1.5rem ${days.map((d) => (d === today ? "minmax(0,2fr)" : "minmax(0,1fr)")).join(" ")}` }}>
           <div className="sticky top-0 z-20 h-[34px] border-b border-[var(--border)] bg-[var(--surface)]" />
           {days.map((day) => (
@@ -378,7 +402,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
             return (
               <div key={day} onDragOver={(e) => { if (drag.current?.allDay) { e.preventDefault(); setOver(`ad:${day}`); } }} onDragLeave={() => setOver(null)} onDrop={(e) => dropAllDay(e, day)}
                 onClick={(e) => { if (e.target === e.currentTarget) setAdding(day); }}
-                className={`group sticky top-[34px] z-20 flex max-h-[16rem] min-h-16 cursor-cell flex-col gap-1 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
+                data-allday="" className={`group sticky top-[34px] z-20 flex max-h-[16rem] min-h-16 cursor-cell flex-col gap-1 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
                 {(d?.events ?? []).map((e, i) => e.all_day && (
                   <div key={i} role="button" tabIndex={0} draggable={!!e.id} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={() => { drag.current = null; setOver(null); }}
                     onClick={() => setPicked(`${day}:${i}`)} onKeyDown={(k) => k.key === "Enter" && setPicked(`${day}:${i}`)} title={eventTip(day, e, e.id ? "Drag to another day to move" : "Read-only calendar")} aria-pressed={picked === `${day}:${i}`}
@@ -417,7 +441,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
           })}
 
           <div className="relative" style={{ height: GRID_PX }}>
-            {Array.from({ length: 24 }, (_, h) => h > 0 && heights[h] === HOUR_PX && (
+            {Array.from({ length: 24 }, (_, h) => h > 0 && heights[h] === hourPx && (
               <span key={h} className="absolute right-0.5 -translate-y-1.5 font-mono text-micro text-[var(--muted-foreground)]" style={{ top: tops[h] }}>{pad2(h)}</span>
             ))}
           </div>
