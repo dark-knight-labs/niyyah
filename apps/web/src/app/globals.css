@@ -75,8 +75,8 @@
   --warn-light: #3a2f17;
 }
 
-/* A/B skin: the Kahf ID admin look (blue-gray, IBM Plex, soft corners) as a second set of the same tokens. Switch with ?skin=kahf / ?skin=paper or the corner button; independent of light/dark. */
-:root[data-skin="kahf"] {
+/* Skins: pick-and-choose looks as alternative token sets (list in components/skin-switch.tsx). Paper is the default (no data-skin). Switch with ?skin=<id> or the corner picker; independent of light/dark. Each skin sets the same variables, the radius scale (--r-*) and optionally the fonts. */
+:root[data-skin="admin"] {
   --background: #f5f8fc;
   --surface: #ffffff;
   --foreground: #1a2333;
@@ -92,9 +92,10 @@
   --warn-light: #fffcf0;
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
-  --r-xs: 4px; --r-sm: 6px; --r-md: 8px; --r-lg: 9px; --r-xl: 14px; --r-2xl: 16px; --r-3xl: 18px;
+  --r-xs: 4; --r-sm: 6; --r-md: 8; --r-lg: 9; --r-xl: 14; --r-2xl: 16; --r-3xl: 18;
 }
-:root[data-skin="kahf"][data-theme="dark"] {
+
+:root[data-skin="admin"][data-theme="dark"] {
   --background: #0f1624;
   --surface: #161f31;
   --foreground: #e6ecf5;
@@ -109,9 +110,152 @@
   --warn: #e0b15a;
   --warn-light: #3a2f17;
 }
-/* Kahf labels are IBM Plex Sans uppercase, not mono; data keeps font-mono. */
-:root[data-skin="kahf"] .mono { font-family: var(--font-sans); font-weight: 600; letter-spacing: 0.08em; }
-:root[data-skin="kahf"] .font-clock { font-family: var(--font-mono); }
+
+:root[data-skin="admin"] .mono { font-family: var(--font-sans); font-weight: 600; letter-spacing: 0.08em; }
+:root[data-skin="admin"] .font-clock { font-family: var(--font-mono); }
+
+:root[data-skin="artcraft"] {
+  --background: #f2f1ee;
+  --surface: #faf9f7;
+  --foreground: #101014;
+  --muted: #e9e8e4;
+  --muted-foreground: #5b5b60;
+  --border: #dcdbd8;
+  --rule: #b8b8ba;
+  --accent: #2d81ff;
+  --accent-fg: #ffffff;
+  --accent-light: #e3edff;
+  --destructive: #b3261e;
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-serif: "Archivo Variable", system-ui, sans-serif;
+}
+
+:root[data-skin="artcraft"][data-theme="dark"] {
+  --background: #121316;
+  --surface: #17181c;
+  --foreground: #f2f1ee;
+  --muted: #1d1e22;
+  --muted-foreground: #a4a4a3;
+  --border: #2a2b2e;
+  --rule: #4a4b4f;
+  --accent: #74aaff;
+  --accent-fg: #0b0b0c;
+  --accent-light: #1a2a47;
+  --destructive: #ff6259;
+}
+
+:root[data-skin="minimal"] {
+  --background: #f7f6f3;
+  --surface: #ffffff;
+  --foreground: #111111;
+  --muted: #efeeea;
+  --muted-foreground: #787774;
+  --border: #eaeaea;
+  --rule: #d9d8d4;
+  --accent: #111111;
+  --accent-fg: #ffffff;
+  --accent-light: #edf3ec;
+  --destructive: #9f2f2d;
+  --warn: #956400;
+  --warn-light: #fbf3db;
+  --r-xs: 4; --r-sm: 4; --r-md: 6; --r-lg: 8; --r-xl: 10; --r-2xl: 12; --r-3xl: 12;
+}
+
+:root[data-skin="minimal"][data-theme="dark"] {
+  --background: #191919;
+  --surface: #202020;
+  --foreground: #ededec;
+  --muted: #2a2a29;
+  --muted-foreground: #9b9a97;
+  --border: #2f2f2e;
+  --rule: #3f3f3d;
+  --accent: #ededec;
+  --accent-fg: #191919;
+  --accent-light: #2a2a29;
+  --destructive: #eb8e8b;
+  --warn: #e0b15a;
+  --warn-light: #3a2f17;
+}
+
+:root[data-skin="brutalist"] {
+  --background: #f4f4f0;
+  --surface: #fafaf7;
+  --foreground: #050505;
+  --muted: #eae8e3;
+  --muted-foreground: #4a4a46;
+  --border: #bdbab0;
+  --rule: #050505;
+  --accent: #e61919;
+  --accent-fg: #ffffff;
+  --accent-light: #fbdcdc;
+  --destructive: #e61919;
+  --font-sans: "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+:root[data-skin="brutalist"][data-theme="dark"] {
+  --background: #0a0a0a;
+  --surface: #121212;
+  --foreground: #eaeaea;
+  --muted: #1c1c1c;
+  --muted-foreground: #9a9a9a;
+  --border: #2c2c2c;
+  --rule: #eaeaea;
+  --accent: #ff2a2a;
+  --accent-fg: #0a0a0a;
+  --accent-light: #3a1212;
+  --destructive: #ff2a2a;
+}
+
+:root[data-skin="editorial"] {
+  --background: #fdfbf7;
+  --surface: #fffefb;
+  --foreground: #2a211b;
+  --muted: #f1ece2;
+  --muted-foreground: #7a6e62;
+  --border: #e8e1d4;
+  --rule: #d6ccb9;
+  --accent: #5f7a63;
+  --accent-fg: #ffffff;
+  --accent-light: #e6ede4;
+  --destructive: #a8402f;
+  --warn: #a8741a;
+  --warn-light: #f5ead2;
+  --font-sans: "Fraunces", Georgia, serif;
+  --r-xs: 2; --r-sm: 4; --r-md: 6; --r-lg: 8; --r-xl: 10; --r-2xl: 14; --r-3xl: 18;
+}
+
+:root[data-skin="editorial"][data-theme="dark"] {
+  --background: #1a1512;
+  --surface: #231c18;
+  --foreground: #f0e8dc;
+  --muted: #2d2420;
+  --muted-foreground: #a79a8a;
+  --border: #382d27;
+  --rule: #4b3e35;
+  --accent: #9fbb9f;
+  --accent-fg: #14201a;
+  --accent-light: #26352a;
+  --destructive: #e58a76;
+}
+
+:root[data-skin="oled"] {
+  --background: #050505;
+  --surface: #0d0d0f;
+  --foreground: #f2f2f3;
+  --muted: #17171a;
+  --muted-foreground: #8b8b94;
+  --border: #1f1f24;
+  --rule: #34343b;
+  --accent: #34d399;
+  --accent-fg: #04140d;
+  --accent-light: #0f2a22;
+  --destructive: #fb7185;
+  color-scheme: dark;
+  --warn: #e0b15a;
+  --warn-light: #3a2f17;
+  --r-xs: 6; --r-sm: 8; --r-md: 12; --r-lg: 14; --r-xl: 18; --r-2xl: 24; --r-3xl: 32;
+}
 
 @theme inline {
   --color-background: var(--background);
