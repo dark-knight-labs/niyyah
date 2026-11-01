@@ -12,11 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
+    EventOverlay, Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
     Quarter, QuarterStream, Task, WeekObjective,
 )
 from app.models.user import User
-from app.services.rules import checklist_from_text, checklist_progress
+from app.services.rules import checklist_from_text, checklist_progress, item_status
 from app.models.vault import VaultDay
 
 FORMAT_VERSION = 1
@@ -91,9 +91,15 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
                              for n in await rows(NotebookEntry, NotebookEntry.stream, NotebookEntry.position)],
         "days": days,
         "tasks": [{"id": t.id, "text": t.text, "done": t.done, "due_on": _iso(t.due_on), "scheduled_on": _iso(t.scheduled_on),
-                   "start_on": _iso(t.start_on), "done_on": _iso(t.done_on), "source_path": t.source_path, "stream": t.stream, "products": list(t.products or []), "description": t.description or ""}
+                   "start_on": _iso(t.start_on), "done_on": _iso(t.done_on), "source_path": t.source_path, "stream": t.stream, "products": list(t.products or []), "description": t.description or "",
+                   "status": item_status(t.done, t.status), "start_min": t.start_min, "end_min": t.end_min, "weight": t.weight,
+                   "checklist": list(t.checklist or [])}
                   for t in await rows(Task, Task.id)],
         "habits": habits,
+        "item_overlays": [{"key": o.event_key, "calendar": o.source_calendar, "title": o.title, "day": _iso(o.day), "status": o.status,
+                           "weight": o.weight, "stream": o.stream, "products": list(o.products or []), "description": o.description or "",
+                           "checklist": list(o.checklist or [])}
+                          for o in await rows(EventOverlay, EventOverlay.event_key)],
     }
 
 

@@ -6,15 +6,17 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
+    EventOverlay, Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
     Quarter, QuarterStream, Task, WeekObjective,
 )
 from app.models.vault import VaultBlockVote, VaultDay
 from app.schemas.snapshot import Snapshot
-from app.services.rules import checklist_from_text, checklist_text, clean_checklist, clean_products
+from app.services.rules import (
+    MAX_ITEM_TAGS, checklist_from_text, checklist_text, clean_checklist, clean_minutes, clean_products, clean_subtasks, item_status,
+)
 
 USER_TABLES = (PlannerHabitCheck, PlannerHabit, PlannerBlock, PlannerCalendarFeed, Task, LogEntry, Goal, Quarter, QuarterStream, WeekObjective, PipelineItem,
-               NotebookEntry, PlannerScheduleSetting, PlannerScheduleBlock)
+               NotebookEntry, PlannerScheduleSetting, PlannerScheduleBlock, EventOverlay)
 
 
 async def _wipe(db: AsyncSession, user_id: int) -> None:
@@ -42,6 +44,12 @@ def _check(snap: Snapshot) -> None:
         raise ValueError("a weekly objective appears twice")
     if len({b.key for b in snap.blocks}) != len(snap.blocks):
         raise ValueError("a block key appears twice")
+    if len({o.key for o in snap.item_overlays}) != len(snap.item_overlays):
+        raise ValueError("an event key appears twice in item_overlays")
+    for t in snap.tasks:
+        clean_minutes(t.start_min, t.end_min)
+        if t.start_min is not None and t.scheduled_on is None:
+            raise ValueError("a task with a time needs a scheduled_on date")
 
 
 def _lines(checklist, text: str) -> list[dict]:
@@ -101,7 +109,12 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
     objectives = [WeekObjective(user_id=user_id, week=o.week, stream=o.stream, text=o.text, done=o.done, checkpoint=o.checkpoint)
                   for o in snap.week_objectives]
     tasks = [Task(user_id=user_id, text=t.text, done=t.done, due_on=t.due_on, scheduled_on=t.scheduled_on, start_on=t.start_on,
-                  done_on=t.done_on, source_path=t.source_path, stream=t.stream, products=clean_products(t.products), description=t.description, position=n) for n, t in enumerate(snap.tasks)]
+                  done_on=t.done_on, source_path=t.source_path, stream=t.stream, products=clean_products(t.products, MAX_ITEM_TAGS),
+                  description=t.description, position=n, status=item_status(t.done, t.status), start_min=t.start_min, end_min=t.end_min,
+                  weight=t.weight, checklist=clean_subtasks([i.model_dump() for i in t.checklist])) for n, t in enumerate(snap.tasks)]
+    overlays = [EventOverlay(user_id=user_id, event_key=o.key, source_calendar=o.calendar, title=o.title, day=o.day, status=o.status,
+                             weight=o.weight, stream=o.stream, products=clean_products(o.products, MAX_ITEM_TAGS), description=o.description,
+                             checklist=clean_subtasks([i.model_dump() for i in o.checklist])) for o in snap.item_overlays]
     goals = [Goal(user_id=user_id, position=n, title=g.title, value=g.value, caption=g.caption, progress=g.progress,
                   checklist=clean_checklist([i.model_dump() for i in g.checklist])) for n, g in enumerate(snap.goals)]
     feeds = [PlannerCalendarFeed(user_id=user_id, name=f.name, url=f.url, color=f.color, email=f.email, position=n) for n, f in enumerate(f for f in snap.feeds if f.url)]
@@ -113,7 +126,7 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
 
     groups = {"blocks": blocks, "schedule_blocks": schedule_rows, "feeds": feeds, "goals": goals, "quarters": quarters,
               "quarter_streams": streams, "week_objectives": objectives, "pipeline_items": pipeline, "notebook_entries": notebook,
-              "days": days, "log_entries": logs, "tasks": tasks}
+              "days": days, "log_entries": logs, "tasks": tasks, "item_overlays": overlays}
     for rows in groups.values():
         db.add_all(rows)
     if snap.schedule:

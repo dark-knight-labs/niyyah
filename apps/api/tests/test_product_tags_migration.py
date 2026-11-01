@@ -28,6 +28,8 @@ def _schema_before() -> str:
             text = text.replace("products JSON NOT NULL", "product VARCHAR(100)")
         if table.name == "planner_tasks":  # the stream and products columns come with later migrations
             text = text.replace("stream VARCHAR(24), ", "").replace("products JSON NOT NULL, ", "").replace("description TEXT NOT NULL, ", "")
+            later = ("start_min ", "end_min ", "weight ", "status ", "checklist ")  # the item fields come later still
+            text = "\n".join(line for line in text.split("\n") if not line.strip().startswith(later))
         ddl.append(text + ";")
     return "\n".join(ddl)
 

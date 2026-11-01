@@ -157,6 +157,26 @@ class SnapTask(_Loose):
     stream: str | None = Field(default=None, max_length=24)
     products: list[str] = []
     description: str = Field(default="", max_length=4000)
+    # Item fields (newer exports). Older ones lack them: status then follows `done`, which wins whenever the two disagree.
+    status: str | None = Field(default=None, pattern=r"^(open|done|skipped)$")
+    start_min: int | None = Field(default=None, ge=0, le=1440)
+    end_min: int | None = Field(default=None, ge=0, le=1440)
+    weight: int = Field(default=0, ge=0, le=3)
+    checklist: list[SnapLine] = Field(default=[], max_length=50)
+
+
+class SnapOverlay(_Loose):
+    """What the user added to one calendar event, matched by its event key (docs/export-format.md)."""
+    key: str = Field(min_length=1, max_length=400)
+    calendar: str = Field(default="", max_length=120)
+    title: str = Field(default="", max_length=300)
+    day: dt.date | None = None
+    status: str = Field(default="open", pattern=r"^(open|done|skipped)$")
+    weight: int = Field(default=0, ge=0, le=3)
+    stream: str | None = Field(default=None, max_length=24)
+    products: list[str] = []
+    description: str = Field(default="", max_length=4000)
+    checklist: list[SnapLine] = Field(default=[], max_length=50)
 
 
 def _cap(limit: int):
@@ -199,6 +219,7 @@ class Snapshot(_Loose):
     days: list[SnapDay] = _cap(20000)
     tasks: list[SnapTask] = _cap(50000)
     habits: list[SnapHabit] = _cap(500)
+    item_overlays: list[SnapOverlay] = _cap(20000)
 
     @field_validator("version")
     @classmethod
