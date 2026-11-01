@@ -23,6 +23,8 @@ interface Props {
   onClose: () => void;
   /** After any saved change (the planner reads tasks too). */
   onChanged?: () => void;
+  /** An own item was moved to another day: the card follows it there. */
+  onMoved?: (day: string) => void;
 }
 
 const action = "mono inline-flex min-h-8 items-center gap-1.5 border border-[var(--rule)] px-3 hover:bg-[var(--muted)]";
@@ -67,7 +69,7 @@ function TimeRange({ start, end, onSave }: { start: number; end: number; onSave:
  * The details card of any item, own task or calendar event: status, weight, stream, tags, sub-tasks and notes for both.
  * An own item also has its title, day, time and Delete; a calendar item's title and time stay its calendar's.
  */
-export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChanged }: Props) {
+export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChanged, onMoved }: Props) {
   const [newTag, setNewTag] = useState("");
   const [asked, setAsked] = useState(false);
   const own = item.kind === "task";
@@ -121,7 +123,7 @@ export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChang
           <span className={label}>When</span>
           {own ? (
             <div className="grid gap-1.5">
-              <input type="date" value={day} aria-label="Day" onChange={(e) => { const to = e.target.value; if (to && to !== day) void items.move(item, day, to).then(after); }}
+              <input type="date" value={day} aria-label="Day" onChange={(e) => { const to = e.target.value; if (to && to !== day) { onMoved?.(to); void items.move(item, day, to).then(after); } }}
                 className="mono min-h-7 w-fit border border-[var(--rule)] bg-[var(--surface)] px-1.5" />
               <div className="flex flex-wrap items-center gap-2">
                 <Segments value={timed ? "timed" : "all"} label="When" options={[{ value: "all", label: "All day" }, { value: "timed", label: "Timed" }]}

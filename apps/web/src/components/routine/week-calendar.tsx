@@ -386,7 +386,8 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     <div>
       {sel && (
         <ItemCard key={itemRef(sel)} item={sel} streams={streams} items={items} pinned={isPinned(pinOf(sel))}
-          onPin={() => week.togglePin(pinOf(sel))} onClose={() => setPicked(null)} onChanged={onChanged} />
+          onPin={() => week.togglePin(pinOf(sel))} onClose={() => setPicked(null)} onChanged={onChanged}
+          onMoved={(to) => setPicked(days.includes(to) ? itemRef({ ...sel, day: to }) : null)} />
       )}
       <div ref={scroller} className="overflow-auto border border-[var(--border)]" style={{ maxHeight: box ? box.height : "calc(100vh - 14rem)" }} role="grid" aria-label="Week schedule">
         <div className="grid min-w-[40rem]" style={{ gridTemplateColumns: `1.5rem ${days.map((d) => (d === today ? "minmax(0,2fr)" : "minmax(0,1fr)")).join(" ")}` }}>

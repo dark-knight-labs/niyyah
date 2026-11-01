@@ -220,6 +220,14 @@ test("week calendar: tick a task, move it to another day, toggle its pin star", 
   await allDayTask(page, other, "Call bank").getByRole("button", { name: "Important: Call bank" }).click();
   await expect(allDayTask(page, other, "Call bank").getByRole("button", { name: "Important: Call bank" })).toHaveAttribute("aria-pressed", "false");
 
+  // The card's Day field moves an item too, and the card stays open on it.
+  await openTask(page, other, "Call bank");
+  const movedBack = page.waitForResponse((r) => r.url().endsWith("/vault/tasks/move"));
+  await card(page).getByLabel("Day").fill(today);
+  await movedBack;
+  await expect(allDayTask(page, today, "Call bank")).toBeVisible();
+  await expect(card(page).getByLabel("Day")).toHaveValue(today);
+
   // An own timed item drags in the grid too, and back to the all-day row.
   const stretch = grid(page, today).locator('[data-item^="t:"]').filter({ hasText: "Stretch" });
   const patched = page.waitForResponse((r) => r.url().includes("/vault/items/") && r.request().method() === "PATCH");
