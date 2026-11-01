@@ -131,15 +131,15 @@ MAX_PRODUCTS = 8
 MAX_PRODUCT_CHARS = 100
 
 
-def clean_products(raw) -> list[str]:
-    """Trim, drop blanks, dedupe case-insensitively (first spelling wins), keep at most MAX_PRODUCTS."""
+def clean_products(raw, limit: int = MAX_PRODUCTS) -> list[str]:
+    """Trim, drop blanks, dedupe case-insensitively (first spelling wins), keep at most `limit`."""
     seen, tags = set(), []
     for tag in raw or []:
         tag = " ".join(str(tag).split())[:MAX_PRODUCT_CHARS]
         if tag and tag.lower() not in seen:
             seen.add(tag.lower())
             tags.append(tag)
-    return tags[:MAX_PRODUCTS]
+    return tags[:limit]
 
 def split_tags(text: str) -> tuple[str, list[str]]:
     """('Wire it #router [product:: DNS, Switch]') -> ('Wire it', ['DNS', 'Switch', 'router']): tags are a field, not part of the text.
@@ -166,6 +166,57 @@ def clean_item(text: str) -> tuple[str, str | None]:
     if len(cleaned) > MAX_TEXT_CHARS:
         raise ValueError(f"item is longer than {MAX_TEXT_CHARS} characters")
     return cleaned, month
+
+# --- Items: tasks and annotated calendar events ---------------------------
+
+ITEM_STATUSES = ("open", "done", "skipped")
+MAX_WEIGHT = 3
+MAX_ITEM_TAGS = 12
+MAX_SUBTASKS = 50
+MAX_SUBTASK_CHARS = 200
+
+
+def item_status(done: bool, status: str | None) -> str:
+    """The status to show. `done` wins: older code writes only `done`, so a disagreeing `status` is stale."""
+    if done:
+        return "done"
+    return status if status in ITEM_STATUSES and status != "done" else "open"
+
+
+def clean_status(status: str) -> str:
+    if status not in ITEM_STATUSES:
+        raise ValueError("status must be open, done or skipped")
+    return status
+
+
+def clean_weight(weight: int) -> int:
+    if not isinstance(weight, int) or isinstance(weight, bool) or not 0 <= weight <= MAX_WEIGHT:
+        raise ValueError(f"weight must be 0-{MAX_WEIGHT}")
+    return weight
+
+
+def clean_minutes(start: int | None, end: int | None) -> tuple[int | None, int | None]:
+    """A time range in minutes from midnight (0 <= start < end <= 1440), or (None, None) for all day."""
+    if start is None and end is None:
+        return None, None
+    if start is None or end is None:
+        raise ValueError("send both start_min and end_min, or neither for all day")
+    if not 0 <= start < end <= 1440:
+        raise ValueError("the time must be 0 <= start_min < end_min <= 1440")
+    return start, end
+
+
+def item_tags(*sources: list[str]) -> list[str]:
+    """Tags from several places (a list, #words in the text or notes), deduped; more than MAX_ITEM_TAGS is refused."""
+    tags = clean_products([tag for source in sources for tag in source], limit=MAX_ITEM_TAGS + 1)
+    if len(tags) > MAX_ITEM_TAGS:
+        raise ValueError(f"at most {MAX_ITEM_TAGS} tags")
+    return tags
+
+
+def clean_subtasks(raw: list[dict] | None) -> list[dict]:
+    return clean_checklist(raw, MAX_SUBTASKS, MAX_SUBTASK_CHARS)
+
 
 # --- Notebooks -------------------------------------------------------------
 
@@ -250,7 +301,7 @@ MAX_LINE_CHARS = 400
 _LINE_ID = re.compile(r"^[a-z0-9]{4,12}$")
 
 
-def clean_checklist(raw: list[dict] | None) -> list[dict]:
+def clean_checklist(raw: list[dict] | None, max_lines: int = MAX_CHECKLIST, max_chars: int = MAX_LINE_CHARS) -> list[dict]:
     """Validated lines as [{id, text, done}]. A new line (no id) gets one, an id is never reused within a list, empty lines are dropped."""
     out: list[dict] = []
     seen: set[str] = set()
@@ -258,15 +309,15 @@ def clean_checklist(raw: list[dict] | None) -> list[dict]:
         text = " ".join(str(item.get("text", "")).split())
         if not text:
             continue
-        if len(text) > MAX_LINE_CHARS:
-            raise ValueError(f"a line is longer than {MAX_LINE_CHARS} characters")
+        if len(text) > max_chars:
+            raise ValueError(f"a line is longer than {max_chars} characters")
         line_id = item.get("id")
         if not isinstance(line_id, str) or not _LINE_ID.match(line_id) or line_id in seen:
             line_id = new_id()
         seen.add(line_id)
         out.append({"id": line_id, "text": text, "done": bool(item.get("done", False))})
-    if len(out) > MAX_CHECKLIST:
-        raise ValueError(f"at most {MAX_CHECKLIST} lines in a list")
+    if len(out) > max_lines:
+        raise ValueError(f"at most {max_lines} lines in a list")
     return out
 
 
