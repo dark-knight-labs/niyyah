@@ -37,6 +37,20 @@ export interface RingGraphicProps {
   centre?: "prayer" | "block";
   /** Font size of the hour numbers and prayer labels, in viewBox units (default 11). */
   labelSize?: number;
+  /** Colour of block `index` (a block colour mode); the block's own colour by default. */
+  colorOf?: (index: number) => string;
+  /** Not today: no now marker, no current block, every slice the same weight. */
+  noNow?: boolean;
+  /** Small multiple: no names on the slices and no hour numbers. */
+  mini?: boolean;
+  /** Leave out the dashed inner lane (the caller draws its own items there). */
+  hideInnerLane?: boolean;
+  /** Text in the middle instead of the clock and the line under it: a big first line, smaller ones under it. */
+  centreText?: { big: string; lines: string[]; accent?: boolean };
+  /** Radius of the hour numbers (default just inside the band), so item lanes can sit between. */
+  hourRadius?: number;
+  /** Drawn above the slices' hit areas and under the now marker: item lanes, for instance. */
+  overlay?: React.ReactNode;
 }
 
 /** The 24h ring: slices, names on the slices, now marker, clock. Meant to sit inside an <svg>. */
@@ -44,18 +58,20 @@ export function RingGraphic(p: RingGraphicProps) {
   const blocks = useBlocks();
   const { day, nowMin, cx, cy, r, t, hover } = p;
   const g = ringGeometry(cx, cy, r);
-  const current = currentBlock(day, nowMin);
+  const colour = (i: number) => p.colorOf?.(i) ?? blocks.color(day.blocks[i].block);
+  const current = p.noNow ? undefined : currentBlock(day, nowMin);
   const nextP = nextPrayer(day, nowMin);
   const elapsed = current ? (((nowMin - current.startMin) % 1440) + 1440) % 1440 : 0;
   // Hover keeps the ring's size: the hovered slice glows and brightens while the others ease back.
   const slice = (i: number): React.CSSProperties => ({
-    filter: hover === i ? `drop-shadow(0 0 7px color-mix(in srgb, ${blocks.color(day.blocks[i].block)} 67%, transparent))` : "none",
+    filter: hover === i ? `drop-shadow(0 0 7px color-mix(in srgb, ${colour(i)} 67%, transparent))` : "none",
     transition: "opacity .45s ease, filter .45s ease",
     pointerEvents: "none",
   });
   const opacityOf = (i: number) => {
     const b = day.blocks[i];
     if (hover !== null) return hover === i ? 1 : 0.3;
+    if (p.noNow) return 0.8;
     return b === current ? 1 : isPast(b, nowMin) ? 0.4 : 0.75;
   };
 
@@ -67,15 +83,15 @@ export function RingGraphic(p: RingGraphicProps) {
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--muted)" strokeWidth={t} />
 
       {day.blocks.map((b, i) => (
-        <path key={`s-${b.block}-${b.startMin}`} d={g.arc(b.startMin, b.endMin)} fill="none" stroke={blocks.color(b.block)}
+        <path key={`s-${b.block}-${b.startMin}`} d={g.arc(b.startMin, b.endMin)} fill="none" stroke={colour(i)}
           strokeWidth={b === current ? t + 6 : t} style={{ ...slice(i), opacity: b === current && hover === null ? 0.3 : opacityOf(i) }} />
       ))}
       {/* the part of the current slice already passed is solid; the rest stays faded */}
       {current && hover === null && elapsed > 0 && (
-        <path d={g.arc(current.startMin, current.startMin + elapsed)} fill="none" stroke={blocks.color(current.block)} strokeWidth={t + 6} style={{ pointerEvents: "none" }} />
+        <path d={g.arc(current.startMin, current.startMin + elapsed)} fill="none" stroke={colour(day.blocks.indexOf(current))} strokeWidth={t + 6} style={{ pointerEvents: "none" }} />
       )}
 
-      {day.blocks.map((b, i) => {
+      {!p.mini && day.blocks.map((b, i) => {
         if (!nameFits(b, r, p.nameSize * 0.57, blocks.ring(b.block))) return null;
         const id = `${p.idPrefix}-n${i}`;
         return (
@@ -88,12 +104,12 @@ export function RingGraphic(p: RingGraphicProps) {
         );
       })}
 
-      {[0, 6, 12, 18].map((h) => {
-        const [x, y] = g.point(r - t / 2 - 12 - (p.sideLabels ? 4 : 0), h * 60);
+      {!p.mini && [0, 6, 12, 18].map((h) => {
+        const [x, y] = g.point(p.hourRadius ?? r - t / 2 - 12 - (p.sideLabels ? 4 : 0), h * 60);
         return <text key={h} x={x} y={y + 4} textAnchor="middle" fontSize={p.sideLabels ? 12 : (p.labelSize ?? 11) - 1} fill="var(--muted-foreground)">{String(h).padStart(2, "0")}</text>;
       })}
       {/* reserved inner lane for calendar events */}
-      <circle cx={cx} cy={cy} r={r - t / 2 - 34} fill="none" stroke="var(--border)" strokeDasharray="2 5" />
+      {!p.hideInnerLane && <circle cx={cx} cy={cy} r={r - t / 2 - 34} fill="none" stroke="var(--border)" strokeDasharray="2 5" />}
       {timedEvents(p.events).map((e, i) => {
         const lane = ringGeometry(cx, cy, r - t / 2 - 24);
         const on = p.hoverEvent === i;
@@ -111,13 +127,21 @@ export function RingGraphic(p: RingGraphicProps) {
           <g key={name}>
             <title>{`${name[0].toUpperCase()}${name.slice(1)} ${formatMinutes(min)}`}</title>
             <circle cx={x} cy={y} r={3.5} fill="var(--foreground)" />
-            <text x={lx} y={ly} textAnchor="middle" dominantBaseline="central" fontSize={p.labelSize ?? 11} fontWeight={600} fill="var(--muted-foreground)" style={{ textTransform: "uppercase" }}>{name[0]}</text>
+            {!p.mini && <text x={lx} y={ly} textAnchor="middle" dominantBaseline="central" fontSize={p.labelSize ?? 11} fontWeight={600} fill="var(--muted-foreground)" style={{ textTransform: "uppercase" }}>{name[0]}</text>}
           </g>
         );
       })}
 
       {p.sideLabels && <SideLabels {...p} g={g} />}
 
+      {p.centreText ? (
+        <>
+          <text x={cx} y={cy + p.clockSize * 0.18} textAnchor="middle" fontSize={p.clockSize} fontFamily="var(--font-serif)" fill={p.centreText.accent ? "var(--accent)" : "var(--foreground)"}>{p.centreText.big}</text>
+          {p.centreText.lines.map((line, n) => (
+            <text key={n} x={cx} y={cy + p.clockSize * 0.18 + p.clockSize * (0.42 + 0.34 * n)} textAnchor="middle" fontSize={p.clockSize * (n ? 0.22 : 0.25)} fontWeight={n ? 400 : 600} fill={n ? "var(--muted-foreground)" : "var(--foreground)"}>{line}</text>
+          ))}
+        </>
+      ) : <>
       {/* centre clock */}
       <text x={cx} y={cy + p.clockSize * 0.18} textAnchor="middle" fontSize={p.clockSize} fontFamily="var(--font-mono)" fontWeight={400} letterSpacing="-.04em" fill="var(--foreground)">{formatMinutes(nowMin)}</text>
       {p.centre === "block" && current ? (
@@ -134,6 +158,7 @@ export function RingGraphic(p: RingGraphicProps) {
           {nextP.name} in {formatDuration(nextP.in)}
         </text>
       )}
+      </>}
 
       {/* fixed hit areas: the slices move when hovered, so hover must not depend on them */}
       {day.blocks.map((b, i) => (
@@ -159,13 +184,15 @@ export function RingGraphic(p: RingGraphicProps) {
           onClick={(ev) => p.onHoverEvent?.(i, { x: ev.clientX, y: ev.clientY })} />
       ))}
 
+      {p.overlay}
+
       {/* now marker: a hairline across the band with a small square head outside it, haloed by the background so it reads on any slice */}
-      <g pointerEvents="none">
+      {!p.noNow && <g pointerEvents="none">
         <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--background)" strokeWidth={4.5} strokeLinecap="butt" />
         <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--foreground)" strokeWidth={1.5} strokeLinecap="butt" />
         <rect x={nx2 - 3.5} y={ny2 - 3.5} width={7} height={7} transform={`rotate(45 ${nx2} ${ny2})`} fill="var(--foreground)" stroke="var(--background)" strokeWidth={1.5} />
         <circle cx={nx1} cy={ny1} r={1.5} fill="var(--foreground)" />
-      </g>
+      </g>}
     </>
   );
 }

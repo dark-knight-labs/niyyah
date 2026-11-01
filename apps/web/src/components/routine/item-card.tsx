@@ -25,6 +25,8 @@ interface Props {
   onChanged?: () => void;
   /** An own item was moved to another day: the card follows it there. */
   onMoved?: (day: string) => void;
+  /** One column (a narrow side panel or sheet) instead of two side by side from md up. */
+  stacked?: boolean;
 }
 
 const action = "mono inline-flex min-h-8 items-center gap-1.5 border border-[var(--rule)] px-3 hover:bg-[var(--muted)]";
@@ -69,7 +71,7 @@ function TimeRange({ start, end, onSave }: { start: number; end: number; onSave:
  * The details card of any item, own task or calendar event: status, weight, stream, tags, sub-tasks and notes for both.
  * An own item also has its title, day, time and Delete; a calendar item's title and time stay its calendar's.
  */
-export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChanged, onMoved }: Props) {
+export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChanged, onMoved, stacked = false }: Props) {
   const [newTag, setNewTag] = useState("");
   const [asked, setAsked] = useState(false);
   const own = item.kind === "task";
@@ -91,8 +93,8 @@ export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChang
   }
 
   return (
-    <section aria-label="Item details" data-kind={item.kind} className="mb-2 grid gap-3 border border-[var(--border)] bg-[var(--surface)] p-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-      <div className="grid content-start gap-2">
+    <section aria-label="Item details" data-kind={item.kind} className={`grid gap-3 border border-[var(--border)] bg-[var(--surface)] p-3 ${stacked ? "grid-cols-[minmax(0,1fr)]" : "mb-2 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]"}`}>
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2">
         <p className="mono flex items-center justify-between gap-2 text-[var(--muted-foreground)]">
           <span className="min-w-0 truncate">{own ? "Task" : `Event · ${item.calendar ?? "calendar"}`} · {fmtDay(day, { weekday: "short", day: "numeric", month: "short" })} · {when}</span>
           <button type="button" onClick={onClose} aria-label="Close details" title="Close" className="grid h-6 w-6 shrink-0 place-items-center hover:text-[var(--foreground)]"><X size={14} aria-hidden="true" /></button>
@@ -114,7 +116,7 @@ export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChang
             onSave={(description) => void save({ description })} />
         </label>
       </div>
-      <div className="grid content-start gap-3 text-small">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 text-small">
         <div>
           <span className={label}>Status</span>
           <Segments value={item.status} options={STATUSES} label="Status" onChange={(status) => void save({ status })} />

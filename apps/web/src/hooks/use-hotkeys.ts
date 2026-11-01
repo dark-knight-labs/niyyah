@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-/** Key -> action. A key is one character or name ("t", "[", "Escape"), "mod+b" (Cmd on a Mac, Ctrl elsewhere), or a two-key chord ("g o"). */
+/** Key -> action. A key is one character or name ("t", "[", "Escape"), "mod+b" (Cmd on a Mac, Ctrl elsewhere), "shift+v" (a letter with Shift; plain "v" also gets it when no shift+ entry exists), or a two-key chord ("g o"). */
 export type Hotkeys = Record<string, () => void>;
 
 const CHORD_MS = 1000;
@@ -41,6 +41,7 @@ export function useHotkeys(keys: Hotkeys) {
       if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) { reset(); return; }
 
       if (first && run(`${first} ${key}`)) { reset(); return; }
+      if (e.shiftKey && e.key.length === 1 && run(`shift+${key}`)) { reset(); return; }
       reset();
       if (run(key)) return;
       if (Object.keys(map).some((k) => k.startsWith(`${key} `))) {

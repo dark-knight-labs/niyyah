@@ -52,7 +52,7 @@ const hhmm = (min: number) => formatMinutes(Math.min(1439, Math.max(0, min)));
 /** What a pin is stored under: a Google event by its id, any other event by title, day and start, a task by day and text (as before items). */
 const eventPin = (day: string, e: ItemData) => `e:${e.event_id ?? `${e.title}|${day}|${e.start_min ?? "all"}`}`;
 const taskPin = (day: string, t: ItemData) => `t:${day}|${t.title}`;
-const pinOf = (i: ItemData) => (i.kind === "task" ? taskPin(i.day as string, i) : eventPin(i.day as string, i));
+export const pinOf = (i: ItemData) => (i.kind === "task" ? taskPin(i.day as string, i) : eventPin(i.day as string, i));
 
 /** The week Sunday to Saturday around `today`, its items per day (one read of /vault/items), the picked item and the paging that changes it. */
 export function useWeek(today: string | null, refreshKey: number) {
@@ -88,6 +88,8 @@ export function useWeek(today: string | null, refreshKey: number) {
     },
     go: (n: number) => { setPicked(null); setStart(addDays(first as string, 7 * n)); },
     goToday: () => { setPicked(null); setStart(null); },
+    /** Show the week that holds `iso` (the picked item stays when it is already this week). */
+    show: (iso: string) => { if (sundayOf(iso) === first) return; setPicked(null); setStart(sundayOf(iso) === thisWeek ? null : sundayOf(iso)); },
     /** Read the week's items again, in the background. */
     reload: items.refetch,
   };
@@ -236,8 +238,12 @@ interface Drag { item: ItemData; day: string; allDay: boolean; duration: number;
 interface Draw { day: string; from: number; to: number; }
 
 /** The week as a 24-hour grid: drag an item to move it (an own item between the all-day row and the grid too), drag across an empty slot to draw a new event. Sleep is greyed out. */
-export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged }: {
+export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged, card = true, dimmed }: {
   week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void; onEventsChanged: () => void;
+  /** Show the picked item's details card above the grid (off when the page shows it elsewhere). */
+  card?: boolean;
+  /** Items to fade back (a tag filter that does not match them). */
+  dimmed?: (item: ItemData) => boolean;
 }) {
   const { days, data, today, items } = week;
   const { picked, setPicked } = week;
@@ -381,10 +387,11 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const sel = week.selected;
   const tick = (t: ItemData) => changeTask(items.patch(t, { status: t.done ? "open" : "done" }));
   const finished = (t: ItemData) => t.status !== "open";
+  const dim = (i: ItemData) => ({ "data-dimmed": dimmed?.(i) ? "true" : undefined });
 
   return (
     <div>
-      {sel && (
+      {card && sel && (
         <ItemCard key={itemRef(sel)} item={sel} streams={streams} items={items} pinned={isPinned(pinOf(sel))}
           onPin={() => week.togglePin(pinOf(sel))} onClose={() => setPicked(null)} onChanged={onChanged}
           onMoved={(to) => setPicked(days.includes(to) ? itemRef({ ...sel, day: to }) : null)} />
@@ -410,7 +417,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                   const ref = itemRef(e);
                   return (
                     <div key={ref} role="button" tabIndex={0} data-item={ref} draggable={!!e.event_id} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={endDrag}
-                      onClick={() => pick(e)} onKeyDown={(k) => k.key === "Enter" && pick(e)} title={eventTip(day, e, e.event_id ? "Drag to another day to move" : "Read-only calendar")} aria-pressed={picked === ref}
+                      onClick={() => pick(e)} onKeyDown={(k) => k.key === "Enter" && pick(e)} title={eventTip(day, e, e.event_id ? "Drag to another day to move" : "Read-only calendar")} aria-pressed={picked === ref} data-dimmed={dim(e)["data-dimmed"]}
                       className={`flex items-center gap-1 border-l-2 bg-[var(--muted)] px-1.5 text-xs font-medium ${e.event_id ? "cursor-grab" : "cursor-pointer"} ${picked === ref ? "outline outline-1 outline-[var(--foreground)]" : ""} ${finished(e) ? "text-[var(--muted-foreground)] line-through" : ""}`} style={{ borderColor: e.color ?? "var(--muted-foreground)" }}>
                       {isPinned(eventPin(day, e)) && <Star size={10} aria-label="Important" className="shrink-0 fill-[var(--accent)] text-[var(--accent)]" />}
                       <span className="truncate">{e.title}</span>
@@ -423,6 +430,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                   return (
                     <div key={ref} data-item={ref} draggable onDragStart={(ev) => startDrag(ev, t, day)} onDragEnd={endDrag}
                       title={`${t.title}${t.products.map((tag) => ` #${tag}`).join("")}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick for details · drag to another day or a time to move`}
+                      data-dimmed={dim(t)["data-dimmed"]}
                       className={`group/task flex cursor-grab items-start border border-dashed text-xs hover:bg-[var(--muted)] ${picked === ref ? "border-[var(--foreground)]" : "border-[var(--border)]"}`}>
                       <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.title}`} aria-pressed={t.done} onClick={() => tick(t)}
                         className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
@@ -473,7 +481,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                 return (
                   <div key={key} role="button" tabIndex={0} data-item={key} draggable={canDrag(e)} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={endDrag}
                     onPointerDown={(ev) => ev.stopPropagation()} onClick={() => pick(e)} onKeyDown={(k) => k.key === "Enter" && pick(e)}
-                    aria-pressed={picked === key} title={tip}
+                    aria-pressed={picked === key} title={tip} data-dimmed={dim(e)["data-dimmed"]}
                     className={`absolute overflow-hidden border-l-2 px-1.5 py-0.5 text-left text-xs font-medium leading-[15px] ${own ? "border border-dashed" : ""} ${canDrag(e) ? "cursor-grab" : "cursor-pointer"} ${picked === key ? "z-10 outline outline-1 outline-[var(--foreground)]" : ""}`}
                     style={{ top: px(e.start_min as number), height: Math.max(20, px(e.end_min as number) - px(e.start_min as number) - 2), left: `calc(${(100 * lane) / lanes}% + 2px)`, width: `calc(${100 / lanes}% - 4px)`,
                       borderColor: colour, background: `color-mix(in srgb, ${colour} ${own ? 8 : 16}%, var(--surface))` }}>
