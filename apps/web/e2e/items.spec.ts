@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * Overview items against a seeded dev API (run.sh): quick add, the details card (sub-tasks, tags, notes), annotating a
  * calendar fixture event, locked fields on calendar items, and the week calendar's task tick / move / pin.
+ * Then /calendar: its nine views, V rotation, the stored choice, the card, the All day strip and the tag filter.
  * The tests share one database and run in order.
  */
 test.describe.configure({ mode: "serial" });
@@ -250,4 +251,170 @@ test("screenshots: light and dark", async ({ page }) => {
   await page.screenshot({ path: `${OUT}/overview-event-dark.png`, fullPage: true });
   await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
   await page.screenshot({ path: `${OUT}/overview-event-light.png`, fullPage: true });
+});
+
+/* ---------- /calendar: the nine rotatable views (P3) ---------- */
+
+const VIEWS = ["day-grid", "day-agenda", "day-ribbon", "day-ring", "week-grid", "week-agenda", "week-strips", "week-rings", "week-blocks"] as const;
+const view = (page: Page) => page.locator("[data-cal-view]");
+const panel = (page: Page) => page.getByRole("complementary", { name: "Item panel" });
+
+/** Console errors and uncaught page errors, collected for the whole test. */
+function watchErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("pageerror", (e) => errors.push(e.message));
+  return errors;
+}
+
+/** Open /calendar on `start` (stored the way the page stores it) and wait for the week's items. */
+async function openCalendar(page: Page, start: (typeof VIEWS)[number]) {
+  await page.addInitScript((v) => { if (!sessionStorage.getItem("e2e-view-set")) { localStorage.setItem("niy-calendar-view", v); sessionStorage.setItem("e2e-view-set", "1"); } }, start);
+  const loaded = page.waitForResponse((r) => r.url().includes("/vault/items?from="));
+  await page.goto("/calendar");
+  expect((await loaded).ok()).toBeTruthy();
+  await expect(view(page)).toHaveAttribute("data-cal-view", start, { timeout: 30_000 });
+}
+
+const noPageScrollX = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+test("calendar: every view renders, with no console errors and no sideways page scroll", async ({ page }) => {
+  const errors = watchErrors(page);
+  await openCalendar(page, "day-grid");
+  const expectations: Record<(typeof VIEWS)[number], string> = {
+    "day-grid": `[data-allday-strip="${today}"]`,
+    "day-agenda": `[data-allday-strip="${today}"]`,
+    "day-ribbon": `[data-allday-strip="${today}"]`,
+    "day-ring": "svg[aria-label^='24-hour ring']",
+    "week-grid": `[data-grid-day="${today}"]`,
+    "week-agenda": `[data-agenda-day="${today}"]`,
+    "week-strips": `[data-strip-day="${today}"]`,
+    "week-rings": `[data-ring-day="${today}"] svg`,
+    "week-blocks": "table",
+  };
+  for (const v of VIEWS) {
+    await page.locator(`[data-view-button="${v}"]`).click();
+    await expect(view(page)).toHaveAttribute("data-cal-view", v);
+    await expect(view(page).locator(expectations[v]).first()).toBeVisible();
+    expect(await noPageScrollX(page), `${v}: page scrolls sideways`).toBeLessThanOrEqual(0);
+  }
+  // Today's daily standup shows in the views that write titles out.
+  for (const v of ["day-grid", "day-agenda", "week-agenda"] as const) {
+    await page.locator(`[data-view-button="${v}"]`).click();
+    await expect(view(page).locator('[data-cal-item^="e:"]').filter({ hasText: "Daily standup" }).first()).toBeVisible();
+  }
+  expect(errors).toEqual([]);
+});
+
+test("calendar: V cycles through all nine views and back, Shift+V goes back, typing a v does not", async ({ page }) => {
+  await openCalendar(page, "day-grid");
+  const seen: string[] = [];
+  for (let n = 0; n < VIEWS.length; n++) {
+    await page.keyboard.press("v");
+    seen.push((await view(page).getAttribute("data-cal-view")) as string);
+  }
+  expect(seen).toEqual([...VIEWS.slice(1), VIEWS[0]]);
+  await page.keyboard.press("Shift+V");
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-blocks");
+  await page.keyboard.press("Shift+V");
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-rings");
+  await page.locator("#quick-add-title").fill("v");
+  await page.locator("#quick-add-title").press("v");
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-rings");
+  await page.locator("#quick-add-title").fill("");
+});
+
+test("calendar: a reload keeps the chosen view, ring variant and colour mode", async ({ page }) => {
+  await openCalendar(page, "day-grid");
+  await page.locator('[data-view-button="day-ring"]').click();
+  await page.getByRole("button", { name: "Ring lanes: Lane per calendar" }).click();
+  await page.getByRole("group", { name: "Block colours" }).getByRole("button", { name: "Alternate" }).click();
+  await page.reload();
+  await expect(view(page)).toHaveAttribute("data-cal-view", "day-ring", { timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Ring lanes: Lane per calendar" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("group", { name: "Block colours" }).getByRole("button", { name: "Alternate" })).toHaveAttribute("aria-pressed", "true");
+  await page.locator('[data-view-button="week-strips"]').click();
+  await page.reload();
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-strips", { timeout: 30_000 });
+});
+
+test("calendar: clicking an item in a day view and in a week view opens its details card", async ({ page }) => {
+  await openCalendar(page, "day-grid");
+  await view(page).locator('[data-cal-item^="e:"]').filter({ hasText: "Daily standup" }).click();
+  await expect(panel(page)).toBeVisible();
+  await expect(card(page)).toHaveAttribute("data-kind", "event");
+  await expect(card(page).getByRole("heading", { name: "Daily standup" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(panel(page)).toHaveCount(0);
+
+  await page.locator('[data-view-button="week-agenda"]').click();
+  await view(page).locator(`[data-agenda-day="${today}"] [data-cal-item^="t:"]`).filter({ hasText: "Write report" }).getByRole("button", { name: /^Details: Write report/ }).click();
+  await expect(card(page)).toHaveAttribute("data-kind", "task");
+  await expect(card(page).getByRole("textbox", { name: "Title" })).toHaveValue("Write report");
+  // The ring's lanes open the card too (keyboard: Enter on the item).
+  await page.locator('[data-view-button="day-ring"]').click();
+  await view(page).locator('svg [data-cal-item^="e:"] [role="button"]').first().focus();
+  await page.keyboard.press("Enter");
+  await expect(card(page)).toHaveAttribute("data-kind", "event");
+  // In the week grid (the Overview's WeekCalendar) the card opens in the same panel, not above the grid.
+  await page.keyboard.press("Escape");
+  await page.locator('[data-view-button="week-grid"]').click();
+  await grid(page, today).getByText("Daily standup").click();
+  await expect(panel(page).getByRole("region", { name: "Item details" })).toBeVisible();
+  await expect(card(page)).toHaveCount(1);
+});
+
+test("calendar: all-day items sit in the All day strip, timed ones do not; ticking one marks it done", async ({ page }) => {
+  await openCalendar(page, "day-grid");
+  const strip = page.locator(`[data-allday-strip="${today}"]`);
+  await expect(strip.locator('[data-cal-item^="t:"]').filter({ hasText: "Call bank" })).toBeVisible();
+  await expect(strip.locator('[data-cal-item^="t:"]').filter({ hasText: "Buy milk" })).toHaveAttribute("data-state", "done");
+  await expect(strip.locator("[data-cal-item]").filter({ hasText: "Write report" })).toHaveCount(0);
+  await expect(strip.locator("[data-cal-item]").filter({ hasText: "Daily standup" })).toHaveCount(0);
+  const call = strip.locator('[data-cal-item^="t:"]').filter({ hasText: "Call bank" });
+  const ticked = page.waitForResponse((r) => r.url().includes("/vault/items/") && r.request().method() === "PATCH");
+  await call.getByRole("button", { name: "Done: Call bank" }).click();
+  expect((await ticked).ok()).toBeTruthy();
+  await expect(call).toHaveAttribute("data-state", "done");
+  await call.getByRole("button", { name: "Not done: Call bank" }).click();
+  await expect(call).toHaveAttribute("data-state", "open");
+  await page.locator('[data-view-button="day-agenda"]').click();
+  await expect(page.locator(`[data-allday-strip="${today}"]`).getByText("Call bank")).toBeVisible();
+});
+
+test("calendar: a tag filter dims items without the tag, in day views and the week grid", async ({ page }) => {
+  await openCalendar(page, "day-agenda");
+  await page.locator('[data-tag-filter="errand"]').click();
+  const milk = view(page).locator('[data-cal-item^="t:"]').filter({ hasText: "Buy milk" }).first();
+  const standup = view(page).locator('[data-cal-item^="e:"]').filter({ hasText: "Daily standup" }).first();
+  await expect(milk).not.toHaveAttribute("data-dimmed", "true");
+  await expect(standup).toHaveAttribute("data-dimmed", "true");
+  expect(Number(await standup.evaluate((el) => getComputedStyle(el).opacity))).toBeLessThan(0.5);
+  expect(Number(await milk.evaluate((el) => getComputedStyle(el).opacity))).toBeGreaterThan(0.5);
+  await page.locator('[data-view-button="week-grid"]').click();
+  await expect(grid(page, today).locator('[data-item^="e:"]').filter({ hasText: "Daily standup" })).toHaveAttribute("data-dimmed", "true");
+  await page.locator('[data-view-button="day-ring"]').click();
+  await expect(view(page).locator('svg [data-cal-item^="e:"]').first()).toHaveAttribute("data-dimmed", "true");
+  await page.getByRole("group", { name: "Filter by tag" }).getByRole("button", { name: "All", exact: true }).click();
+  await expect(view(page).locator('[data-dimmed="true"]')).toHaveCount(0);
+});
+
+test("calendar: screenshots of every view, light and dark", async ({ page }) => {
+  await openCalendar(page, "day-grid");
+  for (const theme of ["light", "dark"] as const) {
+    await page.evaluate((t) => document.documentElement.setAttribute("data-theme", t), theme);
+    for (const v of VIEWS) {
+      await page.locator(`[data-view-button="${v}"]`).click();
+      await expect(view(page)).toHaveAttribute("data-cal-view", v);
+      await page.screenshot({ path: `${OUT}/calendar-${v}-${theme}.png`, fullPage: true });
+    }
+  }
+  // A picked item with its side panel, and the phone layout with the bottom sheet.
+  await page.locator('[data-view-button="day-grid"]').click();
+  await view(page).locator('[data-cal-item^="e:"]').filter({ hasText: "Daily standup" }).click();
+  await page.screenshot({ path: `${OUT}/calendar-day-grid-panel-dark.png`, fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(panel(page)).toBeVisible();
+  expect(await noPageScrollX(page)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: `${OUT}/calendar-phone-sheet-dark.png` });
 });

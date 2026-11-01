@@ -6,7 +6,7 @@ import { fmtDay } from "@/lib/week";
 import { ItemHandlers } from "@/components/calendar/item-bits";
 import { MiniStrip } from "@/components/calendar/mini-strip";
 
-const COLS = "grid grid-cols-[3.5rem_minmax(0,1fr)_5.5rem] items-center gap-2.5";
+const COLS = "grid grid-cols-[3.5rem_minmax(0,1fr)_7.5rem] items-center gap-2.5";
 
 /** Seven 24h strips on one axis, to compare days: the schedule band, prayer ticks, items stacked under it; booked time on the right. */
 export function WeekStrips({ days, colours, h }: { days: CalDay[]; colours: (iso: string) => string[]; h: ItemHandlers }) {

@@ -417,3 +417,8 @@ h1, h2, h3 {
 
 /* Calendar tag filter: items that do not carry the picked tag fade back in every view (unlayered, so it wins over utilities and inline SVG opacity). */
 [data-dimmed="true"] { opacity: 0.22 !important; }
+/* Calendar rings: a focused item lane (a transparent hit path) shows the focus colour; no motion when the user asked for none. */
+[data-cal-view] svg [role="button"]:focus-visible { outline: none; stroke: var(--accent); stroke-opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) {
+  [data-cal-view] *, [data-cal-view] *::before, [data-cal-view] *::after { animation: none !important; transition: none !important; }
+}
