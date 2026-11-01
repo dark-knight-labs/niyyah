@@ -46,22 +46,14 @@ def report(name: str, samples: list[float]) -> None:
     print(f"{name:<34} n={len(samples):<3} p50={statistics.median(samples):7.1f} ms  p95={p95(samples):7.1f} ms  max={max(samples):7.1f} ms")
 
 
-async def main(n: int, task_put_only: bool) -> None:
-    from httpx import ASGITransport, AsyncClient
-    from sqlalchemy import select
+async def measure(n: int, task_put_only: bool, workdir: str) -> None:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
     from app.api.v1.vault import _local_now
     from app.core.database import Base, get_db
     from app.main import app
-    from app.models.planner import PlannerCalendarFeed
-    from app.models.user import User
-    from app.schemas.snapshot import Snapshot
     from app.services import calendar_events
-    from app.services.planner_import import import_snapshot
-    from tests.sample_snapshot import sample_snapshot
 
-    workdir = tempfile.mkdtemp(prefix="niyyah-measure-")
     engine = create_async_engine(f"sqlite+aiosqlite:///{workdir}/measure.db")
     sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with engine.begin() as conn:
@@ -75,6 +67,24 @@ async def main(n: int, task_put_only: bool) -> None:
     today = _local_now().date()
     feeds = {"fixture.ics": FIXTURE.read_bytes(), "busy.ics": busy_calendar(today)}
     calendar_events._download = lambda url: next(body for part, body in feeds.items() if part in url)
+
+    try:
+        await _run(n, task_put_only, today, sessions)
+    finally:
+        await engine.dispose()
+
+
+async def _run(n: int, task_put_only: bool, today: date, sessions) -> None:
+    from httpx import ASGITransport, AsyncClient
+    from sqlalchemy import select
+
+    from app.main import app
+    from app.models.planner import PlannerCalendarFeed
+    from app.models.user import User
+    from app.schemas.snapshot import Snapshot
+    from app.services import calendar_events
+    from app.services.planner_import import import_snapshot
+    from tests.sample_snapshot import sample_snapshot
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://measure") as client:
         await client.post("/api/v1/auth/register", json={"email": "m@niyyah.app", "password": "measurepass123"})
@@ -117,7 +127,11 @@ async def main(n: int, task_put_only: bool) -> None:
                 if i >= 3:
                     samples.append(ms)
             report(label, samples)
-    await engine.dispose()
+
+
+async def main(n: int, task_put_only: bool) -> None:
+    with tempfile.TemporaryDirectory(prefix="niyyah-measure-") as workdir:
+        await measure(n, task_put_only, workdir)
 
 
 if __name__ == "__main__":
