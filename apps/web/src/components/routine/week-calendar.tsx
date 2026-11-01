@@ -318,14 +318,14 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   }
   const endDrag = () => { drag.current = null; setOver(null); };
   /** Own items go anywhere; a calendar event keeps its kind (timed stays timed, all day stays all day). */
-  const accepts = (allDayRow: boolean) => !!drag.current && (drag.current.item.kind === "task" || drag.current.allDay === allDayRow);
+  const accepts = (allDayRow: boolean, d: Drag | null = drag.current): d is Drag => !!d && (d.item.kind === "task" || d.allDay === allDayRow);
 
   function dropTimed(e: React.DragEvent<HTMLDivElement>, day: string) {
     e.preventDefault();
     setOver(null);
     const d = drag.current;
     drag.current = null;
-    if (!d || !accepts(false)) return;
+    if (!accepts(false, d)) return;
     const duration = d.duration || 60;
     const start = Math.min(1440 - duration, Math.max(0, snap(minuteAt(e.currentTarget, e.clientY) - d.grab)));
     if (d.item.kind === "task") return changeTask(items.patch(d.item, { day, start_min: start, end_min: start + duration }));
@@ -337,7 +337,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     setOver(null);
     const d = drag.current;
     drag.current = null;
-    if (!d || !accepts(true)) return;
+    if (!accepts(true, d)) return;
     if (d.item.kind === "event") { if (d.day !== day) void changeEvent(() => vaultApi.moveEvent(d.item.event_id as string, { day })); return; }
     const task = d.item;
     if (!d.allDay && d.day === day) return changeTask(items.patch(task, { start_min: null, end_min: null }));
