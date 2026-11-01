@@ -375,6 +375,13 @@ class CalendarEventResponse(BaseModel):
     end_min: int | None
 
 
+class CalendarEventEntry(CalendarEventResponse):
+    """An event read from a feed."""
+    uid: str | None = None  # the iCal UID (Google: iCalUID)
+    instance: str | None = None  # one occurrence of a repeating event: its original start
+    key: str | None = None  # names the event for overlays: uid, uid|instance, or t|title|day|start without a UID
+
+
 class CalendarEventIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     start: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")  # local HH:MM
@@ -403,7 +410,7 @@ class GoogleConnectResponse(BaseModel):
 
 
 class CalendarEventsResponse(BaseModel):
-    events: list[CalendarEventResponse]
+    events: list[CalendarEventEntry]
     errors: list[str]
 
 
@@ -572,3 +579,93 @@ class HabitFieldsIn(BaseModel):
 class HabitCheckIn(BaseModel):
     day: date
     level: str | None = None
+
+
+# --- Items: own tasks and annotated calendar events ------------------------------------------------------------
+
+ItemStatus = Literal["open", "done", "skipped"]
+
+
+class ItemFieldsIn(BaseModel):
+    """What a user can add to any item, own or calendar. Only the fields sent change. Tags may also be typed as #word in the notes."""
+    status: ItemStatus | None = None
+    weight: int | None = Field(default=None, ge=0, le=3)
+    stream: str | None = None  # null takes the item out of its stream
+    products: list[str] | None = Field(default=None, max_length=12)
+    description: str | None = Field(default=None, max_length=4000)
+    checklist: list[ChecklistItemIn] | None = Field(default=None, max_length=50)
+
+
+class ItemCreateIn(ItemFieldsIn):
+    day: date
+    text: str = Field(min_length=1, max_length=300)
+    start_min: int | None = Field(default=None, ge=0, le=1440)  # both omitted = all day
+    end_min: int | None = Field(default=None, ge=0, le=1440)
+
+
+class ItemPatchIn(ItemFieldsIn):
+    text: str | None = Field(default=None, min_length=1, max_length=300)
+    day: date | None = None  # reschedules: sets the scheduled date, leaves due and start dates alone
+    start_min: int | None = Field(default=None, ge=0, le=1440)  # send both null to make it all day
+    end_min: int | None = Field(default=None, ge=0, le=1440)
+
+
+class OverlayIn(ItemFieldsIn):
+    key: str = Field(min_length=1, max_length=400)  # the event's `key` from GET /vault/items
+    title: str | None = Field(default=None, max_length=300)  # cached for orphans and exports; the feed's title always shows
+    calendar: str | None = Field(default=None, max_length=120)
+    day: date | None = None  # the day the event was seen on
+
+
+class ItemResponse(BaseModel):
+    """One item on one day. Own items (`kind` task) have an `id`; calendar items (`kind` event) a `key` and the feed's fields."""
+    kind: Literal["task", "event"]
+    id: int | None = None
+    key: str | None = None
+    day: date | None
+    title: str
+    status: ItemStatus
+    done: bool
+    weight: int
+    stream: str | None
+    products: list[str]
+    description: str
+    checklist: list[ChecklistItem]
+    all_day: bool
+    start_min: int | None
+    end_min: int | None
+    # own items
+    due_on: date | None = None
+    scheduled_on: date | None = None
+    start_on: date | None = None
+    path: str | None = None
+    # calendar items
+    annotated: bool | None = None
+    event_id: str | None = None  # Google event id, for moving or deleting through /vault/events
+    uid: str | None = None
+    instance: str | None = None
+    calendar: str | None = None
+    color: str | None = None
+    location: str | None = None
+    meeting_url: str | None = None
+
+
+class OverlayResponse(BaseModel):
+    key: str
+    calendar: str
+    title: str
+    day: date | None
+    annotated: bool
+    status: ItemStatus
+    done: bool
+    weight: int
+    stream: str | None
+    products: list[str]
+    description: str
+    checklist: list[ChecklistItem]
+
+
+class ItemsResponse(BaseModel):
+    items: list[ItemResponse]  # by day, all day first, then by start
+    orphans: list[OverlayResponse]  # annotations whose event no longer shows, only claimed when every feed was read
+    errors: list[str]
