@@ -1,7 +1,8 @@
 """Per-user planner data: what the vault notes hold, as rows. Every table is scoped by user_id."""
 import datetime as dt
 
-from sqlalchemy import JSON, Boolean, Date, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -28,6 +29,36 @@ class Task(Base):
     products: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # tags, typed as #word in the text
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)  # details, like a Plan item's
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Item fields. Every one has a database default, so an older image that does not know them can still insert a task.
+    start_min: Mapped[int | None] = mapped_column(Integer, nullable=True)  # minutes from midnight on scheduled_on; None = all day
+    end_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weight: Mapped[int] = mapped_column(SmallInteger, default=0, server_default=sql_text("0"), nullable=False)  # 0-3
+    # open | done | skipped. `done` stays the source of truth older code writes: when the two disagree, `done` wins.
+    status: Mapped[str] = mapped_column(String(10), default="open", server_default="open", nullable=False)
+    checklist: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)  # sub-tasks [{"id", "text", "done"}]
+
+
+class EventOverlay(Base):
+    """What the user added to one calendar event: status, weight, stream, tags, notes, sub-tasks. Title and time stay the feed's.
+
+    `event_key` names the event across feeds and re-imports: the iCal UID, plus `|<original start>` for one occurrence of a
+    repeating event (see calendar_events.event_key). `title`, `day` and `source_calendar` are cached from the last write.
+    """
+    __tablename__ = "planner_event_overlays"
+    __table_args__ = (UniqueConstraint("user_id", "event_key", name="uq_planner_event_overlay_user_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    event_key: Mapped[str] = mapped_column(String(400), nullable=False)
+    source_calendar: Mapped[str] = mapped_column(String(120), default="", server_default="", nullable=False)
+    title: Mapped[str] = mapped_column(String(300), default="", server_default="", nullable=False)
+    day: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(10), default="open", server_default="open", nullable=False)
+    weight: Mapped[int] = mapped_column(SmallInteger, default=0, server_default=sql_text("0"), nullable=False)
+    stream: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    products: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", server_default="", nullable=False)
+    checklist: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)
 
 
 class LogEntry(Base):
