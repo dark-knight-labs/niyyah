@@ -9,6 +9,7 @@ import { fmtDay } from "@/lib/week";
 import { Checklist } from "@/components/planner/checklist";
 import { EditableRow } from "@/components/routine/editable-row";
 import type { Week } from "@/components/routine/week-calendar";
+import { itemRef } from "@/lib/items";
 
 const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
 
@@ -60,12 +61,12 @@ export function ThisWeek({ quarter, objectives, week, goals, onChanged, onTick }
                   {tasks.length > 0 && (
                     <ul className="mt-0.5 grid gap-px pl-6">
                       {tasks.map(({ day, task }) => (
-                        <li key={task.line} className="flex items-start gap-1.5 text-xs">
-                          <button type="button" aria-pressed={task.done} aria-label={`${task.done ? "Not done" : "Done"}: ${task.text}`}
-                            onClick={() => void vaultApi.setTask(task, !task.done).then(() => { week.reloadTasks(); onChanged(); })}
+                        <li key={itemRef(task)} className="flex items-start gap-1.5 text-xs">
+                          <button type="button" aria-pressed={task.done} aria-label={`${task.done ? "Not done" : "Done"}: ${task.title}`}
+                            onClick={() => void week.items.patch(task, { status: task.done ? "open" : "done" }).then((ok) => ok && onChanged())}
                             className="grid h-4 w-4 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${task.done ? "bg-[var(--accent)]" : ""}`} /></button>
                           <span className="w-7 shrink-0 font-mono tabular-nums text-[var(--muted-foreground)]">{fmtDay(day, { weekday: "short" })}</span>
-                          <span className={`min-w-0 break-words ${task.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{task.text}</span>
+                          <button type="button" onClick={() => week.setPicked(itemRef(task))} title="Open details" className={`min-w-0 break-words text-left hover:underline ${task.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{task.title}</button>
                         </li>
                       ))}
                     </ul>

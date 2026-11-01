@@ -1,8 +1,8 @@
 import type { ChecklistItemData, ItemData, ItemFields, OverlayData } from "@/lib/vault-types";
 
-/** One handle for an item wherever it shows: own items by id, calendar items by key and day (a repeating event has one key per occurrence). */
+/** One handle for an item on one day: own items by id, calendar items by key (one per occurrence), both with the day, since a task can show on several days and an event can span several. */
 export function itemRef(item: Pick<ItemData, "kind" | "id" | "key" | "day">): string {
-  return item.kind === "task" ? `t:${item.id}:${item.day}` : `e:${item.key}`;
+  return item.kind === "task" ? `t:${item.id}:${item.day}` : `e:${item.key}:${item.day}`;
 }
 
 export const isTimed = (i: ItemData) => !i.all_day && i.start_min !== null && i.end_min !== null;

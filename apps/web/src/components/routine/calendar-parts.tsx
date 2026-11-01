@@ -2,8 +2,11 @@
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { parseQuick } from "@/lib/items";
+import { formatMinutes } from "@/lib/routine";
 import { vaultApi } from "@/lib/vault-api";
 import { StreamMeta } from "@/lib/streams";
+import type { ItemCreate } from "@/lib/vault-types";
 import { fmtDay } from "@/lib/week";
 
 const INPUT = "min-h-9 min-w-0 rounded-none border border-[var(--border)] bg-[var(--surface)] px-3.5 text-small placeholder:text-[var(--muted-foreground)]";
@@ -88,8 +91,19 @@ export function meetingName(url: string): string {
   return "call";
 }
 
-/** Add a task (any date, optionally in a stream) or a Google Calendar event (any date, start to end). The date starts on today. */
-export function QuickAdd({ day, connected, streams, onAdded }: { day: string; connected: boolean; streams: StreamMeta[]; onAdded: () => void }) {
+/** What a quick-add line will make: day, time (or all day) and tags, and a word when a typed time was not understood. */
+function quickPreview(text: string, date: string): string {
+  const p = parseQuick(text);
+  if (!p.title) return "Type a title. Add #tags and a time like 14:00-15:00 (or 14:00 45m). No time means all day.";
+  const when = p.start !== null && p.end !== null ? `${formatMinutes(p.start)}–${formatMinutes(Math.min(1439, p.end))}` : "all day";
+  return `→ ${date ? fmtDay(date, { weekday: "short", day: "numeric", month: "short" }) : "pick a day"} · ${when}${p.tags.length ? ` · ${p.tags.map((t) => `#${t}`).join(" ")}` : ""}${p.bad ? " · time not understood, added as all day" : ""}`;
+}
+
+/**
+ * Add an item or a Google Calendar event. An item is one line: `#tag` words become tags, `14:00-15:00` or `14:00 45m` makes it
+ * timed and no time means all day; the date starts on the visible day. An event (any date, start to end) goes to Google.
+ */
+export function QuickAdd({ day, connected, streams, onCreate, onAdded }: { day: string; connected: boolean; streams: StreamMeta[]; onCreate: (item: ItemCreate) => Promise<boolean>; onAdded: () => void }) {
   const [kind, setKind] = useState<"task" | "event">("task");
   const [title, setTitle] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
@@ -100,6 +114,7 @@ export function QuickAdd({ day, connected, streams, onAdded }: { day: string; co
   const [error, setError] = useState<string | null>(null);
   const event = kind === "event";
   const date = picked ?? day;
+  const parsed = parseQuick(title);
 
   function changeStart(value: string) {
     setStart(value);
@@ -109,12 +124,15 @@ export function QuickAdd({ day, connected, streams, onAdded }: { day: string; co
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const text = title.trim();
-    if (!text || !date) return;
+    if (!text || !date || (!event && !parsed.title)) return;
     setBusy(true);
     setError(null);
     try {
       if (event) await vaultApi.addEvent(date, { title: text, start, end, location: null });
-      else await vaultApi.addTask(date, text, stream);
+      else {
+        const timed = parsed.start !== null && parsed.end !== null ? { start_min: parsed.start, end_min: parsed.end } : {};
+        if (!(await onCreate({ day: date, text: parsed.title, products: parsed.tags, stream, ...timed }))) throw new Error("Could not add the item.");
+      }
       setTitle("");
       onAdded();
     } catch (err) {
@@ -132,7 +150,8 @@ export function QuickAdd({ day, connected, streams, onAdded }: { day: string; co
         <button type="button" aria-pressed={!event} onClick={() => setKind("task")} className={KIND}>Task</button>
         <button type="button" aria-pressed={event} disabled={!connected} title={connected ? undefined : "Connect Google Calendar to add events"} onClick={() => setKind("event")} className={KIND}>Event</button>
       </span>
-      <input id="quick-add-title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }} maxLength={event ? 200 : 300} placeholder={event ? "New event" : "New task #tag"} aria-label={event ? "Event title" : "Task title"}
+      <input id="quick-add-title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }} maxLength={event ? 200 : 300}
+        placeholder={event ? "New event" : "New task #tag 14:00-15:00"} aria-label={event ? "Event title" : "Task title"} aria-describedby={event ? undefined : "quick-add-preview"}
         className="min-h-8 min-w-[8rem] flex-1 border border-[var(--border)] bg-[var(--surface)] px-2.5 text-small placeholder:text-[var(--muted-foreground)]" />
       <input type="date" value={date} onChange={(e) => setPicked(e.target.value || null)} aria-label="Date" className={`${FIELD} w-[9.5rem]`} />
       {event ? (
@@ -146,7 +165,8 @@ export function QuickAdd({ day, connected, streams, onAdded }: { day: string; co
           {streams.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
       )}
-      <button type="submit" disabled={busy || !title.trim() || !date || (event && (!start || !end))} aria-label={`Add ${kind}`} className="inline-flex min-h-8 items-center gap-1 bg-[var(--accent)] px-3 text-xs font-bold text-[var(--accent-fg)] disabled:opacity-50"><Plus size={13} aria-hidden="true" />Add</button>
+      <button type="submit" disabled={busy || !title.trim() || !date || (event ? !start || !end : !parsed.title)} aria-label={`Add ${kind}`} className="inline-flex min-h-8 items-center gap-1 bg-[var(--accent)] px-3 text-xs font-bold text-[var(--accent-fg)] disabled:opacity-50"><Plus size={13} aria-hidden="true" />Add</button>
+      {!event && title.trim() && <p id="quick-add-preview" aria-live="polite" className={`w-full font-mono text-micro ${parsed.bad ? "text-[var(--warn)]" : "text-[var(--muted-foreground)]"}`}>{quickPreview(title, date)}</p>}
       {error && <p role="alert" className="w-full text-xs text-[var(--destructive)]">{error}</p>}
     </form>
   );
