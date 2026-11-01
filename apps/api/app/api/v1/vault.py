@@ -640,7 +640,7 @@ async def get_items(from_: date = Query(alias="from"), to: date = Query(), user:
     items = await planner_items.tasks_in_range(db, user.id, from_, to)
     items += [planner_items.event_item(e, by_key.get(e["key"])) for e in read.events]
     items.sort(key=lambda i: (i["day"], not i["all_day"], i["start_min"] or 0))
-    orphans, to_check = planner_items.orphan_candidates(overlays, {e["key"] for e in read.events}, read.errors, read.uids, from_, to)
+    orphans, to_check = planner_items.orphan_candidates(overlays, {e["key"] for e in read.events}, read.errors, read.uids, from_, to, len(feeds))
     google_feed = cred is not None and any((f["email"] or "").lower() == cred.email.lower() for f in feeds)
     if to_check and google_feed:
         asked = to_check[:planner_items.MAX_ORPHAN_LOOKUPS]

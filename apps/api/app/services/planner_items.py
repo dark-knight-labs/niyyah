@@ -106,11 +106,12 @@ def key_uid(key: str) -> str | None:
     return uid if sep and instance[:8].isdigit() else key
 
 
-def orphan_candidates(overlays: list[EventOverlay], seen: set[str], errors: list[str], uids: set[str], first: date, last: date) -> tuple[list[EventOverlay], list[EventOverlay]]:
-    """(orphans, to_check). An overlay is only in question when every feed was read, it was last seen in the range and its key
-    did not show. A UID a feed still holds (the event moved, or another occurrence shows) is not an orphan; one no read
-    feed holds goes to `to_check` (the caller asks Google, if one is connected) or is an orphan."""
-    if errors:
+def orphan_candidates(overlays: list[EventOverlay], seen: set[str], errors: list[str], uids: set[str], first: date, last: date,
+                      feed_count: int) -> tuple[list[EventOverlay], list[EventOverlay]]:
+    """(orphans, to_check). An overlay is only in question when there are feeds and every one was read, it was last seen in
+    the range and its key did not show. A UID a feed still holds (the event moved, or another occurrence shows) is not an
+    orphan; one no read feed holds goes to `to_check` (the caller asks Google, if one is connected) or is an orphan."""
+    if errors or not feed_count:
         return [], []
     orphans, to_check = [], []
     for overlay in overlays:
