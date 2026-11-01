@@ -8,6 +8,12 @@ import {
   HabitFields,
   HabitLevel,
   HabitsData,
+  ItemCreate,
+  ItemData,
+  ItemPatch,
+  ItemsData,
+  OverlayData,
+  OverlayIn,
   ScheduleConfigIn,
   VaultBlocksSeriesData,
   VaultDayData,
@@ -116,4 +122,13 @@ export const vaultApi = {
   removeHabit: (id: number) => api.delete<HabitsData>(`/vault/habits/${id}`),
   checkHabit: (id: number, day: string, level: HabitLevel | null) => api.put<HabitsData>(`/vault/habits/${id}/check`, { day, level }),
   status: () => api.get<DaysStatusData>("/vault/status"),
+  /** Own items and calendar events from `from` to `to` (YYYY-MM-DD, at most 14 days). */
+  items: (from: string, to: string) => api.get<ItemsData>(`/vault/items?from=${from}&to=${to}`),
+  addItem: (item: ItemCreate) => api.post<ItemData>("/vault/items", item),
+  patchItem: (id: number, change: ItemPatch) => api.patch<ItemData>(`/vault/items/${id}`, change),
+  /** Move an own item off `fromDay` the way a task drag always has: its due, scheduled and start dates on that day follow it. */
+  moveItem: (id: number, fromDay: string, toDay: string) => api.put<VaultEditData>("/vault/tasks/move", { line: id, from_day: fromDay, to_day: toDay }),
+  removeItem: (id: number) => api.delete(`/vault/items/${id}`),
+  /** Annotate a calendar event by its key; the first write creates its annotation. */
+  annotate: (overlay: OverlayIn) => api.put<OverlayData>("/vault/items/overlay", overlay),
 };

@@ -311,3 +311,103 @@ export interface HabitFields {
   /** Demote although the gate is not met. */
   force?: boolean;
 }
+
+/** Open, done or skipped: what happened to an item. */
+export type ItemStatus = "open" | "done" | "skipped";
+
+/**
+ * One item on one day: an own task (`kind` "task", with an `id`) or a calendar event (`kind` "event", with a `key`).
+ * No start/end means all day. An event's title and time come from its calendar; the rest is the user's annotation.
+ */
+export interface ItemData {
+  kind: "task" | "event";
+  id: number | null;
+  key: string | null;
+  day: string | null;
+  title: string;
+  status: ItemStatus;
+  done: boolean;
+  /** 0-3. */
+  weight: number;
+  stream: string | null;
+  /** Tags. */
+  products: string[];
+  /** Notes. */
+  description: string;
+  /** Sub-tasks. */
+  checklist: ChecklistItemData[];
+  all_day: boolean;
+  start_min: number | null;
+  end_min: number | null;
+  // own items
+  due_on?: string | null;
+  scheduled_on?: string | null;
+  start_on?: string | null;
+  path?: string | null;
+  // calendar items
+  annotated?: boolean | null;
+  /** Google event id, for moving or deleting through /vault/events. */
+  event_id?: string | null;
+  calendar?: string | null;
+  color?: string | null;
+  location?: string | null;
+  meeting_url?: string | null;
+}
+
+/** A calendar event's annotation, as PUT /vault/items/overlay returns it. */
+export interface OverlayData {
+  key: string;
+  calendar: string;
+  title: string;
+  day: string | null;
+  annotated: boolean;
+  status: ItemStatus;
+  done: boolean;
+  weight: number;
+  stream: string | null;
+  products: string[];
+  description: string;
+  checklist: ChecklistItemData[];
+}
+
+export interface ItemsData {
+  /** By day, all day first, then by start. */
+  items: ItemData[];
+  /** Annotations whose event no longer shows. */
+  orphans: OverlayData[];
+  errors: string[];
+}
+
+/** What a user can change on any item, own or calendar. Only the fields sent change. */
+export interface ItemFields {
+  status?: ItemStatus;
+  weight?: number;
+  stream?: string | null;
+  products?: string[];
+  description?: string;
+  checklist?: ChecklistLine[];
+}
+
+export interface ItemCreate extends ItemFields {
+  day: string;
+  text: string;
+  /** Both left out = all day. */
+  start_min?: number;
+  end_min?: number;
+}
+
+export interface ItemPatch extends ItemFields {
+  text?: string;
+  /** Reschedules: sets the scheduled date, leaves due and start dates alone. */
+  day?: string;
+  /** Send both null to make it all day. */
+  start_min?: number | null;
+  end_min?: number | null;
+}
+
+export interface OverlayIn extends ItemFields {
+  key: string;
+  title?: string;
+  calendar?: string;
+  day?: string;
+}
