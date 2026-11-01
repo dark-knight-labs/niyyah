@@ -38,6 +38,12 @@ from app.schemas.vault import (
     GoalsResponse,
     GoogleConnectResponse,
     GoogleStatusResponse,
+    ItemCreateIn,
+    ItemPatchIn,
+    ItemResponse,
+    ItemsResponse,
+    OverlayIn,
+    OverlayResponse,
     HabitCheckIn,
     HabitFieldsIn,
     HabitIn,
@@ -85,8 +91,8 @@ from app.schemas.vault import (
     VaultWeekResponse,
     VoteIn,
 )
-from app.services import google_calendar, planner_blocks, planner_config, planner_day, planner_habits, planner_store, planner_work
-from app.services.calendar_events import events_for_day
+from app.services import google_calendar, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_store, planner_work
+from app.services.calendar_events import events_for_day, events_for_range, fixture_feeds
 from app.services.google_calendar import GoogleCalendarError
 from app.services.planner_views import notebooks_response, objectives_response, pipelines_response, quarter_response
 from app.services.rules import quarter_for, week_for
@@ -458,17 +464,24 @@ async def _credential(db: AsyncSession, user: User) -> GoogleCredential | None:
     return (await db.execute(select(GoogleCredential).where(GoogleCredential.user_id == user.id))).scalar_one_or_none()
 
 
-@router.get("/day/{day}/events", response_model=CalendarEventsResponse)
-async def get_day_events(day: date, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """The day's events from the user's calendar feeds.
-
-    The feed matching the connected Google account is read through the Calendar API (fresh), the rest via iCal."""
+async def _event_sources(db: AsyncSession, user: User) -> tuple[list[dict], tuple | None, GoogleCredential | None]:
+    """(feeds, google, credential) to read events from. The feed matching the connected Google account is read through the
+    Calendar API (fresh), the rest via iCal. In development a CALENDAR_FIXTURE_FILE replaces all of them."""
+    fixture = fixture_feeds(settings)
+    if fixture:
+        return fixture, None, None
     cred = await _credential(db, user)
     google = None
     if cred:
         refresh = cred.refresh_token
         google = (cred.email, lambda start, end: google_calendar.list_events(google_calendar.access_token(refresh), start, end))
-    feeds = await planner_store.calendar_feeds(db, user.id)
+    return await planner_store.calendar_feeds(db, user.id), google, cred
+
+
+@router.get("/day/{day}/events", response_model=CalendarEventsResponse)
+async def get_day_events(day: date, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """The day's events from the user's calendar feeds."""
+    feeds, google, _ = await _event_sources(db, user)
     events, errors = await asyncio.to_thread(events_for_day, day, settings.app_timezone, feeds, google)
     return {"events": events, "errors": errors}
 
@@ -590,6 +603,96 @@ async def delete_event(event_id: str, user: User = Depends(get_current_user), db
     except GoogleCalendarError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     return {"ok": True}
+
+
+# --- Items: own tasks and annotated calendar events, over a range of days -----------------------------------------
+
+def _google_holds(cred: GoogleCredential, uids: list[str]) -> set[str]:
+    """Which of `uids` the connected Google calendar still has (any date). A failed lookup counts as held: never a false orphan."""
+    held = set()
+    try:
+        token = google_calendar.access_token(cred.refresh_token)
+    except GoogleCalendarError:
+        return set(uids)
+    for uid in uids:
+        try:
+            if google_calendar.has_ical_uid(token, uid):
+                held.add(uid)
+        except GoogleCalendarError:
+            held.add(uid)
+    return held
+
+
+@router.get("/items", response_model=ItemsResponse)
+async def get_items(from_: date = Query(alias="from"), to: date = Query(), user: User = Depends(get_current_user),
+                    db: AsyncSession = Depends(get_db)):
+    """Own items and calendar events (with the user's annotations) from `from` to `to`, at most 14 days.
+
+    Each calendar is read once for the whole range; one that fails is named in `errors` and the rest still show."""
+    try:
+        planner_items.check_range(from_, to)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    feeds, google, cred = await _event_sources(db, user)
+    read = await asyncio.to_thread(events_for_range, from_, to, settings.app_timezone, feeds, google)
+    overlays = await planner_items.overlays_for(db, user.id)
+    by_key = {o.event_key: o for o in overlays}
+    items = await planner_items.tasks_in_range(db, user.id, from_, to)
+    items += [planner_items.event_item(e, by_key.get(e["key"])) for e in read.events]
+    items.sort(key=lambda i: (i["day"], not i["all_day"], i["start_min"] or 0))
+    orphans, to_check = planner_items.orphan_candidates(overlays, {e["key"] for e in read.events}, read.errors, read.uids, from_, to, len(feeds))
+    google_feed = cred is not None and any((f["email"] or "").lower() == cred.email.lower() for f in feeds)
+    if to_check and google_feed:
+        asked = to_check[:planner_items.MAX_ORPHAN_LOOKUPS]
+        held = await asyncio.to_thread(_google_holds, cred, sorted({planner_items.key_uid(o.event_key) for o in asked}))
+        orphans += [o for o in asked if planner_items.key_uid(o.event_key) not in held]
+    elif to_check:
+        orphans += to_check
+    return {"items": items, "orphans": [planner_items.overlay_out(o) for o in orphans], "errors": read.errors}
+
+
+async def _item_run(db: AsyncSession, work):
+    """`_db_run`, with an item that is not the user's (or gone) as a 404."""
+    try:
+        return await _db_run(db, work)
+    except planner_items.ItemNotFound as exc:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+def _item_fields(data) -> dict:
+    return data.model_dump(exclude_unset=True)
+
+
+@router.post("/items", response_model=ItemResponse, status_code=201)
+async def post_item(data: ItemCreateIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Add an own item on `day`. `#word`s in the text become tags; no start_min/end_min = all day."""
+    _check_task_day(data.day)
+    task = await _item_run(db, lambda: planner_items.create_item(db, user.id, data.day, _item_fields(data), _local_now().date()))
+    return planner_items.written_task(task)
+
+
+@router.patch("/items/{item_id}", response_model=ItemResponse)
+async def patch_item(item_id: int, data: ItemPatchIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Change an own item: only the fields sent. A time needs a scheduled day (send `day` with it for a task that has none)."""
+    if data.day is not None:
+        _check_task_day(data.day)
+    task = await _item_run(db, lambda: planner_items.update_item(db, user.id, item_id, _item_fields(data), _local_now().date()))
+    return planner_items.written_task(task)
+
+
+@router.delete("/items/{item_id}", status_code=204)
+async def delete_item(item_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _item_run(db, lambda: planner_items.remove_item(db, user.id, item_id))
+
+
+@router.put("/items/overlay", response_model=OverlayResponse)
+async def put_item_overlay(data: OverlayIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Annotate a calendar event by its key (status, weight, stream, tags, notes, sub-tasks). Its title and time stay the feed's."""
+    fields = _item_fields(data)
+    key = fields.pop("key")
+    overlay = await _item_run(db, lambda: planner_items.upsert_overlay(db, user.id, key, fields))
+    return planner_items.overlay_out(overlay)
 
 
 # --- Quarter, streams, weekly objectives and pipelines ------------------------------------------------------------

@@ -164,7 +164,8 @@ async def test_super_objective_and_streams(db_client):
                                                               "checkpoints": {"nov": "DNS live", "oct": "Router done"}})
     studio = next(s for s in changed.json()["streams"] if s["stream"] == "studio")
     assert (studio["name"], studio["color"], studio["weekly"]) == ("Studio Hosting", "teal", False)
-    assert [(c["month"], c["text"]) for c in studio["checkpoints"]] == [("oct", "Router done"), ("nov", "DNS live")]
+    # The current month is listed first, so the order depends on today's date; compare as a set.
+    assert {(c["month"], c["text"]) for c in studio["checkpoints"]} == {("oct", "Router done"), ("nov", "DNS live")}
     assert (await client.put(f"{V}/quarter/stream", json={"stream": "studio", "color": "plaid"})).status_code == 422
     assert (await client.put(f"{V}/quarter/stream", json={"stream": "sleep", "name": "x"})).status_code == 422
     added = await client.post(f"{V}/quarter/stream", json={"stream": "errands", "name": "Errands", "goal": "Clear the list"})

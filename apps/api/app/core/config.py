@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Comma-separated "module:Class" plugins to load, in addition to installed packages that register a "niyyah.plugins" entry point.
     plugins: str = ""
 
+    # Development and tests only: a local .ics file read in place of every calendar feed (ignored when APP_ENV=production).
+    calendar_fixture_file: str = ""
+
     # For tests, swap asyncpg → aiosqlite
     test_database_url: str = "sqlite+aiosqlite:///./test.db"
 

@@ -44,7 +44,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: alembic upgrade head
+      # Up, back one step and up again: the newest migration must also reverse cleanly.
+      - run: alembic upgrade head && alembic downgrade -1 && alembic upgrade head && alembic current
         env:
           DATABASE_URL: postgresql+asyncpg://niyyah:niyyah@localhost:5432/niyyah
           APP_ENV: development

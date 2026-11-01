@@ -137,10 +137,25 @@ def insert_event(token: str, title: str, start: datetime, end: datetime, tz: str
     return _api("POST", token, json=body)
 
 
+MAX_PAGES = 5
+
+
 def list_events(token: str, day_start: datetime, day_end: datetime) -> list[dict]:
-    """Events overlapping [day_start, day_end), recurrences expanded, in start order."""
+    """Events overlapping [day_start, day_end), recurrences expanded, in start order. Follows nextPageToken, at most MAX_PAGES pages."""
     params = {"timeMin": day_start.isoformat(), "timeMax": day_end.isoformat(), "singleEvents": "true", "orderBy": "startTime", "maxResults": "250"}
-    return _api("GET", token, params=params).get("items", [])
+    items: list[dict] = []
+    for _ in range(MAX_PAGES):
+        page = _api("GET", token, params=params)
+        items += page.get("items", [])
+        if not page.get("nextPageToken"):
+            break
+        params = {**params, "pageToken": page["nextPageToken"]}
+    return items
+
+
+def has_ical_uid(token: str, uid: str) -> bool:
+    """Whether the primary calendar still holds an event with this iCal UID, on any date."""
+    return bool(_api("GET", token, params={"iCalUID": uid, "maxResults": "1"}).get("items"))
 
 
 def move_event(token: str, event_id: str, start: datetime | date, end: datetime | date, tz: str) -> dict:

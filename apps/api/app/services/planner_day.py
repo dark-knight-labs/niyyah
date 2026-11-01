@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.models.planner import LogEntry, QuarterStream, Task
 from app.models.vault import VaultBlockVote, VaultDay
 from app.services import planner_blocks
-from app.services.rules import MODE_META, line_hash, one_line_note, possible_for_count, split_tags, MAX_DESCRIPTION_CHARS
+from app.services.rules import MODE_META, clean_status, line_hash, one_line_note, possible_for_count, split_tags, MAX_DESCRIPTION_CHARS
 
 TASK_GONE = "this task no longer exists; reload and try again"
 LOG_GONE = "this log entry changed; reload and try again"
@@ -155,10 +155,15 @@ async def add_task(db, user_id: int, day: date, text: str, stream: str | None = 
     return row
 
 
+def set_status(task: Task, status: str, today: date) -> None:
+    """The one place a task's status changes: `done` and `done_on` follow it (a skipped task has no done_on)."""
+    task.status = clean_status(status)
+    task.done = status == "done"
+    task.done_on = today if task.done else None
+
+
 async def set_task_done(db, user_id: int, task_id: int, done: bool, today: date) -> None:
-    task = await _task(db, user_id, task_id)
-    task.done = done
-    task.done_on = today if done else None
+    set_status(await _task(db, user_id, task_id), "done" if done else "open", today)
 
 
 async def set_task_text(db, user_id: int, task_id: int, text: str) -> None:
