@@ -414,3 +414,6 @@ h1, h2, h3 {
 @media (prefers-reduced-motion: reduce) {
   .niy-cb *, .niy-cb.pulse *, .niy-flash, .niy-bump { animation: none !important; transition: none !important; }
 }
+
+/* Calendar tag filter: items that do not carry the picked tag fade back in every view (unlayered, so it wins over utilities and inline SVG opacity). */
+[data-dimmed="true"] { opacity: 0.22 !important; }

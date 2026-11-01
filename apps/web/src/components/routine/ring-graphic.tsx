@@ -47,6 +47,8 @@ export interface RingGraphicProps {
   hideInnerLane?: boolean;
   /** Text in the middle instead of the clock and the line under it: a big first line, smaller ones under it. */
   centreText?: { big: string; lines: string[]; accent?: boolean };
+  /** Radius of the hour numbers (default just inside the band), so item lanes can sit between. */
+  hourRadius?: number;
   /** Drawn above the slices' hit areas and under the now marker: item lanes, for instance. */
   overlay?: React.ReactNode;
 }
@@ -103,7 +105,7 @@ export function RingGraphic(p: RingGraphicProps) {
       })}
 
       {!p.mini && [0, 6, 12, 18].map((h) => {
-        const [x, y] = g.point(r - t / 2 - 12 - (p.sideLabels ? 4 : 0), h * 60);
+        const [x, y] = g.point(p.hourRadius ?? r - t / 2 - 12 - (p.sideLabels ? 4 : 0), h * 60);
         return <text key={h} x={x} y={y + 4} textAnchor="middle" fontSize={p.sideLabels ? 12 : (p.labelSize ?? 11) - 1} fill="var(--muted-foreground)">{String(h).padStart(2, "0")}</text>;
       })}
       {/* reserved inner lane for calendar events */}

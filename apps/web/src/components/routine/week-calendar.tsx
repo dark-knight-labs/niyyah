@@ -387,7 +387,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const sel = week.selected;
   const tick = (t: ItemData) => changeTask(items.patch(t, { status: t.done ? "open" : "done" }));
   const finished = (t: ItemData) => t.status !== "open";
-  const dim = (i: ItemData) => (dimmed?.(i) ? { "data-dimmed": "true", className: " opacity-25" } : { "data-dimmed": undefined, className: "" });
+  const dim = (i: ItemData) => ({ "data-dimmed": dimmed?.(i) ? "true" : undefined });
 
   return (
     <div>
@@ -418,7 +418,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                   return (
                     <div key={ref} role="button" tabIndex={0} data-item={ref} draggable={!!e.event_id} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={endDrag}
                       onClick={() => pick(e)} onKeyDown={(k) => k.key === "Enter" && pick(e)} title={eventTip(day, e, e.event_id ? "Drag to another day to move" : "Read-only calendar")} aria-pressed={picked === ref} data-dimmed={dim(e)["data-dimmed"]}
-                      className={`flex items-center gap-1 border-l-2 bg-[var(--muted)] px-1.5 text-xs font-medium ${e.event_id ? "cursor-grab" : "cursor-pointer"} ${picked === ref ? "outline outline-1 outline-[var(--foreground)]" : ""} ${finished(e) ? "text-[var(--muted-foreground)] line-through" : ""}${dim(e).className}`} style={{ borderColor: e.color ?? "var(--muted-foreground)" }}>
+                      className={`flex items-center gap-1 border-l-2 bg-[var(--muted)] px-1.5 text-xs font-medium ${e.event_id ? "cursor-grab" : "cursor-pointer"} ${picked === ref ? "outline outline-1 outline-[var(--foreground)]" : ""} ${finished(e) ? "text-[var(--muted-foreground)] line-through" : ""}`} style={{ borderColor: e.color ?? "var(--muted-foreground)" }}>
                       {isPinned(eventPin(day, e)) && <Star size={10} aria-label="Important" className="shrink-0 fill-[var(--accent)] text-[var(--accent)]" />}
                       <span className="truncate">{e.title}</span>
                       <Marks item={e} />
@@ -431,7 +431,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                     <div key={ref} data-item={ref} draggable onDragStart={(ev) => startDrag(ev, t, day)} onDragEnd={endDrag}
                       title={`${t.title}${t.products.map((tag) => ` #${tag}`).join("")}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick for details · drag to another day or a time to move`}
                       data-dimmed={dim(t)["data-dimmed"]}
-                      className={`group/task flex cursor-grab items-start border border-dashed text-xs hover:bg-[var(--muted)] ${picked === ref ? "border-[var(--foreground)]" : "border-[var(--border)]"}${dim(t).className}`}>
+                      className={`group/task flex cursor-grab items-start border border-dashed text-xs hover:bg-[var(--muted)] ${picked === ref ? "border-[var(--foreground)]" : "border-[var(--border)]"}`}>
                       <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.title}`} aria-pressed={t.done} onClick={() => tick(t)}
                         className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
                       {streamOf(t) && <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" style={{ background: streamOf(t)?.color }} />}
@@ -482,7 +482,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
                   <div key={key} role="button" tabIndex={0} data-item={key} draggable={canDrag(e)} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={endDrag}
                     onPointerDown={(ev) => ev.stopPropagation()} onClick={() => pick(e)} onKeyDown={(k) => k.key === "Enter" && pick(e)}
                     aria-pressed={picked === key} title={tip} data-dimmed={dim(e)["data-dimmed"]}
-                    className={`absolute overflow-hidden border-l-2 px-1.5 py-0.5 text-left text-xs font-medium leading-[15px] ${own ? "border border-dashed" : ""} ${canDrag(e) ? "cursor-grab" : "cursor-pointer"} ${picked === key ? "z-10 outline outline-1 outline-[var(--foreground)]" : ""}${dim(e).className}`}
+                    className={`absolute overflow-hidden border-l-2 px-1.5 py-0.5 text-left text-xs font-medium leading-[15px] ${own ? "border border-dashed" : ""} ${canDrag(e) ? "cursor-grab" : "cursor-pointer"} ${picked === key ? "z-10 outline outline-1 outline-[var(--foreground)]" : ""}`}
                     style={{ top: px(e.start_min as number), height: Math.max(20, px(e.end_min as number) - px(e.start_min as number) - 2), left: `calc(${(100 * lane) / lanes}% + 2px)`, width: `calc(${100 / lanes}% - 4px)`,
                       borderColor: colour, background: `color-mix(in srgb, ${colour} ${own ? 8 : 16}%, var(--surface))` }}>
                     <span className="flex items-center gap-1">
