@@ -39,7 +39,14 @@ export function CalendarView({ week, schedule, today, nowMin, streams, google, s
   sidebar: boolean; onSidebar: () => void; onChanged: () => void; onEventsChanged: () => void;
 }) {
   const blocks = useBlocks();
-  const [view, setView] = usePref<ViewId>(VIEW_KEY, "week-grid", VIEW_IDS);
+  const [stored, setStored] = usePref<ViewId>(VIEW_KEY, "week-grid", VIEW_IDS);
+  // On a phone with no stored choice the calendar opens on one day. Decided after mount (no hydration mismatch) and never stored: the first pick replaces it.
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem(VIEW_KEY) === null && window.matchMedia("(max-width: 767px)").matches) setPhone(true); } catch { /* no storage: keep the default */ }
+  }, []);
+  const view: ViewId = phone ? "day-grid" : stored;
+  const setView = (v: ViewId) => { setPhone(false); setStored(v); };
   const [variant, setVariant] = usePref<RingVariant>(RING_KEY, "A", RING_VARIANTS);
   const [shade, setShade] = usePref<ShadeMode>(SHADE_KEY, "shade", SHADE_MODES);
   const [tag, setTag] = useState<string | null>(null);

@@ -705,6 +705,7 @@ test("public home page without a login: ring and now card, no calendar bar", asy
 
 test("phone 390px: no sideways scroll, the bar wraps, quick add preview sits under the input", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => localStorage.setItem("niy-calendar-view", "week-grid")); // the phone default is the day grid
   await openOverview(page);
   expect(await noPageScrollX(page)).toBeLessThanOrEqual(0);
   await page.locator("#quick-add-title").fill("Phone check tomorrow 14:00-15:00 #work");
@@ -717,4 +718,25 @@ test("phone 390px: no sideways scroll, the bar wraps, quick add preview sits und
   await menu(page, /^Style/);
   await page.screenshot({ path: `${OUT}/home-390-style-menu.png` });
   expect(await noPageScrollX(page)).toBeLessThanOrEqual(0);
+});
+
+test("first open with no stored view: day grid on a phone, week grid on a desktop; a stored choice wins", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(view(page)).toHaveAttribute("data-cal-view", "day-grid", { timeout: 30_000 });
+  expect(await page.evaluate(() => localStorage.getItem("niy-calendar-view"))).toBeNull(); // the default is not stored
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.reload();
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-grid", { timeout: 30_000 });
+  // A stored choice wins on a phone, and a pick on a phone sticks.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => localStorage.setItem("niy-calendar-view", "week-agenda"));
+  await page.reload();
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-agenda", { timeout: 30_000 });
+  await page.evaluate(() => localStorage.removeItem("niy-calendar-view"));
+  await page.reload();
+  await expect(view(page)).toHaveAttribute("data-cal-view", "day-grid", { timeout: 30_000 });
+  await pickView(page, "day-agenda");
+  await page.reload();
+  await expect(view(page)).toHaveAttribute("data-cal-view", "day-agenda", { timeout: 30_000 });
 });
