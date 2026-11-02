@@ -9,6 +9,7 @@ import { meetingName } from "@/components/routine/calendar-parts";
 import type { Items } from "@/hooks/use-items";
 import { isTimed, subtaskStat } from "@/lib/items";
 import { formatDuration } from "@/lib/ring";
+import { vaultApi } from "@/lib/vault-api";
 import { formatMinutes } from "@/lib/routine";
 import { StreamMeta } from "@/lib/streams";
 import type { ChecklistLine, ItemData, ItemFields, ItemStatus } from "@/lib/vault-types";
@@ -74,6 +75,8 @@ function TimeRange({ start, end, onSave }: { start: number; end: number; onSave:
 export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChanged, onMoved, stacked = false }: Props) {
   const [newTag, setNewTag] = useState("");
   const [asked, setAsked] = useState(false);
+  const [removing, setRemoving] = useState<"ask" | "busy" | null>(null);
+  const [gone, setGone] = useState<string | null>(null);
   const own = item.kind === "task";
   const day = item.day ?? "";
   const timed = isTimed(item);
@@ -85,6 +88,22 @@ export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChang
   const options = [{ value: "", label: "No stream" }, ...streams.map((s) => ({ value: s.id, label: s.label }))];
   const when = timed ? `${formatMinutes(item.start_min as number)}–${formatMinutes(item.end_min as number)} · ${formatDuration((item.end_min as number) - (item.start_min as number))}` : "All day";
   const ref = `${item.kind}-${item.id ?? item.key}-${day}`;
+
+  /** Delete a Google event (the one change a calendar item allows): asks once, then removes it from Google and reads the week again. */
+  async function removeGoogle() {
+    if (removing !== "ask") return setRemoving("ask");
+    setRemoving("busy");
+    setGone(null);
+    try {
+      await vaultApi.removeEvent(item.event_id as string);
+      onClose();
+      items.refetch();
+      onChanged?.();
+    } catch (err) {
+      setGone(err instanceof Error ? err.message : "Could not delete the event.");
+      setRemoving(null);
+    }
+  }
 
   function addTag() {
     const w = cleanTag(newTag);
@@ -166,12 +185,17 @@ export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChang
         <div className="flex flex-wrap gap-2">
           <button type="button" aria-pressed={pinned} onClick={onPin} className={`${action} ${pinned ? "text-[var(--accent)]" : ""}`}><Star size={12} aria-hidden="true" className={pinned ? "fill-[var(--accent)]" : ""} />{pinned ? "Important" : "Mark important"}</button>
           {item.meeting_url && <a href={item.meeting_url} target="_blank" rel="noopener noreferrer" className={`${action} text-[var(--accent)]`}>Join {meetingName(item.meeting_url)}</a>}
+          {!own && item.event_id && (
+            <button type="button" disabled={removing === "busy"} onClick={() => void removeGoogle()} onBlur={() => removing === "ask" && setRemoving(null)}
+              className={`${action} border-[var(--destructive)] text-[var(--destructive)]`}>{removing === "ask" ? "Confirm delete" : "Delete Google event"}</button>
+          )}
           {own && (
             <button type="button" onClick={() => (asked ? (onClose(), void items.remove(item).then(after)) : setAsked(true))} onBlur={() => setAsked(false)}
               className={`${action} border-[var(--destructive)] text-[var(--destructive)]`}>{asked ? "Confirm delete" : "Delete"}</button>
           )}
         </div>
         {!own && <p className="text-xs text-[var(--muted-foreground)]">The {item.calendar ?? "outside"} calendar stays read-only. Status, weight, stream, tags, sub-tasks and notes are kept in Niyyah against this event.</p>}
+        {gone && <p role="alert" className="text-xs text-[var(--destructive)]">{gone}</p>}
         {items.problem && <p role="alert" className="text-xs text-[var(--destructive)]">{items.problem}</p>}
       </div>
     </section>

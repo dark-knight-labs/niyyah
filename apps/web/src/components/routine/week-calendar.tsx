@@ -1,17 +1,16 @@
 "use client";
 
-import { AlignLeft, ChevronLeft, ChevronRight, ListChecks, PanelLeftClose, PanelLeftOpen, Plus, Star, TriangleAlert, X } from "lucide-react";
+import { AlignLeft, ListChecks, Plus, Star } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useItems } from "@/hooks/use-items";
 import { isTimed, itemRef, subtaskStat } from "@/lib/items";
 import { formatMinutes } from "@/lib/routine";
 import { StreamMeta } from "@/lib/streams";
-import { formatDuration } from "@/lib/ring";
 import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, ItemData } from "@/lib/vault-types";
 import { addDays, fmtDay, sundayOf, weekDays } from "@/lib/week";
 import { ItemCard } from "@/components/routine/item-card";
-import { AddEventForm, ConnectButton, meetingName, QuickAdd } from "@/components/routine/calendar-parts";
+import { AddEventForm, ConnectButton } from "@/components/routine/calendar-parts";
 
 /** The grid shows the whole day. One hour is as tall as fits the window (HOUR_PX before it is measured, never under MIN_HOUR_PX or over MAX_HOUR_PX; SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
 const HOUR_PX = 48;
@@ -23,7 +22,6 @@ const BOTTOM_GAP = 16;
 const HEADER_PX = 34;
 const SNAP = 15;
 const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
-const BTN = "inline-flex min-h-8 items-center whitespace-nowrap border border-[var(--border)] px-2.5 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] disabled:opacity-40";
 
 /** A day's calendar events and own items (tasks), each list all day first, then by start. */
 export interface DayData { events: ItemData[]; tasks: ItemData[]; }
@@ -96,80 +94,6 @@ export function useWeek(today: string | null, refreshKey: number) {
 }
 export type Week = ReturnType<typeof useWeek>;
 
-/** "18–24 Oct", or "28 Oct – 3 Nov" when the week spans two months. */
-function rangeLabel(first: string, last: string): string {
-  const month = (d: string) => fmtDay(d, { month: "short" });
-  const day = (d: string) => fmtDay(d, { day: "numeric" });
-  return month(first) === month(last) ? `${day(first)}–${day(last)} ${month(last)}` : `${day(first)} ${month(first)} – ${day(last)} ${month(last)}`;
-}
-
-/** One row: add a task or event for today, previous / the week's range / next, the sidebar and done-task switches, and a note when a calendar could not be read (with Reconnect when Google's consent expired). The range button returns to this week. */
-export function WeekToolbar({ week, streams, status, sidebar, onSidebar, onAdded }: { week: Week; streams: StreamMeta[]; status: GoogleStatusData | null; sidebar: boolean; onSidebar: () => void; onAdded: () => void }) {
-  const { days, errors } = week;
-  const doneCount = days.reduce((n, day) => n + (week.data[day]?.tasks ?? []).filter((t) => t.done).length, 0);
-  if (!days.length) return null;
-  const expired = errors.some((e) => e.includes("Reconnect"));
-  return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1.5 pb-px">
-      <button type="button" onClick={onSidebar} aria-pressed={sidebar} aria-keyshortcuts="Control+B Meta+B" aria-label={sidebar ? "Hide the sidebar" : "Show the sidebar"} title={`${sidebar ? "Hide" : "Show"} the sidebar (⌘B)`} className={`${BTN} order-first px-1.5`}>
-        {sidebar ? <PanelLeftClose size={15} aria-hidden="true" /> : <PanelLeftOpen size={15} aria-hidden="true" />}
-      </button>
-      {errors.length > 0 && (
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--destructive)]" title={errors.join("\n")}>
-          <TriangleAlert size={13} aria-hidden="true" className="shrink-0" />
-          <span className="hidden max-w-[14rem] truncate 2xl:inline">{errors[0]}</span>
-          {expired && <ReconnectLink />}
-        </span>
-      )}
-      {week.selected?.kind === "event"
-        ? <EventDetails event={week.selected} week={week} onChanged={onAdded} />
-        : week.today && <QuickAdd day={week.isThisWeek ? week.today : days[0]} connected={!!status?.connected} streams={streams} onCreate={week.items.create} onAdded={onAdded} />}
-      <span className="inline-flex shrink-0" role="group" aria-label="Week">
-        <button type="button" onClick={() => week.go(-1)} aria-label="Previous week" className={`${BTN} px-1.5`}><ChevronLeft size={15} aria-hidden="true" /></button>
-        <button type="button" onClick={week.goToday} disabled={week.isThisWeek} aria-label={`${rangeLabel(days[0], days[6])} ${fmtDay(days[6], { year: "numeric" })}${week.isThisWeek ? ", this week" : ", back to this week"}`} title={week.isThisWeek ? "This week" : "Back to this week"}
-          className={`${BTN} border-x-0 font-mono tabular-nums ${week.isThisWeek ? "!text-[var(--foreground)] !opacity-100" : ""}`}>{rangeLabel(days[0], days[6])}</button>
-        <button type="button" onClick={() => week.go(1)} aria-label="Next week" className={`${BTN} px-1.5`}><ChevronRight size={15} aria-hidden="true" /></button>
-      </span>
-      <button type="button" onClick={() => week.setShowDone(!week.showDone)} aria-pressed={week.showDone} aria-keyshortcuts="d" title={`${week.showDone ? "Hide" : "Show"} done tasks (d)`} className={`${BTN} gap-1.5 aria-pressed:text-[var(--foreground)]`}>
-        Done <span className="font-mono tabular-nums">{doneCount}</span>
-      </button>
-    </div>
-  );
-}
-
-/** The picked calendar event, shown in the toolbar in place of the quick add (its details card opens above the grid). The cross deselects it and the quick add comes back. */
-function EventDetails({ event: e, week, onChanged }: { event: ItemData; week: Week; onChanged: () => void }) {
-  const [problem, setProblem] = useState<string | null>(null);
-  const day = e.day as string;
-  const key = eventPin(day, e);
-  const pinned = week.pins.includes(key);
-  const when = e.all_day || e.start_min === null || e.end_min === null ? "All day" : `${formatMinutes(e.start_min)}–${formatMinutes(e.end_min)} · ${formatDuration(e.end_min - e.start_min)}`;
-  const act = "inline-flex min-h-8 shrink-0 items-center gap-1 whitespace-nowrap border border-[var(--border)] px-2.5 text-xs font-semibold hover:bg-[var(--muted)]";
-  async function remove() {
-    setProblem(null);
-    try { await vaultApi.removeEvent(e.event_id as string); week.setPicked(null); week.reload(); onChanged(); } catch (err) { setProblem(err instanceof Error ? err.message : "Could not delete"); }
-  }
-  return (
-    <div className="flex min-w-0 flex-1 items-center gap-x-3 text-small" aria-label="Event details" role="group">
-      <span className="min-w-0 max-w-[16rem] shrink-0 truncate font-semibold">{e.title}</span>
-      <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-[var(--muted-foreground)]">{fmtDay(day, { weekday: "short", day: "numeric", month: "short" })} · {when}</span>
-      <span className="min-w-0 flex-1 truncate text-[var(--muted-foreground)]">{e.calendar}{e.location && e.location !== e.meeting_url ? ` · ${e.location}` : ""}{e.event_id ? "" : " · read-only"}</span>
-      <button type="button" aria-pressed={pinned} onClick={() => week.togglePin(key)} className={`${act} ${pinned ? "text-[var(--accent)]" : "text-[var(--muted-foreground)]"}`}><Star size={12} aria-hidden="true" className={pinned ? "fill-[var(--accent)]" : ""} />{pinned ? "Important" : "Mark important"}</button>
-      {e.meeting_url && <a href={e.meeting_url} target="_blank" rel="noopener noreferrer" className={`${act} text-[var(--accent)]`}>Join {meetingName(e.meeting_url)}</a>}
-      {e.event_id && <button type="button" onClick={() => void remove()} className={`${act} text-[var(--destructive)]`}>Delete</button>}
-      <button type="button" onClick={() => week.setPicked(null)} aria-label="Deselect event" title="Deselect" className={`${act} px-1.5 text-[var(--muted-foreground)]`}><X size={14} aria-hidden="true" /></button>
-      {problem && <span role="alert" className="w-full text-xs text-[var(--destructive)]">{problem}</span>}
-    </div>
-  );
-}
-
-function ReconnectLink() {
-  return (
-    <button type="button" className="relative shrink-0 whitespace-nowrap border border-[var(--destructive)] px-2 py-0.5 text-xs font-semibold hover:bg-[var(--muted)]"
-      onClick={() => void vaultApi.googleConnect().then((r) => window.location.assign(r.url)).catch(() => {})}>Reconnect</button>
-  );
-}
-
 const STREAM_SELECT = "min-h-6 min-w-0 max-w-[45%] border border-[var(--border)] bg-[var(--background)] px-0.5 text-micro text-[var(--muted-foreground)]";
 
 /** The stream choice for a task: "No stream" or one of the quarter's streams. */
@@ -238,10 +162,12 @@ interface Drag { item: ItemData; day: string; allDay: boolean; duration: number;
 interface Draw { day: string; from: number; to: number; }
 
 /** The week as a 24-hour grid: drag an item to move it (an own item between the all-day row and the grid too), drag across an empty slot to draw a new event. Sleep is greyed out. */
-export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged, card = true, dimmed }: {
+export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged, onOpenDay, card = true, dimmed }: {
   week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void; onEventsChanged: () => void;
   /** Show the picked item's details card above the grid (off when the page shows it elsewhere). */
   card?: boolean;
+  /** A day header was clicked: show that day. */
+  onOpenDay?: (day: string) => void;
   /** Items to fade back (a tag filter that does not match them). */
   dimmed?: (item: ItemData) => boolean;
 }) {
@@ -251,6 +177,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const [draw, setDraw] = useState<Draw | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -277,7 +204,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, [collapsedCount, data, adding, week.picked, problem]);
+  }, [collapsedCount, data, adding, week.picked, problem, dragging, week.showDone]);
   const hourPx = box?.hour ?? HOUR_PX;
   const { px, minuteAt: scaleMinuteAt, heights, tops, total: GRID_PX } = makeScale(collapsible, hourPx);
 
@@ -320,15 +247,17 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     drag.current = { item, day, allDay: !timed, duration: timed ? (item.end_min as number) - (item.start_min as number) : 0,
       grab: timed ? scaleMinuteAt(e.clientY - rect.top + px(item.start_min as number)) - (item.start_min as number) : 0 };
     e.dataTransfer.effectAllowed = "move";
+    setDragging(true);
     e.dataTransfer.setData("text/plain", item.title);
   }
-  const endDrag = () => { drag.current = null; setOver(null); };
+  const endDrag = () => { drag.current = null; setOver(null); setDragging(false); };
   /** Own items go anywhere; a calendar event keeps its kind (timed stays timed, all day stays all day). */
   const accepts = (allDayRow: boolean, d: Drag | null = drag.current): d is Drag => !!d && (d.item.kind === "task" || d.allDay === allDayRow);
 
   function dropTimed(e: React.DragEvent<HTMLDivElement>, day: string) {
     e.preventDefault();
     setOver(null);
+    setDragging(false);
     const d = drag.current;
     drag.current = null;
     if (!accepts(false, d)) return;
@@ -341,6 +270,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   function dropAllDay(e: React.DragEvent, day: string) {
     e.preventDefault();
     setOver(null);
+    setDragging(false);
     const d = drag.current;
     drag.current = null;
     if (!accepts(true, d)) return;
@@ -385,6 +315,10 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   if (!days.length) return null;
   const connected = !!status?.connected;
   const sel = week.selected;
+  // The All day strip takes no height while no day has anything in it; it opens for a drag (to drop an item into it) or an add.
+  const hasAllDay = days.some((day) => (data[day]?.events ?? []).some((e) => !isTimed(e)) || (data[day]?.tasks ?? []).some((t) => !isTimed(t) && (week.showDone || !t.done)));
+  const stripOpen = hasAllDay || dragging || adding !== null;
+  const strip = stripOpen ? "" : "!h-0 !min-h-0 !max-h-0 overflow-hidden !border-b-0 !p-0";
   const tick = (t: ItemData) => changeTask(items.patch(t, { status: t.done ? "open" : "done" }));
   const finished = (t: ItemData) => t.status !== "open";
   const dim = (i: ItemData) => ({ "data-dimmed": dimmed?.(i) ? "true" : undefined });
@@ -401,18 +335,27 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
           <div className="sticky top-0 z-20 h-[34px] border-b border-[var(--border)] bg-[var(--surface)]" />
           {days.map((day) => (
             <div key={day} className={`sticky top-0 z-20 flex h-[34px] items-baseline gap-1.5 border-b border-l border-[var(--border)] px-1.5 py-1.5 ${day === today ? "bg-[var(--accent-light)] shadow-[inset_0_-2px_0_var(--accent)]" : "bg-[var(--surface)]"}`}>
-              <span className={`${MICRO} ${day === today ? "!text-[var(--accent)]" : ""}`}>{fmtDay(day, { weekday: "short" })}</span>
-              <span className={`font-mono text-small font-medium tabular-nums ${day === today ? "text-[var(--accent)]" : ""}`}>{fmtDay(day, { day: "numeric" })}</span>
+              {(() => {
+                const head = (
+                  <>
+                    <span className={`${MICRO} ${day === today ? "!text-[var(--accent)]" : ""}`}>{fmtDay(day, { weekday: "short" })}</span>
+                    <span className={`font-mono text-small font-medium tabular-nums ${day === today ? "text-[var(--accent)]" : ""}`}>{fmtDay(day, { day: "numeric" })}</span>
+                  </>
+                );
+                return onOpenDay
+                  ? <button type="button" data-open-day={day} onClick={() => onOpenDay(day)} aria-label={`Open ${fmtDay(day, { weekday: "long", day: "numeric", month: "long" })}`} className="flex items-baseline gap-1.5 hover:underline">{head}</button>
+                  : head;
+              })()}
             </div>
           ))}
 
-          <div className="sticky top-[34px] z-20 grid place-items-center border-b border-[var(--border)] bg-[var(--surface)] text-micro text-[var(--muted-foreground)]"><span className="rotate-180 whitespace-nowrap [writing-mode:vertical-rl]">All day</span></div>
+          <div className={`sticky top-[34px] z-20 grid place-items-center border-b border-[var(--border)] bg-[var(--surface)] text-micro text-[var(--muted-foreground)] ${strip}`}><span className="rotate-180 whitespace-nowrap [writing-mode:vertical-rl]">All day</span></div>
           {days.map((day) => {
             const d = data[day];
             return (
               <div key={day} data-day={day} onDragOver={(e) => { if (accepts(true)) { e.preventDefault(); setOver(`ad:${day}`); } }} onDragLeave={() => setOver(null)} onDrop={(e) => dropAllDay(e, day)}
                 onClick={(e) => { if (e.target === e.currentTarget) setAdding(day); }}
-                data-allday="" className={`group sticky top-[34px] z-20 flex max-h-[16rem] min-h-16 cursor-cell flex-col gap-1 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
+                data-allday="" className={`${strip} group sticky top-[34px] z-20 flex max-h-[16rem] min-h-16 cursor-cell flex-col gap-1 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
                 {(d?.events ?? []).filter((e) => !isTimed(e)).map((e) => {
                   const ref = itemRef(e);
                   return (

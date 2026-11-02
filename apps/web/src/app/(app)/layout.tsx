@@ -10,7 +10,6 @@ import { logout } from "@/lib/auth";
 import { BlocksProvider } from "@/lib/blocks";
 import {
   Activity,
-  CalendarDays,
   Clock,
   ListChecks,
   Settings,
@@ -22,7 +21,6 @@ const PUBLIC_PATHS = ["/"];
 
 const nav = [
   { href: "/", label: "Overview", icon: Clock, key: "o" },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays, key: "c" },
   { href: "/plan", label: "Plan", icon: ListChecks, key: "p" },
   { href: "/progress", label: "Progress", icon: Activity, key: "r" },
   { href: "/settings", label: "Settings", icon: Settings, key: "s" },

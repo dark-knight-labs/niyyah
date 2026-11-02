@@ -2,7 +2,7 @@
 
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { parseQuick } from "@/lib/items";
+import { parseQuick, quickDay, type QuickParse } from "@/lib/items";
 import { formatMinutes } from "@/lib/routine";
 import { vaultApi } from "@/lib/vault-api";
 import { StreamMeta } from "@/lib/streams";
@@ -91,83 +91,72 @@ export function meetingName(url: string): string {
   return "call";
 }
 
-/** What a quick-add line will make: day, time (or all day) and tags, and a word when a typed time was not understood. */
-function quickPreview(text: string, date: string): string {
-  const p = parseQuick(text);
-  if (!p.title) return "Type a title. Add #tags and a time like 14:00-15:00 (or 14:00 45m). No time means all day.";
+/** What a quick-add line will make: day, time (or all day), tags and stream, and a word when a typed time was not understood. */
+export function quickPreview(p: QuickParse, day: string, google = false): string {
+  if (!p.title) return "Type a title. Add a day (fri, tomorrow), a time like 14:00-15:00, #tags.";
   const when = p.start !== null && p.end !== null ? `${formatMinutes(p.start)}–${formatMinutes(Math.min(1439, p.end))}` : "all day";
-  return `→ ${date ? fmtDay(date, { weekday: "short", day: "numeric", month: "short" }) : "pick a day"} · ${when}${p.tags.length ? ` · ${p.tags.map((t) => `#${t}`).join(" ")}` : ""}${p.bad ? " · time not understood, added as all day" : ""}`;
+  const bits = [`→ ${fmtDay(day, { weekday: "short", day: "numeric", month: "short" })}`, when, ...(p.tags.length ? [p.tags.map((t) => `#${t}`).join(" ")] : []), ...(p.stream ? [`@${p.stream}`] : []), ...(google ? ["Google Calendar"] : [])];
+  return `${bits.join(" · ")}${p.bad ? " · time not understood, added as all day" : ""}`;
 }
 
 /**
- * Add an item or a Google Calendar event. An item is one line: `#tag` words become tags, `14:00-15:00` or `14:00 45m` makes it
- * timed and no time means all day; the date starts on the visible day. An event (any date, start to end) goes to Google.
+ * One line adds an item. `#tag` words become tags; `14:00-15:00` or `14:00 45m` makes it timed (no time = all day); `today`,
+ * `tomorrow` or a weekday of the shown week picks the day (none = the focused day), and with a day, `@stream` sets the stream.
+ * A timed line can go to Google Calendar instead of Niyyah (the toggle shows when Google is connected). The preview says where it lands.
  */
-export function QuickAdd({ day, connected, streams, onCreate, onAdded }: { day: string; connected: boolean; streams: StreamMeta[]; onCreate: (item: ItemCreate) => Promise<boolean>; onAdded: () => void }) {
-  const [kind, setKind] = useState<"task" | "event">("task");
+export function QuickAdd({ focus, today, days, connected, streams, onCreate, onAdded }: {
+  focus: string; today: string; days: string[]; connected: boolean; streams: StreamMeta[]; onCreate: (item: ItemCreate) => Promise<boolean>; onAdded: () => void;
+}) {
   const [title, setTitle] = useState("");
-  const [picked, setPicked] = useState<string | null>(null);
-  const [start, setStart] = useState(nextHalfHour);
-  const [end, setEnd] = useState(() => plusHour(nextHalfHour()));
-  const [stream, setStream] = useState<string | null>(null);
+  const [google, setGoogle] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const event = kind === "event";
-  const date = picked ?? day;
-  const parsed = parseQuick(title);
-
-  function changeStart(value: string) {
-    setStart(value);
-    if (value) setEnd(plusHour(value));
-  }
+  const parsed = parseQuick(title, streams);
+  const day = quickDay(parsed, { today, days, focus });
+  const timed = parsed.start !== null && parsed.end !== null;
+  const toGoogle = google && timed && connected;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const text = title.trim();
-    if (!text || !date || (!event && !parsed.title)) return;
+    if (!parsed.title) return;
     setBusy(true);
     setError(null);
     try {
-      if (event) await vaultApi.addEvent(date, { title: text, start, end, location: null });
-      else {
-        const timed = parsed.start !== null && parsed.end !== null ? { start_min: parsed.start, end_min: parsed.end } : {};
-        if (!(await onCreate({ day: date, text: parsed.title, products: parsed.tags, stream, ...timed }))) throw new Error("Could not add the item.");
+      if (toGoogle) {
+        if (parsed.title.length > 200) throw new Error("A Google event title can be 200 characters at most.");
+        await vaultApi.addEvent(day, { title: parsed.title, start: formatMinutes(parsed.start as number), end: formatMinutes(Math.min(1439, parsed.end as number)), location: null });
+      } else {
+        const when = timed ? { start_min: parsed.start as number, end_min: parsed.end as number } : {};
+        if (!(await onCreate({ day, text: parsed.title, products: parsed.tags, stream: parsed.stream, ...when }))) throw new Error("Could not add the item.");
       }
       setTitle("");
       onAdded();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Could not add the ${kind}.`);
+      setError(err instanceof Error ? err.message : "Could not add it.");
     } finally {
       setBusy(false);
     }
   }
 
-  const KIND = "min-h-8 px-2.5 text-xs font-semibold aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)] text-[var(--muted-foreground)] disabled:opacity-40";
-  const FIELD = "min-h-8 border border-[var(--border)] bg-[var(--surface)] px-2 text-small";
   return (
-    <form onSubmit={submit} className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" aria-label="Add a task or event">
-      <span className="inline-flex shrink-0 border border-[var(--border)]" role="group" aria-label="Add as">
-        <button type="button" aria-pressed={!event} onClick={() => setKind("task")} className={KIND}>Task</button>
-        <button type="button" aria-pressed={event} disabled={!connected} title={connected ? undefined : "Connect Google Calendar to add events"} onClick={() => setKind("event")} className={KIND}>Event</button>
-      </span>
-      <input id="quick-add-title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }} maxLength={event ? 200 : 300}
-        placeholder={event ? "New event" : "New task #tag 14:00-15:00"} aria-label={event ? "Event title" : "Task title"} aria-describedby={event ? undefined : "quick-add-preview"}
-        className="min-h-8 min-w-[8rem] flex-1 border border-[var(--border)] bg-[var(--surface)] px-2.5 text-small placeholder:text-[var(--muted-foreground)]" />
-      <input type="date" value={date} onChange={(e) => setPicked(e.target.value || null)} aria-label="Date" className={`${FIELD} w-[9.5rem]`} />
-      {event ? (
-        <>
-          <input type="time" value={start} onChange={(e) => changeStart(e.target.value)} aria-label="Start time" className={`${FIELD} w-[6.5rem]`} />
-          <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} aria-label="End time" className={`${FIELD} w-[6.5rem]`} />
-        </>
-      ) : streams.length > 0 && (
-        <select value={stream ?? ""} onChange={(e) => setStream(e.target.value || null)} aria-label="Stream" title="Stream" className={`${FIELD} max-w-[9rem]`}>
-          <option value="">No stream</option>
-          {streams.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-        </select>
+    <form onSubmit={submit} className="flex min-w-[14rem] flex-1 items-start gap-1.5" aria-label="Add a task or event">
+      <div className="relative min-w-0 flex-1">
+        <input id="quick-add-title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }} maxLength={300}
+          placeholder="Add: fri 14:00-15:00 call #work" aria-label="Add a task or event" aria-describedby="quick-add-preview" style={title.trim() ? { paddingRight: "min(52%, 24rem)" } : undefined}
+          className="min-h-8 w-full border border-[var(--border)] bg-[var(--surface)] px-2.5 text-small placeholder:text-[var(--muted-foreground)] max-lg:!pr-2.5" />
+        {title.trim() && (
+          <p id="quick-add-preview" aria-live="polite" title={quickPreview(parsed, day, toGoogle)}
+            className={`pointer-events-none px-0.5 pt-0.5 font-mono text-micro lg:absolute lg:inset-y-0 lg:right-2 lg:flex lg:max-w-[50%] lg:items-center lg:truncate lg:p-0 ${parsed.bad ? "text-[var(--warn)]" : "text-[var(--muted-foreground)]"}`}>
+            <span className="truncate">{quickPreview(parsed, day, toGoogle)}</span>
+          </p>
+        )}
+        {error && <p role="alert" className="pt-0.5 text-xs text-[var(--destructive)]">{error}</p>}
+      </div>
+      {connected && timed && (
+        <button type="button" aria-pressed={google} onClick={() => setGoogle(!google)} title="Make a Google Calendar event instead of a Niyyah item"
+          className="min-h-8 shrink-0 whitespace-nowrap border border-[var(--border)] px-2 text-xs font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">Put in Google Calendar</button>
       )}
-      <button type="submit" disabled={busy || !title.trim() || !date || (event ? !start || !end : !parsed.title)} aria-label={`Add ${kind}`} className="inline-flex min-h-8 items-center gap-1 bg-[var(--accent)] px-3 text-xs font-bold text-[var(--accent-fg)] disabled:opacity-50"><Plus size={13} aria-hidden="true" />Add</button>
-      {!event && title.trim() && <p id="quick-add-preview" aria-live="polite" className={`w-full font-mono text-micro ${parsed.bad ? "text-[var(--warn)]" : "text-[var(--muted-foreground)]"}`}>{quickPreview(title, date)}</p>}
-      {error && <p role="alert" className="w-full text-xs text-[var(--destructive)]">{error}</p>}
+      <button type="submit" disabled={busy || !parsed.title} aria-label="Add item" className="inline-flex min-h-8 shrink-0 items-center gap-1 bg-[var(--accent)] px-3 text-xs font-bold text-[var(--accent-fg)] disabled:opacity-50"><Plus size={13} aria-hidden="true" />Add</button>
     </form>
   );
 }
