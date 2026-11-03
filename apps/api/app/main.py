@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import check_secrets, settings
 from app.core.deps import get_current_user
 from app.core.plugins import API_PREFIX, check_collisions, discover_entry_points, flat_routes, load_plugins, parse_specs
-from app.api.v1 import auth, personas, schedule, principles, tracker, settings as settings_router, dashboard, vault, tokens, export, import_data
+from app.api.v1 import auth, personas, schedule, principles, tracker, settings as settings_router, dashboard, vault, tokens, export, import_data, compass
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -40,6 +40,7 @@ def create_app(plugin_specs: Iterable[str] | None = None, entry_points: Callable
     app.include_router(tokens.router, prefix="/api/v1")
     app.include_router(export.router, prefix="/api/v1")
     app.include_router(import_data.router, prefix="/api/v1")
+    app.include_router(compass.router, prefix="/api/v1")
 
     @app.get("/health")
     async def health():

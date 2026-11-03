@@ -239,6 +239,33 @@
    "type": "object"
   }
  },
+ "GET /api/v1/compass": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "mission": {
+     "type": "string"
+    },
+    "updated_at": {
+     "type": "string"
+    },
+    "vision": {
+     "type": "string"
+    },
+    "vision_horizon": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "mission",
+    "updated_at",
+    "vision",
+    "vision_horizon"
+   ],
+   "type": "object"
+  }
+ },
  "GET /api/v1/dashboard": {
   "params": [],
   "request": null,
@@ -325,6 +352,9 @@
       "type": "array"
      },
      "ritual": {
+      "type": "string"
+     },
+     "stream": {
       "type": "string"
      },
      "updated_at": {
@@ -429,6 +459,9 @@
      "type": "array"
     },
     "ritual": {
+     "type": "string"
+    },
+    "stream": {
      "type": "string"
     },
     "updated_at": {
@@ -2387,6 +2420,9 @@
     },
     "ritual": {
      "type": "string"
+    },
+    "stream": {
+     "type": "string"
     }
    },
    "required": [],
@@ -2464,6 +2500,9 @@
      "type": "array"
     },
     "ritual": {
+     "type": "string"
+    },
+    "stream": {
      "type": "string"
     },
     "updated_at": {
@@ -3762,6 +3801,9 @@
     },
     "ritual": {
      "type": "string"
+    },
+    "stream": {
+     "type": "string"
     }
    },
    "required": [
@@ -3842,6 +3884,9 @@
      "type": "array"
     },
     "ritual": {
+     "type": "string"
+    },
+    "stream": {
      "type": "string"
     },
     "updated_at": {
@@ -5472,6 +5517,47 @@
    "required": [
     "commit",
     "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/compass": {
+  "params": [],
+  "request": {
+   "properties": {
+    "mission": {
+     "type": "string"
+    },
+    "vision": {
+     "type": "string"
+    },
+    "vision_horizon": {
+     "type": "string"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "mission": {
+     "type": "string"
+    },
+    "updated_at": {
+     "type": "string"
+    },
+    "vision": {
+     "type": "string"
+    },
+    "vision_horizon": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "mission",
+    "updated_at",
+    "vision",
+    "vision_horizon"
    ],
    "type": "object"
   }

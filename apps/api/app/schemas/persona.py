@@ -1,5 +1,13 @@
 from datetime import date, datetime
-from pydantic import BaseModel
+from typing import Annotated
+
+from pydantic import BaseModel, Field, field_validator
+
+StreamSlug = Annotated[str, Field(pattern=r"^[a-z][a-z0-9-]{1,23}$")]
+
+
+def _blank_is_none(value):
+    return None if isinstance(value, str) and value == "" else value
 
 
 class PersonaCreate(BaseModel):
@@ -13,6 +21,9 @@ class PersonaCreate(BaseModel):
     ritual: str | None = None
     guardrail: str | None = None
     points: list[str] = []
+    stream: StreamSlug | None = None
+
+    _stream = field_validator("stream", mode="before")(_blank_is_none)
 
 
 class PersonaUpdate(BaseModel):
@@ -27,6 +38,9 @@ class PersonaUpdate(BaseModel):
     guardrail: str | None = None
     points: list[str] | None = None
     order: int | None = None
+    stream: StreamSlug | None = None
+
+    _stream = field_validator("stream", mode="before")(_blank_is_none)
 
 
 class PersonaResponse(BaseModel):
@@ -42,6 +56,7 @@ class PersonaResponse(BaseModel):
     guardrail: str | None
     points: list
     order: int
+    stream: str | None = None
     milestones: list["MilestoneResponse"] = []
     created_at: datetime
     updated_at: datetime
