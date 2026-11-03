@@ -31,7 +31,10 @@ async def main(email: str, password: str) -> None:
         assert res.status_code in (200, 201), res.text
     async with async_session() as db:
         user_id = (await db.execute(select(User.id).where(User.email == email))).scalar_one()
-        await import_snapshot(db, user_id, Snapshot.model_validate(sample_snapshot(_local_now().date())))
+        snap = sample_snapshot(_local_now().date())
+        # A goal with a checklist, so the browser run can tick one from the home page's Goals section.
+        snap["goals"][0]["checklist"] = [{"text": "Pay the card", "done": False}, {"text": "Pay the loan", "done": False}]
+        await import_snapshot(db, user_id, Snapshot.model_validate(snap))
         await db.commit()
     print(f"seeded {email} (user {user_id}) for {_local_now().date()}")
 

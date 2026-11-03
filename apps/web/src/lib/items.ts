@@ -47,6 +47,14 @@ export function hashtags(text: string): string[] {
   return [...new Set([...text.matchAll(TAG)].map((m) => m[2].toLowerCase()))];
 }
 
+/** Day words a quick-add line can carry: today, tomorrow, or a weekday (0 = Sunday) that means that day of the shown week. */
+export type DayWord = "today" | "tomorrow" | number;
+const WEEKDAYS: [RegExp, number][] = [
+  [/^sun(day)?$/, 0], [/^mon(day)?$/, 1], [/^tue(s(day)?)?$/, 2], [/^wed(nesday)?$/, 3], [/^thu(r(s(day)?)?)?$/, 4], [/^fri(day)?$/, 5], [/^sat(urday)?$/, 6],
+];
+const DAY_WORD = /(^|\s)(today|tomorrow|sun(?:day)?|mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?)(?=\s|$)/i;
+const STREAM_WORD = /(^|\s)@([A-Za-z][\w-]*)(?=\s|$)/g;
+
 export interface QuickParse {
   title: string;
   tags: string[];
@@ -55,13 +63,18 @@ export interface QuickParse {
   end: number | null;
   /** A time was typed but makes no sense (end before start, past midnight): the item is added all day. */
   bad: boolean;
+  /** The day word typed (today, tomorrow, a weekday), taken out of the title; null = none. */
+  when: DayWord | null;
+  /** The stream id of an `@stream` word. Only read together with a day word; otherwise `@word` stays in the title. */
+  stream: string | null;
 }
 
 /**
  * Read a quick-add line: `#tag` words become tags; `14:00-15:00` or `14:00 45m` / `14:00 1h` (a bare `14:00` is 30 minutes)
- * makes it timed; no time means all day. The time and tags are taken out of the title.
+ * makes it timed; no time means all day. A day word (`today`, `tomorrow`, `fri`) picks the day, and with one,
+ * `@stream` (a known stream id or label) sets the stream. Everything read is taken out of the title.
  */
-export function parseQuick(text: string): QuickParse {
+export function parseQuick(text: string, streams: readonly { id: string; label: string }[] = []): QuickParse {
   const tags = hashtags(text);
   let t = ` ${text.replace(TAG, " ")} `;
   let start: number | null = null;
@@ -81,7 +94,30 @@ export function parseQuick(text: string): QuickParse {
       end = start + (single[3] ? (single[4].toLowerCase() === "h" ? +single[3] * 60 : +single[3]) : 30);
     }
   }
+  let when: DayWord | null = null;
+  let stream: string | null = null;
+  const word = t.match(DAY_WORD);
+  if (word) {
+    const w = word[2].toLowerCase();
+    when = w === "today" || w === "tomorrow" ? w : WEEKDAYS.find(([re]) => re.test(w))![1];
+    t = t.replace(word[0], " ");
+    const known = (name: string) => streams.find((s) => s.id.toLowerCase() === name || s.label.toLowerCase() === name);
+    t = t.replace(STREAM_WORD, (all, lead: string, name: string) => {
+      const s = stream ? undefined : known(name.toLowerCase());
+      if (!s) return all;
+      stream = s.id;
+      return lead;
+    });
+  }
   const title = t.replace(/\s+/g, " ").trim();
-  if (typed && (start === null || end === null || start >= 1440 || end <= start || end > 1440)) return { title, tags, start: null, end: null, bad: true };
-  return { title, tags, start, end, bad: false };
+  if (typed && (start === null || end === null || start >= 1440 || end <= start || end > 1440)) return { title, tags, start: null, end: null, bad: true, when, stream };
+  return { title, tags, start, end, bad: false, when, stream };
+}
+
+/** The day a quick-add line lands on: `focus` with no day word, the real today / tomorrow, or the weekday in the shown `days`. */
+export function quickDay(p: Pick<QuickParse, "when">, ctx: { today: string; days: string[]; focus: string }): string {
+  if (p.when === null) return ctx.focus;
+  if (p.when === "today") return ctx.today;
+  if (p.when === "tomorrow") return new Date(Date.parse(`${ctx.today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  return ctx.days.find((d) => new Date(`${d}T00:00:00Z`).getUTCDay() === p.when) ?? ctx.focus;
 }

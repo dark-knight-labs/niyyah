@@ -1,0 +1,1493 @@
+{
+  "config": {
+    "argv": [
+      "/home/ubuntu/.nvm/versions/node/v22.23.1/bin/node",
+      "/home/ubuntu/.npm/_npx/9a46e323c0326ddf/node_modules/.bin/playwright",
+      "test",
+      "-c",
+      "e2e/playwright.config.ts"
+    ],
+    "configFile": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/playwright.config.ts",
+    "rootDir": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/out/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "./out/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "items.spec.ts",
+      "file": "items.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "quick add: no time makes an all-day item, #tags become tags",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 987,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:08:53.406Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-a53dcbba0ccf0783f7b9",
+          "file": "items.spec.ts",
+          "line": 90,
+          "column": 5
+        },
+        {
+          "title": "quick add: 14:00-15:00 makes a timed item in the grid",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 616,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:08:54.471Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-479b15a5eddbeb617e87",
+          "file": "items.spec.ts",
+          "line": 101,
+          "column": 5
+        },
+        {
+          "title": "quick add: a bad time falls back to all day",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 509,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:08:55.098Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-2cbda36c162c5d6257e9",
+          "file": "items.spec.ts",
+          "line": 114,
+          "column": 5
+        },
+        {
+          "title": "details card: add, tick and remove sub-tasks; all done prompts to mark the item done",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1665,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:08:55.614Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-349bed8ac28b3c130888",
+          "file": "items.spec.ts",
+          "line": 122,
+          "column": 5
+        },
+        {
+          "title": "notes: a #word typed in the notes becomes a tag, shown on the item",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 739,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:08:57.286Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-670ff958de635cf3fd2e",
+          "file": "items.spec.ts",
+          "line": 161,
+          "column": 5
+        },
+        {
+          "title": "calendar event: annotate notes and weight, still there after reload; title, time and delete are locked",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1128,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:08:58.035Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-87efac8c36b079e3313c",
+          "file": "items.spec.ts",
+          "line": 181,
+          "column": 5
+        },
+        {
+          "title": "week calendar: tick a task, move it to another day, toggle its pin star",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1505,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:08:59.170Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-b5214784759f18d1fc0e",
+          "file": "items.spec.ts",
+          "line": 221,
+          "column": 5
+        },
+        {
+          "title": "screenshots: light and dark",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1236,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:00.683Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-4fa79a38d440d5bd0c97",
+          "file": "items.spec.ts",
+          "line": 269,
+          "column": 5
+        },
+        {
+          "title": "calendar: every view renders, with no console errors and no sideways page scroll",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1759,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:01.927Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-83c339651567e2fcf600",
+          "file": "items.spec.ts",
+          "line": 310,
+          "column": 5
+        },
+        {
+          "title": "calendar: V cycles through all nine views and back, Shift+V goes back, typing a v does not",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 687,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:03.702Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-0fe539525a1be8c184c6",
+          "file": "items.spec.ts",
+          "line": 338,
+          "column": 5
+        },
+        {
+          "title": "calendar: a reload keeps the chosen view, ring variant and colour mode",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1204,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:04.396Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-d8b30e963011c872d746",
+          "file": "items.spec.ts",
+          "line": 356,
+          "column": 5
+        },
+        {
+          "title": "calendar: clicking an item in a day view and in a week view opens its details card",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1174,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:05.606Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-41c7bae54e5fba68210e",
+          "file": "items.spec.ts",
+          "line": 372,
+          "column": 5
+        },
+        {
+          "title": "calendar: all-day items sit in the All day strip, timed ones do not; ticking one marks it done",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 853,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:06.789Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-bce43782aff8425f3831",
+          "file": "items.spec.ts",
+          "line": 398,
+          "column": 5
+        },
+        {
+          "title": "calendar: a tag filter dims items without the tag, in day views and the week grid",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 879,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:07.650Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-e77db929eb51d2d0a694",
+          "file": "items.spec.ts",
+          "line": 416,
+          "column": 5
+        },
+        {
+          "title": "calendar: screenshots of every view, light and dark",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3912,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:08.537Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-479d13edf6ebd2ca6b85",
+          "file": "items.spec.ts",
+          "line": 435,
+          "column": 5
+        },
+        {
+          "title": "/calendar redirects to / and the stored view still applies",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 412,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:12.456Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-df93da80cebe7743a580",
+          "file": "items.spec.ts",
+          "line": 459,
+          "column": 5
+        },
+        {
+          "title": "bar: one row at 1440x900 even with a long line typed; ‹ › and Today move the range",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 773,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:12.880Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-c2c150ce65627ef47047",
+          "file": "items.spec.ts",
+          "line": 468,
+          "column": 5
+        },
+        {
+          "title": "bar: Day | Week, week headers open the day in the last day style, display and tag menus",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1768,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:13.661Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-478a6b59564fcc671968",
+          "file": "items.spec.ts",
+          "line": 491,
+          "column": 5
+        },
+        {
+          "title": "rail: Ctrl+B and the ☰ button hide and show it; the date, mode and stars sit in the top bar; a goal item ticks",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 623,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:15.436Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-03b94005defb659e16c8",
+          "file": "items.spec.ts",
+          "line": 536,
+          "column": 5
+        },
+        {
+          "title": "?calendar=connected shows a note once and leaves the URL",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 349,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:16.066Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-7e10f0ea15183e81d940",
+          "file": "items.spec.ts",
+          "line": 556,
+          "column": 5
+        },
+        {
+          "title": "quick add: the preview says where each line lands (parser table)",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 720,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:16.422Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-41ccdc6ccf1e456578b1",
+          "file": "items.spec.ts",
+          "line": 562,
+          "column": 5
+        },
+        {
+          "title": "quick add: a line with a day, time, tag and @stream creates one item with those fields",
+          "ok": true,
+          "tags": [
+            "stream"
+          ],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 566,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:17.148Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-14c034e8a01a15a11043",
+          "file": "items.spec.ts",
+          "line": 598,
+          "column": 5
+        },
+        {
+          "title": "quick add: Put in Google Calendar shows for timed lines when connected and makes exactly one entry in each mode",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 659,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:17.721Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-b81a8f9b73dec28615de",
+          "file": "items.spec.ts",
+          "line": 610,
+          "column": 5
+        },
+        {
+          "title": "Google event: Join, Mark important and Delete Google event are in the item panel",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 702,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:18.388Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-640c6ef81f94c1b41765",
+          "file": "items.spec.ts",
+          "line": 642,
+          "column": 5
+        },
+        {
+          "title": "calendar problems: a chip with the count, the text on click, and Reconnect when consent expired",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5525,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:19.097Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-affc76635f8b9f31b1fc",
+          "file": "items.spec.ts",
+          "line": 669,
+          "column": 5
+        },
+        {
+          "title": "public home page without a login: ring and now card, no calendar bar",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 430,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:24.629Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-49b7179f13179d52d3ed",
+          "file": "items.spec.ts",
+          "line": 687,
+          "column": 5
+        },
+        {
+          "title": "phone 390px: no sideways scroll, the bar wraps, quick add preview sits under the input",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [
+                {
+                  "type": "serial",
+                  "location": {
+                    "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                    "line": 0,
+                    "column": 0
+                  }
+                }
+              ],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 661,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-02T17:09:25.069Z",
+                  "annotations": [
+                    {
+                      "type": "serial",
+                      "location": {
+                        "file": "/home/ubuntu/.paseo/worktrees/3j0mskbl/niyyah-one-view/apps/web/e2e/items.spec.ts",
+                        "line": 0,
+                        "column": 0
+                      }
+                    }
+                  ],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "1959835f811e6269bcf2-d774c31a0843d849898e",
+          "file": "items.spec.ts",
+          "line": 706,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-02T17:08:52.885Z",
+    "duration": 32929.678,
+    "expected": 27,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

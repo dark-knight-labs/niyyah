@@ -8,7 +8,6 @@ import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, QuarterData, VaultGoalsData, VaultObjectivesData, VaultDayData, VaultEventsData, HabitsData } from "@/lib/vault-types";
 import { dateInTz, hasLocation, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
-import { useHotkeys } from "@/hooks/use-hotkeys";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
 import { TopBar } from "@/components/routine/top-bar";
@@ -17,7 +16,8 @@ import { RoutineRing } from "@/components/routine/routine-ring";
 import { ThisWeek } from "@/components/routine/this-week";
 import { HabitsPanel } from "@/components/routine/habits-panel";
 import { VotesPanel } from "@/components/routine/votes-panel";
-import { SleepSpan, useWeek, WeekCalendar, WeekToolbar } from "@/components/routine/week-calendar";
+import { useWeek } from "@/components/routine/week-calendar";
+import { CalendarView } from "@/components/calendar/calendar-view";
 import { toMeta } from "@/lib/streams";
 
 const REFRESH_MS = 60_000;
@@ -47,17 +47,8 @@ export default function OverviewPage() {
   const [sidebar, setSidebar] = useState(true);
   const now = useNow(30_000);
   const dayToday = schedule ? dateInTz(now, schedule.meta.tz) : null;
+  const streams = useMemo(() => quarter?.streams.map(toMeta) ?? [], [quarter]);
   const week = useWeek(canEdit ? dayToday : null, calendarKey);
-  useHotkeys({
-    "mod+b": () => setSidebar((v) => !v),
-    "[": () => week.go(-1),
-    "]": () => week.go(1),
-    t: week.goToday,
-    d: () => week.setShowDone(!week.showDone),
-    n: () => document.getElementById("quick-add-title")?.focus(),
-    "/": () => document.getElementById("quick-add-title")?.focus(),
-    Escape: () => week.setPicked(null),
-  });
 
   const load = useCallback(() => {
     vaultApi
@@ -157,18 +148,6 @@ export default function OverviewPage() {
   const nowMin = schedule ? nowMinutes(now, schedule.meta.tz) : 0;
   const block = day ? currentBlock(day, nowMin) : undefined;
   const owner = canEdit && !!dayKey && !!day;
-  // Sleep blocks of any day of the week, as minute spans, so the grid can grey them out. UTC noon keeps the date in every timezone the schedule can use.
-  const sleepFor = (iso: string): SleepSpan[] => {
-    if (!schedule) return [];
-    try {
-      return resolveDay(schedule, new Date(`${iso}T12:00:00Z`), knownBlocks).blocks
-        .filter((b) => b.block === "sleep" || blocks.label(b.block).toLowerCase() === "sleep")
-        .flatMap((b) => (b.endMin > 1440 ? [{ from: b.startMin, to: 1440 }, { from: 0, to: b.endMin - 1440 }] : [{ from: b.startMin, to: b.endMin }]));
-    } catch {
-      return [];
-    }
-  };
-
   return (
     <div className="w-full">
       {problems.length > 0 && (
@@ -198,10 +177,8 @@ export default function OverviewPage() {
                   <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} week={week} goals={goals?.items ?? null} onChanged={loadPlanner} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} /></div>
                 </div>
                 <section aria-label="Calendar" className="min-w-0">
-                  <div className="mb-2 flex min-h-8 items-center border-b border-[var(--border)] pb-1.5">
-                    <WeekToolbar week={week} streams={quarter?.streams.map(toMeta) ?? []} status={google} sidebar={sidebar} onSidebar={() => setSidebar((v) => !v)} onAdded={() => { week.reload(); loadToday(); loadPlanner(); }} />
-                  </div>
-                  <WeekCalendar week={week} streams={quarter?.streams.map(toMeta) ?? []} nowMin={nowMin} status={google} sleepFor={sleepFor} onChanged={loadPlanner} onEventsChanged={loadToday} />
+                  <CalendarView week={week} schedule={schedule} today={dayKey} nowMin={nowMin} streams={streams} google={google}
+                    sidebar={sidebar} onSidebar={() => setSidebar((v) => !v)} onChanged={loadPlanner} onEventsChanged={loadToday} />
                 </section>
               </div>
               {habits && <div className="mb-5"><HabitsPanel day={dayKey} data={habits} today={today} onData={setHabits} onVoted={setToday} /></div>}
