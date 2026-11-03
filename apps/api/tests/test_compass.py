@@ -201,3 +201,26 @@ async def test_import_ignores_unknown_persona_names_and_counts_are_unchanged(aut
 async def test_import_validates_compass_caps_and_stream_slugs(auth_client: AsyncClient):
     assert (await auth_client.post(I, json={"version": 1, "compass": {"mission": "x" * 1001}})).status_code == 422
     assert (await auth_client.post(I, json={"version": 1, "persona_streams": [{"name": "A", "stream": "Bad Slug"}]})).status_code == 422
+
+
+async def test_concurrent_first_save_retries_as_update(auth_client: AsyncClient, monkeypatch):
+    """The row appears between the existence check and the insert: the loser retries as an update instead of failing."""
+    from app.services import compass as compass_service
+
+    real_get = compass_service.get
+    calls = {"n": 0}
+
+    async def racing_get(db, user_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            async with TestSession() as other:  # the other request wins the insert
+                other.add(Compass(user_id=user_id, mission="winner"))
+                await other.commit()
+            return None
+        return await real_get(db, user_id)
+
+    monkeypatch.setattr(compass_service, "get", racing_get)
+    resp = await auth_client.put(URL, json={"vision": "mine"})
+    assert resp.status_code == 200
+    assert (resp.json()["mission"], resp.json()["vision"]) == ("winner", "mine")
+    assert await _rows() == 1

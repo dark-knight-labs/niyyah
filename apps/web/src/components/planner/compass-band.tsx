@@ -49,6 +49,11 @@ export function CompassBand({ streams }: { streams: StreamMeta[] }) {
     setEditing(true);
   }
 
+  function cancel() {
+    setEditing(false);
+    setError(null);
+  }
+
   async function save() {
     const change: CompassChange = {};
     for (const key of ["mission", "vision", "vision_horizon"] as const) if (draft[key].trim() !== compass[key]) change[key] = draft[key].trim();
@@ -88,7 +93,7 @@ export function CompassBand({ streams }: { streams: StreamMeta[] }) {
         {error && <p role="alert" className="border border-[var(--destructive)] px-3 py-2 text-xs text-[var(--destructive)]">{error}</p>}
 
         {editing ? (
-          <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void save(); }} onKeyDown={(e) => e.key === "Escape" && setEditing(false)}>
+          <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void save(); }} onKeyDown={(e) => e.key === "Escape" && cancel()}>
             <label className="grid gap-1"><span className="mono text-[var(--muted-foreground)]">Mission</span>
               <textarea autoFocus rows={3} maxLength={1000} value={draft.mission} onChange={(e) => setDraft({ ...draft, mission: e.target.value })} className={FIELD} /></label>
             <label className="grid gap-1"><span className="mono text-[var(--muted-foreground)]">Vision</span>
@@ -97,7 +102,7 @@ export function CompassBand({ streams }: { streams: StreamMeta[] }) {
               <input maxLength={10} value={draft.vision_horizon} placeholder="2046" onChange={(e) => setDraft({ ...draft, vision_horizon: e.target.value })} className={FIELD} /></label>
             <div className="flex gap-2">
               <button type="submit" disabled={busy} className="min-h-9 rounded-lg bg-[var(--accent)] px-4 text-xs font-bold text-[var(--accent-fg)] disabled:opacity-50">Save</button>
-              <button type="button" onClick={() => setEditing(false)} className={BUTTON}>Cancel</button>
+              <button type="button" onClick={cancel} className={BUTTON}>Cancel</button>
             </div>
           </form>
         ) : empty ? (
