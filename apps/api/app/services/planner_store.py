@@ -8,8 +8,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PipelineItem, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
-    WeekObjective,
+    Goal, LogEntry, NotebookEntry, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
 )
 from app.services.rules import (
     MAX_GOALS, STALE_DAYS, URL, Stream, checklist_from_text, checklist_progress, line_hash, quarter_for, weekly_streams,
@@ -73,25 +72,25 @@ async def quarter_data(db: AsyncSession, user_id: int, label: str) -> dict | Non
 
 async def week_objectives(db: AsyncSession, user_id: int, week: str, streams: list[Stream]) -> list[dict]:
     """One {stream, text, done, checkpoint} per weekly stream, empty where nothing is stored (as parse_objectives does)."""
-    stored = {r.stream: r for r in await _all(db, select(WeekObjective).where(
-        WeekObjective.user_id == user_id, WeekObjective.week == week))}
+    stored = {r.stream: r for r in await _all(db, select(Task).where(
+        Task.user_id == user_id, Task.focus_week == week, Task.objective_text.is_not(None)))}
     out = []
     for s in weekly_streams(streams):
         r = stored.get(s.id)
-        out.append({"stream": s.id, "text": r.text, "done": r.done, "checkpoint": r.checkpoint} if r
+        out.append({"stream": s.id, "text": r.objective_text, "done": bool(r.objective_done), "checkpoint": r.focus_checkpoint} if r
                    else {"stream": s.id, "text": "", "done": False, "checkpoint": None})
     return out
 
 
 async def pipeline_items(db: AsyncSession, user_id: int, today: date) -> dict[str, list[dict]]:
-    rows = await _all(db, select(PipelineItem).where(PipelineItem.user_id == user_id).order_by(PipelineItem.position))
+    rows = await _all(db, select(Task).where(Task.user_id == user_id, Task.lane.is_not(None)).order_by(Task.lane_position, Task.id))
     out: dict[str, list[dict]] = {}
     for r in rows:
         age = (today - r.added_on).days if r.added_on else 0
         out.setdefault(r.stream, []).append({
             "products": list(r.products or []), "product": (r.products or [None])[0], "line": r.id, "hash": "", "text": r.text, "lane": r.lane, "checkpoint": r.checkpoint,
             "added": _iso(r.added_on), "done_on": _iso(r.done_on), "focus": r.focus_week, "done": r.done, "age_days": age,
-            "description": r.description, "blocked_by": list(r.blocked_by or []),
+            "description": r.description or "", "blocked_by": list(r.blocked_by or []),
             "stale": r.lane in ("next", "backlog") and r.checkpoint is None and age >= STALE_DAYS,
         })
     return out

@@ -112,6 +112,7 @@ class SnapObjective(_Loose):
 
 
 class SnapPipelineItem(_Loose):
+    id: int | None = None  # the old row id an export carries; kept as the new row's origin
     stream: Slug
     lane: str = Field(pattern=r"^(now|next|backlog|done)$")
     text: str
@@ -159,6 +160,42 @@ class SnapTask(_Loose):
     description: str = Field(default="", max_length=4000)
     # Item fields (newer exports). Older ones lack them: status then follows `done`, which wins whenever the two disagree.
     status: str | None = Field(default=None, pattern=r"^(open|done|skipped)$")
+    start_min: int | None = Field(default=None, ge=0, le=1440)
+    end_min: int | None = Field(default=None, ge=0, le=1440)
+    weight: int = Field(default=0, ge=0, le=3)
+    checklist: list[SnapLine] = Field(default=[], max_length=50)
+    # Newer exports: the row's id in the export and the id of the row it is a piece of (ids are remapped on import).
+    id: int | None = None
+    parent_ref: int | None = None
+
+
+class SnapPlanningRow(_Loose):
+    """A task row that is a pipeline item and/or carries a week's objective: the full row (docs/export-format.md).
+
+    lane null + focus_week set + objective_text set = a week objective no pipeline item carries."""
+    id: int | None = None
+    parent_ref: int | None = None
+    origin: str | None = Field(default=None, max_length=48)
+    stream: Slug
+    lane: str | None = Field(default=None, pattern=r"^(now|next|backlog|done)$")
+    lane_position: int | None = None
+    text: str
+    description: str = Field(default="", max_length=4000)
+    products: list[str] = Field(default=[], max_length=12)
+    checkpoint: Month | None = None
+    added_on: dt.date | None = None
+    done: bool = False
+    done_on: dt.date | None = None
+    status: str | None = Field(default=None, pattern=r"^(open|done|skipped)$")
+    focus_week: WeekLabel | None = None
+    objective_text: str | None = None
+    objective_done: bool | None = None
+    focus_checkpoint: Month | None = None
+    blocked_by: list[str] = []
+    due_on: dt.date | None = None
+    scheduled_on: dt.date | None = None
+    start_on: dt.date | None = None
+    source_path: str | None = Field(default=None, max_length=500)
     start_min: int | None = Field(default=None, ge=0, le=1440)
     end_min: int | None = Field(default=None, ge=0, le=1440)
     weight: int = Field(default=0, ge=0, le=3)
@@ -218,6 +255,7 @@ class Snapshot(_Loose):
     notebook_entries: list[SnapNotebookEntry] = _cap(20000)
     days: list[SnapDay] = _cap(20000)
     tasks: list[SnapTask] = _cap(50000)
+    planning_rows: list[SnapPlanningRow] | None = Field(default=None, max_length=50000)  # absent in older exports: then pipeline_items/week_objectives are read
     habits: list[SnapHabit] = _cap(500)
     item_overlays: list[SnapOverlay] = _cap(20000)
 

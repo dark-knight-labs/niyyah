@@ -1,7 +1,7 @@
 """Per-user planner data: what the vault notes hold, as rows. Every table is scoped by user_id."""
 import datetime as dt
 
-from sqlalchemy import JSON, Boolean, Date, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, ForeignKey, Index, Integer, SmallInteger, String, Text, UniqueConstraint
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,6 +15,9 @@ def _owner() -> Mapped[int]:
 class Task(Base):
     """A task. It shows on a day when that day is its due, scheduled or start date."""
     __tablename__ = "planner_tasks"
+    # One row per (user, stream, week) is that week's small domino: a partial index, so most rows (no focus_week) are free.
+    __table_args__ = (Index("uq_planner_task_focus", "user_id", "stream", "focus_week", unique=True,
+                            postgresql_where=sql_text("focus_week IS NOT NULL"), sqlite_where=sql_text("focus_week IS NOT NULL")),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = _owner()
@@ -36,6 +39,20 @@ class Task(Base):
     # open | done | skipped. `done` stays the source of truth older code writes: when the two disagree, `done` wins.
     status: Mapped[str] = mapped_column(String(10), default="open", server_default="open", nullable=False)
     checklist: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)  # sub-tasks [{"id", "text", "done"}]
+    # Planning fields: the stream pipelines and the week objectives live on the same row as the task (docs/export-format.md).
+    # All nullable or defaulted, so an older image can still insert a task. A row with a `lane` is a pipeline item; a row with
+    # `focus_week` + `objective_text` carries that week's objective; a row with a lane and no day is an undated item.
+    lane: Mapped[str | None] = mapped_column(String(10), nullable=True)  # now | next | backlog | done; None = not a pipeline item
+    lane_position: Mapped[int | None] = mapped_column(Integer, nullable=True)  # order in the stream's pipeline (the old item position)
+    focus_week: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "2026-W45": this row is that week's small domino
+    objective_text: Mapped[str | None] = mapped_column(Text, nullable=True)  # the week objective's own text; None = no objective
+    objective_done: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    focus_checkpoint: Mapped[str | None] = mapped_column(String(3), nullable=True)  # the objective's month checkpoint
+    checkpoint: Mapped[str | None] = mapped_column(String(3), nullable=True)  # the item's month checkpoint
+    blocked_by: Mapped[list] = mapped_column(JSON, default=list, server_default="[]", nullable=False)  # ext_ids of notebook blockers
+    added_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    parent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("planner_tasks.id", ondelete="SET NULL"), nullable=True, index=True)
+    origin: Mapped[str | None] = mapped_column(String(48), nullable=True)  # 'pipeline:7', 'objective:3': the old row this came from
 
 
 class EventOverlay(Base):

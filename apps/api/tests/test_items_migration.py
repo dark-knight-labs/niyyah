@@ -13,9 +13,11 @@ from pathlib import Path
 import pytest
 
 from app.services.planner_items import RECONCILE_SQL
+from tests.migration_support import PLANNING_COLUMNS, without_columns
 
 API_DIR = Path(__file__).resolve().parent.parent
 PARENT = "c4e6a8b0d2f5"
+THIS = "e8f0a2c4b6d1"  # the revision under test; later revisions (the planning rows) are not part of these tests
 ITEM_COLUMNS = ("start_min", "end_min", "weight", "status", "checklist")
 # The INSERT the image before this migration makes (planner_day.add_task): none of the new columns.
 OLD_INSERT = ("insert into planner_tasks (user_id, text, done, due_on, scheduled_on, start_on, done_on, source_path, stream, products,"
@@ -39,7 +41,7 @@ def _schema_at_parent() -> str:
     ddl = []
     for name in ("users", "planner_tasks"):
         text = str(CreateTable(Base.metadata.tables[name]).compile(dialect=sqlite.dialect()))
-        ddl.append("\n".join(line for line in text.split("\n") if not line.strip().startswith(tuple(f"{c} " for c in ITEM_COLUMNS))) + ";")
+        ddl.append(without_columns(text, ITEM_COLUMNS + PLANNING_COLUMNS) + ";")
     return "\n".join(ddl)
 
 
@@ -59,7 +61,7 @@ def test_sqlite_upgrade_downgrade_upgrade(tmp_path):
             c.execute("insert into planner_tasks (user_id, text, done, products, description, position) values (1, ?, ?, '[]', '', ?)",
                       (f"t{n}", done, n))
     _alembic(url, "stamp", PARENT)
-    _alembic(url, "upgrade", "head")
+    _alembic(url, "upgrade", THIS)
     with sqlite3.connect(db) as c:
         assert set(ITEM_COLUMNS) <= _columns(c, "planner_tasks") and _columns(c, "planner_event_overlays")
         assert [r for r in c.execute("select text, status, weight, checklist from planner_tasks order by position")] == [
@@ -69,16 +71,16 @@ def test_sqlite_upgrade_downgrade_upgrade(tmp_path):
         c.execute("insert into planner_event_overlays (user_id, event_key) values (1, 'uid-1')")
         assert c.execute("select status, weight, products, checklist, description, title from planner_event_overlays").fetchone() == (
             "open", 0, "[]", "[]", "", "")
-    assert "e8f0a2c4b6d1 (head)" in _alembic(url, "current")
+    assert THIS in _alembic(url, "current")
 
-    _alembic(url, "downgrade", "-1")
+    _alembic(url, "downgrade", PARENT)
     with sqlite3.connect(db) as c:
         assert not set(ITEM_COLUMNS) & _columns(c, "planner_tasks")
         assert not c.execute("select name from sqlite_master where name = 'planner_event_overlays'").fetchall()
         assert c.execute("select count(*) from planner_tasks").fetchone() == (3,)  # no task lost
     assert PARENT in _alembic(url, "current")
 
-    _alembic(url, "upgrade", "head")
+    _alembic(url, "upgrade", THIS)
     with sqlite3.connect(db) as c:
         assert [r[0] for r in c.execute("select status from planner_tasks order by position")] == ["done", "open", "open"]
 
@@ -121,7 +123,7 @@ def test_postgres_full_chain_up_down_up_and_old_insert():
         "insert into users (id, email, password_hash, timezone, locale, subscription_tier, is_active, created_at, updated_at)"
         " values (1, 'a@b.c', 'x', 'UTC', 'en', 'free', true, now(), now())",
         "insert into planner_tasks (user_id, text, done, products, description, position) values (1, 't0', true, '[]', '', 0), (1, 't1', false, '[]', '', 1)"))
-    _alembic(PG_URL, "upgrade", "head")
+    _alembic(PG_URL, "upgrade", THIS)
     statuses, _, old_row = asyncio.run(sql(
         "select text, status from planner_tasks order by position",
         OLD_INSERT.format(done="false"),
@@ -131,10 +133,10 @@ def test_postgres_full_chain_up_down_up_and_old_insert():
     asyncio.run(sql("update planner_tasks set done = true where text = 'old image'", RECONCILE_SQL))
     counts = asyncio.run(sql("select count(*) from planner_tasks where done", "select count(*) from planner_tasks where status = 'done'"))
     assert counts[0] == counts[1] == [(2,)]
-    _alembic(PG_URL, "downgrade", "-1")
+    _alembic(PG_URL, "downgrade", PARENT)
     gone = asyncio.run(sql("select count(*) from information_schema.tables where table_name = 'planner_event_overlays'",
                            "select count(*) from information_schema.columns where table_name = 'planner_tasks' and column_name = 'status'",
                            "select count(*) from planner_tasks"))
     assert gone == [[(0,)], [(0,)], [(3,)]]
-    _alembic(PG_URL, "upgrade", "head")
+    _alembic(PG_URL, "upgrade", THIS)
     assert asyncio.run(sql("select status from planner_tasks order by position")) == [[("done",), ("open",), ("done",)]]

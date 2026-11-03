@@ -1,12 +1,17 @@
 """Database writes for streams' work: pipeline items, week objectives, the quarter and notebooks.
 
 Same contract as planner_day: flush, never commit; a ValueError carries the vault path's message.
+
+Pipeline items and week objectives are planner_tasks rows (see planner_mapping): an item is a row with a `lane`; a week's
+objective sits on the row that is that week's small domino (`focus_week`, `objective_*`), or alone on a row with no lane when
+no item carries it. Every function here keeps the outcome the two old tables gave.
 """
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
-from app.models.planner import NotebookEntry, PipelineItem, Quarter, QuarterStream, WeekObjective
+from app.models.planner import NotebookEntry, Quarter, QuarterStream, Task
+from app.services import planner_store
 from app.services.rules import (
     BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, HASHTAG, MONTHS, PRODUCT, SLUG, clean_entry, clean_products, clean_item, split_tags,
     make_stream, new_id, one_line_field, quarter_months, validate_field, week_for, weekly_streams,
@@ -15,17 +20,27 @@ from app.services.rules import (
 ITEM_GONE = "that item changed or moved; reload and try again"
 
 
-async def item_row(db, user_id: int, stream: str, item_id: int) -> PipelineItem:
-    row = (await db.execute(select(PipelineItem).where(
-        PipelineItem.user_id == user_id, PipelineItem.stream == stream, PipelineItem.id == item_id))).scalar_one_or_none()
+def is_planning(task: Task) -> bool:
+    """A pipeline item (has a lane). The generic task and item writes hand these to the functions below."""
+    return task.lane is not None
+
+
+def is_objective_only(task: Task) -> bool:
+    """A week objective no pipeline item carries: it is not an item anyone can see or edit as one."""
+    return task.lane is None and task.focus_week is not None
+
+
+async def item_row(db, user_id: int, stream: str, item_id: int) -> Task:
+    row = (await db.execute(select(Task).where(
+        Task.user_id == user_id, Task.stream == stream, Task.id == item_id, Task.lane.is_not(None)))).scalar_one_or_none()
     if row is None:
         raise ValueError(ITEM_GONE)
     return row
 
 
 async def _next_position(db, user_id: int, stream: str) -> int:
-    top = (await db.execute(select(func.max(PipelineItem.position)).where(
-        PipelineItem.user_id == user_id, PipelineItem.stream == stream))).scalar()
+    top = (await db.execute(select(func.max(Task.lane_position)).where(
+        Task.user_id == user_id, Task.stream == stream, Task.lane.is_not(None)))).scalar()
     return 0 if top is None else top + 1
 
 
@@ -36,8 +51,34 @@ def _description(text: str) -> str:
     return "\n".join(line.rstrip() for line in text.split("\n")) if text.strip() else ""
 
 
-async def add_items(db, user_id: int, stream: str, texts: list[str], lane: str, today: date,
-                    descriptions: list[str] | None = None) -> None:
+def _done_state(row: Task, done: bool) -> None:
+    row.done = done
+    row.status = "done" if done else "open"
+
+
+def _objective_row(user_id: int, stream: str, week: str, text: str, done: bool, checkpoint: str | None) -> Task:
+    """A row that holds only a week's objective (no lane): it shows in the objectives view and nowhere else."""
+    return Task(user_id=user_id, stream=stream, text=text, done=done, status="done" if done else "open", focus_week=week,
+                objective_text=text, objective_done=done, focus_checkpoint=checkpoint, products=[], description="", blocked_by=[])
+
+
+def _carry(row: Task) -> tuple[str, bool, str | None] | None:
+    return None if row.objective_text is None else (row.objective_text, bool(row.objective_done), row.focus_checkpoint)
+
+
+def _drop_objective(row: Task) -> None:
+    row.objective_text = row.objective_done = row.focus_checkpoint = None
+
+
+def _write_objective(row: Task, text: str, done: bool, checkpoint: str | None) -> None:
+    row.objective_text, row.objective_done, row.focus_checkpoint = text, done, checkpoint
+    if row.lane is None:  # an objective-only row has no other meaning: its own text and tick mirror the objective
+        row.text = text
+        _done_state(row, done)
+
+
+async def add_rows(db, user_id: int, stream: str, texts: list[str], lane: str, today: date,
+                   descriptions: list[str] | None = None) -> list[Task]:
     if lane not in LANES or lane == "done":
         raise ValueError(f"cannot add to lane '{lane}'")
     if descriptions is not None and len(descriptions) != len(texts):
@@ -53,22 +94,53 @@ async def add_items(db, user_id: int, stream: str, texts: list[str], lane: str, 
     if not cleaned:
         raise ValueError("nothing to add")
     position = await _next_position(db, user_id, stream)
+    created = []
     for title, products, month, note in cleaned:
-        db.add(PipelineItem(user_id=user_id, stream=stream, lane=lane, text=title, description=note, products=products,
-                            checkpoint=month, added_on=today, done=False, blocked_by=[], position=position))
+        created.append(Task(user_id=user_id, stream=stream, lane=lane, lane_position=position, text=title, description=note, products=products,
+                            checkpoint=month, added_on=today, done=False, status="open", blocked_by=[]))
         position += 1
+    db.add_all(created)
     await db.flush()
+    return created
+
+
+async def add_items(db, user_id: int, stream: str, texts: list[str], lane: str, today: date,
+                    descriptions: list[str] | None = None) -> None:
+    await add_rows(db, user_id, stream, texts, lane, today, descriptions)
+
+
+async def _move_row(db, row: Task, lane: str, today: date) -> None:
+    if lane not in LANES:
+        raise ValueError(f"unknown lane '{lane}'")
+    done = lane == "done"
+    row.lane = lane
+    _done_state(row, done)
+    row.done_on = (row.done_on or today) if done else None
+    row.lane_position = await _next_position(db, row.user_id, row.stream)
 
 
 async def move_item(db, user_id: int, stream: str, item_id: int, lane: str, today: date) -> None:
     """Move an item to the end of `lane`; Done ticks it and stamps the date, any other lane reopens it."""
     if lane not in LANES:
         raise ValueError(f"unknown lane '{lane}'")
-    row = await item_row(db, user_id, stream, item_id)
-    done = lane == "done"
-    row.lane, row.done = lane, done
-    row.done_on = (row.done_on or today) if done else None
-    row.position = await _next_position(db, user_id, stream)
+    await _move_row(db, await item_row(db, user_id, stream, item_id), lane, today)
+
+
+async def move_and_tick(db, user_id: int, row: Task, lane: str, today: date, streams) -> None:
+    """Move an item; finishing (or reopening) this week's small domino ticks (or unticks) the objective with it."""
+    if lane not in LANES:
+        raise ValueError(f"unknown lane '{lane}'")
+    if row.focus_week == week_for(today)[2] and (lane == "done") != row.done:
+        await update_objective(db, user_id, today, row.stream, None, lane == "done", None, streams)
+    await _move_row(db, row, lane, today)
+
+
+async def set_row_done(db, user_id: int, row: Task, done: bool, today: date) -> None:
+    """The generic tick of a pipeline item (a day's task list, an item's status): Done, or back to Now, like the pipeline move."""
+    if done == row.done:
+        return
+    streams = await planner_store.streams_for(db, user_id, today)
+    await move_and_tick(db, user_id, row, "done" if done else "now", today, streams)
 
 
 async def set_checkpoint(db, user_id: int, stream: str, item_id: int, checkpoint: str | None) -> None:
@@ -76,8 +148,28 @@ async def set_checkpoint(db, user_id: int, stream: str, item_id: int, checkpoint
     row.checkpoint = clean_item(f"x #{checkpoint}")[1] if checkpoint else None
 
 
+async def _delete_row(db, row: Task) -> None:
+    """Delete a row; an objective it carries stays (alone on a row of its own), as the objective table kept it."""
+    carry, week, stream, user_id = _carry(row), row.focus_week, row.stream, row.user_id
+    await db.execute(update(Task).where(Task.parent_id == row.id).values(parent_id=None))
+    await db.delete(row)
+    await db.flush()
+    if carry is not None and week is not None:
+        db.add(_objective_row(user_id, stream, week, *carry))
+        await db.flush()
+
+
 async def remove_item(db, user_id: int, stream: str, item_id: int) -> None:
-    await db.delete(await item_row(db, user_id, stream, item_id))
+    await _delete_row(db, await item_row(db, user_id, stream, item_id))
+
+
+async def remove_row(db, user_id: int, row: Task, today: date) -> None:
+    """The generic delete of a pipeline item: as the pipeline remove, a small domino of this week empties the objective's text first."""
+    if row.focus_week == week_for(today)[2] and row.objective_text is not None:
+        _write_objective(row, "", bool(row.objective_done), None)
+        if not row.objective_done:
+            _drop_objective(row)
+    await _delete_row(db, row)
 
 
 async def set_description(db, user_id: int, stream: str, item_id: int, text: str) -> None:
@@ -96,9 +188,8 @@ async def set_blocked_by(db, user_id: int, stream: str, item_id: int, ids: list[
     row.blocked_by = clean
 
 
-async def set_text(db, user_id: int, stream: str, item_id: int, text: str) -> None:
+def set_text_row(row: Task, text: str) -> None:
     """Rename in place, keeping lane, dates and products; a #month typed in the text replaces the checkpoint."""
-    row = await item_row(db, user_id, stream, item_id)
     bare, typed_products = split_tags(text)
     title, typed_month = clean_item(bare)
     row.text = title
@@ -107,21 +198,83 @@ async def set_text(db, user_id: int, stream: str, item_id: int, text: str) -> No
         row.products = typed_products
 
 
-async def focused_item(db, user_id: int, stream: str, week: str) -> PipelineItem | None:
-    return (await db.execute(select(PipelineItem).where(
-        PipelineItem.user_id == user_id, PipelineItem.stream == stream, PipelineItem.focus_week == week)
-        .order_by(PipelineItem.position))).scalars().first()
+async def set_text(db, user_id: int, stream: str, item_id: int, text: str) -> None:
+    set_text_row(await item_row(db, user_id, stream, item_id), text)
+
+
+async def pipeline_streams(db, user_id: int, today: date) -> set[str]:
+    """The streams a pipeline item may belong to: this quarter's, with a pipeline, not archived."""
+    streams = await planner_store.streams_for(db, user_id, today)
+    return {s.id for s in streams if s.goal and not s.archived}
+
+
+async def set_row_stream(db, user_id: int, row: Task, stream: str | None, today: date) -> None:
+    """Move a pipeline item to another stream's pipeline (the pipeline rule: this quarter, has a pipeline)."""
+    if stream is None:
+        raise ValueError("a pipeline item needs a stream")
+    if stream not in await pipeline_streams(db, user_id, today):
+        raise ValueError(f"unknown stream '{stream}'")
+    if stream == row.stream:
+        return
+    if row.focus_week is not None and await _week_row(db, user_id, stream, row.focus_week) is not None:
+        raise ValueError(f"{stream} already has a small domino for {row.focus_week}")
+    row.stream = stream
+    row.lane_position = await _next_position(db, user_id, stream)
+
+
+async def focused_item(db, user_id: int, stream: str, week: str) -> Task | None:
+    return (await db.execute(select(Task).where(
+        Task.user_id == user_id, Task.stream == stream, Task.focus_week == week, Task.lane.is_not(None))
+        .order_by(Task.lane_position, Task.id))).scalars().first()
+
+
+async def _week_row(db, user_id: int, stream: str, week: str) -> Task | None:
+    """The row holding the week's marker: the small domino item, or the row that carries only the objective."""
+    return (await db.execute(select(Task).where(
+        Task.user_id == user_id, Task.stream == stream, Task.focus_week == week).order_by(Task.id))).scalars().first()
+
+
+async def _clear_focus(db, row: Task) -> None:
+    """Take the week marker off an item. A ticked (or non-empty) objective it carried stays, alone on a row of its own."""
+    week, carry = row.focus_week, _carry(row)
+    row.focus_week = None
+    _drop_objective(row)
+    await db.flush()
+    if carry is not None and week is not None and (carry[0] or carry[1]):
+        db.add(_objective_row(row.user_id, row.stream, week, *carry))
+        await db.flush()
 
 
 async def set_focus(db, user_id: int, stream: str, item_id: int, week: str, today: date) -> None:
-    """Make this item the week's small domino: the marker leaves any other item and the item goes to Now, reopened."""
+    """Make this item the week's small domino: the marker leaves any other item and the item goes to Now, reopened.
+
+    The week's objective moves onto the item. A row that carried only that objective folds into the item and is deleted; an
+    objective the item carried for another week stays behind, alone on a row of its own."""
     row = await item_row(db, user_id, stream, item_id)
-    others = (await db.execute(select(PipelineItem).where(
-        PipelineItem.user_id == user_id, PipelineItem.stream == stream, PipelineItem.focus_week == week))).scalars().all()
+    if row.focus_week is not None and row.focus_week != week:
+        old_week, old = row.focus_week, _carry(row)
+        row.focus_week = None
+        _drop_objective(row)
+        await db.flush()
+        if old is not None:
+            db.add(_objective_row(user_id, stream, old_week, *old))
+            await db.flush()
+    carry = None
+    others = (await db.execute(select(Task).where(
+        Task.user_id == user_id, Task.stream == stream, Task.focus_week == week, Task.id != row.id))).scalars().all()
     for other in others:
-        other.focus_week = None
+        carry = carry or _carry(other)
+        if other.lane is None:
+            await db.delete(other)
+        else:
+            other.focus_week = None
+            _drop_objective(other)
+    if others:
+        await db.flush()
     row.focus_week = week
-    await move_item(db, user_id, stream, item_id, "now", today)
+    if carry is not None:
+        row.objective_text, row.objective_done, row.focus_checkpoint = carry
+    await _move_row(db, row, "now", today)
 
 
 async def update_objective(db, user_id: int, today: date, stream: str, text: str | None, done: bool | None,
@@ -134,25 +287,32 @@ async def update_objective(db, user_id: int, today: date, stream: str, text: str
     if checkpoint and checkpoint not in MONTHS:
         raise ValueError(f"unknown month '{checkpoint}'")
     week = week_for(today)[2]
-    existing = (await db.execute(select(WeekObjective).where(
-        WeekObjective.user_id == user_id, WeekObjective.week == week, WeekObjective.stream == stream))).scalar_one_or_none()
-    row = existing or WeekObjective(user_id=user_id, week=week, stream=stream, text="", done=False, checkpoint=None)
+    holder = await _week_row(db, user_id, stream, week)
+    existing = holder is not None and holder.objective_text is not None
+    now_text = holder.objective_text if existing else ""
+    now_done = bool(holder.objective_done) if existing else False
+    now_checkpoint = holder.focus_checkpoint if existing else None
     if text is not None:
         cleaned = " ".join(text.split())
         if len(cleaned) > MAX_OBJECTIVE_CHARS:
             raise ValueError(f"objective is longer than {MAX_OBJECTIVE_CHARS} characters")
-        row.text = cleaned
+        now_text = cleaned
     if done is not None:
-        row.done = done
+        now_done = done
     if checkpoint is not None:
-        row.checkpoint = checkpoint or None
-    if not row.text:
-        row.checkpoint = None  # a checkpoint is only kept with a line of text, as in the weekly note
-    keep = bool(row.text or row.done)
-    if keep and existing is None:
-        db.add(row)
-    elif not keep and existing is not None:
-        await db.delete(row)
+        now_checkpoint = checkpoint or None
+    if not now_text:
+        now_checkpoint = None  # a checkpoint is only kept with a line of text, as in the weekly note
+    if now_text or now_done:
+        if holder is None:
+            holder = _objective_row(user_id, stream, week, now_text, now_done, now_checkpoint)
+            db.add(holder)
+        _write_objective(holder, now_text, now_done, now_checkpoint)
+    elif existing:
+        if holder.lane is None:
+            await db.delete(holder)
+        else:
+            _drop_objective(holder)
     await db.flush()
 
 
@@ -163,26 +323,24 @@ async def sync_focus(db, user_id: int, stream: str, week: str, today: date, *, t
     if text is not None:
         if text.strip() == "":
             if item:
-                item.focus_week = None
+                await _clear_focus(db, item)
             return
         if item:
-            await set_text(db, user_id, stream, item.id, text)
+            set_text_row(item, text)
             return
         wanted = clean_item(split_tags(text)[0])[0].lower()
-        same = (await db.execute(select(PipelineItem).where(
-            PipelineItem.user_id == user_id, PipelineItem.stream == stream, PipelineItem.done.is_(False))
-            .order_by(PipelineItem.position))).scalars().all()
+        same = (await db.execute(select(Task).where(
+            Task.user_id == user_id, Task.stream == stream, Task.lane.is_not(None), Task.done.is_(False))
+            .order_by(Task.lane_position, Task.id))).scalars().all()
         match = next((i for i in same if i.text.lower() == wanted), None)
         if match:  # the objective names an item already in the pipeline: link it instead of adding a twin
             await set_focus(db, user_id, stream, match.id, week, today)
             return
-        await add_items(db, user_id, stream, [text], "now", today)
-        created = (await db.execute(select(PipelineItem).where(
-            PipelineItem.user_id == user_id, PipelineItem.stream == stream).order_by(PipelineItem.position.desc()))).scalars().first()
+        created = (await add_rows(db, user_id, stream, [text], "now", today))[0]
         await set_focus(db, user_id, stream, created.id, week, today)
         return
     if done is not None and item:
-        await move_item(db, user_id, stream, item.id, "done" if done else "now", today)
+        await _move_row(db, item, "done" if done else "now", today)
 
 
 async def ensure_quarter(db, user_id: int, label: str) -> Quarter:

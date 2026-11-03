@@ -7,13 +7,13 @@ import json
 from datetime import date
 from urllib.parse import urlparse
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.planner import (
-    EventOverlay, Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
-    Quarter, QuarterStream, Task, WeekObjective,
+    EventOverlay, Goal, LogEntry, NotebookEntry, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
+    Quarter, QuarterStream, Task,
 )
 from app.models.user import User
 from app.services.rules import checklist_from_text, checklist_progress, item_status
@@ -29,8 +29,18 @@ def _iso(value: date | None) -> str | None:
 async def build_snapshot(db: AsyncSession, user: User) -> dict:
     uid = user.id
 
-    async def rows(model, *order):
-        return list((await db.execute(select(model).where(model.user_id == uid).order_by(*order))).scalars().all())
+    async def rows(model, *order, where=None):
+        stmt = select(model).where(model.user_id == uid)
+        if where is not None:
+            stmt = stmt.where(where)
+        return list((await db.execute(stmt.order_by(*order))).scalars().all())
+
+    # The planning chain lives on planner_tasks rows. `pipeline_items` and `week_objectives` below are derived from them, for
+    # readers of the older shape (the Obsidian mirror, a rolled-back image); `planning_rows` carries the full rows.
+    lane_rows = await rows(Task, Task.lane_position, Task.id, where=Task.lane.is_not(None))
+    objective_rows = await rows(Task, Task.focus_week, Task.stream, where=Task.objective_text.is_not(None))
+    planning = await rows(Task, Task.id, where=or_(Task.lane.is_not(None), Task.focus_week.is_not(None), Task.objective_text.is_not(None)))
+    plain = await rows(Task, Task.id, where=and_(Task.lane.is_(None), Task.focus_week.is_(None), Task.objective_text.is_(None)))
 
     quarters: dict[str, dict] = {}
     for q in await rows(Quarter, Quarter.label):
@@ -80,12 +90,12 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
                    "progress": checklist_progress(g.checklist) if g.checklist else g.progress}
                   for g in await rows(Goal, Goal.position)],
         "quarters": list(quarters.values()),
-        "week_objectives": [{"week": o.week, "stream": o.stream, "text": o.text, "done": o.done, "checkpoint": o.checkpoint}
-                            for o in await rows(WeekObjective, WeekObjective.week, WeekObjective.stream)],
+        "week_objectives": [{"week": o.focus_week, "stream": o.stream, "text": o.objective_text, "done": bool(o.objective_done),
+                             "checkpoint": o.focus_checkpoint} for o in objective_rows],
         "pipeline_items": [{"id": p.id, "stream": p.stream, "lane": p.lane, "text": p.text, "description": p.description,
                             "products": list(p.products or []), "product": (p.products or [None])[0], "checkpoint": p.checkpoint, "added_on": _iso(p.added_on), "done_on": _iso(p.done_on),
                             "focus_week": p.focus_week, "done": p.done, "blocked_by": list(p.blocked_by or [])}
-                           for p in await rows(PipelineItem, PipelineItem.stream, PipelineItem.position)],
+                           for p in sorted(lane_rows, key=lambda p: (p.stream, p.lane_position or 0, p.id))],
         "notebook_entries": [{"stream": n.stream, "id": n.ext_id, "kind": n.kind, "title": n.title, "body": n.body,
                               "date": n.entry_date, "open": n.is_open}
                              for n in await rows(NotebookEntry, NotebookEntry.stream, NotebookEntry.position)],
@@ -93,8 +103,16 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
         "tasks": [{"id": t.id, "text": t.text, "done": t.done, "due_on": _iso(t.due_on), "scheduled_on": _iso(t.scheduled_on),
                    "start_on": _iso(t.start_on), "done_on": _iso(t.done_on), "source_path": t.source_path, "stream": t.stream, "products": list(t.products or []), "description": t.description or "",
                    "status": item_status(t.done, t.status), "start_min": t.start_min, "end_min": t.end_min, "weight": t.weight,
-                   "checklist": list(t.checklist or [])}
-                  for t in await rows(Task, Task.id)],
+                   "checklist": list(t.checklist or []), "parent_ref": t.parent_id}
+                  for t in plain],
+        "planning_rows": [{"id": t.id, "parent_ref": t.parent_id, "origin": t.origin, "stream": t.stream, "lane": t.lane, "lane_position": t.lane_position,
+                           "text": t.text, "description": t.description or "", "products": list(t.products or []), "checkpoint": t.checkpoint,
+                           "added_on": _iso(t.added_on), "done": t.done, "done_on": _iso(t.done_on), "status": item_status(t.done, t.status),
+                           "focus_week": t.focus_week, "objective_text": t.objective_text, "objective_done": t.objective_done,
+                           "focus_checkpoint": t.focus_checkpoint, "blocked_by": list(t.blocked_by or []), "due_on": _iso(t.due_on),
+                           "scheduled_on": _iso(t.scheduled_on), "start_on": _iso(t.start_on), "source_path": t.source_path,
+                           "start_min": t.start_min, "end_min": t.end_min, "weight": t.weight, "checklist": list(t.checklist or [])}
+                          for t in planning],
         "habits": habits,
         "item_overlays": [{"key": o.event_key, "calendar": o.source_calendar, "title": o.title, "day": _iso(o.day), "status": o.status,
                            "weight": o.weight, "stream": o.stream, "products": list(o.products or []), "description": o.description or "",

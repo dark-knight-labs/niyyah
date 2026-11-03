@@ -280,6 +280,10 @@
   "PUT"
  ],
  [
+  "/api/v1/vault/items/undated",
+  "GET"
+ ],
+ [
   "/api/v1/vault/items/{item_id}",
   "DELETE"
  ],

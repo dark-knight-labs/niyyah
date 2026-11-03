@@ -201,6 +201,13 @@
    "type": "object"
   }
  },
+ "DELETE /api/v1/vault/items/{item_id}": {
+  "params": [
+   "path:item_id*"
+  ],
+  "request": null,
+  "response": null
+ },
  "GET /api/v1/auth/me": {
   "params": [],
   "request": null,
@@ -921,6 +928,12 @@
        "id": {
         "type": "string"
        },
+       "instance": {
+        "type": "string"
+       },
+       "key": {
+        "type": "string"
+       },
        "location": {
         "type": "string"
        },
@@ -931,6 +944,9 @@
         "type": "integer"
        },
        "title": {
+        "type": "string"
+       },
+       "uid": {
         "type": "string"
        }
       },
@@ -991,6 +1007,9 @@
   "response": {
    "items": {
     "properties": {
+     "description": {
+      "type": "string"
+     },
      "done": {
       "type": "boolean"
      },
@@ -1002,6 +1021,12 @@
      },
      "path": {
       "type": "string"
+     },
+     "products": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
      },
      "stream": {
       "type": "string"
@@ -1221,6 +1246,403 @@
     "habits",
     "installing_limit",
     "today"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/items": {
+  "params": [
+   "query:from*",
+   "query:to*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "errors": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "items": {
+     "items": {
+      "properties": {
+       "all_day": {
+        "type": "boolean"
+       },
+       "annotated": {
+        "type": "boolean"
+       },
+       "calendar": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "checkpoint": {
+        "type": "string"
+       },
+       "color": {
+        "type": "string"
+       },
+       "day": {
+        "type": "string"
+       },
+       "description": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "due_on": {
+        "type": "string"
+       },
+       "end_min": {
+        "type": "integer"
+       },
+       "event_id": {
+        "type": "string"
+       },
+       "focus_week": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "instance": {
+        "type": "string"
+       },
+       "key": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "lane": {
+        "type": "string"
+       },
+       "location": {
+        "type": "string"
+       },
+       "meeting_url": {
+        "type": "string"
+       },
+       "parent_id": {
+        "type": "integer"
+       },
+       "path": {
+        "type": "string"
+       },
+       "products": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "scheduled_on": {
+        "type": "string"
+       },
+       "start_min": {
+        "type": "integer"
+       },
+       "start_on": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       },
+       "uid": {
+        "type": "string"
+       },
+       "weight": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "all_day",
+       "checklist",
+       "day",
+       "description",
+       "done",
+       "end_min",
+       "kind",
+       "products",
+       "start_min",
+       "status",
+       "stream",
+       "title",
+       "weight"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "orphans": {
+     "items": {
+      "properties": {
+       "annotated": {
+        "type": "boolean"
+       },
+       "calendar": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "day": {
+        "type": "string"
+       },
+       "description": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "key": {
+        "type": "string"
+       },
+       "products": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       },
+       "weight": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "annotated",
+       "calendar",
+       "checklist",
+       "day",
+       "description",
+       "done",
+       "key",
+       "products",
+       "status",
+       "stream",
+       "title",
+       "weight"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "errors",
+    "items",
+    "orphans"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/items/undated": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "items": {
+     "items": {
+      "properties": {
+       "all_day": {
+        "type": "boolean"
+       },
+       "annotated": {
+        "type": "boolean"
+       },
+       "calendar": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "checkpoint": {
+        "type": "string"
+       },
+       "color": {
+        "type": "string"
+       },
+       "day": {
+        "type": "string"
+       },
+       "description": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "due_on": {
+        "type": "string"
+       },
+       "end_min": {
+        "type": "integer"
+       },
+       "event_id": {
+        "type": "string"
+       },
+       "focus_week": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "instance": {
+        "type": "string"
+       },
+       "key": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "lane": {
+        "type": "string"
+       },
+       "location": {
+        "type": "string"
+       },
+       "meeting_url": {
+        "type": "string"
+       },
+       "origin": {
+        "type": "string"
+       },
+       "parent_id": {
+        "type": "integer"
+       },
+       "path": {
+        "type": "string"
+       },
+       "pieces": {
+        "type": "integer"
+       },
+       "products": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "scheduled_on": {
+        "type": "string"
+       },
+       "start_min": {
+        "type": "integer"
+       },
+       "start_on": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       },
+       "uid": {
+        "type": "string"
+       },
+       "weight": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "all_day",
+       "checklist",
+       "day",
+       "description",
+       "done",
+       "end_min",
+       "kind",
+       "products",
+       "start_min",
+       "status",
+       "stream",
+       "title",
+       "weight"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "items"
    ],
    "type": "object"
   }
@@ -2320,6 +2742,205 @@
    "type": "object"
   }
  },
+ "PATCH /api/v1/vault/items/{item_id}": {
+  "params": [
+   "path:item_id*"
+  ],
+  "request": {
+   "properties": {
+    "checklist": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "day": {
+     "type": "string"
+    },
+    "description": {
+     "type": "string"
+    },
+    "end_min": {
+     "type": "integer"
+    },
+    "parent_id": {
+     "type": "integer"
+    },
+    "products": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "start_min": {
+     "type": "integer"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "weight": {
+     "type": "integer"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "all_day": {
+     "type": "boolean"
+    },
+    "annotated": {
+     "type": "boolean"
+    },
+    "calendar": {
+     "type": "string"
+    },
+    "checklist": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "done",
+       "id",
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "checkpoint": {
+     "type": "string"
+    },
+    "color": {
+     "type": "string"
+    },
+    "day": {
+     "type": "string"
+    },
+    "description": {
+     "type": "string"
+    },
+    "done": {
+     "type": "boolean"
+    },
+    "due_on": {
+     "type": "string"
+    },
+    "end_min": {
+     "type": "integer"
+    },
+    "event_id": {
+     "type": "string"
+    },
+    "focus_week": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "instance": {
+     "type": "string"
+    },
+    "key": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "lane": {
+     "type": "string"
+    },
+    "location": {
+     "type": "string"
+    },
+    "meeting_url": {
+     "type": "string"
+    },
+    "parent_id": {
+     "type": "integer"
+    },
+    "path": {
+     "type": "string"
+    },
+    "products": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "scheduled_on": {
+     "type": "string"
+    },
+    "start_min": {
+     "type": "integer"
+    },
+    "start_on": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "uid": {
+     "type": "string"
+    },
+    "weight": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "all_day",
+    "checklist",
+    "day",
+    "description",
+    "done",
+    "end_min",
+    "kind",
+    "products",
+    "start_min",
+    "status",
+    "stream",
+    "title",
+    "weight"
+   ],
+   "type": "object"
+  }
+ },
  "POST /api/v1/auth/login": {
   "params": [],
   "request": {
@@ -2635,6 +3256,67 @@
      },
      "type": "array"
     },
+    "item_overlays": {
+     "items": {
+      "properties": {
+       "calendar": {
+        "type": "string"
+       },
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "day": {
+        "type": "string"
+       },
+       "description": {
+        "type": "string"
+       },
+       "key": {
+        "type": "string"
+       },
+       "products": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       },
+       "weight": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "key"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
     "notebook_entries": {
      "items": {
       "properties": {
@@ -2697,6 +3379,9 @@
        "focus_week": {
         "type": "string"
        },
+       "id": {
+        "type": "integer"
+       },
        "lane": {
         "type": "string"
        },
@@ -2718,6 +3403,108 @@
       },
       "required": [
        "lane",
+       "stream",
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "planning_rows": {
+     "items": {
+      "properties": {
+       "added_on": {
+        "type": "string"
+       },
+       "blocked_by": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "checklist": {
+        "items": {
+         "ref": "SnapLine"
+        },
+        "type": "array"
+       },
+       "checkpoint": {
+        "type": "string"
+       },
+       "description": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "done_on": {
+        "type": "string"
+       },
+       "due_on": {
+        "type": "string"
+       },
+       "end_min": {
+        "type": "integer"
+       },
+       "focus_checkpoint": {
+        "type": "string"
+       },
+       "focus_week": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "lane": {
+        "type": "string"
+       },
+       "lane_position": {
+        "type": "integer"
+       },
+       "objective_done": {
+        "type": "boolean"
+       },
+       "objective_text": {
+        "type": "string"
+       },
+       "origin": {
+        "type": "string"
+       },
+       "parent_ref": {
+        "type": "integer"
+       },
+       "products": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "scheduled_on": {
+        "type": "string"
+       },
+       "source_path": {
+        "type": "string"
+       },
+       "start_min": {
+        "type": "integer"
+       },
+       "start_on": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "weight": {
+        "type": "integer"
+       }
+      },
+      "required": [
        "stream",
        "text"
       ],
@@ -2822,6 +3609,29 @@
     "tasks": {
      "items": {
       "properties": {
+       "checklist": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "description": {
+        "type": "string"
+       },
        "done": {
         "type": "boolean"
        },
@@ -2831,13 +3641,34 @@
        "due_on": {
         "type": "string"
        },
+       "end_min": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "parent_ref": {
+        "type": "integer"
+       },
+       "products": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
        "scheduled_on": {
         "type": "string"
        },
        "source_path": {
         "type": "string"
        },
+       "start_min": {
+        "type": "integer"
+       },
        "start_on": {
+        "type": "string"
+       },
+       "status": {
         "type": "string"
        },
        "stream": {
@@ -2845,6 +3676,9 @@
        },
        "text": {
         "type": "string"
+       },
+       "weight": {
+        "type": "integer"
        }
       },
       "required": [
@@ -3857,6 +4691,208 @@
     "habits",
     "installing_limit",
     "today"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/vault/items": {
+  "params": [],
+  "request": {
+   "properties": {
+    "checklist": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "day": {
+     "type": "string"
+    },
+    "description": {
+     "type": "string"
+    },
+    "end_min": {
+     "type": "integer"
+    },
+    "lane": {
+     "type": "string"
+    },
+    "parent_id": {
+     "type": "integer"
+    },
+    "products": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "start_min": {
+     "type": "integer"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "weight": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "text"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "all_day": {
+     "type": "boolean"
+    },
+    "annotated": {
+     "type": "boolean"
+    },
+    "calendar": {
+     "type": "string"
+    },
+    "checklist": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "done",
+       "id",
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "checkpoint": {
+     "type": "string"
+    },
+    "color": {
+     "type": "string"
+    },
+    "day": {
+     "type": "string"
+    },
+    "description": {
+     "type": "string"
+    },
+    "done": {
+     "type": "boolean"
+    },
+    "due_on": {
+     "type": "string"
+    },
+    "end_min": {
+     "type": "integer"
+    },
+    "event_id": {
+     "type": "string"
+    },
+    "focus_week": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "instance": {
+     "type": "string"
+    },
+    "key": {
+     "type": "string"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "lane": {
+     "type": "string"
+    },
+    "location": {
+     "type": "string"
+    },
+    "meeting_url": {
+     "type": "string"
+    },
+    "parent_id": {
+     "type": "integer"
+    },
+    "path": {
+     "type": "string"
+    },
+    "products": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "scheduled_on": {
+     "type": "string"
+    },
+    "start_min": {
+     "type": "integer"
+    },
+    "start_on": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "uid": {
+     "type": "string"
+    },
+    "weight": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "all_day",
+    "checklist",
+    "day",
+    "description",
+    "done",
+    "end_min",
+    "kind",
+    "products",
+    "start_min",
+    "status",
+    "stream",
+    "title",
+    "weight"
    ],
    "type": "object"
   }
@@ -5398,6 +6434,144 @@
    "type": "object"
   }
  },
+ "PUT /api/v1/vault/items/overlay": {
+  "params": [],
+  "request": {
+   "properties": {
+    "calendar": {
+     "type": "string"
+    },
+    "checklist": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "day": {
+     "type": "string"
+    },
+    "description": {
+     "type": "string"
+    },
+    "key": {
+     "type": "string"
+    },
+    "products": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "weight": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "key"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "annotated": {
+     "type": "boolean"
+    },
+    "calendar": {
+     "type": "string"
+    },
+    "checklist": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "done",
+       "id",
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "day": {
+     "type": "string"
+    },
+    "description": {
+     "type": "string"
+    },
+    "done": {
+     "type": "boolean"
+    },
+    "key": {
+     "type": "string"
+    },
+    "products": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "weight": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "annotated",
+    "calendar",
+    "checklist",
+    "day",
+    "description",
+    "done",
+    "key",
+    "products",
+    "status",
+    "stream",
+    "title",
+    "weight"
+   ],
+   "type": "object"
+  }
+ },
  "PUT /api/v1/vault/notebook/blocker": {
   "params": [],
   "request": {
@@ -6696,6 +7870,74 @@
    },
    "required": [
     "done",
+    "line"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/tasks/description": {
+  "params": [],
+  "request": {
+   "properties": {
+    "description": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    }
+   },
+   "required": [
     "line"
    ],
    "type": "object"
