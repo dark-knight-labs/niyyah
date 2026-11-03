@@ -5,6 +5,7 @@ import { usePlanner } from "@/hooks/use-planner";
 import { useNow } from "@/hooks/use-now";
 import { HabitBoard } from "@/components/planner/habit-board";
 import { CaptureBar } from "@/components/planner/capture-bar";
+import { CompassBand } from "@/components/planner/compass-band";
 import { Notice, Spinner } from "@/components/planner/page-title";
 import { PlanHeader } from "@/components/planner/plan-header";
 import { PlanMap } from "@/components/planner/plan-map";
@@ -114,6 +115,7 @@ export default function PlanPage() {
 
   return (
     <div className="w-full">
+      <CompassBand streams={streams} />
       <PlanHeader quarter={quarter} objectives={objectives} streams={streams} schedule={schedule} today={dateInTz(now, PLANNER_TZ)} busy={busy}
         onSaveObjective={(text) => run(() => vaultApi.setSuperObjective(text, quarter.objective_ar))} />
       {(problem || error) && <p role="alert" className="mb-4 border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
