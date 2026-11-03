@@ -15,6 +15,8 @@ from app.models.planner import (
     EventOverlay, Goal, LogEntry, NotebookEntry, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
     Quarter, QuarterStream, Task,
 )
+from app.models.compass import Compass
+from app.models.persona import Persona
 from app.models.user import User
 from app.services.rules import checklist_from_text, checklist_progress, item_status
 from app.models.vault import VaultDay
@@ -78,6 +80,10 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
                "started_on": _iso(h.started_on), "checks": habit_checks.get(h.id, {})}
               for h in await rows(PlannerHabit, PlannerHabit.position, PlannerHabit.id)]
 
+    compass = (await db.execute(select(Compass).where(Compass.user_id == uid))).scalar_one_or_none()
+    personas = (await db.execute(select(Persona).where(Persona.user_id == uid, Persona.stream.is_not(None))
+                                 .order_by(Persona.order, Persona.id))).scalars().all()
+
     return {
         "version": FORMAT_VERSION,
         "user": {"email": user.email, "timezone": user.timezone},
@@ -118,6 +124,8 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
                            "weight": o.weight, "stream": o.stream, "products": list(o.products or []), "description": o.description or "",
                            "checklist": list(o.checklist or [])}
                           for o in await rows(EventOverlay, EventOverlay.event_key)],
+        "compass": None if compass is None else {"mission": compass.mission, "vision": compass.vision, "vision_horizon": compass.vision_horizon},
+        "persona_streams": [{"name": p.name, "stream": p.stream} for p in personas],
     }
 
 

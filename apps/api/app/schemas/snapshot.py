@@ -243,6 +243,17 @@ class SnapHabit(_Loose):
         return checks
 
 
+class SnapCompass(_Loose):
+    mission: str = Field(default="", max_length=1000)
+    vision: str = Field(default="", max_length=1000)
+    vision_horizon: str = Field(default="", max_length=10)
+
+
+class SnapPersonaStream(_Loose):
+    name: str = Field(max_length=100)
+    stream: Slug
+
+
 class Snapshot(_Loose):
     version: int
     blocks: list[SnapBlock] = _cap(60)
@@ -258,6 +269,8 @@ class Snapshot(_Loose):
     planning_rows: list[SnapPlanningRow] | None = Field(default=None, max_length=50000)  # absent in older exports: then pipeline_items/week_objectives are read
     habits: list[SnapHabit] = _cap(500)
     item_overlays: list[SnapOverlay] = _cap(20000)
+    compass: SnapCompass | None = None  # absent or null in older exports: the account's Compass stays as it is
+    persona_streams: list[SnapPersonaStream] = _cap(100)
 
     @field_validator("version")
     @classmethod
