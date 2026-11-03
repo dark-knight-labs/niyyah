@@ -9,6 +9,7 @@ import { StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, ItemData } from "@/lib/vault-types";
 import { addDays, fmtDay, sundayOf, weekDays } from "@/lib/week";
+import { trayDrag, useTrayDrag, type PlanDrop } from "@/lib/tray-drag";
 import { ItemCard } from "@/components/routine/item-card";
 import { AddEventForm, ConnectButton } from "@/components/routine/calendar-parts";
 
@@ -162,7 +163,7 @@ interface Drag { item: ItemData; day: string; allDay: boolean; duration: number;
 interface Draw { day: string; from: number; to: number; }
 
 /** The week as a 24-hour grid: drag an item to move it (an own item between the all-day row and the grid too), drag across an empty slot to draw a new event. Sleep is greyed out. */
-export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged, onOpenDay, card = true, dimmed }: {
+export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged, onOpenDay, card = true, dimmed, onPlan }: {
   week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void; onEventsChanged: () => void;
   /** Show the picked item's details card above the grid (off when the page shows it elsewhere). */
   card?: boolean;
@@ -170,6 +171,8 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   onOpenDay?: (day: string) => void;
   /** Items to fade back (a tag filter that does not match them). */
   dimmed?: (item: ItemData) => boolean;
+  /** A tray row was dropped on a day (all day) or a time slot. */
+  onPlan?: PlanDrop;
 }) {
   const { days, data, today, items } = week;
   const { picked, setPicked } = week;
@@ -180,6 +183,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const [dragging, setDragging] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
+  const tray = useTrayDrag();
   const scroller = useRef<HTMLDivElement>(null);
   const all = (day: string) => [...(data[day]?.events ?? []), ...(data[day]?.tasks ?? [])];
 
@@ -258,6 +262,12 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     e.preventDefault();
     setOver(null);
     setDragging(false);
+    const row = trayDrag.get();
+    if (row) {
+      trayDrag.set(null);
+      const start = Math.min(1440 - 30, Math.max(0, snap(minuteAt(e.currentTarget, e.clientY))));
+      return onPlan?.(row, day, start, start + 30);
+    }
     const d = drag.current;
     drag.current = null;
     if (!accepts(false, d)) return;
@@ -271,6 +281,8 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     e.preventDefault();
     setOver(null);
     setDragging(false);
+    const row = trayDrag.get();
+    if (row) { trayDrag.set(null); return onPlan?.(row, day); }
     const d = drag.current;
     drag.current = null;
     if (!accepts(true, d)) return;
@@ -317,7 +329,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const sel = week.selected;
   // The All day strip takes no height while no day has anything in it; it opens for a drag (to drop an item into it) or an add.
   const hasAllDay = days.some((day) => (data[day]?.events ?? []).some((e) => !isTimed(e)) || (data[day]?.tasks ?? []).some((t) => !isTimed(t) && (week.showDone || !t.done)));
-  const stripOpen = hasAllDay || dragging || adding !== null;
+  const stripOpen = hasAllDay || dragging || !!tray || adding !== null;
   const strip = stripOpen ? "" : "!h-0 !min-h-0 !max-h-0 overflow-hidden !border-b-0 !p-0";
   const tick = (t: ItemData) => changeTask(items.patch(t, { status: t.done ? "open" : "done" }));
   const finished = (t: ItemData) => t.status !== "open";
@@ -353,7 +365,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
           {days.map((day) => {
             const d = data[day];
             return (
-              <div key={day} data-day={day} onDragOver={(e) => { if (accepts(true)) { e.preventDefault(); setOver(`ad:${day}`); } }} onDragLeave={() => setOver(null)} onDrop={(e) => dropAllDay(e, day)}
+              <div key={day} data-day={day} onDragOver={(e) => { if (accepts(true) || (tray && onPlan)) { e.preventDefault(); setOver(`ad:${day}`); } }} onDragLeave={() => setOver(null)} onDrop={(e) => dropAllDay(e, day)}
                 onClick={(e) => { if (e.target === e.currentTarget) setAdding(day); }}
                 data-allday="" className={`${strip} group sticky top-[34px] z-20 flex max-h-[16rem] min-h-16 cursor-cell flex-col gap-1 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
                 {(d?.events ?? []).filter((e) => !isTimed(e)).map((e) => {
@@ -409,7 +421,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
               className={`relative cursor-cell border-l border-[var(--border)] ${day === today ? "bg-[var(--accent-light)]" : ""}`}
               style={{ height: GRID_PX, touchAction: "pan-x pan-y" }}
               onPointerDown={(e) => startDraw(e, day)} onPointerMove={moveDraw} onPointerUp={endDraw} onPointerCancel={() => setDraw(null)}
-              onDragOver={(e) => { if (accepts(false)) e.preventDefault(); }} onDrop={(e) => dropTimed(e, day)}>
+              onDragOver={(e) => { if (accepts(false) || (tray && onPlan)) e.preventDefault(); }} onDrop={(e) => dropTimed(e, day)}>
               {tops.map((t, h) => <div key={h} aria-hidden="true" className="pointer-events-none absolute inset-x-0 border-t border-[var(--border)]" style={{ top: t }} />)}
               {sleepFor(day).map((s, i) => (
                 <div key={i} aria-hidden="true" title="Sleep: keep clear" className="pointer-events-none absolute inset-x-0 bg-[var(--muted)] opacity-80"
