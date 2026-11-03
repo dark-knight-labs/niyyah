@@ -579,7 +579,7 @@ test("quick add: the preview says where each line lands (parser table)", async (
     ["Plan #oct", `→ ${todayDay} · all day`],
     [`Plan ${wordOf(other)} @studio`, `→ ${day3(other)} · all day · @studio`],
     [`Plan ${wordOf(other)} @nope`, `→ ${day3(other)} · all day`],
-    ["Plan @studio", `→ ${todayDay} · all day`],
+    ["Plan @studio", "→ Studio · Someday"],
     ["Standup tomorrow 09:30-10:00 #work @studio", `→ ${day3(tomorrow)} · 09:30–10:00 · #work · @studio`],
     ["Call bank 18:00-17:00", `→ ${todayDay} · all day · time not understood, added as all day`],
   ];
@@ -739,4 +739,173 @@ test("first open with no stored view: day grid on a phone, week grid on a deskto
   await pickView(page, "day-agenda");
   await page.reload();
   await expect(view(page)).toHaveAttribute("data-cal-view", "day-agenda", { timeout: 30_000 });
+});
+
+// ---- Plan bridge: Week band, tray, quick add routing (Phase B) ----
+
+const authed = () => ({ headers: { Authorization: `Bearer ${tokens!.access_token}` } });
+type Lane = "now" | "next" | "backlog" | "done";
+async function pipelineOf(request: import("@playwright/test").APIRequestContext, stream: string) {
+  const res = await request.get(`${API}/api/v1/vault/pipelines`, authed());
+  const data = await res.json();
+  return { limit: data.now_limit as number, items: data.streams.find((x: { stream: string }) => x.stream === stream).items as { text: string; lane: Lane }[] };
+}
+const laneOf = async (request: import("@playwright/test").APIRequestContext, stream: string, text: string) => (await pipelineOf(request, stream)).items.find((i) => i.text === text)?.lane;
+const band = (page: Page, stream: string) => page.locator(`[data-band-stream="${stream}"]`);
+const trayRow = (page: Page, text: string) => page.locator(`[data-tray-row="${text}"]`);
+const toast = (page: Page) => page.locator("[data-toast]");
+
+test("week band: the seeded objective and its done/total, a tick and an edit that survive a reload", async ({ page, request }) => {
+  await openOverview(page);
+  await expect(page.locator("[data-week-band]")).toBeVisible();
+  await expect(band(page, "studio")).toContainText("Wire the router");
+  const to = plus(today, 6 - dow);
+  const from = plus(today, -dow);
+  const list = await (await request.get(`${API}/api/v1/vault/items?from=${from}&to=${to}`, authed())).json();
+  const mine = new Map<number, boolean>();
+  for (const i of list.items) if (i.kind === "task" && i.stream === "studio") mine.set(i.id, i.done);
+  const done = [...mine.values()].filter(Boolean).length;
+  await expect(band(page, "studio").locator("[data-band-count]")).toHaveText(`${done}/${mine.size}`);
+  expect(mine.size).toBeGreaterThan(0);
+
+  // Tick: persists after a reload.
+  await band(page, "studio").getByLabel("Studio objective done").click({ force: true });
+  await expect.poll(async () => (await (await request.get(`${API}/api/v1/vault/objectives`, authed())).json()).items.find((o: { stream: string }) => o.stream === "studio").done).toBe(true);
+  await page.reload();
+  await expect(band(page, "studio").getByLabel("Studio objective done")).toBeChecked({ timeout: 30_000 });
+
+  // Edit the text in place: persists after a reload.
+  await band(page, "studio").getByRole("button", { name: /^Edit: Wire the router/ }).click();
+  await band(page, "studio").getByLabel("Edit text").fill("Wire the router and the switch");
+  await page.keyboard.press("Enter");
+  await expect(band(page, "studio")).toContainText("Wire the router and the switch");
+  await page.reload();
+  await expect(band(page, "studio")).toContainText("Wire the router and the switch", { timeout: 30_000 });
+});
+
+test("week band: the next week shows the quiet line, not the band; Today brings it back", async ({ page }) => {
+  await openOverview(page);
+  await page.locator("body").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("]");
+  await expect(page.locator("[data-week-band-off]")).toHaveText("Small dominoes are set for the current week");
+  await expect(page.locator("[data-week-band]")).toHaveCount(0);
+  await page.keyboard.press("t");
+  await expect(page.locator("[data-week-band]")).toBeVisible();
+});
+
+test("tray: Next and Someday per stream with counts", async ({ page }) => {
+  await openOverview(page);
+  const next = page.locator('[data-tray-lane="next"]');
+  const someday = page.locator('[data-tray-lane="backlog"]');
+  await expect(next.getByRole("button", { name: /^Next/ })).toContainText("2");
+  await expect(next.locator('[data-tray-stream="studio"]')).toContainText("Plan the DNS cutover");
+  await expect(next.locator('[data-tray-stream="lab"]')).toContainText("Draft the test plan");
+  await expect(someday.getByRole("button", { name: /^Someday/ })).toContainText("3");
+  await expect(someday.locator('[data-tray-stream="studio"]')).toContainText("Replace the switch");
+  await expect(someday.locator('[data-tray-stream="lab"]')).toContainText("Buy cables");
+  // Collapsible.
+  await next.getByRole("button", { name: /^Next/ }).click();
+  await expect(trayRow(page, "Plan the DNS cutover")).toHaveCount(0);
+  await next.getByRole("button", { name: /^Next/ }).click();
+  await expect(trayRow(page, "Plan the DNS cutover")).toBeVisible();
+});
+
+test("quick add routing: previews name the destination before Enter", async ({ page, request }) => {
+  // Fill the studio Now lane (it holds one) so a wk line must fall back to Someday.
+  const studio = await pipelineOf(request, "studio");
+  for (let n = studio.items.filter((i) => i.lane === "now").length; n < studio.limit; n++) {
+    await request.post(`${API}/api/v1/vault/pipeline/studio/items`, { ...authed(), data: { texts: [`Filler ${n}`], lane: "now" } });
+  }
+  await openOverview(page);
+  const input = page.locator("#quick-add-title");
+  const preview = page.locator("#quick-add-preview");
+  const table: [string, string][] = [
+    ["Order cables @lab", "→ Lab · Someday"],
+    ["Order cables nov @lab", "→ Lab · Next"],
+    ["Order cables next @lab", "→ Lab · Next"],
+    ["Order cables wk @lab", "→ Lab · this week's objective"],
+    ["Order cables wk @shop", "→ Shop · Now"],
+    ["Order cables wk @studio", "→ Studio · Someday (Now is full, 3)"],
+    ["Order cables nov", `→ ${todayDay} · all day`],
+    [`Order cables ${wordOf(other)} @lab`, `→ ${day3(other)} · all day · @lab`],
+    ["Order cables 14:00 @lab", `→ ${todayDay} · 14:00–14:30 · @lab`],
+  ];
+  for (const [line, expected] of table) {
+    await input.fill(line);
+    await expect(preview, line).toHaveText(expected);
+  }
+  // Enter sends them: a Next line lands in Lab's Next lane; a wk line with Now full lands in Someday with a toast.
+  await input.fill("Cable run nov @lab");
+  await page.getByRole("button", { name: "Add item" }).click();
+  await expect(input).toHaveValue("");
+  await expect.poll(() => laneOf(request, "lab", "Cable run")).toBe("next");
+  await input.fill("Cable pull wk @studio");
+  await page.getByRole("button", { name: "Add item" }).click();
+  await expect(toast(page)).toHaveText("Now is full (3): left in Someday");
+  await expect.poll(() => laneOf(request, "studio", "Cable pull")).toBe("backlog");
+});
+
+test("week band: a gap offers Pick and Write; Pick sets the objective", async ({ page, request }) => {
+  await openOverview(page);
+  const gap = band(page, "lab").locator("[data-band-gap]");
+  await expect(gap).toContainText("no small domino");
+  await expect(gap.getByRole("button", { name: "Write" })).toBeVisible();
+  await gap.getByRole("button", { name: "Pick Lab small domino from its pipeline" }).click();
+  await page.getByRole("menuitemradio", { name: "Read the paper" }).click();
+  await expect(band(page, "lab")).toContainText("Read the paper");
+  await expect(band(page, "lab").locator("[data-band-gap]")).toHaveCount(0);
+  const o = (await (await request.get(`${API}/api/v1/vault/objectives`, authed())).json()).items.find((x: { stream: string }) => x.stream === "lab");
+  expect(o.text).toBe("Read the paper");
+  await page.reload();
+  await expect(band(page, "lab")).toContainText("Read the paper", { timeout: 30_000 });
+});
+
+test("tray drag: a row dropped on a day's grid makes the item there and moves the pipeline item to Now", async ({ page, request }) => {
+  await openOverview(page);
+  expect(await laneOf(request, "lab", "Buy cables")).toBe("backlog");
+  await trayRow(page, "Buy cables").dragTo(grid(page, other), { targetPosition: { x: 30, y: 300 } });
+  await expect(grid(page, other).locator('[data-item^="t:"]').filter({ hasText: "Buy cables" })).toBeVisible();
+  await expect.poll(() => laneOf(request, "lab", "Buy cables")).toBe("now");
+  await expect(trayRow(page, "Buy cables")).toHaveCount(0);
+});
+
+test("tray drag with Now full: the item is created, the pipeline item stays put, a toast says so", async ({ page, request }) => {
+  await openOverview(page);
+  expect(await laneOf(request, "studio", "Plan the DNS cutover")).toBe("next");
+  await trayRow(page, "Plan the DNS cutover").dragTo(grid(page, other), { targetPosition: { x: 30, y: 400 } });
+  await expect(grid(page, other).locator('[data-item^="t:"]').filter({ hasText: "Plan the DNS cutover" })).toBeVisible();
+  await expect(toast(page)).toHaveText("Now is full (3): left in Next");
+  expect(await laneOf(request, "studio", "Plan the DNS cutover")).toBe("next");
+  await expect(trayRow(page, "Plan the DNS cutover")).toBeVisible();
+  await page.screenshot({ path: `${OUT}/plan-bridge-1440.png`, fullPage: true });
+});
+
+test("tray drag onto the All day strip of the day grid plans the row all day", async ({ page, request }) => {
+  await page.addInitScript(() => localStorage.setItem("niy-calendar-view", "day-grid"));
+  await openOverview(page);
+  await expect(page.locator('[data-cal-view="day-grid"]')).toBeVisible({ timeout: 30_000 });
+  await trayRow(page, "Cable run").dragTo(page.locator(`[data-allday-strip="${today}"]`));
+  await expect(page.locator(`[data-allday-strip="${today}"]`)).toContainText("Cable run");
+  await expect.poll(() => laneOf(request, "lab", "Cable run")).toBe("now"); // Lab's Now has room
+});
+
+test("phone 390px: Plan… (day and time) creates an item without dragging", async ({ page, request }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.locator("[data-tray]")).toBeVisible({ timeout: 30_000 });
+  const row = trayRow(page, "Draft the test plan");
+  await row.getByRole("button", { name: "Plan… Draft the test plan" }).click();
+  const form = page.getByRole("form", { name: "Plan on the calendar" });
+  await form.getByLabel("Day").fill(other);
+  await form.getByLabel("Time (optional)").fill("10:15");
+  const made = page.waitForResponse((r) => r.url().endsWith("/vault/items") && r.request().method() === "POST");
+  await form.getByRole("button", { name: "Add to calendar" }).click();
+  const res = await made;
+  expect(res.status()).toBe(201);
+  expect(await res.json()).toMatchObject({ day: other, title: "Draft the test plan", start_min: 615, end_min: 645, stream: "lab" });
+  // Picking "Read the paper" as Lab's small domino put it in Now, so Lab's Now holds 3 here: the item is made, the pipeline item stays.
+  await expect(toast(page)).toHaveText("Now is full (3): left in Next");
+  expect(await laneOf(request, "lab", "Draft the test plan")).toBe("next");
+  expect(await noPageScrollX(page)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: `${OUT}/plan-bridge-390.png`, fullPage: true });
 });

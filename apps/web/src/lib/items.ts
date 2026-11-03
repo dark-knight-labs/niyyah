@@ -53,6 +53,7 @@ const WEEKDAYS: [RegExp, number][] = [
   [/^sun(day)?$/, 0], [/^mon(day)?$/, 1], [/^tue(s(day)?)?$/, 2], [/^wed(nesday)?$/, 3], [/^thu(r(s(day)?)?)?$/, 4], [/^fri(day)?$/, 5], [/^sat(urday)?$/, 6],
 ];
 const DAY_WORD = /(^|\s)(today|tomorrow|sun(?:day)?|mon(?:day)?|tue(?:s(?:day)?)?|wed(?:nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?)(?=\s|$)/i;
+const LANE_WORD = /(^|\s)(nov|next|wk)(?=\s|$)/i;
 const STREAM_WORD = /(^|\s)@([A-Za-z][\w-]*)(?=\s|$)/g;
 
 export interface QuickParse {
@@ -65,14 +66,16 @@ export interface QuickParse {
   bad: boolean;
   /** The day word typed (today, tomorrow, a weekday), taken out of the title; null = none. */
   when: DayWord | null;
-  /** The stream id of an `@stream` word. Only read together with a day word; otherwise `@word` stays in the title. */
+  /** The stream id of a known `@stream` word (an unknown `@word` stays in the title). */
   stream: string | null;
+  /** `nov` / `next` (-> "next") or `wk`, read only with a stream, no day word and no time; the plan bridge routes on it. */
+  lane: "next" | "wk" | null;
 }
 
 /**
  * Read a quick-add line: `#tag` words become tags; `14:00-15:00` or `14:00 45m` / `14:00 1h` (a bare `14:00` is 30 minutes)
  * makes it timed; no time means all day. A day word (`today`, `tomorrow`, `fri`) picks the day, and with one,
- * `@stream` (a known stream id or label) sets the stream. Everything read is taken out of the title.
+ * `@stream` (a known stream id or label) sets the stream. Without a day or time, `@stream` plus `nov`/`next`/`wk` picks a pipeline destination (see plan-bridge). Everything read is taken out of the title.
  */
 export function parseQuick(text: string, streams: readonly { id: string; label: string }[] = []): QuickParse {
   const tags = hashtags(text);
@@ -101,17 +104,22 @@ export function parseQuick(text: string, streams: readonly { id: string; label: 
     const w = word[2].toLowerCase();
     when = w === "today" || w === "tomorrow" ? w : WEEKDAYS.find(([re]) => re.test(w))![1];
     t = t.replace(word[0], " ");
-    const known = (name: string) => streams.find((s) => s.id.toLowerCase() === name || s.label.toLowerCase() === name);
-    t = t.replace(STREAM_WORD, (all, lead: string, name: string) => {
-      const s = stream ? undefined : known(name.toLowerCase());
-      if (!s) return all;
-      stream = s.id;
-      return lead;
-    });
+  }
+  const known = (name: string) => streams.find((s) => s.id.toLowerCase() === name || s.label.toLowerCase() === name);
+  t = t.replace(STREAM_WORD, (all, lead: string, name: string) => {
+    const s = stream ? undefined : known(name.toLowerCase());
+    if (!s) return all;
+    stream = s.id;
+    return lead;
+  });
+  let lane: "next" | "wk" | null = null;
+  if (stream && !word && !typed) {
+    const w = t.match(LANE_WORD);
+    if (w) { lane = w[2].toLowerCase() === "wk" ? "wk" : "next"; t = t.replace(w[0], " "); }
   }
   const title = t.replace(/\s+/g, " ").trim();
-  if (typed && (start === null || end === null || start >= 1440 || end <= start || end > 1440)) return { title, tags, start: null, end: null, bad: true, when, stream };
-  return { title, tags, start, end, bad: false, when, stream };
+  if (typed && (start === null || end === null || start >= 1440 || end <= start || end > 1440)) return { title, tags, start: null, end: null, bad: true, when, stream, lane };
+  return { title, tags, start, end, bad: false, when, stream, lane };
 }
 
 /** The day a quick-add line lands on: `focus` with no day word, the real today / tomorrow, or the weekday in the shown `days`. */
