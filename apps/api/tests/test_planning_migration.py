@@ -248,7 +248,7 @@ def test_sqlite_upgrade_checks_downgrade_upgrade(tmp_path):
 
     asyncio.run(seed())
     _alembic(url, "stamp", PARENT)
-    _alembic(url, "upgrade", "head")
+    _alembic(url, "upgrade", HEAD)  # the head when this migration was written; later ones are tested on their own
     assert HEAD in _alembic(url, "current")
 
     async def after_upgrade():
@@ -277,7 +277,7 @@ def test_sqlite_upgrade_checks_downgrade_upgrade(tmp_path):
     assert objectives == [(W43, "shop", "", 1, None, 1), (W44, "shop", "Launch the page", 1, None, 1), (W44, "studio", "Unlinked, last week", 0, None, 1),
                           (W45, "shop", "Pick a theme", 0, "nov", 1), (W45, "studio", "Ship X later", 1, "oct", 1), (W45, "studio", "Theirs", 0, None, 2)]
 
-    _alembic(url, "upgrade", "head")
+    _alembic(url, "upgrade", HEAD)  # the head when this migration was written; later ones are tested on their own
     # 10 pipeline items now in the old table, 6 objectives (4 merged into an item, 2 alone? counted below): every one is a row again
     lane_rows = _sqlite(db, "select count(*) from planner_tasks where lane is not null")
     objective_rows = _sqlite(db, "select count(*) from planner_tasks where objective_text is not null")
