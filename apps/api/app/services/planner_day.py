@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.planner import LogEntry, QuarterStream, Task
 from app.models.vault import VaultBlockVote, VaultDay
-from app.services import planner_blocks
+from app.services import planner_blocks, planner_work
 from app.services.rules import MODE_META, clean_status, line_hash, one_line_note, possible_for_count, split_tags, MAX_DESCRIPTION_CHARS
 
 TASK_GONE = "this task no longer exists; reload and try again"
@@ -129,7 +129,7 @@ def _task_fields(text: str) -> tuple[str, list[str]]:
 
 async def _task(db, user_id: int, task_id: int) -> Task:
     task = (await db.execute(select(Task).where(Task.user_id == user_id, Task.id == task_id))).scalar_one_or_none()
-    if task is None:
+    if task is None or planner_work.is_objective_only(task):  # a week objective with no item is not a task
         raise ValueError(TASK_GONE)
     return task
 
@@ -163,12 +163,19 @@ def set_status(task: Task, status: str, today: date) -> None:
 
 
 async def set_task_done(db, user_id: int, task_id: int, done: bool, today: date) -> None:
-    set_status(await _task(db, user_id, task_id), "done" if done else "open", today)
+    task = await _task(db, user_id, task_id)
+    if planner_work.is_planning(task):  # a pipeline item: Done or back to Now, and its objective follows
+        await planner_work.set_row_done(db, user_id, task, done, today)
+        return
+    set_status(task, "done" if done else "open", today)
 
 
 async def set_task_text(db, user_id: int, task_id: int, text: str) -> None:
-    label, tags = _task_fields(text)
     task = await _task(db, user_id, task_id)
+    if planner_work.is_planning(task):  # renamed as a pipeline item is: tags move to products only when typed
+        planner_work.set_text_row(task, text)
+        return
+    label, tags = _task_fields(text)
     task.text = label
     task.products = tags
 
@@ -179,9 +186,20 @@ async def set_task_description(db, user_id: int, task_id: int, text: str) -> Non
     (await _task(db, user_id, task_id)).description = text.strip()
 
 
-async def set_task_stream(db, user_id: int, task_id: int, stream: str | None) -> None:
+async def set_task_stream(db, user_id: int, task_id: int, stream: str | None, today: date) -> None:
     task = await _task(db, user_id, task_id)
+    if planner_work.is_planning(task):  # a pipeline item may only be in a stream with a pipeline this quarter
+        await planner_work.set_row_stream(db, user_id, task, stream, today)
+        return
     task.stream = await _known_stream(db, user_id, stream)
+
+
+async def slot_on_day(db, task: Task, day: date) -> None:
+    """A pipeline item that gets its first day sorts in that day's list like a task made on it (note path, last position)."""
+    if task.lane is not None and task.source_path is None:
+        top = (await db.execute(select(func.max(Task.position)).where(Task.user_id == task.user_id))).scalar()
+        task.source_path = f"Calendar/Daily/{day.isoformat()}.md"
+        task.position = 0 if top is None else top + 1
 
 
 async def move_task(db, user_id: int, task_id: int, from_day: date, to_day: date) -> None:
@@ -194,7 +212,12 @@ async def move_task(db, user_id: int, task_id: int, from_day: date, to_day: date
             moved = True
     if not moved:
         task.scheduled_on = to_day
+    await slot_on_day(db, task, to_day)
 
 
-async def remove_task(db, user_id: int, task_id: int) -> None:
-    await db.delete(await _task(db, user_id, task_id))
+async def remove_task(db, user_id: int, task_id: int, today: date) -> None:
+    task = await _task(db, user_id, task_id)
+    if planner_work.is_planning(task):  # a pipeline item: its objective is cleared as the pipeline remove does
+        await planner_work.remove_row(db, user_id, task, today)
+        return
+    await db.delete(task)

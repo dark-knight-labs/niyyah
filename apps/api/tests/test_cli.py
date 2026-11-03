@@ -23,7 +23,9 @@ async def test_import_command_reports_counts(auth_client, export_file, capsys):
     out = capsys.readouterr().out
     assert code == 0 and "tasks: 3" in out and "pipeline_items: 4" in out
     async with TestSession() as db:
-        assert (await db.execute(select(func.count()).select_from(Task))).scalar_one() == 3
+        # pipeline items and objectives are task rows too: 3 plain tasks + 4 pipeline items + 1 objective no item carries
+        assert (await db.execute(select(func.count()).select_from(Task))).scalar_one() == 8
+        assert (await db.execute(select(func.count()).select_from(Task).where(Task.lane.is_(None), Task.focus_week.is_(None)))).scalar_one() == 3
 
 
 @pytest.mark.asyncio

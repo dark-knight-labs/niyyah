@@ -12,9 +12,10 @@ def _strip(snap):
     """What legitimately differs between two accounts holding the same data: ids and the account itself."""
     snap = copy.deepcopy(snap)
     snap.pop("user", None)
-    for key in ("pipeline_items", "tasks"):
+    for key in ("pipeline_items", "tasks", "planning_rows"):
         for item in snap[key]:
             item.pop("id", None)
+            item.pop("parent_ref", None)
     return snap
 
 

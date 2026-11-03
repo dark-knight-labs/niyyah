@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tests.migration_support import PLANNING_COLUMNS, without_columns
+
 API_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -28,8 +30,8 @@ def _schema_before() -> str:
             text = text.replace("products JSON NOT NULL", "product VARCHAR(100)")
         if table.name == "planner_tasks":  # the stream and products columns come with later migrations
             text = text.replace("stream VARCHAR(24), ", "").replace("products JSON NOT NULL, ", "").replace("description TEXT NOT NULL, ", "")
-            later = ("start_min ", "end_min ", "weight ", "status ", "checklist ")  # the item fields come later still
-            text = "\n".join(line for line in text.split("\n") if not line.strip().startswith(later))
+            # the item fields and the planning columns come later still
+            text = without_columns(text, ("start_min", "end_min", "weight", "status", "checklist") + PLANNING_COLUMNS)
         ddl.append(text + ";")
     return "\n".join(ddl)
 
@@ -45,7 +47,7 @@ def test_backfill_and_downgrade(tmp_path):
             c.execute("insert into planner_pipeline_items (user_id, stream, lane, text, description, product, done, blocked_by, position)"
                       " values (1, 's', 'now', ?, '', ?, 0, '[]', ?)", (f"t{n}", product, n))
     _alembic(db, "stamp", "d5f7a9c1e3b6")
-    _alembic(db, "upgrade", "head")
+    _alembic(db, "upgrade", "e8f0a2c4b6d1")  # the head when this migration was written; later ones are tested on their own
     with sqlite3.connect(db) as c:
         got = [json.loads(r[0]) for r in c.execute("select products from planner_pipeline_items order by position")]
     assert got == [["Router"], [], ["Spaced Out"]]

@@ -82,6 +82,7 @@ from app.schemas.vault import (
     TaskResponse,
     TaskTextIn,
     TaskToggleIn,
+    UndatedItemsResponse,
     VaultBlocksSeriesResponse,
     VaultDayResponse,
     VaultMonthResponse,
@@ -416,7 +417,7 @@ async def put_task_description(data: TaskDescriptionIn, user: User = Depends(get
 @router.put("/tasks/stream", response_model=EditResponse)
 async def put_task_stream(data: TaskStreamIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Put a task in a stream, or take it out of one (`stream` null). Change it any time."""
-    return await _day_write(db, lambda: planner_day.set_task_stream(db, user.id, data.line, data.stream))
+    return await _day_write(db, lambda: planner_day.set_task_stream(db, user.id, data.line, data.stream, _local_now().date()))
 
 
 @router.put("/tasks/move", response_model=EditResponse)
@@ -427,7 +428,7 @@ async def put_task_move(data: TaskMoveIn, user: User = Depends(get_current_user)
 
 @router.post("/tasks/remove", response_model=EditResponse)
 async def post_task_remove(data: TaskRemoveIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await _day_write(db, lambda: planner_day.remove_task(db, user.id, data.line))
+    return await _day_write(db, lambda: planner_day.remove_task(db, user.id, data.line, _local_now().date()))
 
 
 @router.post("/day/{day}/tasks", response_model=EditResponse)
@@ -664,10 +665,18 @@ def _item_fields(data) -> dict:
     return data.model_dump(exclude_unset=True)
 
 
+@router.get("/items/undated", response_model=UndatedItemsResponse)
+async def get_undated_items(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Items with a lane and no day (the pipelines' items, plus any added with `lane`), for a tray to schedule from."""
+    return {"items": await planner_items.undated_items(db, user.id)}
+
+
 @router.post("/items", response_model=ItemResponse, status_code=201)
 async def post_item(data: ItemCreateIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Add an own item on `day`. `#word`s in the text become tags; no start_min/end_min = all day."""
-    _check_task_day(data.day)
+    """Add an own item on `day`, or an undated one in `lane` of the `stream`'s pipeline (exactly one of the two).
+    `#word`s in the text become tags; no start_min/end_min = all day."""
+    if data.day is not None:
+        _check_task_day(data.day)
     task = await _item_run(db, lambda: planner_items.create_item(db, user.id, data.day, _item_fields(data), _local_now().date()))
     return planner_items.written_task(task)
 
@@ -683,7 +692,7 @@ async def patch_item(item_id: int, data: ItemPatchIn, user: User = Depends(get_c
 
 @router.delete("/items/{item_id}", status_code=204)
 async def delete_item(item_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await _item_run(db, lambda: planner_items.remove_item(db, user.id, item_id))
+    await _item_run(db, lambda: planner_items.remove_item(db, user.id, item_id, _local_now().date()))
 
 
 @router.put("/items/overlay", response_model=OverlayResponse)

@@ -15,9 +15,10 @@ def _normalise(snap: dict) -> dict:
     snap = copy.deepcopy(snap)
     snap.pop("user", None)
     snap.pop("feeds", None)
-    for key in ("pipeline_items", "tasks"):
+    for key in ("pipeline_items", "tasks", "planning_rows"):
         for item in snap[key]:
             item.pop("id", None)
+            item.pop("parent_ref", None)
     return snap
 
 

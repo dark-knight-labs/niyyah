@@ -597,15 +597,24 @@ class ItemFieldsIn(BaseModel):
 
 
 class ItemCreateIn(ItemFieldsIn):
-    day: date
+    day: date | None = None  # a scheduled item ...
+    lane: Literal["now", "next", "backlog"] | None = None  # ... or an undated one in this lane of its stream's pipeline (send `stream`)
+    parent_id: int | None = None  # makes it a piece of another item (one level)
     text: str = Field(min_length=1, max_length=300)
     start_min: int | None = Field(default=None, ge=0, le=1440)  # both omitted = all day
     end_min: int | None = Field(default=None, ge=0, le=1440)
 
+    @model_validator(mode="after")
+    def _day_or_lane(self):
+        if (self.day is None) == (self.lane is None):
+            raise ValueError("send exactly one of `day` and `lane`")
+        return self
+
 
 class ItemPatchIn(ItemFieldsIn):
     text: str | None = Field(default=None, min_length=1, max_length=300)
-    day: date | None = None  # reschedules: sets the scheduled date, leaves due and start dates alone
+    day: date | None = None  # reschedules: sets the scheduled date, leaves due and start dates alone (an undated item takes the day)
+    parent_id: int | None = None  # a piece of another item; send null to unlink
     start_min: int | None = Field(default=None, ge=0, le=1440)  # send both null to make it all day
     end_min: int | None = Field(default=None, ge=0, le=1440)
 
@@ -639,6 +648,11 @@ class ItemResponse(BaseModel):
     scheduled_on: date | None = None
     start_on: date | None = None
     path: str | None = None
+    # pipeline fields of an own item (null for a plain task)
+    lane: Lane | None = None
+    focus_week: str | None = None
+    checkpoint: str | None = None
+    parent_id: int | None = None
     # calendar items
     annotated: bool | None = None
     event_id: str | None = None  # Google event id, for moving or deleting through /vault/events
@@ -648,6 +662,15 @@ class ItemResponse(BaseModel):
     color: str | None = None
     location: str | None = None
     meeting_url: str | None = None
+
+
+class UndatedItemResponse(ItemResponse):
+    pieces: int = 0  # how many items are linked to this one as pieces
+    origin: str | None = None  # the migrated row it came from, 'pipeline:7' (null for items made since)
+
+
+class UndatedItemsResponse(BaseModel):
+    items: list[UndatedItemResponse]  # pipeline items with no day, by stream and pipeline order
 
 
 class OverlayResponse(BaseModel):
