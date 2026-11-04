@@ -4,7 +4,6 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { parseQuick, quickDay, type QuickParse } from "@/lib/items";
 import { formatMinutes } from "@/lib/routine";
-import { quickAddRoute, routePreview, sendQuickAdd, type RouteData } from "@/lib/plan-bridge";
 import { vaultApi } from "@/lib/vault-api";
 import { StreamMeta } from "@/lib/streams";
 import type { ItemCreate } from "@/lib/vault-types";
@@ -104,12 +103,9 @@ export function quickPreview(p: QuickParse, day: string, google = false): string
  * One line adds an item. `#tag` words become tags; `14:00-15:00` or `14:00 45m` makes it timed (no time = all day); `today`,
  * `tomorrow` or a weekday of the shown week picks the day (none = the focused day), and with a day, `@stream` sets the stream.
  * A timed line can go to Google Calendar instead of Niyyah (the toggle shows when Google is connected). The preview says where it lands.
- * With a known `@stream` and no day or time the line goes to the planning side instead: `@stream` alone = that stream's Someday,
- * with `nov` / `next` = its Next, with `wk` = this week's objective if empty, else Now (Someday when Now is full).
  */
-export function QuickAdd({ focus, today, days, connected, streams, route: routeData, onCreate, onAdded, onNotice }: {
-  focus: string; today: string; days: string[]; connected: boolean; streams: StreamMeta[]; route: RouteData;
-  onCreate: (item: ItemCreate) => Promise<boolean>; onAdded: () => void; onNotice: (text: string) => void;
+export function QuickAdd({ focus, today, days, connected, streams, onCreate, onAdded }: {
+  focus: string; today: string; days: string[]; connected: boolean; streams: StreamMeta[]; onCreate: (item: ItemCreate) => Promise<boolean>; onAdded: () => void;
 }) {
   const [title, setTitle] = useState("");
   const [google, setGoogle] = useState(false);
@@ -118,9 +114,7 @@ export function QuickAdd({ focus, today, days, connected, streams, route: routeD
   const parsed = parseQuick(title, streams);
   const day = quickDay(parsed, { today, days, focus });
   const timed = parsed.start !== null && parsed.end !== null;
-  const route = quickAddRoute(parsed);
-  const toGoogle = route.kind === "calendar" && google && timed && connected;
-  const preview = route.kind === "calendar" ? quickPreview(parsed, day, toGoogle) : routePreview(route, parsed, routeData);
+  const toGoogle = google && timed && connected;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -128,10 +122,7 @@ export function QuickAdd({ focus, today, days, connected, streams, route: routeD
     setBusy(true);
     setError(null);
     try {
-      if (route.kind !== "calendar") {
-        const note = await sendQuickAdd(route, parsed, routeData);
-        if (note) onNotice(note);
-      } else if (toGoogle) {
+      if (toGoogle) {
         if (parsed.title.length > 200) throw new Error("A Google event title can be 200 characters at most.");
         await vaultApi.addEvent(day, { title: parsed.title, start: formatMinutes(parsed.start as number), end: formatMinutes(Math.min(1439, parsed.end as number)), location: null });
       } else {
@@ -154,14 +145,14 @@ export function QuickAdd({ focus, today, days, connected, streams, route: routeD
           placeholder="Add: fri 14:00-15:00 call #work" aria-label="Add a task or event" aria-describedby="quick-add-preview" style={title.trim() ? { paddingRight: "min(52%, 24rem)" } : undefined}
           className="min-h-8 w-full border border-[var(--border)] bg-[var(--surface)] px-2.5 text-small placeholder:text-[var(--muted-foreground)] max-lg:!pr-2.5" />
         {title.trim() && (
-          <p id="quick-add-preview" aria-live="polite" title={preview}
+          <p id="quick-add-preview" aria-live="polite" title={quickPreview(parsed, day, toGoogle)}
             className={`pointer-events-none px-0.5 pt-0.5 font-mono text-micro lg:absolute lg:inset-y-0 lg:right-2 lg:flex lg:max-w-[50%] lg:items-center lg:truncate lg:p-0 ${parsed.bad ? "text-[var(--warn)]" : "text-[var(--muted-foreground)]"}`}>
-            <span className="truncate">{preview}</span>
+            <span className="truncate">{quickPreview(parsed, day, toGoogle)}</span>
           </p>
         )}
         {error && <p role="alert" className="pt-0.5 text-xs text-[var(--destructive)]">{error}</p>}
       </div>
-      {connected && timed && route.kind === "calendar" && (
+      {connected && timed && (
         <button type="button" aria-pressed={google} onClick={() => setGoogle(!google)} title="Make a Google Calendar event instead of a Niyyah item"
           className="min-h-8 shrink-0 whitespace-nowrap border border-[var(--border)] px-2 text-xs font-semibold text-[var(--muted-foreground)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]">Put in Google Calendar</button>
       )}

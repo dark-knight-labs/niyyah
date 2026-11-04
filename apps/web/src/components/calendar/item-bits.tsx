@@ -5,7 +5,6 @@ import { meetingName } from "@/components/routine/calendar-parts";
 import { CalDay, itemState, STATE_CLASS, sourceOf, timedItems } from "@/lib/calendar";
 import { isTimed, itemRef, subtaskStat } from "@/lib/items";
 import { formatMinutes } from "@/lib/routine";
-import { useTrayDrag } from "@/lib/tray-drag";
 import type { ItemData } from "@/lib/vault-types";
 
 /** What every view needs to draw and act on items. */
@@ -82,12 +81,10 @@ export function ItemChip({ item, cd, h }: { item: ItemData; cd: CalDay; h: ItemH
 }
 
 /** The All day strip of a day view: items with no time. */
-export function AllDayStrip({ cd, h, onDropTray }: { cd: CalDay; h: ItemHandlers; onDropTray?: () => void }) {
+export function AllDayStrip({ cd, h }: { cd: CalDay; h: ItemHandlers }) {
   const list = cd.items.filter((i) => !isTimed(i));
-  const tray = useTrayDrag();
   return (
-    <div data-allday-strip={cd.iso} role="group" aria-label="All day" className={`flex min-h-11 flex-wrap items-center gap-1.5 border-y border-[var(--border)] py-2 ${tray && onDropTray ? "bg-[var(--accent-light)]" : ""}`}
-      onDragOver={(e) => { if (tray && onDropTray) e.preventDefault(); }} onDrop={(e) => { if (onDropTray) { e.preventDefault(); onDropTray(); } }}>
+    <div data-allday-strip={cd.iso} role="group" aria-label="All day" className="flex min-h-11 flex-wrap items-center gap-1.5 border-y border-[var(--border)] py-2">
       <span className={`${MICRO} mr-1`}>All day</span>
       {list.length ? list.map((i) => <ItemChip key={itemRef(i)} item={i} cd={cd} h={h} />) : <span className="text-xs text-[var(--muted-foreground)]">Nothing all day.</span>}
     </div>

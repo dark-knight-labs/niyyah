@@ -34,13 +34,6 @@ async def main(email: str, password: str) -> None:
         snap = sample_snapshot(_local_now().date())
         # A goal with a checklist, so the browser run can tick one from the home page's Goals section.
         snap["goals"][0]["checklist"] = [{"text": "Pay the card", "done": False}, {"text": "Pay the loan", "done": False}]
-        # A weekly stream with no small domino yet and a pipeline to pick from / drag out of (the Week band's gap, the tray).
-        quarter = snap["quarters"][0]
-        quarter["streams"].append({"slug": "lab", "name": "Lab", "color": "teal", "icon": "target", "slot": "OT · Mon", "weekly": True,
-                                   "has_pipeline": True, "in_note": True, "goal": "Run experiments", "status": "committed", "checkpoints": []})
-        for lane, text in (("next", "Draft the test plan"), ("backlog", "Buy cables"), ("backlog", "Read the paper")):
-            snap["pipeline_items"].append({"stream": "lab", "lane": lane, "text": text, "description": "", "products": [], "checkpoint": None,
-                                           "added_on": None, "done_on": None, "focus_week": None, "done": False, "blocked_by": []})
         await import_snapshot(db, user_id, Snapshot.model_validate(snap))
         await db.commit()
     print(f"seeded {email} (user {user_id}) for {_local_now().date()}")
