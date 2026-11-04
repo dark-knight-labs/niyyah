@@ -40,9 +40,9 @@ const iso8601 = (d: Date) => d.toISOString().slice(0, 10);
 const WD = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const wordOf = (isoDay: string) => WD[new Date(`${isoDay}T00:00:00Z`).getUTCDay()];
 
-/** Open a bar menu (Style, Tags, Display) unless it is open already. */
-async function menu(page: Page, name: string | RegExp) {
-  const b = bar(page).getByRole("button", { name });
+/** Open the bar's View options menu (styles, tag filter, display) unless it is open already. */
+async function menu(page: Page) {
+  const b = bar(page).getByRole("button", { name: /^View options/ });
   if ((await b.getAttribute("aria-expanded")) !== "true") await b.click();
 }
 
@@ -51,13 +51,13 @@ async function pickView(page: Page, v: string) {
   const scope = v.startsWith("day") ? "Day" : "Week";
   const btn = bar(page).getByRole("group", { name: "Scope" }).getByRole("button", { name: scope, exact: true });
   if ((await btn.getAttribute("aria-pressed")) !== "true") await btn.click();
-  await menu(page, /^Style/);
+  await menu(page);
   await page.locator(`[data-view-button="${v}"]`).click();
 }
 
 /** Show done tasks through the Display menu (week grid). */
 async function showDone(page: Page) {
-  await menu(page, "Display");
+  await menu(page);
   const b = page.getByRole("button", { name: /^Show done \d+$/ });
   if ((await b.getAttribute("aria-pressed")) !== "true") await b.click();
   await page.keyboard.press("Escape");
@@ -82,17 +82,29 @@ async function quickAdd(page: Page, line: string) {
 }
 
 /** Open the details of the all-day own item `title` on `day` (its title button: the name starts with the title, tags follow). */
-const openTask = (page: Page, day: string, title: string) => allDayTask(page, day, title).getByRole("button", { name: new RegExp(`^${title}`) }).click();
+const openTask = async (page: Page, day: string, title: string) => (await task(page, day, title)).getByRole("button", { name: new RegExp(`^${title}`) }).click();
 
-/** The own item called `title` on `day`, in the all-day row. */
+/** The own item called `title` on `day`, in the all-day row (in the DOM whether or not the day's list is open, so a count of 0 is real). */
 const allDayTask = (page: Page, day: string, title: string) => allDay(page, day).locator('[data-item^="t:"]').filter({ hasText: title });
+
+/** Open `day`'s all-day list when the day shows a count (two or more items) and it is closed; one item shows in the cell itself. */
+async function showAllDay(page: Page, day: string) {
+  const count = page.locator(`[data-allday-count="${day}"]`);
+  if ((await count.count()) && (await count.getAttribute("aria-expanded")) !== "true") await count.click();
+}
+
+/** allDayTask with the day's list opened first, for a row to look at or use. */
+async function task(page: Page, day: string, title: string) {
+  await showAllDay(page, day);
+  return allDayTask(page, day, title);
+}
 
 test("quick add: no time makes an all-day item, #tags become tags", async ({ page }) => {
   await openOverview(page);
   const preview = await quickAdd(page, "Buy milk #errand");
   expect(preview).toContain("all day");
   expect(preview).toContain("#errand");
-  const row = allDayTask(page, today, "Buy milk");
+  const row = await task(page, today, "Buy milk");
   await expect(row).toBeVisible();
   await expect(row.locator('[data-tag="errand"]')).toBeVisible();
   await expect(row).not.toContainText("#errand Buy"); // the tag is not left in the title
@@ -115,7 +127,7 @@ test("quick add: a bad time falls back to all day", async ({ page }) => {
   await openOverview(page);
   const preview = await quickAdd(page, "Call bank 18:00-17:00");
   expect(preview).toContain("time not understood, added as all day");
-  await expect(allDayTask(page, today, "Call bank")).toBeVisible();
+  await expect(await task(page, today, "Call bank")).toBeVisible();
   await expect(grid(page, today).locator('[data-item^="t:"]').filter({ hasText: "Call bank" })).toHaveCount(0);
 });
 
@@ -167,7 +179,7 @@ test("notes: a #word typed in the notes becomes a tag, shown on the item", async
   await c.getByRole("group", { name: "Status" }).click({ position: { x: 1, y: 1 } }); // leave the field
   await saved;
   await expect(c.locator('[data-tag="budget"]')).toBeVisible();
-  const row = allDayTask(page, today, "Call bank");
+  const row = await task(page, today, "Call bank");
   await expect(row.locator('[data-tag="budget"]')).toBeVisible();
   await expect(row.locator('[data-mark="notes"]')).toBeVisible();
   // A tag added by hand shows too, and can be removed.
@@ -175,6 +187,7 @@ test("notes: a #word typed in the notes becomes a tag, shown on the item", async
   await c.getByLabel("Add a tag").fill("#calls");
   await c.getByLabel("Add a tag").press("Enter");
   await tagged;
+  await showAllDay(page, today); // the card took the click, which closed the list
   await expect(row.locator('[data-tag="calls"]')).toBeVisible();
 });
 
@@ -221,31 +234,32 @@ test("calendar event: annotate notes and weight, still there after reload; title
 test("week calendar: tick a task, move it to another day, toggle its pin star", async ({ page }) => {
   await openOverview(page);
   // Tick: a done task leaves the row while done tasks are hidden.
-  const pay = allDayTask(page, today, "Pay invoice");
+  const pay = await task(page, today, "Pay invoice");
   await expect(pay).toBeVisible();
   await pay.getByRole("button", { name: "Done: Pay invoice" }).click();
   await expect(pay).toHaveCount(0);
   await showDone(page);
+  await showAllDay(page, today);
   await expect(pay.getByRole("button", { name: "Not done: Pay invoice" })).toHaveAttribute("aria-pressed", "true");
   await pay.getByRole("button", { name: "Not done: Pay invoice" }).click();
   await expect(pay.getByRole("button", { name: "Done: Pay invoice" })).toHaveAttribute("aria-pressed", "false");
 
   // Move: drag between days in the all-day row.
   const moved = page.waitForResponse((r) => r.url().endsWith("/vault/tasks/move"));
-  await allDayTask(page, today, "Call bank").dragTo(allDay(page, other));
+  await (await task(page, today, "Call bank")).dragTo(allDay(page, other));
   expect((await moved).ok()).toBeTruthy();
-  await expect(allDayTask(page, other, "Call bank")).toBeVisible();
+  await expect(await task(page, other, "Call bank")).toBeVisible();
   await expect(allDayTask(page, today, "Call bank")).toHaveCount(0);
 
   // Pin star.
-  const star = allDayTask(page, other, "Call bank").getByRole("button", { name: "Important: Call bank" });
+  const star = (await task(page, other, "Call bank")).getByRole("button", { name: "Important: Call bank" });
   await star.click();
   await expect(star).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByLabel("Important", { exact: true }).getByText("Call bank")).toBeVisible();
 
   await page.reload();
   await expect(grid(page, today).getByText("Daily standup")).toBeVisible({ timeout: 30_000 });
-  await expect(allDayTask(page, other, "Call bank")).toBeVisible();
+  await expect(await task(page, other, "Call bank")).toBeVisible();
   await expect(allDayTask(page, other, "Call bank").getByRole("button", { name: "Important: Call bank" })).toHaveAttribute("aria-pressed", "true");
   await allDayTask(page, other, "Call bank").getByRole("button", { name: "Important: Call bank" }).click();
   await expect(allDayTask(page, other, "Call bank").getByRole("button", { name: "Important: Call bank" })).toHaveAttribute("aria-pressed", "false");
@@ -255,7 +269,7 @@ test("week calendar: tick a task, move it to another day, toggle its pin star", 
   const movedBack = page.waitForResponse((r) => r.url().endsWith("/vault/tasks/move"));
   await card(page).getByLabel("Day").fill(today);
   await movedBack;
-  await expect(allDayTask(page, today, "Call bank")).toBeVisible();
+  await expect(await task(page, today, "Call bank")).toBeVisible();
   await expect(card(page).getByLabel("Day")).toHaveValue(today);
 
   // An own timed item drags in the grid too, and back to the all-day row.
@@ -263,7 +277,7 @@ test("week calendar: tick a task, move it to another day, toggle its pin star", 
   const patched = page.waitForResponse((r) => r.url().includes("/vault/items/") && r.request().method() === "PATCH");
   await stretch.dragTo(allDay(page, today));
   await patched;
-  await expect(allDayTask(page, today, "Stretch")).toBeVisible();
+  await expect(await task(page, today, "Stretch")).toBeVisible();
 });
 
 test("screenshots: light and dark", async ({ page }) => {
@@ -356,12 +370,12 @@ test("calendar: V cycles through all nine views and back, Shift+V goes back, typ
 test("calendar: a reload keeps the chosen view, ring variant and colour mode", async ({ page }) => {
   await openCalendar(page, "day-grid");
   await pickView(page, "day-ring");
-  await menu(page, "Display");
+  await menu(page);
   await page.getByRole("button", { name: "Ring lanes: Lane per calendar" }).click();
   await page.getByRole("group", { name: "Block colours" }).getByRole("button", { name: "Alternate" }).click();
   await page.reload();
   await expect(view(page)).toHaveAttribute("data-cal-view", "day-ring", { timeout: 30_000 });
-  await menu(page, "Display");
+  await menu(page);
   await expect(page.getByRole("button", { name: "Ring lanes: Lane per calendar" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("group", { name: "Block colours" }).getByRole("button", { name: "Alternate" })).toHaveAttribute("aria-pressed", "true");
   await pickView(page, "week-strips");
@@ -415,7 +429,7 @@ test("calendar: all-day items sit in the All day strip, timed ones do not; ticki
 
 test("calendar: a tag filter dims items without the tag, in day views and the week grid", async ({ page }) => {
   await openCalendar(page, "day-agenda");
-  await menu(page, /^Tags/);
+  await menu(page);
   await page.locator('[data-tag-filter="errand"]').click();
   const milk = view(page).locator('[data-cal-item^="t:"]').filter({ hasText: "Buy milk" }).first();
   const standup = view(page).locator('[data-cal-item^="e:"]').filter({ hasText: "Daily standup" }).first();
@@ -427,7 +441,7 @@ test("calendar: a tag filter dims items without the tag, in day views and the we
   await expect(grid(page, today).locator('[data-item^="e:"]').filter({ hasText: "Daily standup" })).toHaveAttribute("data-dimmed", "true");
   await pickView(page, "day-ring");
   await expect(view(page).locator('svg [data-cal-item^="e:"]').first()).toHaveAttribute("data-dimmed", "true");
-  await menu(page, /^Tags/);
+  await menu(page);
   await page.getByRole("group", { name: "Filter by tag" }).getByRole("button", { name: "All", exact: true }).click();
   await expect(view(page).locator('[data-dimmed="true"]')).toHaveCount(0);
 });
@@ -465,15 +479,20 @@ test("/calendar redirects to / and the stored view still applies", async ({ page
   await expect(page.getByRole("navigation", { name: "Main" }).first().getByRole("link", { name: "Calendar" })).toHaveCount(0);
 });
 
-test("bar: one row at 1440x900 even with a long line typed; ‹ › and Today move the range", async ({ page }) => {
+test("bar: in the 44px app header at 1440x900, one row even with a long line typed; ‹ › and Today move the range", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openOverview(page);
+  await expect(page.locator("header [data-cal-bar]")).toHaveAttribute("data-cal-bar", "header");
+  expect((await page.locator("header").first().boundingBox())!.height).toBe(44);
   const box0 = await bar(page).boundingBox();
-  expect(box0!.height).toBeLessThanOrEqual(56);
+  expect(box0!.height).toBeLessThanOrEqual(44);
   await page.locator("#quick-add-title").fill("Plan the quarterly review tomorrow 14:00-15:30 #work @studio");
   await expect(page.locator("#quick-add-preview")).toBeVisible();
   const box = await bar(page).boundingBox();
-  expect(box!.height, "bar height with text typed").toBeLessThanOrEqual(56);
+  expect(box!.height, "bar height with text typed").toBeLessThanOrEqual(44);
+  // The preview floats under the input, above the calendar's sticky head.
+  const pv = (await page.locator("#quick-add-preview").boundingBox())!;
+  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest("#quick-add-preview"), [pv.x + 4, pv.y + pv.height / 2])).toBe(true);
   await page.screenshot({ path: `${OUT}/home-1440-typing.png`, fullPage: true });
   await page.locator("#quick-add-title").fill("");
   // Range, next / previous, Today.
@@ -481,10 +500,10 @@ test("bar: one row at 1440x900 even with a long line typed; ‹ › and Today mo
   const first = await range.innerText();
   await bar(page).getByRole("button", { name: "Next week" }).click();
   await expect(range).not.toHaveText(first);
-  await expect(bar(page).getByRole("button", { name: "Today", exact: true })).toBeEnabled();
+  await expect(bar(page).getByRole("button", { name: "Today", exact: true })).toBeVisible();
   await page.keyboard.press("t");
   await expect(range).toHaveText(first);
-  await expect(bar(page).getByRole("button", { name: "Today", exact: true })).toBeDisabled();
+  await expect(bar(page).getByRole("button", { name: "Today", exact: true })).toHaveCount(0);
   await page.screenshot({ path: `${OUT}/home-1440.png`, fullPage: true });
 });
 
@@ -512,7 +531,7 @@ test("bar: Day | Week, week headers open the day in the last day style, display 
 
   // Display menu: week grid has the done count; a ring view has ring lanes and block colours.
   await pickView(page, "week-grid");
-  await menu(page, "Display");
+  await menu(page);
   const done = page.getByRole("button", { name: /^Show done \d+$/ });
   await expect(done).toHaveAttribute("aria-pressed", "false");
   await done.click();
@@ -520,29 +539,40 @@ test("bar: Day | Week, week headers open the day in the last day style, display 
   await done.click();
   await expect(page.getByRole("group", { name: "Block colours" })).toHaveCount(0);
   await pickView(page, "day-ring");
-  await menu(page, "Display");
+  await menu(page);
   await expect(page.getByRole("group", { name: "Ring lanes" }).getByRole("button")).toHaveCount(4);
   await expect(page.getByRole("group", { name: "Block colours" }).getByRole("button")).toHaveCount(3);
   await page.keyboard.press("Escape");
 
   // Tag menu: shown (there are tags this week), picking a tag shows it on the button, All clears it.
-  await menu(page, /^Tags/);
+  await menu(page);
   await page.locator('[data-tag-filter="errand"]').click();
-  await expect(bar(page).getByRole("button", { name: /^Tags: #errand/ })).toBeVisible();
+  await expect(bar(page).getByRole("button", { name: /^View options: .*tag #errand/ })).toBeVisible();
   await page.getByRole("group", { name: "Filter by tag" }).getByRole("button", { name: "All", exact: true }).click();
-  await expect(bar(page).getByRole("button", { name: /^Tags: all/ })).toBeVisible();
+  await expect(bar(page).getByRole("button", { name: /^View options/ })).not.toHaveAccessibleName(/tag #/);
 });
 
-test("rail: Ctrl+B and the ☰ button hide and show it; the date, mode and stars sit in the top bar; a goal item ticks", async ({ page }) => {
+test("rail: Ctrl+B and the sidebar button hide and show it; mode and stars sit under the clock, in the bar while it is hidden; a goal item ticks", async ({ page }) => {
   await openOverview(page);
   const rail = page.getByRole("region", { name: "This week" });
   await expect(rail).toBeVisible();
-  await expect(page.locator("#nav-today")).not.toBeEmpty();
+  // A vote makes today's note, which carries the mode and the stars.
+  const voted = page.waitForResponse((r) => r.url().includes("/vault/") && r.request().method() !== "GET");
+  await page.getByRole("group", { name: "Soul vote" }).getByRole("button", { name: "Soul 1 star" }).click();
+  await voted;
+  const facts = page.getByRole("group", { name: "Today" });
+  await expect(facts).toHaveCount(1);
+  await expect(facts.getByRole("progressbar", { name: "Stars today" })).toBeVisible();
+  await expect(bar(page).getByRole("group", { name: "Today" })).toHaveCount(0);
   await page.keyboard.press("Control+b");
   await expect(rail).toBeHidden();
+  await expect(bar(page).getByRole("group", { name: "Today" }).getByRole("button", { name: /^Day mode/ })).toBeVisible();
+  await expect(bar(page).getByRole("progressbar", { name: "Stars today" })).toBeVisible();
   await expect(bar(page).getByRole("button", { name: "Show the sidebar" })).toBeVisible();
   await bar(page).getByRole("button", { name: "Show the sidebar" }).click();
   await expect(rail).toBeVisible();
+  await expect(bar(page).getByRole("group", { name: "Today" })).toHaveCount(0);
+  await page.getByRole("group", { name: "Soul vote" }).getByRole("button", { name: "Soul 1 star" }).click(); // undo the vote
   // Goals section of the rail: open a goal with a checklist and tick a line.
   await rail.getByRole("button", { name: /Zero debt/ }).click();
   const line = rail.getByRole("checkbox", { name: /Pay the card/ });
@@ -715,7 +745,7 @@ test("phone 390px: no sideways scroll, the bar wraps, quick add preview sits und
   expect(box!.height).toBeGreaterThan(56); // wraps to more than one row
   await page.screenshot({ path: `${OUT}/home-390.png`, fullPage: true });
   await page.locator("#quick-add-title").fill("");
-  await menu(page, /^Style/);
+  await menu(page);
   await page.screenshot({ path: `${OUT}/home-390-style-menu.png` });
   expect(await noPageScrollX(page)).toBeLessThanOrEqual(0);
 });
@@ -739,4 +769,95 @@ test("first open with no stored view: day grid on a phone, week grid on a deskto
   await pickView(page, "day-agenda");
   await page.reload();
   await expect(view(page)).toHaveAttribute("data-cal-view", "day-agenda", { timeout: 30_000 });
+});
+
+// ---- One bar (Overview variant B): the bar in the header, the all-day row as counts, the calendar status. ----
+
+test("one bar: the bar sits in the header from 1280px and above the calendar below it; the grid refits when it moves", async ({ page }) => {
+  await page.setViewportSize({ width: 1279, height: 800 });
+  await openOverview(page);
+  await expect(bar(page)).toHaveAttribute("data-cal-bar", "page");
+  await expect(page.locator("header [data-cal-bar]")).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(page.locator("header [data-cal-bar]")).toHaveAttribute("data-cal-bar", "header");
+  expect((await bar(page).boundingBox())!.height, "one row in the header at 1280").toBeLessThanOrEqual(44);
+  expect(await noPageScrollX(page)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: `${OUT}/home-1280.png` });
+  // Grid fills the window under the header (bottom gap 16px; whole-pixel hours leave up to one pixel per hour), at 1440x900 too.
+  // A fit left from the page placement would end about one bar height (~45px) short.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const scroller = page.getByRole("grid", { name: "Week schedule" });
+  await expect.poll(async () => Math.round((await scroller.boundingBox())!.y + (await scroller.boundingBox())!.height)).toBeGreaterThanOrEqual(900 - 16 - 26);
+  expect(Math.round((await scroller.boundingBox())!.y + (await scroller.boundingBox())!.height)).toBeLessThanOrEqual(900);
+  // The all-day row is one 28px row however many items a day has.
+  expect(Math.round((await allDay(page, today).boundingBox())!.height)).toBe(28);
+});
+
+test("one bar: menus opened from the header paint above the calendar", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openOverview(page);
+  await menu(page);
+  const group = page.getByRole("group", { name: "View options" });
+  await expect(group).toBeVisible();
+  const g = (await group.boundingBox())!;
+  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('[role="group"][aria-label="View options"]'), [g.x + g.width / 2, g.y + g.height - 6])).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(group).toHaveCount(0);
+});
+
+test("one bar: a day with several all-day items shows a count; its list opens on top, inside the window, and closes on Esc", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openOverview(page);
+  for (const t of ["Lane one", "Lane two"]) await quickAdd(page, `${t} sat #lane`);
+  const sat = (await page.locator("[data-allday][data-day]").last().getAttribute("data-day"))!;
+  const count = page.locator(`[data-allday-count="${sat}"]`);
+  await expect(count).toHaveAccessibleName(/: 2 tasks/);
+  await expect(allDayTask(page, sat, "Lane one")).toBeHidden(); // in the DOM, list closed
+  await count.click();
+  const list = page.locator(`[data-allday-list="${sat}"]`);
+  await expect(list).toBeVisible();
+  const box = (await list.boundingBox())!;
+  expect(box.x + box.width, "the last day's list stays inside the window").toBeLessThanOrEqual(1440);
+  expect(await noPageScrollX(page)).toBeLessThanOrEqual(0);
+  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest("[data-allday-list]"), [box.x + box.width / 2, box.y + 10])).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(list).toBeHidden();
+  // Drag one out of the list onto the grid: it becomes timed, the drag state resets and the list is closed.
+  await count.click();
+  const patched = page.waitForResponse((r) => r.url().includes("/vault/items/") && r.request().method() === "PATCH");
+  await allDayTask(page, sat, "Lane two").dragTo(grid(page, sat), { targetPosition: { x: 20, y: 200 } });
+  await patched;
+  await expect(grid(page, sat).locator('[data-item^="t:"]').filter({ hasText: "Lane two" })).toBeVisible();
+  await expect(list).toBeHidden();
+  // One item left: it shows in the cell itself, and the day still has an add button.
+  await expect(count).toHaveCount(0);
+  await expect(allDayTask(page, sat, "Lane one")).toBeVisible();
+  await allDay(page, sat).getByRole("button", { name: /^Add a task on / }).click();
+  const made = page.waitForResponse((r) => r.url().endsWith("/vault/items") && r.request().method() === "POST");
+  await page.getByRole("textbox", { name: `New task for ${sat}` }).fill("Lane three");
+  await page.getByRole("textbox", { name: `New task for ${sat}` }).press("Enter");
+  expect((await made).status()).toBe(201);
+  await expect(count).toHaveAccessibleName(/: 2 tasks/);
+});
+
+test("one bar: the calendar status says not set up or not connected (amber), and nothing when connected", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  let status = { configured: false, connected: false, email: null as string | null };
+  await page.route("**/vault/calendar/google/status", (r) => r.fulfill({ json: status }));
+  await openOverview(page);
+  const notSetUp = bar(page).getByRole("button", { name: "Calendar: not set up" });
+  await expect(notSetUp).toBeVisible();
+  await notSetUp.click();
+  await expect(page.getByRole("group", { name: "Calendar" })).toContainText("not set up on the server");
+  await expect(page.getByText("Google Calendar is not set up on the server yet.")).toHaveCount(1); // only in the popover, no footer line
+  status = { configured: true, connected: false, email: null };
+  await page.reload();
+  const notConnected = bar(page).getByRole("button", { name: "Calendar: not connected" });
+  await expect(notConnected).toBeVisible({ timeout: 30_000 });
+  await notConnected.click();
+  await expect(page.getByRole("group", { name: "Calendar" }).getByRole("button", { name: "Connect Google Calendar" })).toBeVisible();
+  status = { configured: true, connected: true, email: "me@example.com" };
+  await page.reload();
+  await expect(grid(page, today).getByText("Daily standup")).toBeVisible({ timeout: 30_000 });
+  await expect(bar(page).getByRole("button", { name: /^Calendar/ })).toHaveCount(0);
 });

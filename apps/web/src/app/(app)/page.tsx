@@ -167,18 +167,21 @@ export default function OverviewPage() {
       )}
       {schedule && day && (
         <>
-          <TopBar dateLabel={dateLabel} city={schedule.meta.city} editDay={owner ? dayKey : null} today={today} onSaved={setToday} />
+          {!owner && <TopBar dateLabel={dateLabel} city={schedule.meta.city} editDay={null} today={today} onSaved={setToday} />}
           {owner ? (
             <>
               <div className={`mb-5 grid gap-4 md:items-start ${sidebar ? "xl:grid-cols-[minmax(0,min(27rem,23.1%))_minmax(0,1fr)]" : ""}`}>
                 <div className={`mx-auto w-full max-w-lg xl:max-w-none ${sidebar ? "" : "hidden"}`}>
                   <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
+                  {/* Mode and stars under the clock; while the sidebar is hidden they move into the calendar bar (barExtra). */}
+                  <div className="mt-2"><TopBar look="row" dateLabel={dateLabel} city={schedule.meta.city} editDay={dayKey} today={today} onSaved={setToday} /></div>
                   <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} week={week} goals={goals?.items ?? null} onChanged={loadPlanner} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} /></div>
                 </div>
                 <section aria-label="Calendar" className="min-w-0">
                   <CalendarView week={week} schedule={schedule} today={dayKey} nowMin={nowMin} streams={streams} google={google}
-                    sidebar={sidebar} onSidebar={() => setSidebar((v) => !v)} onChanged={loadPlanner} onEventsChanged={loadToday} />
+                    sidebar={sidebar} onSidebar={() => setSidebar((v) => !v)} onChanged={loadPlanner} onEventsChanged={loadToday}
+                    barExtra={sidebar ? undefined : <TopBar look="bar" dateLabel={dateLabel} city={schedule.meta.city} editDay={dayKey} today={today} onSaved={setToday} />} />
                 </section>
               </div>
               {habits && <div className="mb-5"><HabitsPanel day={dayKey} data={habits} today={today} onData={setHabits} onVoted={setToday} /></div>}

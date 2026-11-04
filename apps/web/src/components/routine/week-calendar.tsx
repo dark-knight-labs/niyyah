@@ -1,7 +1,7 @@
 "use client";
 
-import { AlignLeft, ListChecks, Plus, Star } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlignLeft, ChevronDown, ListChecks, Plus, Star } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useItems } from "@/hooks/use-items";
 import { isTimed, itemRef, subtaskStat } from "@/lib/items";
 import { formatMinutes } from "@/lib/routine";
@@ -10,7 +10,7 @@ import { vaultApi } from "@/lib/vault-api";
 import { GoogleStatusData, ItemData } from "@/lib/vault-types";
 import { addDays, fmtDay, sundayOf, weekDays } from "@/lib/week";
 import { ItemCard } from "@/components/routine/item-card";
-import { AddEventForm, ConnectButton } from "@/components/routine/calendar-parts";
+import { AddEventForm } from "@/components/routine/calendar-parts";
 
 /** The grid shows the whole day. One hour is as tall as fits the window (HOUR_PX before it is measured, never under MIN_HOUR_PX or over MAX_HOUR_PX; SLEEP_PX when it is a collapsed sleep hour); events snap to SNAP minutes when moved or drawn. */
 const HOUR_PX = 48;
@@ -20,6 +20,8 @@ const SLEEP_PX = 5;
 /** Space left under the grid, and the sticky day header above the all-day row. */
 const BOTTOM_GAP = 16;
 const HEADER_PX = 34;
+/** Width of a day's all-day list when it opens under its cell. */
+const LIST_PX = 272;
 const SNAP = 15;
 const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
 
@@ -162,7 +164,7 @@ interface Drag { item: ItemData; day: string; allDay: boolean; duration: number;
 interface Draw { day: string; from: number; to: number; }
 
 /** The week as a 24-hour grid: drag an item to move it (an own item between the all-day row and the grid too), drag across an empty slot to draw a new event. Sleep is greyed out. */
-export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged, onOpenDay, card = true, dimmed }: {
+export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged, onOpenDay, card = true, dimmed, layoutKey }: {
   week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void; onEventsChanged: () => void;
   /** Show the picked item's details card above the grid (off when the page shows it elsewhere). */
   card?: boolean;
@@ -170,6 +172,8 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   onOpenDay?: (day: string) => void;
   /** Items to fade back (a tag filter that does not match them). */
   dimmed?: (item: ItemData) => boolean;
+  /** Changes when something above the grid moves (the bar going into the header), so the grid fits the window again. */
+  layoutKey?: string;
 }) {
   const { days, data, today, items } = week;
   const { picked, setPicked } = week;
@@ -179,6 +183,11 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const [adding, setAdding] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  /** The day whose all-day list is open under its cell, where it sits (fixed, so the scroller does not clip it), and whether a drag from it is under way. */
+  const [listDay, setListDay] = useState<string | null>(null);
+  const [listPos, setListPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const [listHidden, setListHidden] = useState(false);
+  const cells = useRef<Record<string, HTMLDivElement | null>>({});
   const drag = useRef<Drag | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const all = (day: string) => [...(data[day]?.events ?? []), ...(data[day]?.tasks ?? [])];
@@ -203,8 +212,38 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     };
     fit();
     window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [collapsedCount, data, adding, week.picked, problem, dragging, week.showDone]);
+    // The page above the grid can change height without a window resize (the bar moving into the header, the sidebar stacking).
+    const observer = new ResizeObserver(fit);
+    observer.observe(document.body);
+    return () => { window.removeEventListener("resize", fit); observer.disconnect(); };
+  }, [collapsedCount, data, adding, week.picked, problem, dragging, week.showDone, layoutKey]);
+
+  // The open list follows its cell (window or grid scroll, resize) and flips to end at the cell's right edge near the window's edge.
+  const openDay = adding ?? listDay;
+  useLayoutEffect(() => {
+    if (!openDay) return;
+    const place = () => {
+      const r = cells.current[openDay]?.getBoundingClientRect();
+      if (!r) return;
+      const width = Math.max(r.width, LIST_PX);
+      const left = r.left + width > window.innerWidth - 8 ? Math.max(8, r.right - width) : r.left;
+      setListPos({ top: r.bottom, left, width, maxHeight: Math.max(120, Math.min(320, window.innerHeight - r.bottom - 8)) });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => { window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place); };
+  }, [openDay]);
+  // Esc or a press outside the open cell closes the list (an add in progress closes itself on blur, see AddTask).
+  useEffect(() => {
+    if (!listDay) return;
+    const away = (e: MouseEvent) => { if (!cells.current[listDay]?.contains(e.target as Node)) setListDay(null); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setListDay(null); } };
+    document.addEventListener("mousedown", away);
+    // On window, capture phase: ahead of the page hotkeys (document, capture), whose Escape clears the picked item instead.
+    window.addEventListener("keydown", esc, true);
+    return () => { document.removeEventListener("mousedown", away); window.removeEventListener("keydown", esc, true); };
+  }, [listDay]);
   const hourPx = box?.hour ?? HOUR_PX;
   const { px, minuteAt: scaleMinuteAt, heights, tops, total: GRID_PX } = makeScale(collapsible, hourPx);
 
@@ -249,17 +288,22 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
     e.dataTransfer.effectAllowed = "move";
     setDragging(true);
     e.dataTransfer.setData("text/plain", item.title);
+    // Dragging out of an open all-day list: hide it a tick later so the grid shows, but keep the source mounted (removing it aborts the drag).
+    if (listDay) setTimeout(() => setListHidden(true), 0);
   }
-  const endDrag = () => { drag.current = null; setOver(null); setDragging(false); };
+  const endDrag = useCallback(() => { drag.current = null; setOver(null); setDragging(false); setListHidden(false); setListDay(null); }, []);
+  // A drag that ends on a row which re-rendered away never gets its own dragend; the window still does.
+  useEffect(() => {
+    window.addEventListener("dragend", endDrag);
+    return () => window.removeEventListener("dragend", endDrag);
+  }, [endDrag]);
   /** Own items go anywhere; a calendar event keeps its kind (timed stays timed, all day stays all day). */
   const accepts = (allDayRow: boolean, d: Drag | null = drag.current): d is Drag => !!d && (d.item.kind === "task" || d.allDay === allDayRow);
 
   function dropTimed(e: React.DragEvent<HTMLDivElement>, day: string) {
     e.preventDefault();
-    setOver(null);
-    setDragging(false);
     const d = drag.current;
-    drag.current = null;
+    endDrag();
     if (!accepts(false, d)) return;
     const duration = d.duration || 60;
     const start = Math.min(1440 - duration, Math.max(0, snap(minuteAt(e.currentTarget, e.clientY) - d.grab)));
@@ -269,10 +313,8 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
 
   function dropAllDay(e: React.DragEvent, day: string) {
     e.preventDefault();
-    setOver(null);
-    setDragging(false);
     const d = drag.current;
-    drag.current = null;
+    endDrag();
     if (!accepts(true, d)) return;
     if (d.item.kind === "event") { if (d.day !== day) void changeEvent(() => vaultApi.moveEvent(d.item.event_id as string, { day })); return; }
     const task = d.item;
@@ -323,6 +365,42 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
   const finished = (t: ItemData) => t.status !== "open";
   const dim = (i: ItemData) => ({ "data-dimmed": dimmed?.(i) ? "true" : undefined });
 
+  /** One all-day event: inline in its cell (one line) or in the day's list. */
+  const eventRow = (day: string, e: ItemData, inline: boolean) => {
+    const ref = itemRef(e);
+    return (
+      <div key={ref} role="button" tabIndex={0} data-item={ref} draggable={!!e.event_id} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={endDrag}
+        onClick={() => pick(e)} onKeyDown={(k) => k.key === "Enter" && pick(e)} title={eventTip(day, e, e.event_id ? "Drag to another day to move" : "Read-only calendar")} aria-pressed={picked === ref} data-dimmed={dim(e)["data-dimmed"]}
+        className={`flex min-w-0 items-center gap-1 border-l-2 bg-[var(--muted)] px-1.5 text-xs font-medium ${inline ? "h-6" : "min-h-6"} ${e.event_id ? "cursor-grab" : "cursor-pointer"} ${picked === ref ? "outline outline-1 outline-[var(--foreground)]" : ""} ${finished(e) ? "text-[var(--muted-foreground)] line-through" : ""}`} style={{ borderColor: e.color ?? "var(--muted-foreground)" }}>
+        {isPinned(eventPin(day, e)) && <Star size={10} aria-label="Important" className="shrink-0 fill-[var(--accent)] text-[var(--accent)]" />}
+        <span className="truncate">{e.title}</span>
+        <Marks item={e} />
+      </div>
+    );
+  };
+  /** One own all-day task (tick, stream, title, pin): inline in its cell (one line) or in the day's list (up to two lines). */
+  const taskRow = (day: string, t: ItemData, inline: boolean) => {
+    const ref = itemRef(t);
+    return (
+      <div key={ref} data-item={ref} draggable onDragStart={(ev) => startDrag(ev, t, day)} onDragEnd={endDrag}
+        title={`${t.title}${t.products.map((tag) => ` #${tag}`).join("")}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick for details · drag to another day or a time to move`}
+        data-dimmed={dim(t)["data-dimmed"]}
+        className={`group/task flex min-w-0 cursor-grab border border-dashed text-xs hover:bg-[var(--muted)] ${inline ? "h-6 items-center" : "items-start"} ${picked === ref ? "border-[var(--foreground)]" : "border-[var(--border)]"}`}>
+        <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.title}`} aria-pressed={t.done} onClick={() => tick(t)}
+          className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
+        {streamOf(t) && <span aria-hidden="true" className={`h-2 w-2 shrink-0 ${inline ? "" : "mt-1.5"}`} style={{ background: streamOf(t)?.color }} />}
+        <button type="button" onClick={() => pick(t)} aria-pressed={picked === ref} className={`min-w-0 flex-1 break-words pr-1 text-left ${inline ? "truncate" : "line-clamp-2 py-1"} ${finished(t) ? "text-[var(--muted-foreground)] line-through" : ""}`}>
+          {t.title}{t.products.map((tag) => <span key={tag} data-tag={tag} className="mono ml-1 text-[var(--muted-foreground)] no-underline">#{tag}</span>)}
+        </button>
+        <span className="self-center"><Marks item={t} /></span>
+        <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.title}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
+          className={`grid h-4 w-4 shrink-0 place-items-center self-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
+          <Star size={11} className={isPinned(taskPin(day, t)) ? "fill-[var(--accent)] text-[var(--accent)]" : "text-[var(--muted-foreground)]"} />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div>
       {card && sel && (
@@ -349,51 +427,42 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
             </div>
           ))}
 
-          <div className={`sticky top-[34px] z-20 grid place-items-center border-b border-[var(--border)] bg-[var(--surface)] text-micro text-[var(--muted-foreground)] ${strip}`}><span className="rotate-180 whitespace-nowrap [writing-mode:vertical-rl]">All day</span></div>
+          <div className={`sticky top-[34px] z-20 flex items-center border-b border-[var(--border)] bg-[var(--surface)] pl-0.5 text-[9px] font-semibold uppercase leading-[1.1] tracking-[0.06em] text-[var(--muted-foreground)] ${strip}`}><span>All<br />day</span></div>
           {days.map((day) => {
             const d = data[day];
+            const evs = (d?.events ?? []).filter((e) => !isTimed(e));
+            const tks = (d?.tasks ?? []).filter((t) => !isTimed(t) && (week.showDone || !t.done));
+            const n = evs.length + tks.length;
+            const done = tks.filter((t) => t.done).length;
+            const open = openDay === day;
+            const dayName = fmtDay(day, { weekday: "long", day: "numeric", month: "long" });
+            const count = [tks.length - done && `${tks.length - done} task${tks.length - done === 1 ? "" : "s"}`, evs.length && `${evs.length} event${evs.length === 1 ? "" : "s"}`, done && `${done} done`].filter(Boolean).join(" · ");
+            const rows = (inline: boolean) => [...evs.map((e) => eventRow(day, e, inline)), ...tks.map((t) => taskRow(day, t, inline))];
             return (
-              <div key={day} data-day={day} onDragOver={(e) => { if (accepts(true)) { e.preventDefault(); setOver(`ad:${day}`); } }} onDragLeave={() => setOver(null)} onDrop={(e) => dropAllDay(e, day)}
+              <div key={day} ref={(el) => { cells.current[day] = el; }} data-day={day} data-allday="" data-count={n}
+                onDragOver={(e) => { if (accepts(true)) { e.preventDefault(); setOver(`ad:${day}`); } }} onDragLeave={() => setOver(null)} onDrop={(e) => dropAllDay(e, day)}
                 onClick={(e) => { if (e.target === e.currentTarget) setAdding(day); }}
-                data-allday="" className={`${strip} group sticky top-[34px] z-20 flex max-h-[16rem] min-h-16 cursor-cell flex-col gap-1 overflow-y-auto border-b border-l border-[var(--border)] p-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
-                {(d?.events ?? []).filter((e) => !isTimed(e)).map((e) => {
-                  const ref = itemRef(e);
-                  return (
-                    <div key={ref} role="button" tabIndex={0} data-item={ref} draggable={!!e.event_id} onDragStart={(ev) => startDrag(ev, e, day)} onDragEnd={endDrag}
-                      onClick={() => pick(e)} onKeyDown={(k) => k.key === "Enter" && pick(e)} title={eventTip(day, e, e.event_id ? "Drag to another day to move" : "Read-only calendar")} aria-pressed={picked === ref} data-dimmed={dim(e)["data-dimmed"]}
-                      className={`flex items-center gap-1 border-l-2 bg-[var(--muted)] px-1.5 text-xs font-medium ${e.event_id ? "cursor-grab" : "cursor-pointer"} ${picked === ref ? "outline outline-1 outline-[var(--foreground)]" : ""} ${finished(e) ? "text-[var(--muted-foreground)] line-through" : ""}`} style={{ borderColor: e.color ?? "var(--muted-foreground)" }}>
-                      {isPinned(eventPin(day, e)) && <Star size={10} aria-label="Important" className="shrink-0 fill-[var(--accent)] text-[var(--accent)]" />}
-                      <span className="truncate">{e.title}</span>
-                      <Marks item={e} />
-                    </div>
-                  );
-                })}
-                {(d?.tasks ?? []).filter((t) => !isTimed(t) && (week.showDone || !t.done)).map((t) => {
-                  const ref = itemRef(t);
-                  return (
-                    <div key={ref} data-item={ref} draggable onDragStart={(ev) => startDrag(ev, t, day)} onDragEnd={endDrag}
-                      title={`${t.title}${t.products.map((tag) => ` #${tag}`).join("")}${streamOf(t) ? ` · ${streamOf(t)?.label}` : ""}${isPinned(taskPin(day, t)) ? " (important)" : ""}\nClick for details · drag to another day or a time to move`}
-                      data-dimmed={dim(t)["data-dimmed"]}
-                      className={`group/task flex cursor-grab items-start border border-dashed text-xs hover:bg-[var(--muted)] ${picked === ref ? "border-[var(--foreground)]" : "border-[var(--border)]"}`}>
-                      <button type="button" aria-label={`${t.done ? "Not done" : "Done"}: ${t.title}`} aria-pressed={t.done} onClick={() => tick(t)}
-                        className="grid h-5 w-5 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${t.done ? "bg-[var(--accent)]" : ""}`} /></button>
-                      {streamOf(t) && <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" style={{ background: streamOf(t)?.color }} />}
-                      <button type="button" onClick={() => pick(t)} aria-pressed={picked === ref} className={`min-w-0 flex-1 line-clamp-2 break-words py-1 pr-1 text-left ${finished(t) ? "text-[var(--muted-foreground)] line-through" : ""}`}>
-                        {t.title}{t.products.map((tag) => <span key={tag} data-tag={tag} className="mono ml-1 text-[var(--muted-foreground)] no-underline">#{tag}</span>)}
-                      </button>
-                      <span className="self-center"><Marks item={t} /></span>
-                      <button type="button" aria-pressed={isPinned(taskPin(day, t))} aria-label={`Important: ${t.title}`} title="Mark important" onClick={() => week.togglePin(taskPin(day, t))}
-                        className={`grid h-4 w-4 shrink-0 place-items-center self-center ${isPinned(taskPin(day, t)) ? "" : "opacity-0 focus:opacity-100 group-hover/task:opacity-100"}`}>
-                        <Star size={11} className={isPinned(taskPin(day, t)) ? "fill-[var(--accent)] text-[var(--accent)]" : "text-[var(--muted-foreground)]"} />
-                      </button>
-                    </div>
-                  );
-                })}
-                {adding === day ? (
-                  <AddTask key="add" day={day} streams={streams} onDone={(text, stream) => { setAdding(null); if (text) changeTask(items.create({ day, text, stream })); }} />
-                ) : (
-                  <button type="button" aria-label={`Add a task on ${fmtDay(day, { weekday: "long", day: "numeric", month: "long" })}`} title="Add a task for this day" onClick={() => setAdding(day)}
-                    className="flex h-4 items-center gap-0.5 px-0.5 text-micro text-[var(--muted-foreground)] opacity-40 hover:opacity-100 focus:opacity-100 group-hover:opacity-100"><Plus size={11} aria-hidden="true" />Task</button>
+                className={`${strip} group sticky top-[34px] ${open ? "z-[25]" : "z-20"} flex h-7 min-w-0 cursor-cell items-center gap-0.5 border-b border-l border-[var(--border)] px-0.5 ${over === `ad:${day}` ? "bg-[var(--accent-light)]" : "bg-[var(--surface)]"}`}>
+                {n === 1 && <div className="min-w-0 flex-1">{rows(true)}</div>}
+                {n >= 2 && (
+                  <button type="button" data-allday-count={day} aria-expanded={listDay === day} aria-label={`${dayName}: ${count}`} onClick={() => setListDay(listDay === day ? null : day)}
+                    className="flex h-6 min-w-0 flex-1 items-center justify-between gap-1 px-1 text-xs font-medium hover:bg-[var(--muted)]">
+                    <span className="truncate">{count}</span><ChevronDown size={12} aria-hidden="true" className={`shrink-0 text-[var(--muted-foreground)] transition-transform ${listDay === day ? "rotate-180" : ""}`} />
+                  </button>
+                )}
+                <button type="button" aria-label={`Add a task on ${dayName}`} title="Add a task for this day" onClick={() => { setListDay(null); setAdding(day); }}
+                  className={`flex h-6 shrink-0 items-center gap-0.5 px-0.5 text-micro text-[var(--muted-foreground)] opacity-40 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 ${n === 0 ? "" : "w-5 justify-center"}`}>
+                  <Plus size={11} aria-hidden="true" />{n === 0 && "Task"}
+                </button>
+                {(n >= 2 || adding === day) && (
+                  <div role="list" aria-label={`All day, ${dayName}`} data-allday-list={day}
+                    style={open && listPos ? { top: listPos.top, left: listPos.left, maxHeight: listPos.maxHeight, width: listPos.width } : undefined}
+                    className={`${open && listPos ? "grid" : "hidden"} fixed z-40 content-start gap-1 overflow-y-auto border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[0_12px_30px_rgb(0_0_0/0.2)] ${listHidden ? "invisible pointer-events-none" : ""}`}>
+                    {n >= 2 && rows(false)}
+                    {adding === day && (
+                      <AddTask key="add" day={day} streams={streams} onDone={(text, stream) => { setAdding(null); if (text) changeTask(items.create({ day, text, stream })); }} />
+                    )}
+                  </div>
                 )}
               </div>
             );
@@ -464,8 +533,6 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
         <AddEventForm key={`${draft.day}-${draft.start}-${draft.end}`} day={draft.day} start={draft.start} end={draft.end}
           onChanged={() => { setDraft(null); refresh(); }} onCancel={() => setDraft(null)} />
       )}
-      {status?.configured && !status.connected && <ConnectButton />}
-      {status && !status.configured && <p className="mt-2 text-xs text-[var(--muted-foreground)]">Google Calendar is not set up on the server yet.</p>}
     </div>
   );
 }
