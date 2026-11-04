@@ -20,6 +20,7 @@ class Persona(Base):
     one_thing: Mapped[str | None] = mapped_column(Text, nullable=True)
     ritual: Mapped[str | None] = mapped_column(Text, nullable=True)
     guardrail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    stream: Mapped[str | None] = mapped_column(String(24), nullable=True)  # the planner stream this role works in
     points: Mapped[dict | None] = mapped_column(JSON, default=list)
     order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

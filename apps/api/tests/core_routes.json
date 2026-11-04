@@ -20,6 +20,14 @@
   "POST"
  ],
  [
+  "/api/v1/compass",
+  "GET"
+ ],
+ [
+  "/api/v1/compass",
+  "PUT"
+ ],
+ [
   "/api/v1/dashboard",
   "GET"
  ],

@@ -9,6 +9,8 @@ from app.models.planner import (
     EventOverlay, Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
     Quarter, QuarterStream, Task, WeekObjective,
 )
+from app.models.compass import Compass
+from app.models.persona import Persona
 from app.models.vault import VaultBlockVote, VaultDay
 from app.schemas.snapshot import Snapshot
 from app.services.planner_mapping import map_planning
@@ -188,4 +190,24 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
     db.add_all(checks)
     await db.flush()
     groups["habits"], groups["habit_checks"] = habits, checks
+    await _compass(db, user_id, snap)  # not in USER_TABLES and not in the counts: an older file must not erase it
     return {name: len(rows) for name, rows in groups.items()}
+
+
+async def _compass(db: AsyncSession, user_id: int, snap: Snapshot) -> None:
+    """Upsert the Compass when the file has one; set a persona's stream by name for each listed entry (unknown names are ignored)."""
+    if snap.compass is not None:
+        row = (await db.execute(select(Compass).where(Compass.user_id == user_id))).scalar_one_or_none()
+        if row is None:
+            row = Compass(user_id=user_id)
+            db.add(row)
+        row.mission, row.vision, row.vision_horizon = snap.compass.mission, snap.compass.vision, snap.compass.vision_horizon
+    if snap.persona_streams:
+        personas = (await db.execute(select(Persona).where(Persona.user_id == user_id).order_by(Persona.order, Persona.id))).scalars().all()
+        first: dict[str, Persona] = {}
+        for p in personas:
+            first.setdefault(p.name, p)
+        for entry in snap.persona_streams:
+            if entry.name in first:
+                first[entry.name].stream = entry.stream
+    await db.flush()
