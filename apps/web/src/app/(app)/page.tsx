@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api-client";
 import { useBlocks } from "@/lib/blocks";
 import { isAuthenticated } from "@/lib/auth";
 import { vaultApi } from "@/lib/vault-api";
-import { GoogleStatusData, QuarterData, VaultGoalsData, VaultObjectivesData, VaultDayData, VaultEventsData, HabitsData, PipelinesData } from "@/lib/vault-types";
+import { GoogleStatusData, QuarterData, VaultGoalsData, VaultObjectivesData, VaultDayData, VaultEventsData, HabitsData } from "@/lib/vault-types";
 import { dateInTz, hasLocation, nowMinutes, resolveDay, VaultScheduleData } from "@/lib/routine";
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
@@ -18,9 +18,6 @@ import { HabitsPanel } from "@/components/routine/habits-panel";
 import { VotesPanel } from "@/components/routine/votes-panel";
 import { useWeek } from "@/components/routine/week-calendar";
 import { CalendarView } from "@/components/calendar/calendar-view";
-import { Tray } from "@/components/calendar/tray";
-import { planFromPipeline } from "@/lib/plan-bridge";
-import type { PlanDrop } from "@/lib/tray-drag";
 import { toMeta } from "@/lib/streams";
 
 const REFRESH_MS = 60_000;
@@ -44,8 +41,6 @@ export default function OverviewPage() {
   const [goals, setGoals] = useState<VaultGoalsData | null>(null);
   const [quarter, setQuarter] = useState<QuarterData | null>(null);
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
-  const [pipelines, setPipelines] = useState<PipelinesData | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [habits, setHabits] = useState<HabitsData | null>(null);
   const [calendarKey, setCalendarKey] = useState(0);
   /** The left sidebar (clock, now, this week); hidden, the calendar takes the full width. */
@@ -105,7 +100,6 @@ export default function OverviewPage() {
     vaultApi.goals().then(setGoals).catch(() => setGoals(null));
     vaultApi.quarter().then(setQuarter).catch(() => setQuarter(null));
     vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
-    vaultApi.pipelines().then(setPipelines).catch(() => setPipelines(null));
     vaultApi.habits().then(setHabits).catch(() => setHabits(null));
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
@@ -119,18 +113,6 @@ export default function OverviewPage() {
     setCalendarKey((k) => k + 1);
     vaultApi.googleStatus().then(setGoogle).catch(() => setGoogle(null));
   }, [canEdit, dayKey, loadToday]);
-  /** A tray row dropped on a day or slot, or planned from its Plan… form. */
-  const plan: PlanDrop = useCallback((row, day, start, end) => {
-    void planFromPipeline({ create: week.items.create, pipelines }, row.stream, row.item, day, start, end).then((r) => {
-      if (r.message) setToast(r.message);
-      loadPlanner();
-    });
-  }, [week.items.create, pipelines, loadPlanner]);
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 7000);
-    return () => clearTimeout(id);
-  }, [toast]);
   const loadPrivate = useCallback(() => { loadPlanner(); loadCalendar(); }, [loadPlanner, loadCalendar]);
 
   // Drop the ?calendar= param so a reload does not repeat the note.
@@ -175,7 +157,6 @@ export default function OverviewPage() {
           ))}
         </div>
       )}
-      {toast && <p role="status" data-toast="" className="fixed bottom-4 left-1/2 z-50 max-w-[90vw] -translate-x-1/2 border border-[var(--foreground)] bg-[var(--surface)] px-4 py-2 text-small shadow-[0_12px_30px_rgba(0,0,0,0.2)]">{toast}</p>}
       {calendarNote && <p role="status" className="mb-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs">{calendarNote}</p>}
       {needsLocation && (
         <div className="mx-auto max-w-xl rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
@@ -193,11 +174,10 @@ export default function OverviewPage() {
                 <div className={`mx-auto w-full max-w-lg xl:max-w-none ${sidebar ? "" : "hidden"}`}>
                   <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
                   <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
-                  <div className="mt-4"><ThisWeek quarter={quarter} goals={goals?.items ?? null} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} /></div>
-                  <Tray pipelines={pipelines} today={dayKey} onPlan={plan} />
+                  <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} week={week} goals={goals?.items ?? null} onChanged={loadPlanner} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} /></div>
                 </div>
                 <section aria-label="Calendar" className="min-w-0">
-                  <CalendarView week={week} schedule={schedule} today={dayKey} nowMin={nowMin} streams={streams} google={google} quarter={quarter} objectives={objectives} pipelines={pipelines} onPlan={plan} onNotice={setToast}
+                  <CalendarView week={week} schedule={schedule} today={dayKey} nowMin={nowMin} streams={streams} google={google}
                     sidebar={sidebar} onSidebar={() => setSidebar((v) => !v)} onChanged={loadPlanner} onEventsChanged={loadToday} />
                 </section>
               </div>

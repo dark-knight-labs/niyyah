@@ -5,7 +5,6 @@ import { useBlocks } from "@/lib/blocks";
 import { CalDay, itemState, lanes, pieces, prayerMarks, STATE_CLASS, timedItems, tint } from "@/lib/calendar";
 import { itemRef, subtaskStat } from "@/lib/items";
 import { formatMinutes } from "@/lib/routine";
-import { trayDrag, useTrayDrag, type PlanDrop } from "@/lib/tray-drag";
 import { AllDayStrip, Badge, ItemHandlers, itemAttrs, labelOf, StatusBox } from "@/components/calendar/item-bits";
 
 /** Pixels per minute: the whole day is 1152px tall and scrolls inside its own box. */
@@ -15,10 +14,8 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 /**
  * One day on a time axis: blocks as tinted bands (label on the left), prayers as dashed lines with a chip in the axis,
  * timed items as cards in the right-hand column (overlaps side by side), the All day strip above. Starts scrolled to now.
- * A tray row dropped on the strip or a time slot is planned there (15-minute snap, 30 minutes).
  */
-export function DayGrid({ cd, colours, h, onPlan }: { cd: CalDay; colours: string[]; h: ItemHandlers; onPlan?: PlanDrop }) {
-  const tray = useTrayDrag();
+export function DayGrid({ cd, colours, h }: { cd: CalDay; colours: string[]; h: ItemHandlers }) {
   const blocks = useBlocks();
   const box = useRef<HTMLDivElement>(null);
   const timed = timedItems(cd.items);
@@ -35,18 +32,9 @@ export function DayGrid({ cd, colours, h, onPlan }: { cd: CalDay; colours: strin
   const veil = cd.past ? height : cd.nowMin !== null ? cd.nowMin * PX : 0;
   return (
     <div>
-      <AllDayStrip cd={cd} h={h} onDropTray={onPlan && (() => { const row = trayDrag.get(); trayDrag.set(null); if (row) onPlan(row, cd.iso); })} />
+      <AllDayStrip cd={cd} h={h} />
       <div ref={box} className="max-h-[70vh] overflow-auto" role="group" aria-label="Day grid">
-        <div className="relative min-w-[32rem]" style={{ height }} data-grid-day={cd.iso}
-          onDragOver={(e) => { if (tray && onPlan) e.preventDefault(); }}
-          onDrop={(e) => {
-            const row = trayDrag.get();
-            if (!row || !onPlan) return;
-            e.preventDefault();
-            trayDrag.set(null);
-            const start = Math.min(1440 - 30, Math.max(0, Math.round((e.clientY - e.currentTarget.getBoundingClientRect().top) / PX / 15) * 15));
-            onPlan(row, cd.iso, start, start + 30);
-          }}>
+        <div className="relative min-w-[32rem]" style={{ height }}>
           {Array.from({ length: 24 }, (_, hr) => {
             const near = prayers.some((p) => Math.abs(p.min - hr * 60) * PX < 22);
             return (

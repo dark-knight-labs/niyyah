@@ -10,10 +10,6 @@ import { VaultScheduleData } from "@/lib/routine";
 import { StreamMeta } from "@/lib/streams";
 import type { GoogleStatusData, ItemData } from "@/lib/vault-types";
 import { addDays, fmtDay } from "@/lib/week";
-import { WeekBand } from "@/components/calendar/week-band";
-import type { PlanDrop } from "@/lib/tray-drag";
-import type { RouteData } from "@/lib/plan-bridge";
-import type { PipelinesData, QuarterData, VaultObjectivesData } from "@/lib/vault-types";
 import { QuickAdd } from "@/components/routine/calendar-parts";
 import { SleepSpan, Week, WeekCalendar } from "@/components/routine/week-calendar";
 import { CalendarBar, rangeLabel } from "@/components/calendar/calendar-toolbar";
@@ -38,8 +34,7 @@ const SHADE_KEY = "niy-calendar-shade";
  * that V rotates through. `week` is the home page's one useWeek; edits tell the page through `onChanged` (planner) and
  * `onEventsChanged` (today's events). A picked item opens its details beside the view (a sheet on phones).
  */
-export function CalendarView({ week, schedule, today, nowMin, streams, google, quarter, objectives, pipelines, sidebar, onSidebar, onChanged, onEventsChanged, onPlan, onNotice }: {
-  quarter: QuarterData | null; objectives: VaultObjectivesData | null; pipelines: PipelinesData | null; onPlan: PlanDrop; onNotice: (text: string) => void;
+export function CalendarView({ week, schedule, today, nowMin, streams, google, sidebar, onSidebar, onChanged, onEventsChanged }: {
   week: Week; schedule: VaultScheduleData; today: string; nowMin: number; streams: StreamMeta[]; google: GoogleStatusData | null;
   sidebar: boolean; onSidebar: () => void; onChanged: () => void; onEventsChanged: () => void;
 }) {
@@ -108,7 +103,6 @@ export function CalendarView({ week, schedule, today, nowMin, streams, google, q
   const doneCount = days.reduce((n, d) => n + d.items.filter((i) => i.kind === "task" && i.done).length, 0);
   const range = scope === "day" ? fmtDay(focus, { weekday: "short", day: "numeric", month: "short" }) : rangeLabel(days[0].iso, days[6].iso);
   const rangeLong = scope === "day" ? fmtDay(focus, { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : `${range} ${fmtDay(days[6].iso, { year: "numeric" })}`;
-  const route: RouteData = { pipelines, objectives: objectives?.items ?? null, names: Object.fromEntries(streams.map((s) => [s.id, s.label])) };
   const added = () => { week.reload(); onEventsChanged(); onChanged(); };
 
   return (
@@ -124,18 +118,17 @@ export function CalendarView({ week, schedule, today, nowMin, streams, google, q
         variant={variant} onVariant={setVariant} showsRing={view === "day-ring" || view === "week-rings"}
         shade={shade} onShade={setShade}
         errors={week.errors}
-        quickAdd={<QuickAdd focus={focus} today={today} days={week.days} connected={!!google?.connected} streams={streams} onCreate={items.create} onAdded={added} onNotice={onNotice} route={route} />}
+        quickAdd={<QuickAdd focus={focus} today={today} days={week.days} connected={!!google?.connected} streams={streams} onCreate={items.create} onAdded={added} />}
       />
 
-      <WeekBand quarter={quarter} objectives={objectives} pipelines={pipelines} week={week} onChanged={onChanged} />
       <div className={`grid items-start gap-4 ${week.selected ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}>
         <section aria-label={viewName(view)} data-cal-view={view} className="min-w-0">
-          {view === "day-grid" && <DayGrid cd={cd} colours={colours(cd.iso)} h={h} onPlan={onPlan} />}
+          {view === "day-grid" && <DayGrid cd={cd} colours={colours(cd.iso)} h={h} />}
           {view === "day-agenda" && <DayAgenda cd={cd} colours={colours(cd.iso)} h={h} />}
           {view === "day-ribbon" && <DayRibbon cd={cd} colours={colours(cd.iso)} h={h} />}
           {view === "day-ring" && <DayRing cd={cd} variant={variant} colours={colours(cd.iso)} h={h} />}
           {view === "week-grid" && (
-            <WeekCalendar week={week} streams={streams} nowMin={nowMin} status={google} sleepFor={sleepFor} card={false} dimmed={h.dimmed} onPlan={onPlan}
+            <WeekCalendar week={week} streams={streams} nowMin={nowMin} status={google} sleepFor={sleepFor} card={false} dimmed={h.dimmed}
               onChanged={onChanged} onEventsChanged={onEventsChanged} onOpenDay={openDay} />
           )}
           {view === "week-agenda" && <WeekAgenda days={days} colours={colours} h={h} onOpenDay={openDay} />}

@@ -2,22 +2,29 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { vaultApi } from "@/lib/vault-api";
 import { colorVar } from "@/lib/streams";
-import { QuarterData, VaultGoal } from "@/lib/vault-types";
+import { QuarterData, VaultGoal, VaultObjectivesData } from "@/lib/vault-types";
+import { fmtDay } from "@/lib/week";
 import { Checklist } from "@/components/planner/checklist";
+import { EditableRow } from "@/components/routine/editable-row";
+import type { Week } from "@/components/routine/week-calendar";
+import { itemRef } from "@/lib/items";
 
 const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
 
 /**
- * Each stream's quarter goal with its progress, the week of the quarter and a link to the stream's plan; Goals set in Settings follow.
- * The week's small dominoes and the stream's items this week are the Week band above the calendar.
+ * Each stream, nested: the quarter goal with its progress, under it the week's goal (click to edit),
+ * under that the tasks put on this week's calendar for the stream. Goals set in Settings follow.
  */
-export function ThisWeek({ quarter, goals, onTick }: {
-  quarter: QuarterData | null; goals: VaultGoal[] | null;
-  onTick: (id: string, done: boolean) => Promise<unknown>;
+export function ThisWeek({ quarter, objectives, week, goals, onChanged, onTick }: {
+  quarter: QuarterData | null; objectives: VaultObjectivesData | null; week: Week; goals: VaultGoal[] | null;
+  onChanged: () => void; onTick: (id: string, done: boolean) => Promise<unknown>;
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const streams = (quarter?.streams ?? []).filter((s) => s.status !== "archived" && s.goal.trim());
+  const weekly = new Map((objectives?.items ?? []).map((o) => [o.stream, o]));
+  const streams = (quarter?.streams ?? []).filter((s) => s.status !== "archived" && (s.goal.trim() || weekly.has(s.stream)));
+  const tasksOf = (stream: string) => week.days.flatMap((day) => (week.data[day]?.tasks ?? []).filter((t) => t.stream === stream).map((t) => ({ day, task: t })));
   const opened = goals?.find((g) => g.title === open) ?? null;
   const square = (color: string) => <span className="mt-1.5 h-2 w-2 shrink-0" style={{ background: colorVar(color) }} aria-hidden="true" />;
 
@@ -30,8 +37,10 @@ export function ThisWeek({ quarter, goals, onTick }: {
       <ul className="grid gap-2.5 px-3 py-2.5 text-small">
         {streams.length === 0 && <li className="text-[var(--muted-foreground)]">No streams set for this quarter.</li>}
         {streams.map((s) => {
+          const o = weekly.get(s.stream);
           const done = s.goal_checklist.filter((l) => l.done).length;
           const pct = s.goal_checklist.length ? Math.round((100 * done) / s.goal_checklist.length) : null;
+          const tasks = tasksOf(s.stream);
           return (
             <li key={s.stream}>
               <div className="flex items-start gap-2">
@@ -42,6 +51,26 @@ export function ThisWeek({ quarter, goals, onTick }: {
                     {pct !== null && <span className="ml-auto font-mono text-xs tabular-nums text-[var(--muted-foreground)]" title={`${done} of ${s.goal_checklist.length} done`}>{pct}%</span>}
                   </div>
                   {s.goal.trim() && <p className="line-clamp-2 break-words" title={s.goal}><span className={MICRO}>Q </span>{s.goal}</p>}
+                  {o && (
+                    <div className="mt-0.5 pl-3">
+                      <EditableRow compact text={o.text} struck={o.done} maxLength={300} placeholder="Set this week's goal"
+                        lead={<span className={`${MICRO} self-center`}>W</span>}
+                        onSave={async (text) => { await vaultApi.setObjective(o.stream, { text }); onChanged(); }} />
+                    </div>
+                  )}
+                  {tasks.length > 0 && (
+                    <ul className="mt-0.5 grid gap-px pl-6">
+                      {tasks.map(({ day, task }) => (
+                        <li key={itemRef(task)} className="flex items-start gap-1.5 text-xs">
+                          <button type="button" aria-pressed={task.done} aria-label={`${task.done ? "Not done" : "Done"}: ${task.title}`}
+                            onClick={() => void week.items.patch(task, { status: task.done ? "open" : "done" }).then((ok) => ok && onChanged())}
+                            className="grid h-4 w-4 shrink-0 place-items-center"><span className={`h-2.5 w-2.5 border border-[var(--muted-foreground)] ${task.done ? "bg-[var(--accent)]" : ""}`} /></button>
+                          <span className="w-7 shrink-0 font-mono tabular-nums text-[var(--muted-foreground)]">{fmtDay(day, { weekday: "short" })}</span>
+                          <button type="button" onClick={() => week.setPicked(itemRef(task))} title="Open details" className={`min-w-0 break-words text-left hover:underline ${task.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{task.title}</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             </li>
