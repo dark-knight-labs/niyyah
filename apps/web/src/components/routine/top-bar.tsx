@@ -1,8 +1,7 @@
 "use client";
 
 import { Check, ChevronDown } from "lucide-react";
-import { createPortal } from "react-dom";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { vaultApi } from "@/lib/vault-api";
 import { VaultDayData } from "@/lib/vault-types";
 import { resolveModeColor } from "@/lib/vault-constants";
@@ -22,7 +21,7 @@ interface Props {
 }
 
 /** The day's mode: a chip that opens a short list (colour dot, name, tick on the current one). Arrow keys move, Enter picks, Esc closes. */
-function ModePicker({ mode, editable, onChange }: { mode: string; editable: boolean; onChange: (mode: string) => void }) {
+function ModePicker({ mode, editable, onChange, cell }: { mode: string; editable: boolean; onChange: (mode: string) => void; cell: string }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const root = useRef<HTMLDivElement>(null);
@@ -44,7 +43,7 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
       <span className="text-small font-semibold capitalize">{label}</span>
     </>
   );
-  if (!editable) return <div className={FACT}>{face}</div>;
+  if (!editable) return <div className={cell}>{face}</div>;
 
   function pick(key: string) {
     setOpen(false);
@@ -67,7 +66,7 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
     <div ref={root} className="relative flex" onKeyDown={onKey}>
       <button ref={button} type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Day mode: ${label}`}
         onClick={() => { setActive(Math.max(current, 0)); setOpen(!open); }}
-        className={`${FACT} w-full pr-2.5 transition-colors hover:bg-[var(--muted)]`}>
+        className={`${cell} w-full pr-2.5 transition-colors hover:bg-[var(--muted)]`}>
         {face}
         <ChevronDown size={13} aria-hidden="true" className={`ml-1 max-sm:ml-auto text-[var(--muted-foreground)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -87,23 +86,32 @@ function ModePicker({ mode, editable, onChange }: { mode: string; editable: bool
   );
 }
 
-const FACT = "relative flex h-full min-h-9 items-center gap-2 whitespace-nowrap border-l border-[var(--border)] px-3.5";
+/** Cells of the facts strip: "top" in its own row above the page (public view), "row" under the clock, "bar" in the calendar bar. */
+type FactsLook = "top" | "row" | "bar";
+const CELL: Record<FactsLook, string> = {
+  top: "relative flex h-full min-h-9 items-center gap-2 whitespace-nowrap border-l border-[var(--border)] px-3.5",
+  row: "relative flex h-full min-h-8 items-center gap-2 whitespace-nowrap px-2 first:pl-0",
+  bar: "relative flex h-full min-h-8 items-center gap-1.5 whitespace-nowrap border-l border-[var(--border)] px-2",
+};
 const LABEL = "mono text-[var(--muted-foreground)]";
 
-interface FactsProps { dateLabel: string; city: string | null; editDay: string | null; today: VaultDayData | null; onMode: (mode: string) => void; }
+interface FactsProps { dateLabel: string; city: string | null; editDay: string | null; today: VaultDayData | null; onMode: (mode: string) => void; look: FactsLook; }
 
-/** Date, the day's mode and the star total as plain cells; they sit in the app's top bar, before the account. */
-function TodayFacts({ dateLabel, city, editDay, today, onMode }: FactsProps) {
+/** Date (top look only), the day's mode and the star total as plain cells. */
+function TodayFacts({ dateLabel, city, editDay, today, onMode, look }: FactsProps) {
+  const cell = CELL[look];
   return (
     <div className="flex h-full items-stretch" role="group" aria-label="Today">
-      <div className={FACT} title={city ?? undefined}>
-        <span className={LABEL}>Date</span>
-        <span className="text-small font-semibold">{dateLabel}{city && <span className="hidden font-normal text-[var(--muted-foreground)] xl:inline"> · {city}</span>}</span>
-      </div>
+      {look === "top" && (
+        <div className={cell} title={city ?? undefined}>
+          <span className={LABEL}>Date</span>
+          <span className="text-small font-semibold">{dateLabel}{city && <span className="hidden font-normal text-[var(--muted-foreground)] xl:inline"> · {city}</span>}</span>
+        </div>
+      )}
       {today && (
         <>
-          <ModePicker mode={today.mode ?? "full"} editable={!!editDay} onChange={onMode} />
-          <div className={FACT} role="progressbar" aria-label="Stars today" aria-valuemin={0} aria-valuemax={today.possible} aria-valuenow={today.total}>
+          <ModePicker mode={today.mode ?? "full"} editable={!!editDay} onChange={onMode} cell={cell} />
+          <div className={cell} role="progressbar" aria-label="Stars today" aria-valuemin={0} aria-valuemax={today.possible} aria-valuenow={today.total}>
             <span className={LABEL}>Stars</span>
             <span className="text-small font-semibold"><b className="font-mono tabular-nums">{today.total}</b><span className="font-normal text-[var(--muted-foreground)]"> / <span className="font-mono tabular-nums">{today.possible}</span></span></span>
             <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-[var(--muted)]" aria-hidden="true">
@@ -116,15 +124,12 @@ function TodayFacts({ dateLabel, city, editDay, today, onMode }: FactsProps) {
   );
 }
 
-/** Where the app's top bar wants the facts (md and up); below md they sit under the objectives instead. */
-function useNavSlot(): HTMLElement | null {
-  return useSyncExternalStore(() => () => {}, () => document.getElementById("nav-today"), () => null);
-}
-
-/** The date, mode and stars strip; the quarter's goals live in the This week panel. */
-export function TopBar({ dateLabel, city, editDay, today, onSaved }: Props) {
+/**
+ * The day's facts. `look="top"` (public view): a strip with the date above the clock. For the owner the date is left to the
+ * calendar range and the clock: `look="row"` sits under the clock, `look="bar"` goes in the calendar bar while the sidebar is hidden.
+ */
+export function TopBar({ dateLabel, city, editDay, today, onSaved, look = "top" }: Props & { look?: FactsLook }) {
   const [error, setError] = useState<string | null>(null);
-  const slot = useNavSlot();
 
   async function setMode(next: string) {
     if (!editDay) return;
@@ -136,12 +141,13 @@ export function TopBar({ dateLabel, city, editDay, today, onSaved }: Props) {
     }
   }
 
-  const facts: FactsProps = { dateLabel, city, editDay, today, onMode: (m) => void setMode(m) };
-
+  const facts: FactsProps = { dateLabel, city, editDay, today, onMode: (m) => void setMode(m), look };
+  // Under the clock and in the bar the strip is only mode and stars, which need the day's note.
+  if (look !== "top" && !today) return null;
+  if (look === "bar") return <div className="flex h-8 shrink-0 items-stretch" title={error ?? undefined}><TodayFacts {...facts} />{error && <span role="alert" className="sr-only">{error}</span>}</div>;
   return (
-    <header className={slot ? "md:-mt-4 md:mb-0 md:border-0 md:pb-0 mb-2 border-b border-[var(--border)] pb-2" : "mb-2 border-b border-[var(--border)] pb-2"}>
-      {slot && createPortal(<TodayFacts {...facts} />, slot)}
-      <div className={`border-b border-[var(--border)] ${slot ? "md:hidden" : ""}`}><TodayFacts {...facts} /></div>
+    <header className={look === "row" ? "border-b border-[var(--border)] py-1" : "mb-2 border-b border-[var(--border)] pb-2"} title={look === "row" ? city ?? undefined : undefined}>
+      <TodayFacts {...facts} />
       {error && <p className="mt-2 text-xs text-[var(--destructive)]">{error}</p>}
     </header>
   );

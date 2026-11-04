@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useHeaderSlot } from "@/hooks/use-header-slot";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { usePref } from "@/hooks/use-pref";
 import { useBlocks } from "@/lib/blocks";
@@ -33,11 +35,16 @@ const SHADE_KEY = "niy-calendar-shade";
  * The calendar on the home page: the one bar row, then the week's items (own items and calendar events, one read) in nine views
  * that V rotates through. `week` is the home page's one useWeek; edits tell the page through `onChanged` (planner) and
  * `onEventsChanged` (today's events). A picked item opens its details beside the view (a sheet on phones).
+ * On wide screens the bar renders into the app header (one row less); crossing that width moves it, which remounts it (typed
+ * quick-add text and an open menu are dropped).
  */
-export function CalendarView({ week, schedule, today, nowMin, streams, google, sidebar, onSidebar, onChanged, onEventsChanged }: {
+export function CalendarView({ week, schedule, today, nowMin, streams, google, sidebar, onSidebar, onChanged, onEventsChanged, barExtra }: {
   week: Week; schedule: VaultScheduleData; today: string; nowMin: number; streams: StreamMeta[]; google: GoogleStatusData | null;
   sidebar: boolean; onSidebar: () => void; onChanged: () => void; onEventsChanged: () => void;
+  /** Shown in the bar after the range (the day's mode and stars while the sidebar is hidden). */
+  barExtra?: ReactNode;
 }) {
+  const slot = useHeaderSlot();
   const blocks = useBlocks();
   const [stored, setStored] = usePref<ViewId>(VIEW_KEY, "week-grid", VIEW_IDS);
   // On a phone with no stored choice the calendar opens on one day. Decided after mount (no hydration mismatch) and never stored: the first pick replaces it.
@@ -105,9 +112,9 @@ export function CalendarView({ week, schedule, today, nowMin, streams, google, s
   const rangeLong = scope === "day" ? fmtDay(focus, { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : `${range} ${fmtDay(days[6].iso, { year: "numeric" })}`;
   const added = () => { week.reload(); onEventsChanged(); onChanged(); };
 
-  return (
-    <div className="w-full min-w-0">
+  const bar = (
       <CalendarBar
+        placement={slot ? "header" : "page"}
         sidebar={sidebar} onSidebar={onSidebar}
         scope={scope} onScope={(s) => setView(last.current[s])}
         view={view} onView={setView}
@@ -117,9 +124,14 @@ export function CalendarView({ week, schedule, today, nowMin, streams, google, s
         showDone={week.showDone} onShowDone={week.setShowDone} doneCount={doneCount}
         variant={variant} onVariant={setVariant} showsRing={view === "day-ring" || view === "week-rings"}
         shade={shade} onShade={setShade}
-        errors={week.errors}
-        quickAdd={<QuickAdd focus={focus} today={today} days={week.days} connected={!!google?.connected} streams={streams} onCreate={items.create} onAdded={added} />}
+        errors={week.errors} google={google} extra={barExtra}
+        quickAdd={<QuickAdd floating={!!slot} focus={focus} today={today} days={week.days} connected={!!google?.connected} streams={streams} onCreate={items.create} onAdded={added} />}
       />
+  );
+
+  return (
+    <div className="w-full min-w-0">
+      {slot ? createPortal(bar, slot) : bar}
 
       <div className={`grid items-start gap-4 ${week.selected ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}`}>
         <section aria-label={viewName(view)} data-cal-view={view} className="min-w-0">
@@ -128,7 +140,7 @@ export function CalendarView({ week, schedule, today, nowMin, streams, google, s
           {view === "day-ribbon" && <DayRibbon cd={cd} colours={colours(cd.iso)} h={h} />}
           {view === "day-ring" && <DayRing cd={cd} variant={variant} colours={colours(cd.iso)} h={h} />}
           {view === "week-grid" && (
-            <WeekCalendar week={week} streams={streams} nowMin={nowMin} status={google} sleepFor={sleepFor} card={false} dimmed={h.dimmed}
+            <WeekCalendar week={week} streams={streams} nowMin={nowMin} status={google} sleepFor={sleepFor} card={false} dimmed={h.dimmed} layoutKey={slot ? "header" : "page"}
               onChanged={onChanged} onEventsChanged={onEventsChanged} onOpenDay={openDay} />
           )}
           {view === "week-agenda" && <WeekAgenda days={days} colours={colours} h={h} onOpenDay={openDay} />}

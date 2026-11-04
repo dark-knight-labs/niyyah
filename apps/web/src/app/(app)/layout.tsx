@@ -55,10 +55,9 @@ function AccountMenu({ email }: { email: string }) {
   const item = "flex w-full items-center gap-2 px-3 py-2 text-left text-small hover:bg-[var(--muted)]";
   return (
     <div ref={ref} className="relative flex border-l border-[var(--border)]">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} aria-label="Account"
-        className="flex items-center gap-2.5 px-4 hover:bg-[var(--muted)]">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open} aria-label={`Account: ${email}`} title={email}
+        className="flex items-center px-3 hover:bg-[var(--muted)]">
         <span className="grid h-6 w-6 place-items-center border border-[var(--rule)] bg-[var(--muted)] mono text-[var(--foreground)]">{email.slice(0, 1)}</span>
-        <span className="mono hidden max-w-[14rem] truncate text-[var(--muted-foreground)] md:block">{email}</span>
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-full z-30 w-52 border border-[var(--rule)] bg-[var(--surface)] shadow-xl">
@@ -114,22 +113,22 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-20 flex h-11 items-stretch border-b border-[var(--rule)] bg-[var(--background)]">
+      {/* z-30: above the calendar's sticky day head and all-day row (z-20), so menus opened from the bar in the header paint on top. */}
+      <header className="sticky top-0 z-30 flex h-11 items-stretch border-b border-[var(--rule)] bg-[var(--background)]">
         <Brand />
-        <nav aria-label="Main" className="hidden flex-1 md:flex">
+        <nav aria-label="Main" className="hidden shrink-0 md:flex">
           {nav.map((item) => {
             const active = pathname === item.href;
             return (
               <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} title={`${item.label} (g ${item.key})`} aria-keyshortcuts={`g ${item.key}`}
-                className={`mono flex items-center border-r border-[var(--border)] px-4 ${active ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}>
+                className={`mono flex items-center px-3 ${active ? "text-[var(--foreground)] shadow-[inset_0_-2px_0_var(--accent)]" : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"}`}>
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <span className="flex-1 md:hidden" />
-        {/* The Overview page puts the date, mode and stars here (see TopBar). */}
-        <div id="nav-today" className="hidden items-stretch md:flex" />
+        {/* The Overview puts its calendar bar here on wide screens (see useHeaderSlot); elsewhere it is empty space. */}
+        <div id="nav-cal" className="flex min-w-0 flex-1 items-center" />
         <AccountMenu email={user.email} />
       </header>
 
