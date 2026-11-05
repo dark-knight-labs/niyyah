@@ -1,0 +1,53 @@
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.core.deps import get_current_user
+from app.models.board import Board
+from app.models.user import User
+from app.schemas.board import BoardCreate, BoardOut, BoardSummary, BoardUpdate
+from app.services import boards as boards_service
+
+router = APIRouter(prefix="/boards", tags=["boards"])
+
+
+async def owned_board(board_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> Board:
+    board = await boards_service.get_board(db, user.id, board_id)
+    if board is None:
+        raise HTTPException(status_code=404, detail="Board not found")
+    return board
+
+
+@router.get("", response_model=list[BoardSummary])
+async def list_boards(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await boards_service.list_boards(db, user.id)
+
+
+@router.post("", response_model=BoardOut, status_code=201)
+async def create_board(body: BoardCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    board = await boards_service.create_board(db, user.id, body.title)
+    return await boards_service.board_view(db, board)
+
+
+@router.get("/{board_id}", response_model=BoardOut)
+async def get_board(board: Board = Depends(owned_board), db: AsyncSession = Depends(get_db)):
+    return await boards_service.board_view(db, board)
+
+
+@router.patch("/{board_id}", response_model=BoardOut)
+async def patch_board(body: BoardUpdate, board: Board = Depends(owned_board), db: AsyncSession = Depends(get_db)):
+    try:
+        board = await boards_service.update_board(db, board, body.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+    return await boards_service.board_view(db, board)
+
+
+@router.delete("/{board_id}", status_code=204)
+async def delete_board(board: Board = Depends(owned_board), db: AsyncSession = Depends(get_db)):
+    try:
+        await boards_service.delete_board(db, board)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return Response(status_code=204)
