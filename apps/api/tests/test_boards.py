@@ -89,3 +89,24 @@ async def test_title_rules(auth_client):
 
 async def test_requires_login(client):
     assert (await client.get(URL)).status_code in (401, 403)
+
+
+async def test_revision_moves_on_title_change_but_not_on_viewport_saves(auth_client):
+    b = (await auth_client.post(URL, json={"title": "Rev"})).json()
+    path = f"{URL}/{b['id']}"
+    assert b["revision"] == 0
+    assert (await auth_client.patch(path, json={"viewport": {"zoom": 2}})).json()["revision"] == 0   # a pan must not make other tabs reload
+    assert (await auth_client.patch(path, json={"title": "Rev"})).json()["revision"] == 0            # same title: nothing changed
+    assert (await auth_client.patch(path, json={"title": "Renamed"})).json()["revision"] == 1
+    assert (await auth_client.patch(path, json={"title": "Again", "viewport": {"zoom": 3}})).json()["revision"] == 2   # once, not per field
+    assert (await auth_client.get(path)).json()["revision"] == 2
+    assert (await auth_client.get(URL)).json()[1]["revision"] == 2
+
+
+async def test_response_shapes(auth_client):
+    listing = (await auth_client.get(URL)).json()
+    assert isinstance(listing, list) and set(listing[0]) == {"id", "title", "kind", "revision", "updated_at", "counts"}
+    made = (await auth_client.post(URL, json={"title": "Flat"})).json()
+    assert set(made) == {"id", "title", "kind", "viewport", "revision", "nodes", "edges"}
+    assert made["kind"] == "free" and made["nodes"] == [] and made["edges"] == []
+    assert set((await auth_client.get(f"{URL}/{made['id']}")).json()) == set(made)

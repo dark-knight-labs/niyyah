@@ -261,3 +261,14 @@ async def test_remap_collision_merges_into_the_existing_row():
     assert [d.id for d in dropped] == ["moved"]
     assert (existing.ref_key, existing.collapsed, existing.hidden) == ("task:9", True, True)   # the remapped row's state wins
     assert child.parent_id == "keep" and edges[0].from_id == "keep"
+
+
+async def test_notes_survive_export_and_import(db_client):
+    c, _ = db_client
+    b = (await c.post(URL, json={"title": "Notes"})).json()["id"]
+    await c.post(f"{URL}/{b}/ops", json={"ops": [up("n", notes="why this matters")]})
+    snap = (await c.get(E)).json()
+    assert next(x for x in snap["boards"] if x["title"] == "Notes")["nodes"][0]["notes"] == "why this matters"
+    assert (await c.post(I, json=snap)).status_code == 200
+    got = await board_by_title(c, "Notes")
+    assert got["nodes"][0]["notes"] == "why this matters"

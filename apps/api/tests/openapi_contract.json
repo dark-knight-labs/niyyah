@@ -320,12 +320,16 @@
        },
        "to_id": {
         "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
        }
       },
       "required": [
        "from_id",
        "id",
-       "to_id"
+       "to_id",
+       "updated_at"
       ],
       "type": "object"
      },
@@ -356,6 +360,9 @@
         "type": "string"
        },
        "kind": {
+        "type": "string"
+       },
+       "notes": {
         "type": "string"
        },
        "parent_id": {
@@ -2595,12 +2602,16 @@
        },
        "to_id": {
         "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
        }
       },
       "required": [
        "from_id",
        "id",
-       "to_id"
+       "to_id",
+       "updated_at"
       ],
       "type": "object"
      },
@@ -2631,6 +2642,9 @@
         "type": "string"
        },
        "kind": {
+        "type": "string"
+       },
+       "notes": {
         "type": "string"
        },
        "parent_id": {
@@ -3450,12 +3464,16 @@
        },
        "to_id": {
         "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
        }
       },
       "required": [
        "from_id",
        "id",
-       "to_id"
+       "to_id",
+       "updated_at"
       ],
       "type": "object"
      },
@@ -3486,6 +3504,9 @@
         "type": "string"
        },
        "kind": {
+        "type": "string"
+       },
+       "notes": {
         "type": "string"
        },
        "parent_id": {
@@ -3594,6 +3615,9 @@
       "kind": {
        "type": "string"
       },
+      "notes": {
+       "type": "string"
+      },
       "parent_id": {
        "type": "string"
       },
@@ -3681,6 +3705,9 @@
       "type": "string"
      },
      "type": "array"
+    },
+    "updated": {
+     "type": "object"
     }
    },
    "required": [

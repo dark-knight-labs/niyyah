@@ -46,6 +46,7 @@ class BoardNode(Base):
     style: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     collapsed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sql_text("false"))
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sql_text("false"))
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     ref_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
     frame_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=func.now())
@@ -61,3 +62,4 @@ class BoardEdge(Base):
     to_id: Mapped[str] = mapped_column(String(80), nullable=False)
     label: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default="")
     style: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=func.now())

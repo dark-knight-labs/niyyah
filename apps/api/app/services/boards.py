@@ -61,6 +61,7 @@ async def update_board(db: AsyncSession, board: Board, changes: dict) -> Board:
         if board.kind == "life":
             raise ValueError("The Life board cannot be renamed")
         board.title = title
+        board.revision += 1   # a rename is what other tabs should notice; panning and zooming (viewport) are not
     if changes.get("viewport") is not None:
         board.viewport = changes["viewport"]
     await db.commit()
@@ -164,13 +165,15 @@ def _check_tree(nodes: dict[str, BoardNode], touched: dict[str, None]) -> None:
         raise OpsError(422, "Another node on this board already holds that ref_key", clash)
 
 
-async def _apply(db: AsyncSession, board: Board, ops: list) -> list[str]:
+async def _apply(db: AsyncSession, board: Board, ops: list) -> tuple[list[str], dict[str, datetime]]:
     nodes = {n.id: n for n in (await db.execute(select(BoardNode).where(BoardNode.board_id == board.id))).scalars()}
     edges = {e.id: e for e in (await db.execute(select(BoardEdge).where(BoardEdge.board_id == board.id))).scalars()}
     stale: list[str] = []
     touched: dict[str, None] = {}
 
-    def is_stale(row: BoardNode, base: datetime | None) -> bool:
+    written: dict[str, BoardNode | BoardEdge] = {}   # rows this batch wrote, for the `updated` map
+
+    def is_stale(row: BoardNode | BoardEdge, base: datetime | None) -> bool:
         return base is not None and _utc(row.updated_at) > _utc(base)
 
     for op in ops:
@@ -187,6 +190,7 @@ async def _apply(db: AsyncSession, board: Board, ops: list) -> list[str]:
                 for key, value in values.items():
                     setattr(row, key, value)
             touched[row.id] = None
+            written[row.id] = row
         elif isinstance(op, DeleteNodeOp):
             row = nodes.get(op.id)
             if row is None:
@@ -199,20 +203,30 @@ async def _apply(db: AsyncSession, board: Board, ops: list) -> list[str]:
             for i in gone:
                 await db.delete(nodes.pop(i))
                 touched.pop(i, None)
+                written.pop(i, None)
             for e in [e for e in edges.values() if e.from_id in ends or e.to_id in ends]:
                 await db.delete(edges.pop(e.id))
+                written.pop(e.id, None)
             await db.flush()  # so a later op in this batch may reuse a deleted key
         elif isinstance(op, UpsertEdgeOp):
             values = op.edge.model_dump(exclude={"id"})
             row = edges.get(op.edge.id)
+            if row is not None and is_stale(row, op.base_updated_at):
+                stale.append(row.id)
+                continue
             if row is None:
                 row = edges[op.edge.id] = BoardEdge(board_id=board.id, id=op.edge.id, **values)
                 db.add(row)
             else:
                 for key, value in values.items():
                     setattr(row, key, value)
+            written[row.id] = row
         elif isinstance(op, DeleteEdgeOp) and op.id in edges:
+            if is_stale(edges[op.id], op.base_updated_at):
+                stale.append(op.id)
+                continue
             await db.delete(edges.pop(op.id))
+            written.pop(op.id, None)
             await db.flush()
 
     _check_tree(nodes, touched)
@@ -222,7 +236,7 @@ async def _apply(db: AsyncSession, board: Board, ops: list) -> list[str]:
         raise OpsError(413, f"A board holds at most {MAX_EDGES} connectors")
     board.revision += 1
     await db.flush()
-    return stale
+    return stale, {i: row.updated_at for i, row in written.items()}
 
 
 async def apply_ops(db: AsyncSession, board: Board, raw_ops: list) -> dict:
@@ -233,9 +247,9 @@ async def apply_ops(db: AsyncSession, board: Board, raw_ops: list) -> dict:
     board_id = board.id
     for attempt in (1, 2):
         try:
-            stale = await _apply(db, board, ops)
+            stale, updated = await _apply(db, board, ops)
             await db.commit()
-            return {"revision": board.revision, "bad_ops": [], "stale_ops": stale}
+            return {"revision": board.revision, "updated": updated, "bad_ops": [], "stale_ops": stale}
         except OpsError:
             await db.rollback()
             raise

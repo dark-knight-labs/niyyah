@@ -37,7 +37,8 @@ async def test_happy_batch(auth_client):
     b = await new_board(auth_client)
     res = await ops(auth_client, b, up("root", x=0, y=0), up("a", parent_id="root", position=0), up("b", parent_id="root", position=1), edge("e1", "a", "b"))
     assert res.status_code == 200
-    assert res.json() == {"revision": 1, "bad_ops": [], "stale_ops": []}
+    body = res.json()
+    assert (body["revision"], body["bad_ops"], body["stale_ops"], sorted(body["updated"])) == (1, [], [], ["a", "b", "e1", "root"])
     v = await view(auth_client, b)
     assert ids(v) == ["a", "b", "root"] and [e["id"] for e in v["edges"]] == ["e1"] and v["revision"] == 1
     assert all(n["updated_at"] for n in v["nodes"])
@@ -188,3 +189,70 @@ async def test_node_and_edge_count_limits_are_413(auth_client, monkeypatch):
 
 async def test_ops_on_missing_board_404(auth_client):
     assert (await ops(auth_client, 99999, up("a"))).status_code == 404
+
+
+# --- contract with the web client ------------------------------------------------------------------------------------
+
+async def test_response_lists_updated_at_of_every_written_row(auth_client):
+    b = await new_board(auth_client)
+    res = (await ops(auth_client, b, up("a"), up("b"), edge("e1", "a", "b"), {"op": "delete_node", "id": "ghost"})).json()
+    v = await view(auth_client, b)
+    assert set(res["updated"]) == {"a", "b", "e1"}
+    assert res["updated"]["a"] == next(n for n in v["nodes"] if n["id"] == "a")["updated_at"]
+    assert res["updated"]["e1"] == v["edges"][0]["updated_at"]
+    # the client sends it back as the next base: not stale
+    again = (await ops(auth_client, b, up("a", base=res["updated"]["a"], text="changed"),
+                       {"op": "upsert_edge", "edge": {"id": "e1", "from_id": "b", "to_id": "a"}, "base_updated_at": res["updated"]["e1"]})).json()
+    assert again["stale_ops"] == [] and set(again["updated"]) == {"a", "e1"}
+    assert again["updated"]["a"] > res["updated"]["a"]
+    assert (await view(auth_client, b))["nodes"][0]["text"] == "changed"
+
+
+async def test_deleted_and_stale_rows_are_not_in_updated(auth_client):
+    b = await new_board(auth_client)
+    first = (await ops(auth_client, b, up("n"), up("gone"))).json()
+    await ops(auth_client, b, up("n", text="newer"))
+    res = (await ops(auth_client, b, {"op": "delete_node", "id": "gone"}, up("n", text="old", base=first["updated"]["n"]))).json()
+    assert res["stale_ops"] == ["n"] and res["updated"] == {}
+
+
+async def test_null_base_means_no_staleness_check(auth_client):
+    b = await new_board(auth_client)
+    await ops(auth_client, b, up("n", text="v1"))
+    assert (await ops(auth_client, b, up("n", text="blind write", base=None))).json()["stale_ops"] == []
+    assert (await view(auth_client, b))["nodes"][0]["text"] == "blind write"
+
+
+async def test_stale_edge_ops_are_skipped(auth_client):
+    b = await new_board(auth_client)
+    first = (await ops(auth_client, b, up("a"), up("b"), edge("e1", "a", "b"))).json()
+    await ops(auth_client, b, {"op": "upsert_edge", "edge": {"id": "e1", "from_id": "a", "to_id": "b", "label": "new"}})
+    res = (await ops(auth_client, b, {"op": "upsert_edge", "edge": {"id": "e1", "from_id": "b", "to_id": "a", "label": "old"}, "base_updated_at": first["updated"]["e1"]},
+                     {"op": "delete_edge", "id": "e1", "base_updated_at": first["updated"]["e1"]})).json()
+    assert res["stale_ops"] == ["e1", "e1"] and res["updated"] == {}
+    assert [(e["label"], e["from_id"]) for e in (await view(auth_client, b))["edges"]] == [("new", "a")]
+
+
+async def test_revision_bumps_once_per_batch_whatever_its_size(auth_client):
+    b = await new_board(auth_client)
+    assert (await ops(auth_client, b, *[up(f"n{i}") for i in range(25)])).json()["revision"] == 1
+    assert (await ops(auth_client, b, up("n0", text="x"), {"op": "delete_node", "id": "n1"}, edge("e", "n0", "n2"))).json()["revision"] == 2
+    assert (await view(auth_client, b))["revision"] == 2
+
+
+async def test_notes_are_stored_and_limited(auth_client):
+    b = await new_board(auth_client)
+    await ops(auth_client, b, up("a", notes="line one\nline two"), up("plain"))
+    nodes = {n["id"]: n for n in (await view(auth_client, b))["nodes"]}
+    assert nodes["a"]["notes"] == "line one\nline two" and nodes["plain"]["notes"] == ""
+    assert (await ops(auth_client, b, up("a", notes="n" * 10001))).status_code == 422
+    assert (await view(auth_client, b))["nodes"][0]["notes"] == "line one\nline two"
+
+
+async def test_style_is_opaque_but_size_limited(auth_client):
+    b = await new_board(auth_client)
+    style = {"color": "violet", "side": "L", "anything": {"nested": [1, 2]}}
+    await ops(auth_client, b, up("a", style=style))
+    assert (await view(auth_client, b))["nodes"][0]["style"] == style
+    res = await ops(auth_client, b, up("a", style={"blob": "x" * 2100}))
+    assert res.status_code == 422 and res.json()["bad_ops"] == ["a"]

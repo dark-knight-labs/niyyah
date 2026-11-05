@@ -48,6 +48,7 @@ def upgrade() -> None:
         sa.Column("style", sa.JSON(), nullable=False, server_default="{}"),
         sa.Column("collapsed", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("hidden", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("notes", sa.Text(), nullable=False, server_default=""),
         sa.Column("ref_key", sa.String(80), nullable=True),
         sa.Column("frame_id", sa.String(36), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
@@ -62,6 +63,7 @@ def upgrade() -> None:
         sa.Column("to_id", sa.String(80), nullable=False),
         sa.Column("label", sa.String(200), nullable=False, server_default=""),
         sa.Column("style", sa.JSON(), nullable=False, server_default="{}"),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
     )
 
 

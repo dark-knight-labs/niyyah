@@ -17,7 +17,7 @@ MAX_NODES = 5000
 MAX_EDGES = 5000
 MAX_TOTAL = 50000  # nodes over all boards of one file
 TASK_KEY = re.compile(r"^task:(\d+)$")
-NODE_COLUMNS = ("id", "kind", "parent_id", "parent_key", "position", "x", "y", "w", "h", "text", "style", "collapsed", "hidden", "ref_key", "frame_id")
+NODE_COLUMNS = ("id", "kind", "parent_id", "parent_key", "position", "x", "y", "w", "h", "text", "notes", "style", "collapsed", "hidden", "ref_key", "frame_id")
 
 
 async def export_boards(db: AsyncSession, user_id: int) -> list[dict]:
