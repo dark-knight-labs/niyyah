@@ -15,6 +15,7 @@ from app.schemas.snapshot import SnapBoard
 
 MAX_NODES = 5000
 MAX_EDGES = 5000
+MAX_TOTAL = 50000  # nodes over all boards of one file
 TASK_KEY = re.compile(r"^task:(\d+)$")
 NODE_COLUMNS = ("id", "kind", "parent_id", "parent_key", "position", "x", "y", "w", "h", "text", "style", "collapsed", "hidden", "ref_key", "frame_id")
 
@@ -106,6 +107,8 @@ async def remap_existing(db: AsyncSession, user_id: int, mapping: dict[int, int]
 
 def check_boards(boards: list[SnapBoard]) -> None:
     """Refuse a file whose boards the API itself would not store. Raises BoardLimitError (413) or ValueError (422)."""
+    if sum(len(b.nodes) + len(b.edges) for b in boards) > MAX_TOTAL:
+        raise BoardLimitError(f"A file holds at most {MAX_TOTAL} board nodes and connectors in all")
     for b in boards:
         if len(b.nodes) > MAX_NODES:
             raise BoardLimitError(f"Board '{b.title}' has {len(b.nodes)} nodes; a board holds at most {MAX_NODES}")
@@ -123,13 +126,15 @@ def check_boards(boards: list[SnapBoard]) -> None:
         for n in b.nodes:
             if n.parent_id is not None and n.parent_id not in parent:
                 raise ValueError(f"Node '{n.id}' of board '{b.title}' has a parent that is not on the board")
+        acyclic: set[str] = set()   # nodes whose whole parent chain is known to end: each node is walked once, so the check is linear
         for start in parent:
-            seen, current = set(), start
-            while parent.get(current) is not None:
-                if current in seen:
+            path, current = set(), start
+            while current is not None and current not in acyclic:
+                if current in path:
                     raise ValueError(f"Board '{b.title}' has a parent loop at '{start}'")
-                seen.add(current)
+                path.add(current)
                 current = parent[current]
+            acyclic.update(path)
 
 
 class BoardLimitError(ValueError):

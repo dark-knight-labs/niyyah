@@ -190,6 +190,27 @@ async def test_import_validates_boards(db_client):
     assert [b["title"] for b in (await c.get(URL)).json()] == ["Life", "Two"]   # a refused import changed nothing
 
 
+async def test_import_refuses_loops_big_viewports_and_oversized_files(db_client, monkeypatch):
+    c, _ = db_client
+    snap = (await c.get(E)).json()
+    board = lambda **kw: {"title": "X", "kind": "free", "viewport": {}, "nodes": [], "edges": [], **kw}
+    loop = board(nodes=[{"id": "a", "kind": "mind", "parent_id": "b"}, {"id": "b", "kind": "mind", "parent_id": "a"}])
+    assert (await c.post(I, json={**snap, "boards": [loop]})).status_code == 422
+    assert (await c.post(I, json={**snap, "boards": [board(viewport={"x": "9" * 2000})]})).status_code == 422
+    assert (await c.post(I, json={**snap, "boards": [board(nodes=[{"id": f"n{i}", "kind": "mind"} for i in range(5001)])]})).status_code == 422
+    monkeypatch.setattr(board_transfer, "MAX_TOTAL", 3)
+    two = [board(nodes=[{"id": "a", "kind": "mind"}, {"id": "b", "kind": "mind"}]), board(title="Y", nodes=[{"id": "a", "kind": "mind"}, {"id": "b", "kind": "mind"}])]
+    assert (await c.post(I, json={**snap, "boards": two})).status_code == 413
+
+
+async def test_a_long_parent_chain_is_checked_in_one_pass(db_client):
+    c, _ = db_client
+    snap = (await c.get(E)).json()
+    chain = [{"id": f"n{i}", "kind": "mind", "parent_id": f"n{i - 1}" if i else None} for i in range(5000)]
+    res = await c.post(I, json={**snap, "boards": [{"title": "Deep", "kind": "free", "viewport": {}, "nodes": chain, "edges": []}]})
+    assert res.status_code == 200
+
+
 async def test_import_over_the_board_limit_is_413(db_client, monkeypatch):
     c, _ = db_client
     monkeypatch.setattr(board_transfer, "MAX_NODES", 2)

@@ -5,7 +5,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
-from app.schemas.board import EdgeIn, NodeIn, Title
+from app.schemas.board import EdgeIn, NodeIn, Title, _small_json
 
 Str = Annotated[str, StringConstraints(strip_whitespace=False)]
 Slug = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9-]{1,23}$")]
@@ -265,12 +265,17 @@ class SnapBoardEdge(EdgeIn):
 
 
 class SnapBoard(_Loose):
-    """A board of the file. No db id: boards get new ones on import. Node and edge limits are checked by the importer (413)."""
+    """A board of the file. No db id: boards get new ones on import."""
     title: Title
     kind: str = Field(default="free", pattern=r"^(life|free)$")
     viewport: dict = Field(default_factory=dict)
-    nodes: list[SnapBoardNode] = _cap(100000)
-    edges: list[SnapBoardEdge] = _cap(100000)
+    nodes: list[SnapBoardNode] = _cap(5000)   # the per-board limits of the API; the importer also caps the total over all boards
+    edges: list[SnapBoardEdge] = _cap(5000)
+
+    @field_validator("viewport")
+    @classmethod
+    def _viewport(cls, v):
+        return _small_json(v, 1000, "viewport")
 
 
 class Snapshot(_Loose):
@@ -290,7 +295,7 @@ class Snapshot(_Loose):
     item_overlays: list[SnapOverlay] = _cap(20000)
     compass: SnapCompass | None = None  # absent or null in older exports: the account's Compass stays as it is
     persona_streams: list[SnapPersonaStream] = _cap(100)
-    boards: list[SnapBoard] | None = Field(default=None, max_length=200)  # absent in older exports: the account's boards stay as they are
+    boards: list[SnapBoard] | None = Field(default=None, max_length=50)  # absent in older exports: the account's boards stay as they are
 
     @field_validator("version")
     @classmethod
