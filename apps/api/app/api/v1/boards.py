@@ -27,7 +27,10 @@ async def list_boards(user: User = Depends(get_current_user), db: AsyncSession =
 
 @router.post("", response_model=BoardOut, status_code=201)
 async def create_board(body: BoardCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    board = await boards_service.create_board(db, user.id, body.title)
+    try:
+        board = await boards_service.create_board(db, user.id, body.title)
+    except boards_service.BoardLimitError as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
     return await boards_service.board_view(db, board)
 
 
@@ -62,6 +65,8 @@ async def post_ops(body: OpsIn, board: Board = Depends(owned_board), db: AsyncSe
         return await boards_service.apply_ops(db, board, body.ops)
     except boards_service.OpsError as exc:
         return JSONResponse(status_code=exc.status, content={"detail": exc.detail, "bad_ops": exc.bad_ops})
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/{board_id}/nodes/{node_id}/promote", response_model=PromoteOut)

@@ -256,3 +256,69 @@ async def test_style_is_opaque_but_size_limited(auth_client):
     assert (await view(auth_client, b))["nodes"][0]["style"] == style
     res = await ops(auth_client, b, up("a", style={"blob": "x" * 2100}))
     assert res.status_code == 422 and res.json()["bad_ops"] == ["a"]
+
+
+# --- cross-review fixes ------------------------------------------------------------------------------------------------
+
+async def test_ref_keys_can_be_swapped_and_moved_in_one_batch(auth_client):
+    b = await new_board(auth_client)
+    await ops(auth_client, b, up("r1", kind="ref", ref_key="task:1"), up("r2", kind="ref", ref_key="task:2"))
+    res = await ops(auth_client, b, up("r1", kind="ref", ref_key="task:2"), up("r2", kind="ref", ref_key="task:1"))
+    assert res.status_code == 200, res.text
+    assert {n["id"]: n["ref_key"] for n in (await view(auth_client, b))["nodes"]} == {"r1": "task:2", "r2": "task:1"}
+    res = await ops(auth_client, b, up("r1", kind="ref", ref_key="task:3"), up("r2", kind="ref", ref_key="task:2"))   # a chain: r1 frees 2 for r2
+    assert res.status_code == 200
+    assert {n["id"]: n["ref_key"] for n in (await view(auth_client, b))["nodes"]} == {"r1": "task:3", "r2": "task:2"}
+
+
+async def test_a_stale_op_keeps_its_ref_key(auth_client):
+    b = await new_board(auth_client)
+    first = (await ops(auth_client, b, up("r1", kind="ref", ref_key="task:1"))).json()
+    await ops(auth_client, b, up("r1", kind="ref", ref_key="task:1", text="newer"))
+    res = (await ops(auth_client, b, up("r1", kind="ref", ref_key="task:9", base=first["updated"]["r1"]))).json()
+    assert res["stale_ops"] == ["r1"]
+    assert (await view(auth_client, b))["nodes"][0]["ref_key"] == "task:1"
+
+
+async def test_two_nodes_claiming_one_key_is_still_422(auth_client):
+    b = await new_board(auth_client)
+    await ops(auth_client, b, up("r1", kind="ref", ref_key="task:1"), up("r2", kind="ref", ref_key="task:2"))
+    res = await ops(auth_client, b, up("r2", kind="ref", ref_key="task:1"))
+    assert res.status_code == 422 and "r2" in res.json()["bad_ops"]
+    assert {n["id"]: n["ref_key"] for n in (await view(auth_client, b))["nodes"]} == {"r1": "task:1", "r2": "task:2"}
+
+
+async def test_non_finite_and_huge_numbers_are_422_with_bad_ops(auth_client):
+    b = await new_board(auth_client)
+    for raw in ('1e999', 'NaN', '-Infinity', '10000001', '-1e8'):
+        body = '{"ops": [{"op": "upsert_node", "node": {"id": "n", "kind": "sticky", "x": %s}}]}' % raw
+        res = await auth_client.post(f"{URL}/{b}/ops", content=body, headers={"content-type": "application/json"})
+        assert res.status_code == 422 and res.json()["bad_ops"] == ["n"], raw
+    assert (await ops(auth_client, b, up("n", kind="sticky", x=1e7, y=-1e7, w=0.5))).status_code == 200
+    body = '{"ops": [{"op": "upsert_node", "node": {"id": "s", "kind": "sticky", "style": {"k": Infinity}}}]}'
+    res = await auth_client.post(f"{URL}/{b}/ops", content=body, headers={"content-type": "application/json"})
+    assert res.status_code == 422 and res.json()["bad_ops"] == ["s"]
+    assert [n["id"] for n in (await view(auth_client, b))["nodes"]] == ["n"]
+
+
+async def test_board_deleted_during_a_retry_is_404_not_500(auth_client, monkeypatch):
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    b = await new_board(auth_client)
+    real = boards_service._apply
+    calls = []
+
+    async def clash_once(*a, **k):
+        calls.append(1)
+        raise IntegrityError("insert", {}, Exception("duplicate key"))
+
+    async def gone(self, *a, **k):
+        return None
+
+    monkeypatch.setattr(boards_service, "_apply", clash_once)
+    monkeypatch.setattr(AsyncSession, "get", gone)
+    res = await ops(auth_client, b, up("a"))
+    assert res.status_code == 404 and len(calls) == 1
+    monkeypatch.undo()
+    assert real is boards_service._apply

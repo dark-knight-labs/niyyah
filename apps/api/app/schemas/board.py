@@ -11,6 +11,7 @@ MAX_NOTES = 10000
 REF_KEY = re.compile(r"^(stream|cp|week|task|quarter):[A-Za-z0-9:_-]{1,72}$")
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_TITLE)]
+Coord = Annotated[float, Field(allow_inf_nan=False, ge=-1e7, le=1e7)]
 NodeKind = Literal["mind", "ref", "sticky", "text", "shape", "frame"]
 
 
@@ -20,7 +21,11 @@ def _aware(value: datetime) -> datetime:
 
 
 def _small_json(value: dict, limit: int, what: str) -> dict:
-    if len(json.dumps(value)) > limit:
+    try:
+        size = len(json.dumps(value, allow_nan=False))   # NaN and Infinity are not JSON: stored, they would break every read of the board
+    except ValueError:
+        raise ValueError(f"{what} holds a number that is not finite")
+    if size > limit:
         raise ValueError(f"{what} is too large")
     return value
 
@@ -47,10 +52,10 @@ class NodeIn(BaseModel):
     parent_id: str | None = Field(default=None, max_length=36)
     parent_key: str | None = Field(default=None, max_length=80)
     position: int = 0
-    x: float | None = None
-    y: float | None = None
-    w: float | None = None
-    h: float | None = None
+    x: Coord | None = None
+    y: Coord | None = None
+    w: Coord | None = None
+    h: Coord | None = None
     text: str = Field(default="", max_length=MAX_TEXT)
     notes: str = Field(default="", max_length=MAX_NOTES)
     style: dict[str, Any] = Field(default_factory=dict)

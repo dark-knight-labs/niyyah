@@ -110,3 +110,20 @@ async def test_response_shapes(auth_client):
     assert set(made) == {"id", "title", "kind", "viewport", "revision", "nodes", "edges"}
     assert made["kind"] == "free" and made["nodes"] == [] and made["edges"] == []
     assert set((await auth_client.get(f"{URL}/{made['id']}")).json()) == set(made)
+
+
+async def test_boards_per_user_are_capped(auth_client, monkeypatch):
+    from app.services import boards as boards_service
+
+    monkeypatch.setattr(boards_service, "MAX_BOARDS", 3)
+    await auth_client.get(URL)   # the Life board counts
+    assert (await auth_client.post(URL, json={"title": "one"})).status_code == 201
+    assert (await auth_client.post(URL, json={"title": "two"})).status_code == 201
+    res = await auth_client.post(URL, json={"title": "three"})
+    assert res.status_code == 413 and "3" in res.json()["detail"]
+    other = await other_client()
+    try:
+        assert (await other.post(URL, json={"title": "theirs"})).status_code == 201   # the cap is per user
+    finally:
+        await other.aclose()
+    assert len((await auth_client.get(URL)).json()) == 3

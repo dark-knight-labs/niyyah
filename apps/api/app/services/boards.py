@@ -13,6 +13,11 @@ from app.services import planner_work
 from app.schemas.board import DeleteEdgeOp, DeleteNodeOp, NodeIn, Op, UpsertEdgeOp, UpsertNodeOp
 
 LIFE_TITLE = "Life"
+MAX_BOARDS = 200   # per user, the Life board included
+
+
+class BoardLimitError(Exception):
+    """The user already holds the most boards allowed; the route answers 413."""
 
 
 async def get_board(db: AsyncSession, user_id: int, board_id: int) -> Board | None:
@@ -40,6 +45,9 @@ async def list_boards(db: AsyncSession, user_id: int) -> list[dict]:
 
 
 async def create_board(db: AsyncSession, user_id: int, title: str) -> Board:
+    held = (await db.execute(select(func.count()).select_from(Board).where(Board.user_id == user_id))).scalar_one()
+    if held >= MAX_BOARDS:
+        raise BoardLimitError(f"You can have at most {MAX_BOARDS} boards")
     board = Board(user_id=user_id, title=title, kind="free", viewport={}, revision=0)
     db.add(board)
     await db.commit()
@@ -176,10 +184,21 @@ async def _apply(db: AsyncSession, board: Board, ops: list) -> tuple[list[str], 
     def is_stale(row: BoardNode | BoardEdge, base: datetime | None) -> bool:
         return base is not None and _utc(row.updated_at) > _utc(base)
 
+    # A key can move between rows inside one batch (a swap, or r1 freeing a key for r2), but the unique (board_id, ref_key) index
+    # is checked row by row. So first release the key of every existing row whose upsert changes it; the loop sets the new values.
+    released: dict[str, str] = {}
+    for op in ops:
+        if isinstance(op, UpsertNodeOp) and op.node.id not in released:
+            row = nodes.get(op.node.id)
+            if row is not None and row.ref_key is not None and row.ref_key != op.node.ref_key and not is_stale(row, op.base_updated_at):
+                released[row.id], row.ref_key = row.ref_key, None
+    if released:
+        await db.flush()
+
     for op in ops:
         if isinstance(op, UpsertNodeOp):
             row = nodes.get(op.node.id)
-            if row is not None and is_stale(row, op.base_updated_at):
+            if row is not None and row.id not in released and is_stale(row, op.base_updated_at):   # released rows were checked, then touched by the flush
                 stale.append(row.id)
                 continue
             values = op.node.model_dump(include=set(_NODE_FIELDS))
@@ -258,6 +277,8 @@ async def apply_ops(db: AsyncSession, board: Board, raw_ops: list) -> dict:
             if attempt == 2:
                 raise OpsError(422, "The batch conflicts with another change", [])
             board = await db.get(Board, board_id)
+            if board is None:   # deleted while this batch was in flight
+                raise LookupError("Board not found")
 
 
 # --- Promote -----------------------------------------------------------------------------------------------------
