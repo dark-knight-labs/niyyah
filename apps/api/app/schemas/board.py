@@ -111,3 +111,40 @@ class BoardOut(BaseModel):
     revision: int
     nodes: list[NodeOut]
     edges: list[EdgeOut]
+
+
+class UpsertNodeOp(BaseModel):
+    op: Literal["upsert_node"]
+    node: NodeIn
+    base_updated_at: datetime | None = None  # the row's updated_at this client last saw; null for a new row
+
+
+class DeleteNodeOp(BaseModel):
+    op: Literal["delete_node"]
+    id: str = Field(min_length=1, max_length=36)
+    base_updated_at: datetime | None = None
+
+
+class UpsertEdgeOp(BaseModel):
+    op: Literal["upsert_edge"]
+    edge: EdgeIn
+
+
+class DeleteEdgeOp(BaseModel):
+    op: Literal["delete_edge"]
+    id: str = Field(min_length=1, max_length=36)
+
+
+Op = Annotated[UpsertNodeOp | DeleteNodeOp | UpsertEdgeOp | DeleteEdgeOp, Field(discriminator="op")]
+
+
+class OpsIn(BaseModel):
+    """`ops` are validated one by one by the service, so a bad one is reported by id (`bad_ops`) instead of as a generic body error.
+    Each is one of: upsert_node {node, base_updated_at?}, delete_node {id, base_updated_at?}, upsert_edge {edge}, delete_edge {id}."""
+    ops: list[dict[str, Any]]
+
+
+class OpsResult(BaseModel):
+    revision: int
+    bad_ops: list[str] = []
+    stale_ops: list[str] = []  # node ids whose op was skipped because the stored row is newer than the op's base_updated_at

@@ -1,3 +1,4 @@
+from fastapi.responses import JSONResponse
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -5,7 +6,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.board import Board
 from app.models.user import User
-from app.schemas.board import BoardCreate, BoardOut, BoardSummary, BoardUpdate
+from app.schemas.board import BoardCreate, BoardOut, BoardSummary, BoardUpdate, OpsIn, OpsResult
 from app.services import boards as boards_service
 
 router = APIRouter(prefix="/boards", tags=["boards"])
@@ -51,3 +52,12 @@ async def delete_board(board: Board = Depends(owned_board), db: AsyncSession = D
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return Response(status_code=204)
+
+
+@router.post("/{board_id}/ops", response_model=OpsResult)
+async def post_ops(body: OpsIn, board: Board = Depends(owned_board), db: AsyncSession = Depends(get_db)):
+    """A batch of upserts and deletes in one transaction; per-row last write wins. 422 and 413 refuse the whole batch."""
+    try:
+        return await boards_service.apply_ops(db, board, body.ops)
+    except boards_service.OpsError as exc:
+        return JSONResponse(status_code=exc.status, content={"detail": exc.detail, "bad_ops": exc.bad_ops})
