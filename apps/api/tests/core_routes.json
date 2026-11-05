@@ -20,6 +20,34 @@
   "POST"
  ],
  [
+  "/api/v1/boards",
+  "GET"
+ ],
+ [
+  "/api/v1/boards",
+  "POST"
+ ],
+ [
+  "/api/v1/boards/{board_id}",
+  "DELETE"
+ ],
+ [
+  "/api/v1/boards/{board_id}",
+  "GET"
+ ],
+ [
+  "/api/v1/boards/{board_id}",
+  "PATCH"
+ ],
+ [
+  "/api/v1/boards/{board_id}/nodes/{node_id}/promote",
+  "POST"
+ ],
+ [
+  "/api/v1/boards/{board_id}/ops",
+  "POST"
+ ],
+ [
   "/api/v1/compass",
   "GET"
  ],

@@ -5,6 +5,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from app.schemas.board import EdgeIn, NodeIn, Title
+
 Str = Annotated[str, StringConstraints(strip_whitespace=False)]
 Slug = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9-]{1,23}$")]
 QuarterLabel = Annotated[str, StringConstraints(pattern=r"^\d{4}-Q[1-4]$")]
@@ -254,6 +256,23 @@ class SnapPersonaStream(_Loose):
     stream: Slug
 
 
+class SnapBoardNode(NodeIn):
+    model_config = ConfigDict(extra="ignore")
+
+
+class SnapBoardEdge(EdgeIn):
+    model_config = ConfigDict(extra="ignore")
+
+
+class SnapBoard(_Loose):
+    """A board of the file. No db id: boards get new ones on import. Node and edge limits are checked by the importer (413)."""
+    title: Title
+    kind: str = Field(default="free", pattern=r"^(life|free)$")
+    viewport: dict = Field(default_factory=dict)
+    nodes: list[SnapBoardNode] = _cap(100000)
+    edges: list[SnapBoardEdge] = _cap(100000)
+
+
 class Snapshot(_Loose):
     version: int
     blocks: list[SnapBlock] = _cap(60)
@@ -271,6 +290,7 @@ class Snapshot(_Loose):
     item_overlays: list[SnapOverlay] = _cap(20000)
     compass: SnapCompass | None = None  # absent or null in older exports: the account's Compass stays as it is
     persona_streams: list[SnapPersonaStream] = _cap(100)
+    boards: list[SnapBoard] | None = Field(default=None, max_length=200)  # absent in older exports: the account's boards stay as they are
 
     @field_validator("version")
     @classmethod
