@@ -148,3 +148,15 @@ class OpsResult(BaseModel):
     revision: int
     bad_ops: list[str] = []
     stale_ops: list[str] = []  # node ids whose op was skipped because the stored row is newer than the op's base_updated_at
+
+
+class PromoteIn(BaseModel):
+    stream: str
+    lane: Literal["now", "next", "backlog"] = "next"
+    checkpoint: Literal["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] | None = None
+
+
+class PromoteOut(BaseModel):
+    task_id: int
+    revision: int
+    node: NodeOut

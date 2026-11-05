@@ -2,11 +2,12 @@ from fastapi.responses import JSONResponse
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.vault import _known_stream, _local_now
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.board import Board
 from app.models.user import User
-from app.schemas.board import BoardCreate, BoardOut, BoardSummary, BoardUpdate, OpsIn, OpsResult
+from app.schemas.board import BoardCreate, BoardOut, BoardSummary, BoardUpdate, OpsIn, OpsResult, PromoteIn, PromoteOut
 from app.services import boards as boards_service
 
 router = APIRouter(prefix="/boards", tags=["boards"])
@@ -61,3 +62,19 @@ async def post_ops(body: OpsIn, board: Board = Depends(owned_board), db: AsyncSe
         return await boards_service.apply_ops(db, board, body.ops)
     except boards_service.OpsError as exc:
         return JSONResponse(status_code=exc.status, content={"detail": exc.detail, "bad_ops": exc.bad_ops})
+
+
+@router.post("/{board_id}/nodes/{node_id}/promote", response_model=PromoteOut)
+async def promote_node(node_id: str, body: PromoteIn, board: Board = Depends(owned_board), user: User = Depends(get_current_user),
+                       db: AsyncSession = Depends(get_db)):
+    """Make a thought a Plan item (a pipeline row); the node becomes a live ref to it. All or nothing."""
+    today = _local_now().date()
+    await _known_stream(db, user, body.stream, today)
+    try:
+        return await boards_service.promote(db, user.id, board, node_id, body.stream, body.lane, body.checkpoint, today)
+    except LookupError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))

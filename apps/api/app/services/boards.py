@@ -1,5 +1,5 @@
 """Boards: owner-scoped reads and writes. Every query carries the user id, so another user's board is simply not found."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import delete, func, select
@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.board import Board, BoardEdge, BoardNode
+from app.services import planner_work
 from app.schemas.board import DeleteEdgeOp, DeleteNodeOp, NodeIn, Op, UpsertEdgeOp, UpsertNodeOp
 
 LIFE_TITLE = "Life"
@@ -243,3 +244,30 @@ async def apply_ops(db: AsyncSession, board: Board, raw_ops: list) -> dict:
             if attempt == 2:
                 raise OpsError(422, "The batch conflicts with another change", [])
             board = await db.get(Board, board_id)
+
+
+# --- Promote -----------------------------------------------------------------------------------------------------
+
+async def promote(db: AsyncSession, user_id: int, board: Board, node_id: str, stream: str, lane: str, checkpoint: str | None, today: date) -> dict:
+    """Turn a thought into a Plan item, in one transaction: create the pipeline row, set its checkpoint, make the node a ref to it.
+
+    The caller has checked the stream. Raises LookupError for an unknown node and ValueError for input the Plan refuses.
+    The vault write helper (`_day_write`) only commits and maps ValueError to 422, which the router does here too."""
+    node = (await db.execute(select(BoardNode).where(BoardNode.board_id == board.id, BoardNode.id == node_id))).scalar_one_or_none()
+    if node is None:
+        raise LookupError("Node not found")
+    if node.kind != "mind":
+        raise ValueError("Only a thought can become a Plan item")
+    if not node.text.strip():
+        raise ValueError("The thought is empty")
+    created = await planner_work.add_rows(db, user_id, stream, [node.text], lane, today)
+    if not created:
+        raise ValueError("The thought is empty")
+    task = created[0]
+    if checkpoint:  # an explicit checkpoint wins over a #month typed in the text
+        await planner_work.set_checkpoint(db, user_id, stream, task.id, checkpoint)
+    node.kind, node.ref_key, node.text = "ref", f"task:{task.id}", task.text   # the Plan's cleaned title is the last-known one
+    board.revision += 1
+    await db.commit()
+    await db.refresh(node)
+    return {"task_id": task.id, "revision": board.revision, "node": node}
