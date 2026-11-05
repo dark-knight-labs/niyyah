@@ -2,7 +2,7 @@
 
 Import rebuilds planner_tasks without keeping row ids, so a board that links `task:12` would point at the wrong item (or none).
 Ids are matched by content: a (text, stream, lane) that occurs exactly once on both sides is the same item; anything ambiguous or
-unmatched keeps its key and shows under "Unplaced" on the Life board rather than being linked to a guess.
+unmatched becomes task:gone-<old id> and shows under "Unplaced" on the Life board rather than being linked to a guess.
 """
 import re
 from collections import Counter
@@ -41,8 +41,13 @@ def content_map(old_rows: list[tuple], new_rows: list[tuple]) -> dict[int, int]:
 
 
 def _key(value: str | None, mapping: dict[int, int]) -> str | None:
+    """A numeric task key follows the mapping; with no mapping it becomes task:gone-<old>, which never equals a real id, so it
+    cannot collide with (or merge into) a task that now holds that number. It shows as unplaced."""
     m = TASK_KEY.match(value) if value else None
-    return f"task:{mapping[int(m.group(1))]}" if m and int(m.group(1)) in mapping else value
+    if not m:
+        return value
+    old = int(m.group(1))
+    return f"task:{mapping[old]}" if old in mapping else f"task:gone-{old}"
 
 
 async def remap_task_keys(db: AsyncSession | None, nodes: list[BoardNode], edges: list[BoardEdge], mapping: dict[int, int]) -> list[BoardNode]:
@@ -52,8 +57,6 @@ async def remap_task_keys(db: AsyncSession | None, nodes: list[BoardNode], edges
     remapped one's collapsed/hidden state, and children and edges of the dropped node move to it.
     With a session (rows already stored) the keys change in two steps, because 1->2 and 2->3 at once would clash on the unique
     (board_id, ref_key) index for a moment. Without one (rows not yet added) they are just assigned."""
-    if not mapping:
-        return []
     original = {n.id: n.ref_key for n in nodes}
     final = {n.id: _key(n.ref_key, mapping) for n in nodes}
     holders: dict[str, list[BoardNode]] = {}
@@ -95,8 +98,6 @@ async def remap_task_keys(db: AsyncSession | None, nodes: list[BoardNode], edges
 
 async def remap_existing(db: AsyncSession, user_id: int, mapping: dict[int, int]) -> None:
     """Remap the links of every stored board of the user (an import whose file has no boards)."""
-    if not mapping:
-        return
     for board in (await db.execute(select(Board).where(Board.user_id == user_id))).scalars().all():
         nodes = list((await db.execute(select(BoardNode).where(BoardNode.board_id == board.id))).scalars())
         edges = list((await db.execute(select(BoardEdge).where(BoardEdge.board_id == board.id))).scalars())

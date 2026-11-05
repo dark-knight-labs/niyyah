@@ -150,7 +150,7 @@ async def test_file_with_only_pipeline_items_keeps_unmatched_keys(db_client):
     del snap["planning_rows"]
     assert (await c.post(I, json=snap)).status_code == 200
     got = await board_by_title(c, "Linked")
-    assert sorted(n["ref_key"] for n in got["nodes"] if n["ref_key"]) == old_keys   # left as they were
+    assert sorted(n["ref_key"] for n in got["nodes"] if n["ref_key"]) == sorted(k.replace("task:", "task:gone-") for k in old_keys)   # unmatched: never linked to a guess
 
 
 async def test_duplicate_text_is_not_remapped_others_are(db_client):
@@ -169,7 +169,7 @@ async def test_duplicate_text_is_not_remapped_others_are(db_client):
     del snap["boards"]
     assert (await c.post(I, json=snap)).status_code == 200
     keys = {n["id"]: n["ref_key"] for n in (await c.get(f"{URL}/{b}")).json()["nodes"]}
-    assert keys["a"] == f"task:{twins[0]}" and keys["b"] == f"task:{twins[1]}"
+    assert keys["a"] == f"task:gone-{twins[0]}" and keys["b"] == f"task:gone-{twins[1]}"
     assert keys["s"] != f"task:{solo}" and (await tasks_by_id())[int(keys["s"].split(":")[1])][0] == "Solo item"
 
 
@@ -257,7 +257,7 @@ async def test_remap_collision_merges_into_the_existing_row():
     moved = _n("moved", "task:4", collapsed=True, hidden=True)
     child = _n("kid", parent_id="moved")
     edges = [BoardEdge(board_id=1, id="e", from_id="moved", to_id="keep", label="", style={})]
-    dropped = await board_transfer.remap_task_keys(None, [existing, moved, child], edges, {4: 9})
+    dropped = await board_transfer.remap_task_keys(None, [existing, moved, child], edges, {4: 9, 9: 9})
     assert [d.id for d in dropped] == ["moved"]
     assert (existing.ref_key, existing.collapsed, existing.hidden) == ("task:9", True, True)   # the remapped row's state wins
     assert child.parent_id == "keep" and edges[0].from_id == "keep"
@@ -272,3 +272,25 @@ async def test_notes_survive_export_and_import(db_client):
     assert (await c.post(I, json=snap)).status_code == 200
     got = await board_by_title(c, "Notes")
     assert got["nodes"][0]["notes"] == "why this matters"
+
+
+async def test_unmapped_key_never_merges_with_a_task_that_took_its_number():
+    unmapped, moved = _n("old", "task:7"), _n("moved", "task:3")
+    dropped = await board_transfer.remap_task_keys(None, [unmapped, moved], [], {3: 7})
+    assert dropped == []
+    assert (unmapped.ref_key, moved.ref_key) == ("task:gone-7", "task:7")
+    again = await board_transfer.remap_task_keys(None, [unmapped], [], {})   # a gone key is left alone by later imports
+    assert again == [] and unmapped.ref_key == "task:gone-7"
+
+
+async def test_existing_boards_get_gone_keys_when_nothing_matches(db_client):
+    c, _ = db_client
+    b = (await c.post(URL, json={"title": "Orphans"})).json()["id"]
+    await c.post(f"{URL}/{b}/ops", json={"ops": [up("r", kind="ref", ref_key="task:999999"), up("t", parent_key="task:999999"),
+                                                    {"op": "upsert_edge", "edge": {"id": "e", "from_id": "r", "to_id": "task:999999"}}]})
+    snap = (await c.get(E)).json()
+    del snap["boards"]
+    assert (await c.post(I, json=snap)).status_code == 200
+    got = (await c.get(f"{URL}/{b}")).json()
+    assert {n["id"]: (n["ref_key"], n["parent_key"]) for n in got["nodes"]} == {"r": ("task:gone-999999", None), "t": (None, "task:gone-999999")}
+    assert got["edges"][0]["to_id"] == "task:gone-999999"
