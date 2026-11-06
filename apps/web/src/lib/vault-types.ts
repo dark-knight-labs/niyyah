@@ -352,6 +352,8 @@ export interface ItemData {
   color?: string | null;
   location?: string | null;
   meeting_url?: string | null;
+  /** Set on an own item that is a pipeline row (it is on the Map's Life board as task:<id>). */
+  lane?: Lane | null;
 }
 
 /** A calendar event's annotation, as PUT /vault/items/overlay returns it. */

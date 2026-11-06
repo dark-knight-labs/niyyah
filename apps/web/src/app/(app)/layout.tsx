@@ -12,6 +12,7 @@ import {
   Activity,
   Clock,
   ListChecks,
+  Network,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const PUBLIC_PATHS = ["/"];
 const nav = [
   { href: "/", label: "Overview", icon: Clock, key: "o" },
   { href: "/plan", label: "Plan", icon: ListChecks, key: "p" },
+  { href: "/map", label: "Map", icon: Network, key: "m" },
   { href: "/progress", label: "Progress", icon: Activity, key: "r" },
   { href: "/settings", label: "Settings", icon: Settings, key: "s" },
 ];
