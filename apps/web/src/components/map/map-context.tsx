@@ -12,7 +12,7 @@ export interface MapActions {
   /** NodeResizer released: size and position in RF coordinates. */
   /** Buttons of the floating bar above a selected node, and what pressing one does. */
   barItems: (id: string) => BarItem[];
-  runBar: (id: string, key: string) => void;
+  runBar: (id: string, key: string, anchor?: DOMRect) => void;
   resizeEnd: (id: string, p: { x: number; y: number; width: number; height: number }) => void;
 }
 

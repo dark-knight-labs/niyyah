@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "@/lib/map/ops";
 import type { Board, BoardNode } from "@/lib/map/types";
 
-type MenuKind = "boards" | "frames" | null;
+type MenuKind = "boards" | "frames" | "organize" | null;
 
 const STATUS_TEXT: Record<SaveStatus, string> = { saved: "Saved", saving: "Saving", retrying: "Not saved, retrying", offline: "Offline" };
 
 /** Top-left: board name (menu: boards, new board, hidden thoughts), Frames list (zoom to frame), save status. */
-export function BoardBar({ board, boards, frames, hidden, status, onOpen, onNew, onRename, onDelete, onZoomFrame, onUnhide, onRetry, showDone, onShowDone }: {
+export function BoardBar({ board, boards, frames, hidden, status, onOpen, onNew, onRename, onDelete, onZoomFrame, onUnhide, onRetry, showDone, onShowDone, onOrganize }: {
+  onOrganize: (layout: "keep" | "both" | "right" | "down" | "up") => void;
   showDone: boolean | null; onShowDone: (v: boolean) => void;
   board: Board; boards: Board[]; frames: BoardNode[]; hidden: BoardNode[]; status: SaveStatus;
   onOpen: (id: string) => void; onNew: () => void; onRename: (title: string) => void; onDelete: () => void;
@@ -48,6 +49,10 @@ export function BoardBar({ board, boards, frames, hidden, status, onOpen, onNew,
       <button type="button" className="mono" aria-haspopup="menu" aria-expanded={menu === "frames"} data-testid="frames-menu" onClick={() => setMenu(menu === "frames" ? null : "frames")}>
         Frames{frames.length ? ` (${frames.length})` : ""}
       </button>
+      <span className="nm-organize" style={{ padding: 0 }}>
+        <button type="button" className="mono" data-testid="organize" title="Organize the selected map (or every map) in its current layout" onClick={() => onOrganize("keep")}>Organize</button>
+        <button type="button" aria-haspopup="menu" aria-expanded={menu === "organize"} aria-label="Organize options" data-testid="organize-menu" onClick={() => setMenu(menu === "organize" ? null : "organize")} style={{ padding: "0 8px 0 0" }}><span className="mono" style={{ color: "var(--muted-foreground)" }}>▾</span></button>
+      </span>
       <span className={`mono st ${bad ? "bad" : ""}`} role="status" data-testid="save-status" data-status={status}>
         {STATUS_TEXT[status]}
         {bad && <button type="button" onClick={onRetry} style={{ marginLeft: 8, textDecoration: "underline" }}>Retry</button>}
@@ -81,6 +86,14 @@ export function BoardBar({ board, boards, frames, hidden, status, onOpen, onNew,
               {hidden.map((n) => <button key={n.id} type="button" role="menuitem" onClick={() => { setMenu(null); onUnhide(n.id); }}>{item(n)}<span className="k">show</span></button>)}
             </>
           )}
+        </div>
+      )}
+      {menu === "organize" && (
+        <div className="nm-menu" role="menu" style={{ left: 0, top: "100%", marginTop: 4 }}>
+          <div className="mh mono">Organize</div>
+          {([["both", "Horizontal, balanced"], ["right", "Horizontal, to the right"], ["down", "Vertical, down"], ["up", "Vertical, up"]] as const).map(([l, t]) => (
+            <button key={l} type="button" role="menuitem" data-layout={l} onClick={() => { setMenu(null); onOrganize(l); }}>{t}</button>
+          ))}
         </div>
       )}
       {menu === "frames" && (

@@ -1,5 +1,5 @@
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
-import { layoutMindMap, type Size } from "@/lib/map/layout";
+import { branchHandles, layoutMindMap, type Size } from "@/lib/map/layout";
 import { colorKeyOf, colorVar, descendantCount, dirOf, isMind, rootOf, visibleForest } from "@/lib/map/tree";
 import type { LiveInfo } from "@/lib/map/life-tree";
 import type { BoardData } from "@/lib/map/state";
@@ -26,6 +26,18 @@ export type MindData = {
   gone: boolean;
   done: boolean;
   flash: boolean;
+  /** Box style (node style keys). */
+  fill: string;
+  shape: string;
+  size: string;
+  bold: boolean;
+  icon: string;
+  url: string;
+  hasNotes: boolean;
+  locked: boolean;
+  orient: "h" | "v";
+  dim: boolean;
+  own: boolean;
 };
 export type ItemData = {
   kind: "sticky" | "text" | "shape" | "frame" | "image" | "file" | "unknown";
@@ -34,6 +46,7 @@ export type ItemData = {
   editing: boolean;
   bar: boolean;
   linkFrom: boolean;
+  dim?: boolean;
 };
 export type MapNodeData = MindData | ItemData;
 export type MapNode = Node<MapNodeData & Record<string, unknown>>;
@@ -50,6 +63,8 @@ export interface DeriveUi {
   info: ReadonlyMap<string, LiveInfo>;
   live: ReadonlyMap<string, Live>;
   sizes: ReadonlyMap<string, Size>;
+  /** Focus mode: ids that stay bright (everything else is dimmed). Null = off. */
+  focus?: ReadonlySet<string> | null;
 }
 
 export interface Derived {
@@ -118,7 +133,7 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
       id: n.id, type: n.kind === "image" || n.kind === "file" ? "unavailable" : n.kind, parentId: fr?.id, position: { x: l?.x ?? n.x - (fr?.x ?? 0), y: l?.y ?? n.y - (fr?.y ?? 0) },
       width: w, height: n.kind === "text" ? undefined : h, measured: n.kind === "text" ? meas(n.id) ?? { width: w, height: h } : { width: w, height: h },
       zIndex: 1, selected: ui.selected.has(n.id),
-      data: { kind: n.kind as ItemData["kind"], text: n.text, color: (n.style.color as StickyColor) ?? "yellow", editing: ui.editing === n.id, bar: single(n.id), linkFrom: ui.linkFrom === n.id },
+      data: { kind: n.kind as ItemData["kind"], text: n.text, color: (n.style.color as StickyColor) ?? "yellow", editing: ui.editing === n.id, bar: single(n.id), linkFrom: ui.linkFrom === n.id, dim: !!ui.focus && !ui.focus.has(n.id) },
     } as MapNode);
   }
 
@@ -139,14 +154,16 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
       data: {
         kind: "mind", text: n.text, depth, dir: dirOf(nodes, id), color: colorVar(colorKeyOf(nodes, id)), hasChildren: kids.some((c) => !c.hidden),
         collapsed: n.collapsed, hiddenCount: n.collapsed ? descendantCount(idx, id) : 0, editing: ui.editing === id, bar: single(id), drop: ui.dropTarget === id, refKey: n.ref_key, parent: n.parent_id ?? "",
+        fill: n.style.fill ?? (depth === 1 ? "tint" : "outline"), shape: n.style.shape ?? "rect", size: n.style.size ?? "M", bold: !!n.style.bold, icon: n.style.icon ?? "", url: n.style.url ?? "",
+        hasNotes: !!n.notes.trim(), locked: !!n.style.locked, orient: p.orient, dim: !!ui.focus && !ui.focus.has(id), own: !!n.style.color,
         tag: ui.info.get(id)?.tag ?? "", tagNow: !!ui.info.get(id)?.tagNow, sub: ui.info.get(id)?.sub ?? "", gone: !!ui.info.get(id)?.gone, done: !!ui.info.get(id)?.done, flash: ui.flash === id,
       },
     });
     if (n.parent_id && placed.has(n.parent_id)) {
-      const dir = p.side;
+      const hs = branchHandles(p.side, p.orient);
       edges.push({
         id: `t:${id}`, source: n.parent_id, target: id, type: "branch", selectable: false, focusable: false,
-        sourceHandle: dir > 0 ? "sr" : "sl", targetHandle: dir > 0 ? "tl" : "tr", data: { color: colorVar(colorKeyOf(nodes, id)) },
+        sourceHandle: hs.source, targetHandle: hs.target, data: { color: colorVar(colorKeyOf(nodes, id)), kind: rootOf(nodes, id)?.style.edge ?? "curved", depth, orient: p.orient },
       });
     }
   }

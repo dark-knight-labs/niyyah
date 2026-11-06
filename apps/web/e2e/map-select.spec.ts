@@ -206,8 +206,9 @@ test("Life board: a mixed selection hides live nodes, deletes thoughts, skips th
   await page.waitForSelector(".nm-mind");
   await page.waitForTimeout(700);
   const mind = (t: string) => page.locator(".nm-mind", { hasText: t }).first();
-  await mind("Group delete me").click();
-  await mind("Launch page").click({ modifiers: ["Shift"] });
+  // the floating bar of the first pick sits above it, over the node above: pick the upper node first, then the one below it
+  await mind("Launch page").click();
+  await mind("Group delete me").click({ modifiers: ["Shift"] });
   await page.locator('[data-testid^="mind-quarter:"]').click({ modifiers: ["Shift"] });
   await expect(page.getByTestId("multi-count")).toHaveText("3 selected");
   await page.keyboard.press("Delete");

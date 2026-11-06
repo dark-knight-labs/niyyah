@@ -20,6 +20,11 @@ import { navigate } from "@/lib/map/mind-keys";
 import type { Size } from "@/lib/map/layout";
 import { childIndex, depthOf, descendantCount, isDescendant, subtreeIds } from "@/lib/map/tree";
 import type { Board, BoardNode, Op, StickyColor } from "@/lib/map/types";
+import { barOf, makeSel, resolveMenu, runCommand, type Env, type MenuItem } from "@/lib/map/commands";
+import { mapsOf, organizeOps } from "@/lib/map/organize";
+import type { Layout } from "@/lib/map/layout";
+import { STICKY_COLORS, isKnownKind } from "@/lib/map/types";
+import { ContextMenu, PromptDialog } from "./context-menu";
 import { BoardBar } from "./board-bar";
 import { MultiBar } from "./context-bar";
 import { derive, type Live, type MapNode } from "./derive";
@@ -66,6 +71,12 @@ function freeArea(el: HTMLElement, cardOpen: boolean): { w: number; h: number } 
   return el.clientWidth < 760 ? { w: el.clientWidth, h: el.clientHeight * 0.45 } : { w: el.clientWidth - 330, h: el.clientHeight };
 }
 
+function rootOfFramed(nodes: Map<string, BoardNode>, id: string): boolean {
+  let n = nodes.get(id);
+  while (n?.parent_id && nodes.has(n.parent_id)) n = nodes.get(n.parent_id);
+  return !!n?.frame_id;
+}
+
 interface Toast { message: string; undo?: boolean }
 
 export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitle, onDelete, focusNode, plan }: {
@@ -110,6 +121,10 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
   const [live, setLive] = useState<ReadonlyMap<string, Live>>(new Map());
+  const [menu, setMenu] = useState<{ x: number; y: number; ids: string[]; pos: { x: number; y: number } | null; label: string; groups: MenuItem[][] } | null>(null);
+  const [prompt, setPrompt] = useState<{ title: string; initial: string; resolve: (v: string | null) => void } | null>(null);
+  const [focus, setFocus] = useState<ReadonlySet<string> | null>(null);
+  const pendingAnim = useRef<Map<string, { x: number; y: number }> | null>(null);
   const [sizes, setSizes] = useState<ReadonlyMap<string, Size>>(new Map());
   // The minimap redraws every node on each pan frame: at ~1,000 nodes it costs ~10 fps, so big boards start without it (the button turns it on).
   const [minimapPref, setMinimap] = useState<boolean | null>(null);
@@ -122,8 +137,8 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   const seeded = useRef(false);
 
   const derived = useMemo(
-    () => derive(data, idx, { selected, editing, dropTarget, linkFrom, flash, info: view.info, live, sizes }, prevNodes),
-    [data, idx, selected, editing, dropTarget, linkFrom, flash, view.info, live, sizes, prevNodes],
+    () => derive(data, idx, { selected, editing, dropTarget, linkFrom, flash, info: view.info, live, sizes, focus }, prevNodes),
+    [data, idx, selected, editing, dropTarget, linkFrom, flash, view.info, live, sizes, focus, prevNodes],
   );
   const initialized = useNodesInitialized();
 
@@ -143,8 +158,10 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     amend: (tag: string, ops: Op[]) => raw.amend(tag, isLife ? toStored(ops, view, raw.data) : ops),
     discard: (tag: string, ops: Op[]) => raw.discard(tag, isLife ? toStored(ops, view, raw.data) : ops),
   });
-  const L = useRef({ b: raw, data, idx, selected, tool, linkFrom, derived, info: view.info, plan });
-  useEffect(() => { L.current = { b: wrapB(), data, idx, selected, tool, linkFrom, derived, info: view.info, plan }; });
+  const L = useRef({ b: raw, data, idx, selected, tool, linkFrom, derived, info: view.info, plan, sizes });
+  const envRef = useRef<Env | null>(null);
+  const focusRef = useRef<ReadonlySet<string> | null>(null);
+  useEffect(() => { L.current = { b: wrapB(), data, idx, selected, tool, linkFrom, derived, info: view.info, plan, sizes }; });
 
   const select = useCallback((ids: Iterable<string>) => { cardTag.current = null; setSelected(new Set(ids)); }, []);
 
@@ -520,41 +537,6 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     } catch (e) { notify(e instanceof Error ? e.message : "Could not make the item"); }
   }, [boardId, raw, makeContext, notify, select]);
 
-  const barItems = useCallback((id: string): BarItem[] => {
-    const { data: d, idx: ix } = L.current;
-    const n = d.nodes.get(id);
-    if (!n) return [];
-    if (n.kind === "mind" || n.kind === "ref") {
-      const depth = depthOf(d.nodes, id);
-      const live = n.kind === "ref";
-      const items: BarItem[] = [{ key: "child", label: "+ Child", kbd: "Tab" }];
-      if (depth > 0 && !live) items.push({ key: "sib", label: "+ Sibling", kbd: "↵" });
-      if (depth > 0 && (ix.get(id)?.length ?? 0) > 0) items.push({ key: "fold", label: n.collapsed ? "Expand" : "Collapse" });
-      if (!live && L.current.plan.pipelines?.streams.length) items.push({ key: "make", label: "Make item" });
-      items.push({ key: "link", label: "Connect" });
-      if (live) { if (depth > 0 && id !== UNPLACED) items.push({ key: "del", label: "Hide" }); }
-      else items.push({ key: "del", label: depth === 0 ? "Delete map" : "Delete" });
-      return items;
-    }
-    const items: BarItem[] = [];
-    if (n.kind === "sticky") for (const c of ["yellow", "green", "blue", "pink"]) items.push({ key: `color:${c}`, label: c, swatch: c });
-    items.push({ key: "link", label: "Connect" }, { key: "del", label: "Delete" });
-    return items;
-  }, []);
-
-  const runBar = useCallback((id: string, key: string) => {
-    const { data: d, b: bd } = L.current;
-    if (key === "child") createMind("child", id);
-    else if (key === "sib") createMind("sibling", id);
-    else if (key === "fold") toggleFold(id);
-    else if (key === "del") deleteSelection();
-    else if (key === "make") { const c = makeContext(id); if (c.stream) void makeItem(id, c.stream, c.lane ?? "next", c.product && PRODUCT_TAG.test(c.product) ? c.product : null); else notify("Choose a block in the details card"); }
-    else if (key === "link") { setTool("link"); setLinkFrom(id); }
-    else if (key.startsWith("color:")) { const n = d.nodes.get(id); if (n) bd.commit([A.setColor(n, key.slice(6) as StickyColor)]); }
-  }, [createMind, toggleFold, deleteSelection, makeContext, makeItem, notify]);
-
-  const actions = useMemo<MapActions>(() => ({ finishEdit, toggleFold, resizeEnd, barItems, runBar }), [finishEdit, toggleFold, resizeEnd, barItems, runBar]);
-
   const cardModel = useMemo<CardModel | null>(() => {
     if (selected.size === 0) return null;
     if (selected.size > 1) return { type: "many", count: selected.size };
@@ -629,6 +611,22 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
       const one = sel.size === 1 ? [...sel][0] : null;
       const node = one ? d.nodes.get(one) : undefined;
       const stop = () => { e.preventDefault(); e.stopPropagation(); };
+      const env = envRef.current;
+      if ((key === "ContextMenu" || (e.shiftKey && key === "F10")) && env) {
+        stop();
+        const first = [...sel][0];
+        const r = first ? L.current.derived.rects.get(first) : undefined;
+        const pt = r ? rf.flowToScreenPosition({ x: r.x + r.w, y: r.y + r.h / 2 }) : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        const pos = r ? null : rf.screenToFlowPosition(pt);
+        setMenu({ x: pt.x, y: pt.y, ids: [...sel], pos, label: "Actions", groups: resolveMenu(makeSel({ ids: [...sel], data: d, idx: ix, rects: L.current.derived.rects, canMake: !!L.current.plan.pipelines?.streams.length, pos })) });
+        return;
+      }
+      if (e.altKey && !mod && (key === "ArrowUp" || key === "ArrowDown") && env && one) {
+        stop();
+        runCommand(env, makeSel({ ids: [one], data: d, idx: ix, rects: L.current.derived.rects }), key === "ArrowUp" ? "moveUp" : "moveDown");
+        return;
+      }
+      if (mod && key.toLowerCase() === "b" && env && sel.size > 0) { stop(); runCommand(env, makeSel({ ids: [...sel], data: d, idx: ix }), "bold"); return; }
       if (mod && key.toLowerCase() === "z") { stop(); if (e.shiftKey) bd.redo(); else bd.undo(); return; }
       if (mod && key.toLowerCase() === "y") { stop(); bd.redo(); return; }
       if (mod && key === ".") { stop(); if (node && (node.kind === "mind" || node.kind === "ref")) toggleFold(node.id); return; }
@@ -637,10 +635,11 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
       if (e.shiftKey && (key === "!" || e.code === "Digit1")) { stop(); void rf.fitView({ padding: 0.12, maxZoom: 1.5, duration: 250 }); return; }
       if (key === "+" || key === "=") { stop(); void rf.zoomIn({ duration: 120 }); return; }
       if (key === "-") { stop(); void rf.zoomOut({ duration: 120 }); return; }
-      if (key === "Escape") { stop(); if (tl !== "select") chooseTool("select"); else select([]); return; }
+      if (key === "Escape") { stop(); if (tl !== "select") chooseTool("select"); else if (focusRef.current) setFocus(null); else select([]); return; }
       if (node && (node.kind === "mind" || node.kind === "ref")) {
         if (key === "Tab") { stop(); createMind("child", node.id); return; }
         if (key === "Enter" && node.kind === "mind") { stop(); createMind(node.parent_id ? "sibling" : "child", node.id); return; }
+        if (key === "Escape") { /* handled below */ }
         if (key.startsWith("Arrow")) {
           stop();
           const to = navigate(d.nodes, ix, node.id, key as "ArrowLeft");
@@ -693,6 +692,110 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
 
   const fit = useCallback(() => void rf.fitView({ padding: 0.12, maxZoom: 1.5, duration: 250 }), [rf]);
 
+  // ---- command registry wiring: the bar, the right-click menu and the keyboard all run the same commands ----
+  const selFor = useCallback((ids: string[], pos: { x: number; y: number } | null = null) => {
+    const { data: d, idx: ix, derived: dv, plan: pl } = L.current;
+    return makeSel({ ids, data: d, idx: ix, rects: dv.rects, canMake: !!pl.pipelines?.streams.length, pos });
+  }, []);
+
+  const organize = useCallback((rootIds: string[], layout: Layout | "keep") => {
+    const { data: d, idx: ix, derived: dv, b: bd } = L.current;
+    const obstacles = [...dv.rects].filter(([id]) => { const n = d.nodes.get(id); return !!n && n.kind !== "mind" && n.kind !== "ref" && n.kind !== "frame"; }).map(([, r]) => r);
+    const ops = organizeOps(d, ix, rootIds, layout, L.current.sizes as Map<string, Size>, obstacles);
+    if (!ops.length) { notify("Already organized"); return; }
+    pendingAnim.current = new Map([...dv.rects].map(([id, r]) => [id, { x: r.x, y: r.y }]));
+    bd.commit(ops);
+  }, [notify]);
+
+  const env = useMemo<Env>(() => ({
+    commit: (ops, tag) => L.current.b.commit(ops, tag),
+    select, edit: startEdit,
+    editNew: (id) => { fresh.current.add(id); reveal.current = id; select([id]); setEditing(id); },
+    addChild: (id) => createMind("child", id), addSibling: (id) => createMind("sibling", id),
+    fold: toggleFold, del: deleteSelection,
+    connect: (id) => { setTool("link"); setLinkFrom(id); },
+    make: (id) => { const c = makeContext(id); if (c.stream) void makeItem(id, c.stream, c.lane ?? "next", c.product && PRODUCT_TAG.test(c.product) ? c.product : null); else notify("Choose a block in the details card"); },
+    prompt: (title, initial) => new Promise((resolve) => setPrompt({ title, initial, resolve })),
+    notify: (m) => notify(m),
+    focusNotes: (id) => { select([id]); setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="card-notes"]')?.focus(), 140); },
+    organize,
+    focusBranch: (id) => { if (!id) { setFocus(null); return; } setFocus(new Set(subtreeIds(L.current.idx, id))); },
+    openPlan: () => router.push("/plan"),
+    addAt: (kind, pos) => { const p = pos ?? rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }); addItemAt(kind, p.x, p.y); },
+    selectAll: () => select([...L.current.data.nodes.values()].filter((n) => isKnownKind(n.kind) && !n.hidden && L.current.derived.rects.has(n.id)).map((n) => n.id)),
+    fit: () => void rf.fitView({ padding: 0.12, maxZoom: 1.5, duration: 250 }),
+    zoomToFrame: (id) => zoomFrame(id),
+    toggleMinimap: () => setMinimap((m) => !(m ?? data.nodes.size <= 400)),
+    sizes: () => L.current.sizes as Map<string, Size>,
+  }), [select, startEdit, createMind, toggleFold, deleteSelection, makeContext, makeItem, notify, organize, router, rf, addItemAt, zoomFrame, data.nodes.size]);
+  useEffect(() => { envRef.current = env; });
+  useEffect(() => { focusRef.current = focus; }, [focus]);
+
+  const barItems = useCallback((id: string): BarItem[] => {
+    const s = selFor([id]);
+    const items: BarItem[] = barOf(s).map((c) => ({ key: c.id, label: c.label, kbd: c.kbd }));
+    if (s.kind === "sticky") return [...STICKY_COLORS.map((c) => ({ key: `color:${c}`, label: c, swatch: c })), ...items];
+    return items;
+  }, [selFor]);
+
+  const openMenuAt = useCallback((x: number, y: number, ids: string[], pos: { x: number; y: number } | null, label: string) => setMenu({ x, y, ids, pos, label, groups: resolveMenu(selFor(ids, pos)) }), [selFor]);
+  const runBar = useCallback((id: string, key: string, anchor?: DOMRect) => {
+    if (key.startsWith("color:")) { const n = L.current.data.nodes.get(id); if (n) L.current.b.commit([A.setColor(n, key.slice(6) as StickyColor)]); return; }
+    if (key === "more") { const r = anchor; openMenuAt(r ? r.left : 200, r ? r.bottom + 4 : 200, [id], null, "Actions"); return; }
+    runCommand(env, selFor([id]), key);
+  }, [env, selFor, openMenuAt]);
+  const actions = useMemo<MapActions>(() => ({ finishEdit, toggleFold, resizeEnd, barItems, runBar }), [finishEdit, toggleFold, resizeEnd, barItems, runBar]);
+
+  const onNodeContextMenu = useCallback((e: React.MouseEvent, node: MapNode) => {
+    e.preventDefault();
+    if (node.type === "unknown") return;
+    const cur = L.current.selected;
+    const ids = cur.has(node.id) ? [...cur] : [node.id];
+    if (!cur.has(node.id)) select(ids);
+    openMenuAt(e.clientX, e.clientY, ids, null, "Actions");
+  }, [select, openMenuAt]);
+  const onSelectionContextMenu = useCallback((e: React.MouseEvent, nodes: MapNode[]) => { e.preventDefault(); openMenuAt(e.clientX, e.clientY, nodes.map((n) => n.id), null, "Selection actions"); }, [openMenuAt]);
+  const onEdgeContextMenu = useCallback((e: React.MouseEvent, edge: { id: string; type?: string }) => {
+    e.preventDefault();
+    if (edge.type === "branch") return;
+    select([edge.id]);
+    openMenuAt(e.clientX, e.clientY, [edge.id], null, "Connector actions");
+  }, [select, openMenuAt]);
+  const onPaneContextMenu = useCallback((e: MouseEvent | React.MouseEvent) => {
+    e.preventDefault();
+    select([]);
+    openMenuAt(e.clientX, e.clientY, [], rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }), "Board actions");
+  }, [select, openMenuAt, rf]);
+
+  // Organize animates: every node that moved glides from where it was (250 ms, none under prefers-reduced-motion).
+  const animRaf = useRef(0);
+  useEffect(() => {
+    const from = pendingAnim.current;
+    if (!from) return;
+    pendingAnim.current = null;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const moves = new Map<string, { f: { x: number; y: number }; t: { x: number; y: number } }>();
+    for (const [id, r] of derived.rects) {
+      const f = from.get(id), n = data.nodes.get(id);
+      if (!f || !n || n.frame_id || (Math.abs(f.x - r.x) < 1 && Math.abs(f.y - r.y) < 1)) continue;
+      if ((n.kind === "mind" || n.kind === "ref") && rootOfFramed(data.nodes, id)) continue;
+      moves.set(id, { f, t: { x: r.x, y: r.y } });
+    }
+    if (!moves.size) return;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / 250), e = 1 - Math.pow(1 - k, 3);
+      setLive((cur) => {
+        const next = new Map(cur);
+        for (const [id, m] of moves) { if (k >= 1) next.delete(id); else next.set(id, { ...next.get(id), x: m.f.x + (m.t.x - m.f.x) * e, y: m.f.y + (m.t.y - m.f.y) * e }); }
+        return next;
+      });
+      if (k < 1) animRaf.current = requestAnimationFrame(step);
+    };
+    animRaf.current = requestAnimationFrame(step);
+  }, [derived, data.nodes]);
+  useEffect(() => () => cancelAnimationFrame(animRaf.current), []);
+
   if (b.error && !b.board) return <div className="grid h-full place-items-center p-6 text-small text-[var(--muted-foreground)]" role="alert">{b.error}</div>;
   if (!b.board) return <div className="grid h-full place-items-center"><div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" /></div>;
   const board = b.board;
@@ -716,7 +819,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
           defaultViewport={board.viewport ?? undefined}
           minZoom={0.1} maxZoom={4}
           panOnDrag={boxSelect ? [1, 2] : true} panOnScroll zoomOnScroll={false} zoomOnDoubleClick={false} zoomActivationKeyCode={["Control", "Meta"]} panActivationKeyCode="Space"
-          selectionOnDrag={boxSelect} selectionMode={SelectionMode.Partial} onPaneContextMenu={(e) => e.preventDefault()}
+          selectionOnDrag={boxSelect} selectionMode={SelectionMode.Partial} onPaneContextMenu={onPaneContextMenu} onNodeContextMenu={onNodeContextMenu} onSelectionContextMenu={onSelectionContextMenu} onEdgeContextMenu={onEdgeContextMenu}
           selectionKeyCode="Shift" multiSelectionKeyCode={["Shift", "Control", "Meta"]} deleteKeyCode={null} disableKeyboardA11y
           nodesDraggable={!panTool} elementsSelectable={!panTool} nodesConnectable={tool === "select"} nodeDragThreshold={4}
           connectionRadius={24}
@@ -738,7 +841,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
         <BoardBar board={board} boards={boards} frames={frames} hidden={hidden} status={b.status}
           onOpen={onOpen} onNew={onNew} onDelete={() => onDelete(board.id)}
           onRename={(t) => { void b.rename(t).then(() => onRetitle(board.id, t)).catch(() => notify("Could not rename the board")); }}
-          onZoomFrame={zoomFrame} onUnhide={unhide} onRetry={b.retry} showDone={isLife ? showDone : null} onShowDone={setShowDone} />
+          onOrganize={(l) => organize(mapsOf(data, idx, selected), l)} onZoomFrame={zoomFrame} onUnhide={unhide} onRetry={b.retry} showDone={isLife ? showDone : null} onShowDone={setShowDone} />
         <ToolRail tool={tool} onTool={chooseTool} canUndo={b.canUndo} canRedo={b.canRedo} onUndo={b.undo} onRedo={b.redo} />
         <ZoomBar minimap={minimap} onMinimap={() => setMinimap(!minimap)} cardOpen={cardOpen} onFit={fit} />
         <div className="nm-help">Tab child · Enter sibling · F2 edit · Del remove · drag empty space to select · space+drag or two fingers to pan · drop on a node to reparent</div>
@@ -749,6 +852,8 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
             onDelete={deleteSelection} onClose={() => select([])}
             onLane={(id, lane) => void liveLane(id, lane)} onMake={(id, stream, lane, product) => void makeItem(id, stream, lane, product)} onOpenPlan={() => router.push("/plan")} />
         )}
+        {menu && <ContextMenu key={`${menu.x}:${menu.y}:${menu.ids.join(",")}`} x={menu.x} y={menu.y} label={menu.label} groups={menu.groups} onClose={() => setMenu(null)} onRun={(id, choice) => { runCommand(env, selFor(menu.ids, menu.pos), id, choice); }} />}
+        {prompt && <PromptDialog title={prompt.title} initial={prompt.initial} onDone={(v) => { prompt.resolve(v); setPrompt(null); }} />}
         {(b.status === "retrying" || b.status === "offline") && (
           <div className="nm-banner" role="alert">
             <span>{b.status === "offline" ? "Offline. Changes are kept on this device and will save when the connection returns." : "Not saved. Retrying."}</span>

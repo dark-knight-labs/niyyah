@@ -40,6 +40,10 @@
   --map-sticky-green: #d6ead9;
   --map-sticky-blue: #d9e4f2;
   --map-sticky-pink: #f2dbe2;
+  --map-sticky-orange: #f6d9b5;
+  --map-sticky-teal: #cfe6e3;
+  --map-sticky-violet: #e3dcf1;
+  --map-sticky-gray: #e4e2dc;
 
   --font-sans: "Geist Variable", system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
@@ -83,6 +87,10 @@
   --map-sticky-green: #233a2a;
   --map-sticky-blue: #22314a;
   --map-sticky-pink: #46262f;
+  --map-sticky-orange: #4a3520;
+  --map-sticky-teal: #1f3b3a;
+  --map-sticky-violet: #34294d;
+  --map-sticky-gray: #34322e;
 }
 
 /* Skins: pick-and-choose looks as alternative token sets (list in components/skin-switch.tsx). Paper is the default (no data-skin). Switch with ?skin=<id> or the corner picker; independent of light/dark. Each skin sets the same variables, the radius scale (--r-*) and optionally the fonts. */
@@ -269,6 +277,10 @@
   --map-sticky-green: #233a2a;
   --map-sticky-blue: #22314a;
   --map-sticky-pink: #46262f;
+  --map-sticky-orange: #4a3520;
+  --map-sticky-teal: #1f3b3a;
+  --map-sticky-violet: #34294d;
+  --map-sticky-gray: #34322e;
 }
 
 @theme inline {
@@ -463,9 +475,23 @@ h1, h2, h3 {
 .nm-mind { position: relative; width: max-content; max-width: 260px; white-space: pre-wrap; word-break: break-word; }
 .nm-mind .nm-t, .nm-item .nm-t { outline: none; }
 .nm-mind .nm-t { display: inline-block; min-width: 1.5ch; }
-.nm-mind.d0 { font-family: var(--font-serif); font-size: 1.1875rem; font-weight: 500; line-height: 1.25; padding: 12px 18px; border: 1px solid var(--foreground); background: var(--surface); max-width: 300px; border-radius: var(--map-r); }
-.nm-mind.d1 { font-weight: 600; padding: 7px 12px 7px 15px; border: 1px solid var(--border); background: var(--surface); box-shadow: inset 3px 0 0 var(--c); border-radius: var(--map-r); }
-.nm-mind.dn { font-size: 0.8125rem; padding: 3px 6px 4px; border-bottom: 2px solid var(--c); }
+/* Every level is a box. d0: the idea, 2px foreground. d1: branch tint with the branch colour as border. dn: paper with a hairline in the branch colour. */
+.nm-mind { --r: var(--map-r); border-radius: var(--r); background: var(--surface); border: 1px solid var(--c); line-height: 1.3; }
+.nm-mind.d0 { font-family: var(--font-serif); font-size: 1.1875rem; font-weight: 500; line-height: 1.25; padding: 12px 18px; border: 2px solid var(--foreground); max-width: 300px; }
+.nm-mind.d1 { font-weight: 600; padding: 7px 12px; border-width: 1.5px; background: color-mix(in srgb, var(--c) 13%, var(--surface)); }
+.nm-mind.dn { font-size: 0.8125rem; padding: 4px 9px; }
+.nm-mind.fill-outline { background: var(--surface); }
+.nm-mind.fill-tint { background: color-mix(in srgb, var(--c) 13%, var(--surface)); }
+.nm-mind.fill-solid { background: var(--c); color: #fff; }
+.nm-mind.fill-solid .nm-tag, .nm-mind.fill-solid .nm-sub { color: rgb(255 255 255 / 0.8); }
+.nm-mind.d0.fill-solid { background: var(--foreground); color: var(--background); border-color: var(--foreground); }
+.nm-mind.shape-rounded { --r: 10px; } .nm-mind.shape-pill { --r: 999px; padding-inline: 16px; }
+.nm-mind.size-S { font-size: 0.75rem; } .nm-mind.size-L { font-size: 1.0625rem; } .nm-mind.d0.size-S { font-size: 1rem; } .nm-mind.d0.size-L { font-size: 1.5rem; }
+.nm-mind.bold .nm-t { font-weight: 700; }
+.nm-mind .nm-ic { margin-right: 6px; }
+.nm-mind .nm-url { margin-left: 6px; color: var(--accent); font: 600 11px/1 var(--font-mono); text-decoration: none; }
+.nm-mind .nm-note { position: absolute; right: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 1.5px solid var(--surface); }
+.nm-mind.locked::after, .nm-item.locked::after { content: ""; position: absolute; right: -5px; bottom: -5px; width: 9px; height: 9px; background: var(--foreground) ; clip-path: polygon(0 40%, 100% 40%, 100% 100%, 0 100%); }
 .nm-mind.sel-ring, .nm-item.sel-ring { outline: 2px solid var(--accent); outline-offset: 3px; }
 .nm-mind.drop { background: var(--accent-light); }
 .nm-mind .nm-tag.now { color: var(--accent); }
@@ -487,6 +513,7 @@ h1, h2, h3 {
 .nm-sticky { padding: 12px; font-size: 0.8125rem; border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent); overflow: hidden; color: var(--foreground); border-radius: var(--map-r); }
 .nm-sticky.yellow { background: var(--map-sticky-yellow); } .nm-sticky.green { background: var(--map-sticky-green); }
 .nm-sticky.blue { background: var(--map-sticky-blue); } .nm-sticky.pink { background: var(--map-sticky-pink); }
+.nm-sticky.orange { background: var(--map-sticky-orange); } .nm-sticky.teal { background: var(--map-sticky-teal); } .nm-sticky.violet { background: var(--map-sticky-violet); } .nm-sticky.gray { background: var(--map-sticky-gray); }
 .nm-text { font-size: 1.0625rem; padding: 2px 4px; }
 .nm-shape { border: 1px solid var(--foreground); background: var(--surface); display: grid; place-items: center; text-align: center; padding: 8px; font-size: 0.8125rem; border-radius: var(--map-r); }
 .nm-unavailable { display: grid; place-content: center; gap: 4px; justify-items: center; text-align: center; padding: 10px; border: 1px dashed var(--rule); background: var(--surface); color: var(--muted-foreground); border-radius: var(--map-r); font-size: 0.75rem; }
@@ -547,6 +574,7 @@ h1, h2, h3 {
 .nm-card .chip[aria-pressed="true"] { border-color: var(--foreground); color: var(--foreground); box-shadow: inset 0 -2px 0 var(--foreground); }
 .nm-card .chip.yellow { background: var(--map-sticky-yellow); } .nm-card .chip.green { background: var(--map-sticky-green); }
 .nm-card .chip.blue { background: var(--map-sticky-blue); } .nm-card .chip.pink { background: var(--map-sticky-pink); }
+.nm-card .chip.orange { background: var(--map-sticky-orange); } .nm-card .chip.teal { background: var(--map-sticky-teal); } .nm-card .chip.violet { background: var(--map-sticky-violet); } .nm-card .chip.gray { background: var(--map-sticky-gray); }
 .nm-card .btn { border: 1px solid var(--border); padding: 7px 12px; font-size: 0.75rem; font-weight: 600; text-align: center; background: none; cursor: pointer; color: inherit; border-radius: var(--map-r); }
 .nm-card .btn:hover { border-color: var(--rule); }
 .nm-card .kv { display: grid; grid-template-columns: 84px 1fr; gap: 6px 10px; font-size: 0.8125rem; }
@@ -568,3 +596,29 @@ h1, h2, h3 {
   .nm-card { top: auto; height: 55%; width: 100%; border-width: 1px 0 0 0; }
 }
 @media (prefers-reduced-motion: reduce) { .niyyah-map * { animation: none !important; transition: none !important; } }
+
+/* --- Map: right-click menu, prompt, search, help (Map v2) -------------------------------------------------------------------- */
+.nm-cm { position: fixed; z-index: 60; min-width: 232px; padding: 4px 0; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); border-radius: var(--map-r); font-size: 0.8125rem; color: var(--foreground); user-select: none; }
+.nm-cm hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.nm-cm-row { position: relative; }
+.nm-cm button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; color: inherit; }
+.nm-cm button:hover, .nm-cm button:focus-visible, .nm-cm button.act { background: var(--accent-light); outline: none; }
+.nm-cm button[aria-disabled] { color: var(--muted-foreground); cursor: default; opacity: 0.6; }
+.nm-cm button.danger { color: var(--destructive); }
+.nm-cm .nm-cm-ck { width: 14px; flex: none; color: var(--accent); font-size: 11px; text-align: center; }
+.nm-cm .nm-cm-l { flex: 1; }
+.nm-cm kbd { color: var(--muted-foreground); font: 500 11px var(--font-mono); }
+.nm-cm .nm-cm-ar { color: var(--muted-foreground); font-size: 10px; }
+.nm-cm .nm-cm-sw { width: 12px; height: 12px; border: 1px solid var(--rule); flex: none; }
+.nm-cm-sub { position: absolute; left: 100%; top: -5px; margin-left: 2px; max-height: 70vh; overflow-y: auto; }
+.nm-prompt-wrap { position: absolute; inset: 0; z-index: 70; display: grid; place-items: start center; padding-top: 18vh; background: color-mix(in srgb, var(--background) 55%, transparent); }
+.nm-prompt { position: static; width: 360px; padding: 14px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); }
+.nm-prompt label { color: var(--muted-foreground); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.nm-prompt input { font: inherit; background: var(--background); color: inherit; border: 1px solid var(--border); padding: 7px 8px; outline: none; border-radius: var(--map-r); }
+.nm-prompt input:focus { outline: 2px solid var(--accent); }
+.nm-prompt .row { display: flex; gap: 8px; justify-content: flex-end; }
+.nm-prompt .row button { border: 1px solid var(--border); padding: 6px 12px; font-size: 0.75rem; font-weight: 600; border-radius: var(--map-r); }
+.nm-prompt .row .pri { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.nm-organize { position: relative; display: flex; }
+.niyyah-map .nm-dim { opacity: 0.28; }
+.nm-mind.d0.own { border-color: var(--c); }
