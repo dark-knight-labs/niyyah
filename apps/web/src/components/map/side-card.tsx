@@ -17,6 +17,11 @@ export interface MakeModel {
   /** The nearest block above the thought, if any. */
   stream: string | null;
   checkpoint: string | null;
+  /** Lane and product (tag) of the lane or product node it hangs under, if any. */
+  lane: "now" | "next" | "backlog" | null;
+  product: string | null;
+  /** The tags in use per block, offered by the Product select. */
+  productsOf: Record<string, string[]>;
 }
 
 const LANES: { id: Lane; label: string }[] = [{ id: "now", label: "Now" }, { id: "next", label: "Next" }, { id: "backlog", label: "Someday" }, { id: "done", label: "Done" }];
@@ -25,7 +30,7 @@ const HEAD = { sticky: "Sticky note", text: "Text", shape: "Shape", frame: "Fram
 
 /** Right-hand details card (330 px; a bottom sheet under 760 px). Edits are debounced so a burst of typing is one undo step. */
 export function SideCard({ model, onText, onNotes, onLabel, onColor, onChild, onConnect, onDelete, onClose, onLane, onMake, onOpenPlan }: {
-  model: CardModel; onLane: (id: string, lane: Lane) => void; onMake: (id: string, stream: string, lane: "now" | "next" | "backlog") => void; onOpenPlan: () => void; onText: (id: string, text: string) => void; onNotes: (id: string, notes: string) => void; onLabel: (id: string, label: string) => void; onColor: (id: string, c: StickyColor) => void;
+  model: CardModel; onLane: (id: string, lane: Lane) => void; onMake: (id: string, stream: string, lane: "now" | "next" | "backlog", product: string | null) => void; onOpenPlan: () => void; onText: (id: string, text: string) => void; onNotes: (id: string, notes: string) => void; onLabel: (id: string, label: string) => void; onColor: (id: string, c: StickyColor) => void;
   onChild: (id: string) => void; onConnect: (id: string) => void; onDelete: () => void; onClose: () => void;
 }) {
   const head = model.type === "live" ? model.head : model.type === "mind" ? (model.depth === 0 ? "Central idea" : "Thought") : model.type === "item" ? HEAD[model.kind] : model.type === "edge" ? "Connector" : `${model.count} selected`;
@@ -121,6 +126,7 @@ function LiveBody({ model, onLane, onOpenPlan, onHide }: { model: Extract<CardMo
       )}
       {info.type !== "quarter" && info.type !== "unplaced" && (
         <div className="kv">
+          {model.info.product && info.type !== "product" && <><span className="lbl mono">Product</span><span>{model.info.product}</span></>}
           {model.stream && <><span className="lbl mono">Block</span><span>{model.stream}</span></>}
           {model.checkpoint && info.type !== "checkpoint" && <><span className="lbl mono">Checkpoint</span><span>{model.checkpoint}</span></>}
           {info.type === "week" && info.week && <><span className="lbl mono">Week</span><span>{info.week}</span></>}
@@ -139,14 +145,19 @@ function LiveBody({ model, onLane, onOpenPlan, onHide }: { model: Extract<CardMo
         {model.hideable && <button type="button" className="btn" onClick={onHide}>Hide from board</button>}
       </div>
       {model.hideable && <p className="note">Hide removes it from this board only. Delete the item from its card in Plan.</p>}
+      {info.type === "product" && <p className="note">Products come from the first tag of each item. Thoughts here follow the tag name: rename the tag and they move to Unplaced.</p>}
+      {info.type === "lane" && <p className="note">Lanes come from Plan. To move an item between lanes, use its card or Plan.</p>}
       {info.type === "quarter" && <p className="note">The tree around this node is built from Plan on every load. New items in Plan appear here without syncing.</p>}
     </>
   );
 }
 
-function MakeItem({ id, make, onMake }: { id: string; make: MakeModel; onMake: (id: string, stream: string, lane: "now" | "next" | "backlog") => void }) {
+function MakeItem({ id, make, onMake }: { id: string; make: MakeModel; onMake: (id: string, stream: string, lane: "now" | "next" | "backlog", product: string | null) => void }) {
   const [stream, setStream] = useState(make.stream ?? make.streams[0]?.id ?? "");
-  const [lane, setLane] = useState<"now" | "next" | "backlog">("next");
+  const [lane, setLane] = useState<"now" | "next" | "backlog">(make.lane ?? "next");
+  const [product, setProduct] = useState(make.product ?? "");
+  const tags = make.productsOf[stream] ?? [];
+  const shown = product && !tags.some((t) => t.toLowerCase() === product.toLowerCase()) ? [...tags, product] : tags;   // a product with no item yet stays selectable
   if (!make.streams.length) return null;
   return (
     <div data-testid="make-item">
@@ -154,13 +165,17 @@ function MakeItem({ id, make, onMake }: { id: string; make: MakeModel; onMake: (
       <select value={stream} onChange={(e) => setStream(e.target.value)} aria-label="Block" onKeyDown={(e) => e.stopPropagation()}>
         {make.streams.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
       </select>
+      <select value={product} onChange={(e) => setProduct(e.target.value)} aria-label="Product" style={{ marginTop: 8 }} onKeyDown={(e) => e.stopPropagation()}>
+        <option value="">Product: none</option>
+        {shown.map((t) => <option key={t} value={t}>{t}</option>)}
+      </select>
       <div className="chips" style={{ marginTop: 8 }}>
         {LANES.slice(0, 3).map((l) => <button key={l.id} type="button" className="chip" data-mklane={l.id} aria-pressed={lane === l.id} onClick={() => setLane(l.id as "now" | "next" | "backlog")}>{l.label}</button>)}
       </div>
       <div className="row" style={{ marginTop: 10 }}>
-        <button type="button" className="btn pri" data-testid="make-item-go" onClick={() => onMake(id, stream, lane)}>Make item</button>
+        <button type="button" className="btn pri" data-testid="make-item-go" onClick={() => onMake(id, stream, lane, product || null)}>Make item</button>
       </div>
-      <p className="note" style={{ marginTop: 8 }}>{make.checkpoint ? `Checkpoint ${make.checkpoint} comes from the branch it sits in.` : "The block comes from the nearest block above it; change it here."}</p>
+      <p className="note" style={{ marginTop: 8 }}>{make.checkpoint ? `Checkpoint ${make.checkpoint} comes from the goal it sits under.` : "Block, product and lane come from where it hangs; change them here."}</p>
     </div>
   );
 }

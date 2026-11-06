@@ -3,14 +3,14 @@
 import "@xyflow/react/dist/base.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Background, BackgroundVariant, MiniMap, ReactFlow, useNodesInitialized, useReactFlow,
+  Background, BackgroundVariant, MiniMap, ReactFlow, SelectionMode, useNodesInitialized, useReactFlow,
   type EdgeChange, type NodeChange, type OnConnect, type OnNodeDrag,
 } from "@xyflow/react";
 import { useRouter } from "next/navigation";
 import { useBoard } from "@/hooks/use-board";
 import type { Planner } from "@/hooks/use-planner";
 import { boardsApi } from "@/lib/map/boards-api";
-import { deriveLifeTree, enrichRefs, toStored, UNPLACED, type LifeView, type LiveInfo } from "@/lib/map/life-tree";
+import { deriveLifeTree, enrichRefs, LANE_LABEL, toStored, UNPLACED, type LifeView, type LiveInfo } from "@/lib/map/life-tree";
 import { vaultApi } from "@/lib/vault-api";
 import { compassApi, type CompassData } from "@/lib/compass-api";
 import { MONTH_LABEL } from "@/lib/streams";
@@ -21,6 +21,7 @@ import type { Size } from "@/lib/map/layout";
 import { childIndex, depthOf, descendantCount, isDescendant, subtreeIds } from "@/lib/map/tree";
 import type { Board, BoardNode, Op, StickyColor } from "@/lib/map/types";
 import { BoardBar } from "./board-bar";
+import { MultiBar } from "./context-bar";
 import { derive, type Live, type MapNode } from "./derive";
 import { BranchEdge } from "./edges/branch-edge";
 import { ConnectorEdge } from "./edges/connector-edge";
@@ -39,18 +40,24 @@ const typingTarget = (t: EventTarget | null) => {
   return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 };
 
-/** The block and month checkpoint a thought sits under (nearest ancestors that are Plan objects). */
-function makeContextOf(nodes: Map<string, BoardNode>, info: ReadonlyMap<string, LiveInfo>, id: string): { stream: string | null; month: MonthKey | null } {
-  let stream: string | null = null, month: MonthKey | null = null;
+/**
+ * What a thought inherits from where it hangs: the block, the month of a goal, the lane of a lane node and the product of a product
+ * or lane node (nearest ancestors that are Plan objects). Under a Done lane the lane is left open (new items are never born done).
+ */
+interface MakeContext { stream: string | null; month: MonthKey | null; lane: "now" | "next" | "backlog" | null; product: string | null }
+function makeContextOf(nodes: Map<string, BoardNode>, info: ReadonlyMap<string, LiveInfo>, id: string): MakeContext {
+  const out: MakeContext = { stream: null, month: null, lane: null, product: null };
   const me = nodes.get(id);
   for (let n = me?.parent_id ? nodes.get(me.parent_id) : undefined; n; n = n.parent_id ? nodes.get(n.parent_id) : undefined) {
     const i = info.get(n.id);
     if (!i) continue;
-    if (!month && i.type === "checkpoint" && i.month) month = i.month;
-    if (!stream && i.stream) stream = i.stream;
-    if (stream) break;
+    if (!out.month && i.type === "checkpoint" && i.month) out.month = i.month;
+    if (!out.lane && i.type === "lane" && i.lane && i.lane !== "done") out.lane = i.lane;
+    if (!out.product && (i.type === "lane" || i.type === "product") && i.product) out.product = i.product;
+    if (!out.stream && i.stream) out.stream = i.stream;
+    if (out.stream) break;
   }
-  return { stream, month };
+  return out;
 }
 
 /** The part of the board the side card does not cover: 330px on the right, or the bottom sheet under 760px. */
@@ -88,6 +95,15 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   const [compass, setCompass] = useState<CompassData | null>(null);
   useEffect(() => { if (isLife) void compassApi.get().then(setCompass).catch(() => setCompass(null)); }, [isLife]);
 
+  // A finger pans; a mouse or pen draws the selection box. Re-evaluated when the primary pointer changes (a tablet with a keyboard).
+  const [coarse, setCoarse] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)");
+    const sync = () => setCoarse(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
   const [tool, setTool] = useState<Tool>("select");
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
@@ -205,7 +221,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     if (n.kind === "ref") {
       // a live node edits the real Plan row; the Unplaced branch and rows whose Plan object is gone cannot be edited
       const i = L.current.info.get(id);
-      if (!i || i.type === "unplaced" || i.gone) return;
+      if (!i || i.type === "unplaced" || i.type === "product" || i.type === "lane" || i.gone) return;
     }
     setEditing(id);
   }, []);
@@ -246,6 +262,13 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     if (hide.length) notify(hide.length === 1 ? `Hidden from this board. "${d.nodes.get(live[0])!.text}" stays in Plan.` : `Hidden ${hide.length} Plan items from this board`, true);
     else notify(count > 1 ? `Deleted ${count} items` : count === 1 ? "Deleted" : "Deleted the connector", true);
   }, [removeOps, select, notify]);
+
+  /** One colour for every selected sticky, as one undo step. */
+  const colorSelection = useCallback((color: StickyColor) => {
+    const { selected: sel, data: d, b: bd } = L.current;
+    const ops = [...sel].map((id) => d.nodes.get(id)).filter((n): n is BoardNode => n?.kind === "sticky").map((n) => A.setColor(n, color));
+    if (ops.length) bd.commit(ops);
+  }, []);
 
   const createMind = useCallback((kind: "child" | "sibling", id: string) => {
     const { data: d, idx: ix, b: bd } = L.current;
@@ -440,10 +463,10 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
           const ptr = place("touches" in e ? e.changedTouches[0].clientX : e.clientX, 0).x;
           const side = !t.parent_id && ptr < t.x ? "L" : "R";
           ops.push(...A.reparent(d.nodes, ix, n.id, target, side));
-        } else notify("Mind map nodes sit in the tree. Drop onto another node to move the branch.");
+        } else if (dragged.length === 1) notify("Mind map nodes sit in the tree. Drop onto another node to move the branch.");
         continue;
       }
-      if (n.kind === "ref") { notify("Plan items keep their place from Plan. Drag thoughts freely, or change the block in Plan."); continue; }
+      if (n.kind === "ref") { if (dragged.length === 1) notify("Plan items keep their place from Plan. Drag thoughts freely, or change the block in Plan."); continue; }
       const measured = sizes.get(n.id);
       const w = n.kind === "mind" ? measured?.w ?? 0 : n.w, h = n.kind === "mind" ? measured?.h ?? 0 : n.h;
       const absX = dn.position.x + (parent && !movedFrames.has(parent.id) ? parent.x : 0);
@@ -479,7 +502,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   const makeContext = useCallback((id: string) => makeContextOf(L.current.data.nodes, L.current.info, id), []);
 
   /** Thought -> Plan item: the server creates the pipeline row and turns the node into its ref row, in one transaction. */
-  const makeItem = useCallback(async (id: string, stream: string, lane: "now" | "next" | "backlog") => {
+  const makeItem = useCallback(async (id: string, stream: string, lane: "now" | "next" | "backlog", product: string | null) => {
     const { data: d, plan: pl } = L.current;
     const n = d.nodes.get(id);
     if (!n || n.kind !== "mind") return;
@@ -487,7 +510,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     const month = makeContext(id).month;
     try {
       await raw.flush();
-      const res = await boardsApi.promote(boardId, id, { stream, lane, checkpoint: month });
+      const res = await boardsApi.promote(boardId, id, { stream, lane, checkpoint: month, ...(product ? { product } : {}) });
       await pl.reload();            // the item must be in the derived tree before its row turns into a ref, or it would flash under Unplaced
       raw.forgetHistory(id);        // undo must never put the old thought row back over the ref row
       raw.adoptNode(res.node, res.revision);
@@ -525,7 +548,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     else if (key === "sib") createMind("sibling", id);
     else if (key === "fold") toggleFold(id);
     else if (key === "del") deleteSelection();
-    else if (key === "make") { const c = makeContext(id); if (c.stream) void makeItem(id, c.stream, "next"); else notify("Choose a block in the details card"); }
+    else if (key === "make") { const c = makeContext(id); if (c.stream) void makeItem(id, c.stream, c.lane ?? "next", c.product); else notify("Choose a block in the details card"); }
     else if (key === "link") { setTool("link"); setLinkFrom(id); }
     else if (key.startsWith("color:")) { const n = d.nodes.get(id); if (n) bd.commit([A.setColor(n, key.slice(6) as StickyColor)]); }
   }, [createMind, toggleFold, deleteSelection, makeContext, makeItem, notify]);
@@ -542,13 +565,13 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
         const i = view.info.get(id);
         if (i) {
           const depth = depthOf(data.nodes, id);
-          const cp = i.type === "task" && n.parent_id ? view.info.get(n.parent_id) : undefined;
+          const goal = i.type === "task" && i.item?.checkpoint && i.stream ? data.nodes.get(`cp:${i.stream}:${i.item.checkpoint}`) : undefined;
           const quarter = plan.quarter;
           return {
             type: "live", id, text: n.text, below: descendantCount(idx, id), depth, info: i, stream: i.streamName ?? null,
-            checkpoint: cp?.type === "checkpoint" && cp.month ? `${cp.month.toUpperCase()} · ${data.nodes.get(n.parent_id!)?.text ?? ""}` : (i.month ? MONTH_LABEL[i.month] : null),
-            head: { quarter: "Super Objective · live", stream: "Block · live", checkpoint: "Month checkpoint · live", week: "Week objective · live", task: i.gone ? "Plan item · gone" : "Plan item · live", unplaced: "Unplaced" }[i.type],
-            editable: !i.gone && i.type !== "unplaced", hideable: depth > 0 && i.type !== "unplaced",
+            checkpoint: i.type === "task" && i.item?.checkpoint ? `${i.item.checkpoint.toUpperCase()}${goal ? ` · ${goal.text}` : ""}` : (i.month ? MONTH_LABEL[i.month] : null),
+            head: { quarter: "Super Objective · live", stream: "Block · live", checkpoint: "Goal · live", week: "Week objective · live", product: "Product · from tags", lane: `Lane · ${i.lane ? LANE_LABEL[i.lane] : ""}`, task: i.gone ? "Plan item · gone" : "Plan item · live", unplaced: "Unplaced" }[i.type],
+            editable: !i.gone && i.type !== "unplaced" && i.type !== "product" && i.type !== "lane", hideable: depth > 0 && i.type !== "unplaced",
             compass: i.type === "quarter" ? { mission: compass?.mission ?? "", vision: compass?.vision ?? "", week: quarter ? `${quarter.week_of_quarter} of ${quarter.weeks_in_quarter}` : "" } : null,
           };
         }
@@ -556,7 +579,13 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
       if (n.kind === "mind" || n.kind === "ref") {
         const mc = n.kind === "mind" ? makeContextOf(data.nodes, view.info, id) : null;
         const streams = (plan.pipelines?.streams ?? []).filter((s) => s.status !== "archived").map((s) => ({ id: s.stream, label: s.name }));
-        const make = mc && streams.length && n.text.trim() ? { streams, stream: mc.stream, checkpoint: mc.month ? mc.month.toUpperCase() : null } : null;
+        const productsOf: Record<string, string[]> = {};
+        for (const s of plan.pipelines?.streams ?? []) {
+          const seen = new Map<string, string>();
+          for (const it of s.items) for (const t of it.products ?? []) if (/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(t) && !seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
+          productsOf[s.stream] = [...seen.values()].sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase()));
+        }
+        const make = mc && streams.length && n.text.trim() ? { streams, stream: mc.stream, checkpoint: mc.month ? mc.month.toUpperCase() : null, lane: mc.lane, product: mc.product, productsOf } : null;
         return { type: "mind", id, text: n.text, notes: n.notes, below: descendantCount(idx, id), depth: depthOf(data.nodes, id), readOnly: n.kind === "ref", make };
       }
       return { type: "item", id, kind: n.kind as "sticky" | "text" | "shape" | "frame", text: n.text, color: (n.style.color as StickyColor) ?? "yellow" };
@@ -671,6 +700,9 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   if (isLife && (!plan.owner || !plan.quarter)) return <div className="grid h-full place-items-center p-6 text-center text-small text-[var(--muted-foreground)]" role="status"><p>{plan.owner ? (plan.quarterError ?? "The Life board is built from this quarter's plan, which is not available yet.") : "The Life board is built from your Plan, which only the owner can read."}</p></div>;
   const cardOpen = !!cardModel;
   const panTool = tool === "hand";
+  const boxSelect = !coarse && tool === "select";
+  const selectedStickies = [...selected].map((id) => data.nodes.get(id)).filter((n): n is BoardNode => !!n);
+  const allStickies = selectedStickies.length > 1 && selectedStickies.length === selected.size && selectedStickies.every((n) => n.kind === "sticky");
 
   return (
     <MapCtx.Provider value={actions}>
@@ -683,7 +715,8 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
           onMoveEnd={(_, vp) => b.saveViewport({ x: Math.round(vp.x), y: Math.round(vp.y), zoom: +vp.zoom.toFixed(3) })}
           defaultViewport={board.viewport ?? undefined}
           minZoom={0.1} maxZoom={4}
-          panOnDrag panOnScroll zoomOnScroll={false} zoomOnDoubleClick={false} zoomActivationKeyCode={["Control", "Meta"]} panActivationKeyCode="Space"
+          panOnDrag={boxSelect ? [1, 2] : true} panOnScroll zoomOnScroll={false} zoomOnDoubleClick={false} zoomActivationKeyCode={["Control", "Meta"]} panActivationKeyCode="Space"
+          selectionOnDrag={boxSelect} selectionMode={SelectionMode.Partial} onPaneContextMenu={(e) => e.preventDefault()}
           selectionKeyCode="Shift" multiSelectionKeyCode={["Shift", "Control", "Meta"]} deleteKeyCode={null} disableKeyboardA11y
           nodesDraggable={!panTool} elementsSelectable={!panTool} nodesConnectable={tool === "select"} nodeDragThreshold={4}
           connectionRadius={24}
@@ -701,19 +734,20 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
           )}
         </ReactFlow>
 
+        {selected.size > 1 && <MultiBar count={selected.size} stickies={allStickies} onColor={colorSelection} onDelete={deleteSelection} />}
         <BoardBar board={board} boards={boards} frames={frames} hidden={hidden} status={b.status}
           onOpen={onOpen} onNew={onNew} onDelete={() => onDelete(board.id)}
           onRename={(t) => { void b.rename(t).then(() => onRetitle(board.id, t)).catch(() => notify("Could not rename the board")); }}
           onZoomFrame={zoomFrame} onUnhide={unhide} onRetry={b.retry} showDone={isLife ? showDone : null} onShowDone={setShowDone} />
         <ToolRail tool={tool} onTool={chooseTool} canUndo={b.canUndo} canRedo={b.canRedo} onUndo={b.undo} onRedo={b.redo} />
         <ZoomBar minimap={minimap} onMinimap={() => setMinimap(!minimap)} cardOpen={cardOpen} onFit={fit} />
-        <div className="nm-help">Tab child · Enter sibling · arrows move · F2 edit · Del remove · drag onto a node to reparent · Ctrl+wheel zoom · space+drag pan</div>
+        <div className="nm-help">Tab child · Enter sibling · F2 edit · Del remove · drag empty space to select · space+drag or two fingers to pan · drop on a node to reparent</div>
         {cardModel && (
           <SideCard model={cardModel} onText={cardText} onNotes={cardNotes} onLabel={cardLabel}
             onColor={(id, c) => { const n = data.nodes.get(id); if (n) L.current.b.commit([A.setColor(n, c)]); }}
             onChild={(id) => createMind("child", id)} onConnect={(id) => { setTool("link"); setLinkFrom(id); }}
             onDelete={deleteSelection} onClose={() => select([])}
-            onLane={(id, lane) => void liveLane(id, lane)} onMake={(id, stream, lane) => void makeItem(id, stream, lane)} onOpenPlan={() => router.push("/plan")} />
+            onLane={(id, lane) => void liveLane(id, lane)} onMake={(id, stream, lane, product) => void makeItem(id, stream, lane, product)} onOpenPlan={() => router.push("/plan")} />
         )}
         {(b.status === "retrying" || b.status === "offline") && (
           <div className="nm-banner" role="alert">

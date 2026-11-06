@@ -105,6 +105,7 @@ export interface PromoteRequest {
   stream: string;
   lane: "now" | "next" | "backlog";
   checkpoint: string | null;
+  product?: string;
 }
 
 export interface PromoteResponse {

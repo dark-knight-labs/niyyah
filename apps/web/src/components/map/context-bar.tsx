@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { useStore } from "@xyflow/react";
 import { useMapActions } from "./map-context";
+import { STICKY_COLORS, type StickyColor } from "@/lib/map/types";
 
 /**
  * The floating bar above the selection (NodeToolbar). What it offers depends on the node: the canvas supplies the items.
@@ -37,6 +38,19 @@ export function ContextBar({ id }: { id: string }) {
       ) : (
         <button key={it.key} type="button" onClick={() => runBar(id, it.key)}>{it.label}{it.kbd && <kbd>{it.kbd}</kbd>}</button>
       ))}
+    </div>
+  );
+}
+
+/** The bar for a selection of several objects: how many, a colour when they are all stickies, and Delete. */
+export function MultiBar({ count, stickies, onColor, onDelete }: { count: number; stickies: boolean; onColor: (c: StickyColor) => void; onDelete: () => void }) {
+  return (
+    <div className="nm-ctx nm-multi nodrag nopan" role="toolbar" aria-label="Selection actions" data-testid="multi-bar">
+      <span className="nm-n mono" data-testid="multi-count">{count} selected</span>
+      {stickies && STICKY_COLORS.map((c) => (
+        <button key={c} type="button" className={`sw nm-sw-${c}`} style={{ background: `var(--map-sticky-${c})` }} title={c} aria-label={c} onClick={() => onColor(c)} />
+      ))}
+      <button type="button" onClick={onDelete}>Delete<kbd>Del</kbd></button>
     </div>
   );
 }

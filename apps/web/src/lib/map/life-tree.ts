@@ -15,7 +15,7 @@ export interface PlanInput {
   objectives: VaultObjectivesData | null;
 }
 
-export type LiveType = "quarter" | "stream" | "checkpoint" | "week" | "task" | "unplaced";
+export type LiveType = "quarter" | "stream" | "checkpoint" | "week" | "product" | "lane" | "task" | "unplaced";
 
 /** What the canvas needs to know about a derived node beyond its row: how to label it and how to edit the real Plan row. */
 export interface LiveInfo {
@@ -26,7 +26,10 @@ export interface LiveInfo {
   month?: MonthKey;
   week?: string;
   item?: PipelineItemData;
+  /** The lane of a task or of a lane node. */
   lane?: Lane;
+  /** A product node's label, and on a lane node or task the product (tag) it sits under, if any. */
+  product?: string;
   tag: string;
   tagNow?: boolean;
   /** Mono micro-label above the title (root: "Q4 · Super Objective"). */
@@ -49,6 +52,45 @@ export const UNPLACED = "unplaced:life";
 export const isKey = (id: string) => id.includes(":");
 
 export const LANE_TAG: Record<Lane, string> = { now: "NOW", next: "NEXT", backlog: "SOMEDAY", done: "DONE" };
+export const LANE_LABEL: Record<Lane, string> = { now: "Now", next: "Next", backlog: "Someday", done: "Done" };
+const LANE_ORDER: Lane[] = ["now", "next", "backlog", "done"];
+const MONTH_ORDER: MonthKey[] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** SHA-256 of a string as hex (synchronous: the tree is built in render, crypto.subtle is async). */
+function sha256Hex(text: string): string {
+  const K = new Uint32Array(64);
+  for (let i = 0, n = 2; i < 64; n++) { let prime = true; for (let d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; } if (prime) K[i++] = Math.floor((Math.cbrt(n) % 1) * 4294967296); }
+  const H = new Uint32Array(8);
+  for (let i = 0, n = 2; i < 8; n++) { let prime = true; for (let d = 2; d * d <= n; d++) if (n % d === 0) { prime = false; break; } if (prime) H[i++] = Math.floor((Math.sqrt(n) % 1) * 4294967296); }
+  const bytes = new TextEncoder().encode(text);
+  const padded = new Uint8Array(((bytes.length + 9 + 63) >> 6) << 6);
+  padded.set(bytes); padded[bytes.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor((bytes.length * 8) / 4294967296)); view.setUint32(padded.length - 4, (bytes.length * 8) >>> 0);
+  const w = new Uint32Array(64);
+  const rotr = (x: number, n: number) => (x >>> n) | (x << (32 - n));
+  for (let off = 0; off < padded.length; off += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(off + i * 4);
+    for (let i = 16; i < 64; i++) { const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3), s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10); w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0; }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) >>> 0;
+      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H[0] += a; H[1] += b; H[2] += c; H[3] += d; H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+  }
+  return [...H].map((x) => x.toString(16).padStart(8, "0")).join("");
+}
+
+/**
+ * The key part of a product tag. Tags group case-insensitively (the label is the first spelling seen); a plain lowercase tag is its own
+ * key, anything else (spaces, non-ASCII, longer than 32) becomes x + 16 hex of its SHA-256. Keying lives only here, never on the server.
+ */
+export function tagKey(tag: string): string {
+  const low = tag.toLowerCase();
+  return /^[a-z0-9_-]{1,32}$/.test(low) ? low : `x${sha256Hex(low).slice(0, 16)}`;
+}
 
 /** Deterministic id for a state row the client creates (<= 36 chars): the same key always maps to the same row. */
 export function stateRowId(key: string): string {
@@ -99,33 +141,57 @@ export function deriveLifeTree(plan: PlanInput, stored: BoardData, opts: { showD
       let pos = 0;
       const visible = ps.items.filter((it) => opts.showDone || (it.lane !== "done" && !it.done));
       const monthsWithItems = new Set(visible.filter((it) => it.checkpoint).map((it) => it.checkpoint as MonthKey));
-      for (const cp of qs?.checkpoints ?? []) {
-        if (!cp.text.trim() && !monthsWithItems.has(cp.month)) continue;
-        const ck = `cp:${ps.stream}:${cp.month}`;
-        add(ck, key, pos++, cp.text.trim() || MONTH_LABEL[cp.month], { key: ck, type: "checkpoint", stream: ps.stream, streamName: ps.name, month: cp.month, tag: cp.month.toUpperCase() });
-      }
-      // a checkpoint a pipeline item names that the quarter note does not list still gets its node
-      for (const m of monthsWithItems) {
+      // Goals: the month checkpoints, as leaves, in month order. Items no longer hang under them; they carry the month as a tag.
+      const goals = new Map<MonthKey, string>();
+      for (const cp of qs?.checkpoints ?? []) if (cp.text.trim() || monthsWithItems.has(cp.month)) goals.set(cp.month, cp.text.trim() || MONTH_LABEL[cp.month]);
+      for (const m of monthsWithItems) if (!goals.has(m)) goals.set(m, MONTH_LABEL[m]);   // a month an item names that the quarter note does not list
+      for (const m of MONTH_ORDER) {
+        const text = goals.get(m);
+        if (text === undefined) continue;
         const ck = `cp:${ps.stream}:${m}`;
-        if (!nodes.has(ck)) add(ck, key, pos++, MONTH_LABEL[m], { key: ck, type: "checkpoint", stream: ps.stream, streamName: ps.name, month: m, tag: m.toUpperCase() });
+        add(ck, key, pos++, text, { key: ck, type: "checkpoint", stream: ps.stream, streamName: ps.name, month: m, tag: m.toUpperCase() });
       }
       const wk = plan.objectives?.items.find((o) => o.stream === ps.stream && o.text.trim());
       if (wk && plan.objectives) {
         const wkKey = `week:${ps.stream}:${plan.objectives.week}`;
         add(wkKey, key, pos++, wk.text, { key: wkKey, type: "week", stream: ps.stream, streamName: ps.name, week: plan.objectives.week, tag: `W${plan.objectives.week.split("W")[1] ?? ""}`, done: wk.done });
       }
+      // Products: the primary tag of each item, grouped case-insensitively. Untagged items keep their lanes directly under the block.
+      const groups = new Map<string, { label: string; items: PipelineItemData[] }>();
+      const untagged: PipelineItemData[] = [];
       for (const it of visible) {
-        const k = `task:${it.line}`;
-        const parent = it.checkpoint && nodes.has(`cp:${ps.stream}:${it.checkpoint}`) ? `cp:${ps.stream}:${it.checkpoint}` : key;
-        add(k, parent, pos++, it.text, { key: k, type: "task", stream: ps.stream, streamName: ps.name, item: it, lane: it.lane, tag: LANE_TAG[it.lane], tagNow: it.lane === "now", done: it.lane === "done" || it.done });
+        const tag = it.products?.[0]?.trim();
+        if (!tag) { untagged.push(it); continue; }
+        const k = tagKey(tag);
+        const g = groups.get(k);
+        if (g) g.items.push(it); else groups.set(k, { label: tag, items: [it] });
       }
+      const addLanes = (parent: string, tk: string, label: string | undefined, items: PipelineItemData[], position: { n: number }) => {
+        for (const lane of LANE_ORDER) {
+          const inLane = items.filter((it) => (it.done ? "done" : it.lane) === lane);
+          if (!inLane.length) continue;
+          const lk = `lane:${ps.stream}:${tk}:${lane}`;
+          add(lk, parent, position.n++, LANE_LABEL[lane], { key: lk, type: "lane", stream: ps.stream, streamName: ps.name, lane, product: label, tag: String(inLane.length) });
+          inLane.forEach((it, j) => {
+            const k = `task:${it.line}`;
+            add(k, lk, j, it.text, { key: k, type: "task", stream: ps.stream, streamName: ps.name, item: it, lane: it.lane, product: label, month: it.checkpoint ?? undefined, tag: it.checkpoint ? it.checkpoint.toUpperCase() : "", done: it.lane === "done" || it.done });
+          });
+        }
+      };
+      const where = { n: pos };
+      for (const [tk, g] of [...groups.entries()].sort((a, b) => a[1].label.toLowerCase().localeCompare(b[1].label.toLowerCase()) || a[0].localeCompare(b[0]))) {
+        const pk = `prod:${ps.stream}:${tk}`;
+        add(pk, key, where.n++, g.label, { key: pk, type: "product", stream: ps.stream, streamName: ps.name, product: g.label, tag: "" });
+        addLanes(pk, tk, g.label, g.items, { n: 0 });
+      }
+      addLanes(key, "_", undefined, untagged, where);
     }
   }
   const derived = new Set(nodes.keys());
   const rootKey = [...nodes.values()].find((n) => n.parent_id === null)?.id ?? null;
 
-  // Stored rows whose Plan object is gone, and thoughts hung under a key nobody derives, collect under Unplaced on the root.
-  const orphanRows = [...rowOfKey.entries()].filter(([k]) => !derived.has(k) && !k.startsWith("quarter:") && !(k.startsWith("stream:") || k.startsWith("cp:") || k.startsWith("week:")));
+  // Stored rows whose Plan item is gone, and thoughts hung under a key nobody derives, collect under Unplaced on the root.
+  const orphanRows = [...rowOfKey.entries()].filter(([k]) => !derived.has(k) && k.startsWith("task:"));   // only a Plan item can be "gone"; goal, product and lane rows are state that simply stops applying
   const lostParent = (n: BoardNode) => !!n.parent_key && !derived.has(n.parent_key);
   const thoughts = [...stored.nodes.values()].filter((n) => n.kind !== "ref");
   const hasOrphan = orphanRows.length > 0 || thoughts.some((n) => n.kind === "mind" && lostParent(n));
