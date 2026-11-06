@@ -104,7 +104,27 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   return res.json();
 }
 
+/** A raw request (any body, the Response back): uploads and downloads. Same bearer token and one refresh-and-retry as `request`. */
+async function raw(path: string, init: { method?: string; body?: BodyInit; headers?: Record<string, string> } = {}): Promise<Response> {
+  const go = (token: string | null) => fetch(`${API_URL}/api/v1${path}`, { method: init.method || "GET", body: init.body, headers: { ...init.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  let res = await go(token);
+  if (res.status === 401 && token) {
+    const stored = localStorage.getItem("access_token");
+    const renewed = stored && stored !== token ? stored : await refreshSession();
+    if (renewed) res = await go(renewed);
+  }
+  return res;
+}
+
+/** The error a non-ok raw response stands for (message from `detail`, parsed body kept). */
+export async function rawError(res: Response): Promise<ApiError> {
+  const body = await res.json().catch(() => undefined);
+  return httpError(detailText((body as { detail?: unknown } | undefined)?.detail) || `API error: ${res.status}`, res.status, body);
+}
+
 export const api = {
+  raw,
   get: <T>(path: string) => request<T>(path),
   put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body }),
   post: <T>(path: string, body: unknown, opts?: { keepalive?: boolean }) => request<T>(path, { method: "POST", body, keepalive: opts?.keepalive }),

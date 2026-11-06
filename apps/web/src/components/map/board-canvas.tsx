@@ -25,7 +25,7 @@ import { mapsOf, organizeOps } from "@/lib/map/organize";
 import type { Layout } from "@/lib/map/layout";
 import { STICKY_COLORS, isKnownKind } from "@/lib/map/types";
 import { ContextMenu, PromptDialog } from "./context-menu";
-import { HelpSheet, SearchBar } from "./overlays";
+import { FilesPanel, HelpSheet, SearchBar } from "./overlays";
 import { copySelection, getClip, looksLikeOutline, outlineOf, outlineOps, parseOutline, pasteClip, setClip } from "@/lib/map/clipboard";
 import { snapMove } from "@/lib/map/arrange";
 import { BoardBar } from "./board-bar";
@@ -34,13 +34,14 @@ import { derive, type Live, type MapNode } from "./derive";
 import { BranchEdge } from "./edges/branch-edge";
 import { ConnectorEdge } from "./edges/connector-edge";
 import { MapCtx, type BarItem, type EditHow, type MapActions } from "./map-context";
-import { FrameNode, ShapeNode, StickyNode, TextNode, UnavailableNode, UnknownNode } from "./nodes/item-nodes";
+import { FileNode, FrameNode, ImageNode, ShapeNode, StickyNode, TextNode, UnknownNode } from "./nodes/item-nodes";
+import { downloadFile, filesApi, forgetFile, MAX_FILE_BYTES, openFile, prepare, releaseFiles } from "@/lib/map/files";
 import { MindNode } from "./nodes/mind-node";
 import { SideCard, type CardModel } from "./side-card";
 import { ToolRail, TOOLS, type Tool } from "./tool-rail";
 import { ZoomBar } from "./zoom-bar";
 
-const nodeTypes = { mind: MindNode, sticky: StickyNode, text: TextNode, shape: ShapeNode, frame: FrameNode, unavailable: UnavailableNode, unknown: UnknownNode };
+const nodeTypes = { mind: MindNode, sticky: StickyNode, text: TextNode, shape: ShapeNode, frame: FrameNode, image: ImageNode, file: FileNode, unknown: UnknownNode };
 const edgeTypes = { branch: BranchEdge, connector: ConnectorEdge };
 const ADD_TOOLS = new Set<Tool>(["mind", "sticky", "text", "shape", "frame"]);
 const typingTarget = (t: EventTarget | null) => {
@@ -130,6 +131,10 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   const [connecting, setConnecting] = useState(false);
   const [search, setSearch] = useState<{ q: string; at: number } | null>(null);
   const [help, setHelp] = useState(false);
+  const [filesOpen, setFilesOpen] = useState(false);
+  const [dropping, setDropping] = useState(false);
+  const picker = useRef<HTMLInputElement>(null);
+  const pickCtx = useRef<{ at: { x: number; y: number } | null; replaceId?: string; attachTo?: string; imageOnly?: boolean }>({ at: null });
   const [guides, setGuides] = useState<{ vx: number[]; hy: number[] } | null>(null);
   const [snapOn, setSnapOn] = useState(() => typeof window === "undefined" || window.localStorage.getItem("niyyah-map-snap") !== "0");
   const pointer = useRef<{ x: number; y: number } | null>(null);
@@ -244,7 +249,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
 
   const startEdit = useCallback((id: string) => {
     const n = L.current.data.nodes.get(id);
-    if (!n || n.kind === "image" || n.kind === "file" || n.style.locked) return;
+    if (!n || n.style.locked) return;
     if (n.kind === "ref") {
       // a live node edits the real Plan row; the Unplaced branch and rows whose Plan object is gone cannot be edited
       const i = L.current.info.get(id);
@@ -670,6 +675,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
         runCommand(env, makeSel({ ids: [...sel], data: d, idx: ix, rects: L.current.derived.rects }), "order", mode);
         return;
       }
+      if (!mod && !e.altKey && !e.shiftKey && key.toLowerCase() === "i" && env) { stop(); env.pickFiles({ imageOnly: true }); return; }
       if (!mod && !e.altKey && key === "?" && env) { stop(); env.help(); return; }
       if (mod && key.toLowerCase() === "b" && env && sel.size > 0) { stop(); runCommand(env, makeSel({ ids: [...sel], data: d, idx: ix }), "bold"); return; }
       if (mod && key.toLowerCase() === "z") { stop(); if (e.shiftKey) bd.redo(); else bd.undo(); return; }
@@ -775,8 +781,62 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     bd.commit(ops);
   }, [notify]);
 
-  // ---- clipboard: copy / cut / paste / duplicate (internal clipboard + a Markdown outline on the system one) ----
+  /** Where a new object lands when nothing says: under the pointer, else the middle of the window. */
   const placeFresh = useCallback(() => (pointer.current ? rf.screenToFlowPosition(pointer.current) : rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })), [rf]);
+  // ---- images and files: picked, pasted or dropped -> prepared (big images downscaled) -> uploaded -> an object on the board ----
+  useEffect(() => () => releaseFiles(), [boardId]);
+  const ingest = useCallback(async (files: File[], at: { x: number; y: number } | null, opts: { replaceId?: string; attachTo?: string } = {}) => {
+    const base = at ?? placeFresh();
+    let i = 0;
+    for (const f of files) {
+      try {
+        notify(`Uploading ${f.name || "file"}…`);
+        const prep = await prepare(f);
+        if (prep.blob.size > MAX_FILE_BYTES) { notify(`${f.name || "That file"} is over ${MAX_FILE_BYTES / 1048576} MB`); continue; }
+        const up = await filesApi.upload(prep.blob, prep.name, boardId);
+        const kind = up.mime.startsWith("image/") ? "image" : "file";
+        const { data: d, b: bd } = L.current;
+        const meta = { file_id: up.id, name: up.name, bytes: up.size, mime: up.mime, nw: prep.nw || undefined, nh: prep.nh || undefined };
+        if (opts.replaceId) {
+          const n = d.nodes.get(opts.replaceId);
+          if (!n) continue;
+          const oldId = n.style.file_id;
+          const sty = { ...n.style, file_id: up.id, bytes: up.size, mime: up.mime, nw: meta.nw, nh: meta.nh } as BoardNode["style"];
+          if (!meta.nw) { delete sty.nw; delete sty.nh; }
+          bd.commit([{ op: "upsert_node", node: { ...n, kind, style: sty, text: kind === "file" && !n.text ? up.name : n.text }, base_updated_at: null }]);
+          if (oldId) forgetFile(oldId);
+          notify("Replaced");
+          continue;
+        }
+        let px = base.x + i * 28, py = base.y + i * 28;
+        const anchor = opts.attachTo ? d.nodes.get(opts.attachTo) : undefined;
+        const ar = opts.attachTo ? L.current.derived.rects.get(opts.attachTo) : undefined;
+        if (anchor && ar) { px = ar.x + ar.w + 120; py = ar.y + ar.h / 2 + i * 90; }
+        const fr = A.frameAt(d.nodes, px, py);
+        const made = A.addMedia(kind, px, py, meta, fr?.id ?? null);
+        const ops = [...made.ops];
+        if (anchor) ops.push(A.edgeBetween(anchor.id, made.id).op);
+        if (bd.commit(ops)) select([made.id]);
+        i++;
+        notify(kind === "image" ? "Image added" : "File added");
+      } catch (e) {
+        const err = e as { status?: number; message?: string };
+        notify(err.message || "Could not upload");
+        if (err.status === 422) setFilesOpen(true);
+      }
+    }
+  }, [boardId, notify, placeFresh, select]);
+  const pickFiles = useCallback((o: { at?: { x: number; y: number } | null; replaceId?: string; attachTo?: string; imageOnly?: boolean } = {}) => {
+    pickCtx.current = { at: o.at ?? null, replaceId: o.replaceId, attachTo: o.attachTo, imageOnly: o.imageOnly };
+    const el = picker.current;
+    if (!el) return;
+    el.accept = o.imageOnly ? "image/png,image/jpeg,image/webp,image/gif" : "";
+    el.multiple = !o.replaceId;
+    el.value = "";
+    el.click();
+  }, []);
+
+  // ---- clipboard: copy / cut / paste / duplicate (internal clipboard + a Markdown outline on the system one) ----
   const copyCmd = useCallback((cut: boolean) => {
     const { selected: sel, data: d } = L.current;
     const ids = [...sel].filter((id) => d.nodes.has(id));
@@ -836,6 +896,8 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     const onPaste = (e: ClipboardEvent) => {
       if (typingTarget(e.target) || (e.target as HTMLElement | null)?.closest?.("[role=menu]")) return;
       const { selected: sel, data: d } = L.current;
+      const files = [...(e.clipboardData?.files ?? [])];
+      if (files.length) { e.preventDefault(); void ingest(files, null); return; }
       const text = e.clipboardData?.getData("text/plain") ?? "";
       const one = sel.size === 1 ? d.nodes.get([...sel][0]) : undefined;
       const parent = one && one.kind === "mind" ? one.id : null;
@@ -850,7 +912,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerdown", onDown, true);
     return () => { window.removeEventListener("paste", onPaste); window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerdown", onDown, true); };
-  }, [pasteCmd, doPasteText]);
+  }, [pasteCmd, doPasteText, ingest]);
 
   const env = useMemo<Env>(() => ({
     commit: (ops, tag) => L.current.b.commit(ops, tag),
@@ -875,8 +937,11 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     copy: (cut) => copyCmd(cut), paste: (parentId, pos) => pasteCmd(parentId, pos), duplicate: () => duplicateCmd(),
     copyOutline: () => { const { selected: sel, data: d } = L.current; const t = outlineOf(d, [...sel]); if (t) { void navigator.clipboard?.writeText(t).catch(() => undefined); notify("Copied as an outline"); } },
     search: () => setSearch((s) => s ?? { q: "", at: 0 }), help: () => setHelp(true),
+    pickFiles: (o) => pickFiles(o),
+    download: (id) => { const n = L.current.data.nodes.get(id); const fid = n?.style.file_id; if (fid) void downloadFile(fid, n.text || "file").catch(() => notify("Could not download")); },
+    openFull: (id) => { const fid = L.current.data.nodes.get(id)?.style.file_id; if (fid) void openFile(fid).catch(() => notify("Could not open")); },
     toggleSnap: () => setSnapOn((v) => { const n = !v; try { window.localStorage.setItem("niyyah-map-snap", n ? "1" : "0"); } catch { /* private mode */ } return n; }),
-  }), [copyCmd, pasteCmd, duplicateCmd, select, startEdit, createMind, toggleFold, deleteSelection, makeContext, makeItem, notify, organize, router, rf, addItemAt, zoomFrame, data.nodes.size]);
+  }), [pickFiles, copyCmd, pasteCmd, duplicateCmd, select, startEdit, createMind, toggleFold, deleteSelection, makeContext, makeItem, notify, organize, router, rf, addItemAt, zoomFrame, data.nodes.size]);
   useEffect(() => { envRef.current = env; });
   useEffect(() => { focusRef.current = focus; }, [focus]);
 
@@ -959,7 +1024,13 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
 
   return (
     <MapCtx.Provider value={actions}>
-      <div className="niyyah-map" data-tool={tool} data-card={cardOpen ? "1" : undefined} data-testid="map-canvas" data-board={board.id}>
+      <div className="niyyah-map" data-tool={tool} data-card={cardOpen ? "1" : undefined} data-testid="map-canvas" data-board={board.id}
+        onDragOver={(e) => { if (e.dataTransfer?.types.includes("Files")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; setDropping(true); } }}
+        onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false); }}
+        onDrop={(e) => { setDropping(false); const files = [...(e.dataTransfer?.files ?? [])]; if (!files.length) return; e.preventDefault(); void ingest(files, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })); }}>
+        <input ref={picker} type="file" hidden data-testid="upload-input" aria-hidden="true" tabIndex={-1}
+          onChange={(e) => { const files = [...(e.target.files ?? [])]; e.target.value = ""; const c = pickCtx.current; if (files.length) void ingest(files, c.at, { replaceId: c.replaceId, attachTo: c.attachTo }); }} />
+        {dropping && <div className="nm-drop" aria-hidden="true">Drop to add to the board</div>}
         <ReactFlow
           nodes={derived.nodes} edges={derived.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
           onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
@@ -1000,8 +1071,8 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
         <BoardBar board={board} boards={boards} frames={frames} hidden={hidden} status={b.status}
           onOpen={onOpen} onNew={onNew} onDelete={() => onDelete(board.id)}
           onRename={(t) => { void b.rename(t).then(() => onRetitle(board.id, t)).catch(() => notify("Could not rename the board")); }}
-          onOrganize={(l) => organize(mapsOf(data, idx, selected), l)} onZoomFrame={zoomFrame} onUnhide={unhide} onRetry={b.retry} showDone={isLife ? showDone : null} onShowDone={setShowDone} />
-        <ToolRail tool={tool} onTool={chooseTool} canUndo={b.canUndo} canRedo={b.canRedo} onUndo={b.undo} onRedo={b.redo} />
+          onOrganize={(l) => organize(mapsOf(data, idx, selected), l)} onZoomFrame={zoomFrame} onUnhide={unhide} onRetry={b.retry} showDone={isLife ? showDone : null} onShowDone={setShowDone} onFiles={() => setFilesOpen((v) => !v)} filesOpen={filesOpen} />
+        <ToolRail onImage={() => pickFiles({ imageOnly: true })} tool={tool} onTool={chooseTool} canUndo={b.canUndo} canRedo={b.canRedo} onUndo={b.undo} onRedo={b.redo} />
         <ZoomBar minimap={minimap} onMinimap={() => setMinimap(!minimap)} cardOpen={cardOpen} onFit={fit} />
         <div className="nm-help">Tab child · Enter sibling · F2 edit · Del remove · drag empty space to select · space+drag or two fingers to pan · drop on a node to reparent</div>
         {cardModel && (
@@ -1017,6 +1088,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
           onStep={(dlt) => { if (!matches.length) return; const at = (search.at + dlt + matches.length) % matches.length; setSearch({ q: search.q, at }); jump(at, matches); }}
           onClose={() => setSearch(null)} />}
         {help && <HelpSheet onClose={() => setHelp(false)} />}
+        {filesOpen && <FilesPanel onClose={() => setFilesOpen(false)} onGone={(id) => forgetFile(id)} notify={notify} />}
         {prompt && <PromptDialog title={prompt.title} initial={prompt.initial} onDone={(v) => { prompt.resolve(v); setPrompt(null); }} />}
         {(b.status === "retrying" || b.status === "offline") && (
           <div className="nm-banner" role="alert">

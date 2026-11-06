@@ -123,3 +123,24 @@ describe("window 2: objects, locks, connectors", () => {
     expect(new Set(rows).size).toBe(rows.length);
   });
 });
+
+describe("window F: images and files", () => {
+  const media = [row("img", { kind: "image", style: { file_id: "f1", nw: 800, nh: 600 } }), row("doc", { kind: "file", text: "plan.pdf", style: { file_id: "f2" } })];
+  const d3 = dataFrom([...nodes, ...media], []);
+  const s3 = (ids: string[]) => makeSel({ ids, data: d3, idx: childIndex(d3.nodes), rects: new Map(), canMake: true });
+  const mid = (ids: string[]) => resolveMenu(s3(ids)).flat().map((i) => i.id);
+  it("image menu: caption, replace, reset size, open, download; file menu: rename, replace, download", () => {
+    expect(mid(["img"])).toEqual(["edit", "replace", "resetSize", "openFull", "download", "copy", "cut", "duplicate", "order", "lock", "connect", "delete"]);
+    expect(mid(["doc"])).toEqual(["edit", "replace", "download", "copy", "cut", "duplicate", "order", "lock", "connect", "delete"]);
+    expect(resolveMenu(s3(["img"])).flat()[0].label).toBe("Caption"); expect(resolveMenu(s3(["doc"])).flat()[0].label).toBe("Rename");
+  });
+  it("a thought can attach an image or a file; the board can add one", () => {
+    expect(mid(["a"])).toEqual(expect.arrayContaining(["attachImage", "attachFile"])); expect(mid([])).toContain("addImage");
+    expect(mid(["live"])).not.toContain("attachImage");
+  });
+  it("a locked image can still be downloaded but not replaced or deleted", () => {
+    const d4 = dataFrom([row("li", { kind: "image", style: { file_id: "f", locked: true } })], []);
+    const m = resolveMenu(makeSel({ ids: ["li"], data: d4, idx: childIndex(d4.nodes) })).flat().map((i) => i.id);
+    expect(m).toEqual(expect.arrayContaining(["download", "openFull", "lock"])); expect(m).not.toContain("replace"); expect(m).not.toContain("delete");
+  });
+});

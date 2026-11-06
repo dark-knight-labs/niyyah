@@ -52,6 +52,7 @@ export type ItemData = {
   dim?: boolean;
   ports?: boolean;
   /** Style keys of the object (shape, fill colour, border colour/width/dash, text align/size/bold, lock). */
+  fileId?: string; bytes?: number; mime?: string; nw?: number; nh?: number;
   shape?: string; fillc?: string; border?: string; bw?: number; dash?: string; align?: string; size?: string; bold?: boolean; locked?: boolean;
 };
 export type MapNodeData = MindData | ItemData;
@@ -150,12 +151,12 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
     const w = l?.w ?? n.w, h = l?.h ?? n.h;
     rects.set(n.id, { x: n.x, y: n.y, w: n.w, h: n.h });
     push({
-      id: n.id, type: n.kind === "image" || n.kind === "file" ? "unavailable" : n.kind, parentId: fr?.id, position: { x: l?.x ?? n.x - (fr?.x ?? 0), y: l?.y ?? n.y - (fr?.y ?? 0) },
+      id: n.id, type: n.kind, parentId: fr?.id, position: { x: l?.x ?? n.x - (fr?.x ?? 0), y: l?.y ?? n.y - (fr?.y ?? 0) },
       width: w, height: n.kind === "text" ? undefined : h, measured: n.kind === "text" ? meas(n.id) ?? { width: w, height: h } : { width: w, height: h },
       zIndex: 1, selected: ui.selected.has(n.id), draggable: !n.style.locked,
       data: {
         kind: n.kind as ItemData["kind"], text: n.text, color: (n.style.color as StickyColor) ?? "yellow", editing: ui.editing === n.id, bar: single(n.id), linkFrom: ui.linkFrom === n.id, dim: !!ui.focus && !ui.focus.has(n.id),
-        ports: ui.selected.has(n.id) || !!ui.connecting, shape: n.style.shape ?? "rect", fillc: n.style.color ?? "", border: n.style.border ?? "ink", bw: n.style.bw ?? 1, dash: n.style.dash ?? "solid", align: n.style.align ?? "", size: n.style.size ?? "M", bold: !!n.style.bold, locked: !!n.style.locked,
+        ports: ui.selected.has(n.id) || !!ui.connecting, fileId: n.style.file_id, bytes: n.style.bytes, mime: n.style.mime, nw: n.style.nw, nh: n.style.nh, shape: n.style.shape ?? "rect", fillc: n.style.color ?? "", border: n.style.border ?? "ink", bw: n.style.bw ?? 1, dash: n.style.dash ?? "solid", align: n.style.align ?? "", size: n.style.size ?? "M", bold: !!n.style.bold, locked: !!n.style.locked,
       },
     } as MapNode);
   }

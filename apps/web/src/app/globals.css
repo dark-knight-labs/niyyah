@@ -651,3 +651,24 @@ h1, h2, h3 {
 .nm-guides line { stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 4 3; }
 .nm-elabel { font-size: 11px; }
 .nm-ctx .nm-more { font-size: 1rem; line-height: 1; padding: 0 10px; }
+/* image and file objects */
+.nm-image { background: var(--surface); border: 1px solid var(--border); border-radius: var(--map-r); display: flex; flex-direction: column; }
+.nm-image img { display: block; width: 100%; flex: 1; min-height: 0; object-fit: contain; border-radius: var(--map-r); pointer-events: none; user-select: none; }
+.nm-img-wait { flex: 1; background: linear-gradient(90deg, var(--muted), var(--surface), var(--muted)); background-size: 200% 100%; animation: nm-shimmer 1.2s linear infinite; }
+@keyframes nm-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .nm-img-wait { animation: none; } }
+.nm-cap { padding: 4px 8px; font-size: 0.75rem; color: var(--muted-foreground); border-top: 1px solid var(--border); background: var(--surface); }
+.nm-file { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--map-r); }
+.nm-file .nm-ext { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--rule); color: var(--accent); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
+.nm-file .nm-fi { min-width: 0; flex: 1; } .nm-file .nm-fn { font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm-file .nm-fs { color: var(--muted-foreground); font-size: 10px; margin-top: 2px; }
+.nm-file .nm-dl { flex: none; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: var(--map-r); color: var(--muted-foreground); background: none; cursor: pointer; }
+.nm-file .nm-dl:hover { color: var(--foreground); background: var(--muted); }
+.nm-files { position: absolute; z-index: 30; left: 12px; top: 54px; width: 380px; max-height: 60vh; overflow: auto; padding: 10px 0; box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); }
+.nm-files .hd { display: flex; justify-content: space-between; padding: 0 12px 8px; color: var(--muted-foreground); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.nm-files .row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 0.8125rem; }
+.nm-files .row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .nm-files .row .mono { font-size: 11px; color: var(--muted-foreground); }
+.nm-files .row .un { color: var(--warn); } .nm-files .row button { border: 1px solid var(--border); padding: 3px 8px; font-size: 0.75rem; border-radius: var(--map-r); }
+.nm-files .row button:hover { color: var(--destructive); }
+.nm-files .foot { padding: 8px 12px 0; display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 0.75rem; }
+.nm-drop { position: absolute; inset: 8px; z-index: 35; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); display: grid; place-items: center; pointer-events: none; font: 600 0.8125rem var(--font-mono); color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }

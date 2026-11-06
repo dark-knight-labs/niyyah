@@ -9,7 +9,8 @@ type MenuKind = "boards" | "frames" | "organize" | null;
 const STATUS_TEXT: Record<SaveStatus, string> = { saved: "Saved", saving: "Saving", retrying: "Not saved, retrying", offline: "Offline" };
 
 /** Top-left: board name (menu: boards, new board, hidden thoughts), Frames list (zoom to frame), save status. */
-export function BoardBar({ board, boards, frames, hidden, status, onOpen, onNew, onRename, onDelete, onZoomFrame, onUnhide, onRetry, showDone, onShowDone, onOrganize }: {
+export function BoardBar({ board, boards, frames, hidden, status, onOpen, onNew, onRename, onDelete, onZoomFrame, onUnhide, onRetry, showDone, onShowDone, onOrganize, onFiles, filesOpen }: {
+  onFiles: () => void; filesOpen: boolean;
   onOrganize: (layout: "keep" | "both" | "right" | "down" | "up") => void;
   showDone: boolean | null; onShowDone: (v: boolean) => void;
   board: Board; boards: Board[]; frames: BoardNode[]; hidden: BoardNode[]; status: SaveStatus;
@@ -49,6 +50,7 @@ export function BoardBar({ board, boards, frames, hidden, status, onOpen, onNew,
       <button type="button" className="mono" aria-haspopup="menu" aria-expanded={menu === "frames"} data-testid="frames-menu" onClick={() => setMenu(menu === "frames" ? null : "frames")}>
         Frames{frames.length ? ` (${frames.length})` : ""}
       </button>
+      <button type="button" className="mono" aria-pressed={filesOpen} data-testid="files-button" onClick={onFiles}>Files</button>
       <span className="nm-organize" style={{ padding: 0 }}>
         <button type="button" className="mono" data-testid="organize" title="Organize the selected map (or every map) in its current layout" onClick={() => onOrganize("keep")}>Organize</button>
         <button type="button" aria-haspopup="menu" aria-expanded={menu === "organize"} aria-label="Organize options" data-testid="organize-menu" onClick={() => setMenu(menu === "organize" ? null : "organize")} style={{ padding: "0 8px 0 0" }}><span className="mono" style={{ color: "var(--muted-foreground)" }}>▾</span></button>

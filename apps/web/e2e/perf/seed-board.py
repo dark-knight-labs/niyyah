@@ -16,6 +16,18 @@ NS = uuid.UUID("6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f")
 SHAPES = ["rect", "rounded", "ellipse", "diamond", "triangle", "hexagon", "parallelogram", "star", "arrow", "cylinder", "cloud", "speech"]
 COLORS = ["violet", "cyan", "orange", "indigo", "lime", "fuchsia", "rose", "sky", "emerald", "amber"]
 STICKY = ["yellow", "green", "blue", "pink"]
+# a valid 16x16 PNG (solid grey), built once
+import struct, zlib
+
+
+def _png(w: int = 16, h: int = 16) -> bytes:
+    raw = b"".join(b"\x00" + b"\x88" * w for _ in range(h))
+    def chunk(t: bytes, d: bytes) -> bytes:
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 0, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+PNG = _png()
 
 
 def nid(board: str, name: str) -> str:
@@ -72,8 +84,12 @@ def main() -> None:
             for j in range(10):
                 ops.append(node("S", f"sh{k}_{j}", "shape", x=-2600 + j * 200, y=1400 + k * 140, w=170, h=100, text=shape, style={"shape": shape}))
         if images:
+            # one small real PNG (uploaded raw), referenced by 20 image nodes: the browser fetches it once and shows it 20 times
+            up = c.post("/api/v1/boards/files", params={"name": "seed.png"}, content=PNG, headers={**h, "content-type": "image/png"})
+            up.raise_for_status()
+            fid = up.json()["id"]
             for i in range(20):
-                ops.append(node("S", f"img{i}", "image", x=-2600 + (i % 10) * 200, y=3200 + (i // 10) * 160, w=170, h=120, style={}))
+                ops.append(node("S", f"img{i}", "image", x=-2600 + (i % 10) * 200, y=3200 + (i // 10) * 160, w=170, h=120, style={"file_id": fid, "mime": "image/png", "bytes": len(PNG), "nw": 16, "nh": 16}))
         for i in range(100):
             ops.append({"op": "upsert_edge", "base_updated_at": None, "edge": {
                 "id": nid("S", f"e{i}"), "from_id": nid("S", f"s{i}"), "to_id": nid("S", f"s{(i * 7 + 3) % 200}"), "label": f"link {i}" if i % 10 == 0 else "",

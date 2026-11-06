@@ -202,3 +202,13 @@ export function convertTo(n: BoardNode, to: "mind" | "sticky" | "text" | "shape"
   return up({ ...n, kind: to, parent_id: null, position: 0, x: Math.round(rect.x), y: Math.round(rect.y), w, h, style, frame_id: n.frame_id });
 }
 const STICKY_COLOR_SET = new Set<string>(STICKY_COLORS);
+
+/** An image or file object for an uploaded file, centred on (cx, cy). Images are drawn at their natural size (at most 320 px), files as a card. */
+export function addMedia(kind: "image" | "file", cx: number, cy: number, m: { file_id: string; name: string; bytes: number; mime: string; nw?: number; nh?: number }, frameId: string | null): { ops: Op[]; id: string } {
+  const w = kind === "image" ? Math.max(40, Math.round(Math.min(1, 320 / Math.max(m.nw || 320, m.nh || 240)) * (m.nw || 320))) : 250;
+  const h = kind === "image" ? Math.max(40, Math.round(Math.min(1, 320 / Math.max(m.nw || 320, m.nh || 240)) * (m.nh || 240))) : 64;
+  const style: BoardNode["style"] = { file_id: m.file_id, bytes: m.bytes, mime: m.mime };
+  if (kind === "image" && m.nw && m.nh) { style.nw = m.nw; style.nh = m.nh; }
+  const n = blank(kind, { x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w, h, text: kind === "file" ? m.name : "", style, frame_id: frameId });
+  return { ops: [up(n)], id: n.id };
+}

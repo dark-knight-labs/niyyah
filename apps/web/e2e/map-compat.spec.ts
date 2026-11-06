@@ -31,7 +31,7 @@ const status = (page: import("@playwright/test").Page) => page.getByTestId("save
 const settled = async (page: import("@playwright/test").Page) => { await page.waitForTimeout(700); await expect(status(page)).toHaveAttribute("data-status", "saved", { timeout: 15_000 }); };
 const open = async (page: import("@playwright/test").Page, id: string) => { await page.goto(`/map?board=${id}`); await page.waitForSelector('[data-testid="map-canvas"] .react-flow__renderer'); await page.waitForTimeout(500); };
 
-test("image and file rows draw as a movable File unavailable card and keep style.file_id", async ({ page, request }) => {
+test("an image row whose file is gone draws as a movable File unavailable card; image and file rows keep style.file_id", async ({ page, request }) => {
   const b = await api(request, "/boards", { method: "POST", data: { title: "Media" } });
   await api(request, `/boards/${b.id}/ops`, { method: "POST", data: { ops: [
     row("pic", "image", { x: 200, y: 200, w: 170, h: 120, style: { file_id: FILE_ID } }),
@@ -41,7 +41,7 @@ test("image and file rows draw as a movable File unavailable card and keep style
   await open(page, String(b.id));
   const card = page.getByTestId("unavailable-pic");
   await expect(card).toContainText("File unavailable");
-  await expect(page.getByTestId("unavailable-doc")).toContainText("plan.pdf");
+  await expect(page.getByTestId("file-doc")).toContainText("plan.pdf");              // a file row is a card (its bytes are fetched only on download)
   const before = (await card.boundingBox())!;
   await page.mouse.move(before.x + 40, before.y + 40);
   await page.mouse.down();

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { filesApi, humanSize, type FileList } from "@/lib/map/files";
 import { COMMANDS, labelOf, type Sel } from "@/lib/map/commands";
 
 /** Ctrl+F: find a thought or object by its text. Enter = next, Shift+Enter = previous, Esc closes. */
@@ -37,6 +38,34 @@ export function HelpSheet({ onClose }: { onClose: () => void }) {
         <div className="mono hd">Keyboard shortcuts <button type="button" aria-label="Close" onClick={onClose}>×</button></div>
         <dl>{all.map(([k, l]) => <div key={`${k}|${l}`} data-kbd={k}><dt className="mono">{k}</dt><dd>{l}</dd></div>)}</dl>
       </div>
+    </div>
+  );
+}
+
+/** The Files panel: every file this account uploaded, which ones no object uses any more, and delete. The quota refusal points here. */
+export function FilesPanel({ onClose, onGone, notify }: { onClose: () => void; onGone: (id: string) => void; notify: (m: string) => void }) {
+  const [list, setList] = useState<FileList | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = useCallback(() => { filesApi.list().then((l) => { setList(l); setErr(null); }).catch((e: Error) => setErr(e.message)); }, []);
+  useEffect(() => { load(); }, [load]);
+  const del = async (ids: string[]) => {
+    try { for (const id of ids) { await filesApi.remove(id); onGone(id); } load(); notify(ids.length === 1 ? "File deleted" : `${ids.length} files deleted`); }
+    catch (e) { notify((e as Error).message || "Could not delete"); load(); }
+  };
+  const unused = list?.files.filter((f) => !f.used) ?? [];
+  return (
+    <div className="nm-ui nm-files" role="dialog" aria-label="Files" data-testid="files-panel" onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}>
+      <div className="hd mono"><span>Files{list ? ` · ${humanSize(list.used_bytes)} of ${humanSize(list.quota_bytes)}` : ""}</span><button type="button" aria-label="Close files" onClick={onClose}>×</button></div>
+      {err && <div className="row"><span className="un">{err}</span></div>}
+      {list && list.files.length === 0 && <div className="row"><span className="mono">No files yet. Press I, paste an image, or drop one on the board.</span></div>}
+      {list?.files.map((f) => (
+        <div className="row" key={f.id} data-testid={`file-row-${f.id}`} data-used={f.used ? "1" : "0"}>
+          <span className="nm" title={f.name}>{f.name}</span>
+          <span className={`mono ${f.used ? "" : "un"}`}>{humanSize(f.size)} · {f.used ? "in use" : "unused"}</span>
+          <button type="button" aria-label={`Delete ${f.name}`} onClick={() => void del([f.id])}>Delete</button>
+        </div>
+      ))}
+      {unused.length > 0 && <div className="foot"><span>{unused.length} unused</span><button type="button" className="row-btn" data-testid="delete-unused" onClick={() => void del(unused.map((f) => f.id))}>Delete unused</button></div>}
     </div>
   );
 }

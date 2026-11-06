@@ -76,6 +76,10 @@ export interface Env {
   search(): void;
   help(): void;
   toggleSnap(): void;
+  /** Open the file picker: new objects at `at` (or where the pointer is), replace one object's file, attach to a thought, images only. */
+  pickFiles(o?: { at?: { x: number; y: number } | null; replaceId?: string; attachTo?: string; imageOnly?: boolean }): void;
+  download(id: string): void;
+  openFull(id: string): void;
 }
 
 export interface Command {
@@ -119,7 +123,7 @@ export function makeSel(p: { ids: string[]; data: BoardData; idx: Map<string | n
 export const LIVE_BLOCKED: ReadonlySet<string> = new Set(["edit", "deleteBranch", "cut", "convert", "detach", "toSticky", "parent", "sibling", "paste", "pasteChild", "note", "make"]);
 
 /** What a locked selection still offers: reading, copying, arranging in the stack, and unlocking. Everything that edits or removes is hidden. */
-export const LOCK_ALLOWED: ReadonlySet<string> = new Set(["lock", "copy", "duplicate", "copyOutline", "connect", "selectBranch", "focusBranch", "fold", "collapseBelow", "expandBelow", "showInPlan", "order", "zoomFrame", "selectAll"]);
+export const LOCK_ALLOWED: ReadonlySet<string> = new Set(["lock", "copy", "duplicate", "copyOutline", "connect", "selectBranch", "focusBranch", "fold", "collapseBelow", "expandBelow", "showInPlan", "order", "zoomFrame", "selectAll", "download", "openFull"]);
 
 /** Does the command belong in this selection's menu? Kind, extra condition, and the live-node rule. */
 export function appliesTo(c: Command, s: Sel): boolean {
@@ -160,7 +164,7 @@ const CORE: Command[] = [
     id: "parent", label: "Add parent", kinds: ["mind"], when: (s) => !!only(s)?.parent_id,
     run: (env, s) => { const made = A.insertParent(s.data.nodes, only(s)); if (env.commit(made.ops, `new:${made.id}`)) env.editNew(made.id); },
   },
-  { id: "edit", label: "Edit text", kbd: "F2", native: true, kinds: ["mind", "sticky", "shape", "text", "frame"], run: (env, s) => env.edit(s.ids[0]) },
+  { id: "edit", label: (s) => (s.kind === "image" ? "Caption" : s.kind === "file" ? "Rename" : "Edit text"), kbd: "F2", native: true, kinds: ["mind", "sticky", "shape", "text", "frame", "image", "file"], run: (env, s) => env.edit(s.ids[0]) },
   {
     id: "note", label: "Note…", kinds: ["mind"],
     current: (s) => !!only(s)?.notes.trim(), run: (env, s) => env.focusNotes(s.ids[0]),
@@ -303,6 +307,16 @@ const membersOf = (s: Sel, frameId: string) => [...s.data.nodes.values()].filter
 const KIND_LABEL: Record<string, string> = { sticky: "Sticky note", shape: "Shape", text: "Text", mind: "Mind map node" };
 
 const MORE: Command[] = [
+  { id: "replace", label: "Replace…", kinds: ["image", "file"], run: (env, s) => env.pickFiles({ replaceId: s.ids[0], imageOnly: s.kind === "image" }) },
+  {
+    id: "resetSize", label: "Reset size", kinds: ["image"], when: (s) => !!only(s)?.style.nw,
+    run: (env, s) => { const n = only(s); const nw = n.style.nw!, nh = n.style.nh ?? nw; const k = Math.min(1, 320 / Math.max(nw, nh)); env.commit([{ op: "upsert_node", node: { ...n, w: Math.round(nw * k), h: Math.round(nh * k) }, base_updated_at: null }]); },
+  },
+  { id: "openFull", label: "Open full size", kinds: ["image"], run: (env, s) => env.openFull(s.ids[0]) },
+  { id: "download", label: "Download", kinds: ["image", "file"], run: (env, s) => env.download(s.ids[0]) },
+  { id: "attachImage", label: "Attach image…", kinds: ["mind"], run: (env, s) => env.pickFiles({ attachTo: s.ids[0], imageOnly: true }) },
+  { id: "attachFile", label: "Attach file…", kinds: ["mind"], run: (env, s) => env.pickFiles({ attachTo: s.ids[0] }) },
+  { id: "addImage", label: "Add image or file…", kbd: "I", native: true, kinds: ["pane"], run: (env, s) => env.pickFiles({ at: s.pos }) },
   { id: "copy", label: "Copy", kbd: "Ctrl+C", native: true, kinds: GENERIC, run: (env) => env.copy(false) },
   { id: "cut", label: "Cut", kbd: "Ctrl+X", native: true, kinds: ["mind", "sticky", "shape", "text", "frame", "image", "file", "multi"], run: (env) => env.copy(true) },
   { id: "pasteChild", label: "Paste as child", kbd: "Ctrl+V", native: true, kinds: ["mind"], run: (env, s) => env.paste(s.ids[0], null) },
@@ -417,17 +431,17 @@ export const REGISTRY: ReadonlyMap<string, Command> = new Map(COMMANDS.map((c) =
 
 /** Menu layout per kind: groups (a hairline between them), each a list of command ids. Resolution hides what does not apply. */
 export const MENUS: Record<Kind, string[][]> = {
-  mind: [["child", "sibling", "parent"], ["edit", "note", "link", "unlink"], ["color", "fill", "mshape", "size", "bold", "icon"], ["layout", "branchLines", "organizeMap"], ["fold", "collapseBelow", "expandBelow", "focusBranch", "selectBranch"], ["moveUp", "moveDown"], ["copy", "cut", "pasteChild", "duplicate", "copyOutline"], ["detach", "toSticky", "lock"], ["make", "connect"], ["delete"]],
+  mind: [["child", "sibling", "parent"], ["edit", "note", "link", "unlink"], ["color", "fill", "mshape", "size", "bold", "icon"], ["layout", "branchLines", "organizeMap"], ["fold", "collapseBelow", "expandBelow", "focusBranch", "selectBranch"], ["moveUp", "moveDown"], ["copy", "cut", "pasteChild", "duplicate", "copyOutline"], ["detach", "toSticky", "lock"], ["attachImage", "attachFile"], ["make", "connect"], ["delete"]],
   live: [["child"], ["link", "unlink"], ["color", "fill", "mshape", "size", "bold", "icon"], ["layout", "branchLines", "organizeMap"], ["fold", "collapseBelow", "expandBelow", "focusBranch", "selectBranch"], ["copy", "copyOutline", "lock"], ["showInPlan", "connect"], ["hide"]],
   sticky: [["edit"], ["color", "size", "bold", "talign"], ["convert"], ["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
   shape: [["edit"], ["shapeKind", "color", "border", "bw", "dash", "size", "bold", "talign"], ["convert"], ["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
   text: [["edit"], ["size", "bold", "talign"], ["convert"], ["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
   frame: [["edit", "zoomFrame", "fitFrame", "tidyFrame"], ["copy", "cut", "duplicate", "lock"], ["connect"], ["delete", "deleteFrameAll"]],
-  image: [["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
-  file: [["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
+  image: [["edit", "replace", "resetSize", "openFull", "download"], ["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
+  file: [["edit", "replace", "download"], ["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
   edge: [["epath", "ewidth", "edash", "estart", "eend", "ecolor"], ["elabel", "eswap"], ["delete"]],
   multi: [["align", "distribute", "tidy", "frameSel", "mindFromStickies"], ["color", "size", "bold"], ["copy", "cut", "duplicate", "lock"], ["order"], ["delete"]],
-  pane: [["addSticky", "addMind", "addShape", "addText", "addFrame"], ["paste", "selectAll", "find"], ["organizeAll", "toggleSnap"], ["fit", "minimap", "help"]],
+  pane: [["addSticky", "addMind", "addShape", "addText", "addFrame", "addImage"], ["paste", "selectAll", "find"], ["organizeAll", "toggleSnap"], ["fit", "minimap", "help"]],
 };
 
 export interface MenuItem {

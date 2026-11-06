@@ -34,8 +34,8 @@ export interface NodeStyle {
   z?: number;
   /** Shapes and text. */
   border?: string; dash?: "solid" | "dashed" | "dotted"; bw?: 1 | 2 | 4; align?: "left" | "center" | "right";
-  /** Image and file nodes: the id of the uploaded file. */
-  file_id?: string;
+  /** Image and file nodes: the id of the uploaded file, its size and type, and (images) the natural size in pixels. */
+  file_id?: string; bytes?: number; mime?: string; nw?: number; nh?: number;
 }
 
 export interface BoardNode {

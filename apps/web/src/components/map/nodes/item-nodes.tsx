@@ -1,8 +1,9 @@
 "use client";
 
-import { memo, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { Handle, NodeResizer, NodeResizeControl, NodeToolbar, Position, useNodeId, useUpdateNodeInternals, type NodeProps } from "@xyflow/react";
 import { shapeOf } from "@/lib/map/shapes";
+import { downloadFile, extOf, fileUrl, humanSize } from "@/lib/map/files";
 import { EditableText } from "../editable";
 import { useMapActions } from "../map-context";
 import type { ItemData, MapNode } from "../derive";
@@ -91,15 +92,63 @@ export const ShapeNode = memo(function ShapeNode({ id, data, selected }: NodePro
   );
 });
 
-/** An image or file row on a build that cannot show it yet: a movable placeholder. Position, size and style.file_id stay untouched. */
-export const UnavailableNode = memo(function UnavailableNode({ id, data, selected }: NodeProps<MapNode>) {
-  const d = data as ItemData;
+/** The card shown when the bytes cannot be had (deleted, another account, an older server): the node keeps its place and file id. */
+function Missing({ id, d, selected }: { id: string; d: ItemData; selected: boolean }) {
   return (
     <div className={`nm-item nm-unavailable ${selected ? "sel-ring" : ""} ${d.linkFrom ? "nm-linkfrom" : ""}`} data-testid={`unavailable-${id}`}>
-      <Handles />
+      <Handles /><Ports show={d.ports} />
       <span className="mono nm-ut">File unavailable</span>
       {d.text && <span className="nm-un">{d.text}</span>}
       <NodeToolbar isVisible={selected && d.bar} position={Position.Top} offset={14}><ContextBar id={id} /></NodeToolbar>
+    </div>
+  );
+}
+
+/** The bytes of a file as an object URL (fetched with the bearer token, cached per id). */
+function useFileUrl(fileId: string | undefined): { url: string | null; failed: boolean } {
+  const [state, setState] = useState<{ id?: string; url: string | null; failed: boolean }>({ url: null, failed: false });
+  useEffect(() => {
+    let live = true;
+    if (!fileId) return;
+    fileUrl(fileId).then((u) => { if (live) setState({ id: fileId, url: u, failed: false }); }).catch(() => { if (live) setState({ id: fileId, url: null, failed: true }); });
+    return () => { live = false; };
+  }, [fileId]);
+  if (!fileId) return { url: null, failed: true };
+  return state.id === fileId ? state : { url: null, failed: false };
+}
+
+export const ImageNode = memo(function ImageNode({ id, data, selected }: NodeProps<MapNode>) {
+  const d = data as ItemData;
+  const { url, failed } = useFileUrl(d.fileId);
+  const { resizeEnd } = useMapActions();
+  if (failed) return <Missing id={id} d={d} selected={selected} />;
+  return (
+    <div className={`nm-item nm-image ${styleCls(d)} ${d.dim ? "nm-dim" : ""} ${selected ? "sel-ring" : ""} ${d.editing ? "editing" : ""} ${d.linkFrom ? "nm-linkfrom" : ""}`} data-testid={`image-${id}`} data-loaded={url ? "1" : "0"}>
+      <NodeResizer isVisible={selected && !d.locked} minWidth={48} minHeight={48} keepAspectRatio onResizeEnd={(_, p) => resizeEnd(id, p)} handleStyle={{ width: 9, height: 9 }} />
+      <Handles /><Ports show={d.ports} />
+      {url ? (
+        // an object URL of bytes fetched with the bearer token: next/image cannot optimise it
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt={d.text || "Image"} draggable={false} />
+      ) : <div className="nm-img-wait" aria-hidden="true" />}
+      {(d.text || d.editing) && <div className="nm-cap"><EditableText id={id} text={d.text} editing={d.editing} multiline placeholder="Caption" /></div>}
+      <NodeToolbar isVisible={selected && d.bar && !d.editing} position={Position.Top} offset={14}><ContextBar id={id} /></NodeToolbar>
+    </div>
+  );
+});
+
+export const FileNode = memo(function FileNode({ id, data, selected }: NodeProps<MapNode>) {
+  const d = data as ItemData;
+  const name = d.text || "file";
+  return (
+    <div className={`nm-item nm-file ${styleCls(d)} ${d.dim ? "nm-dim" : ""} ${selected ? "sel-ring" : ""} ${d.editing ? "editing" : ""} ${d.linkFrom ? "nm-linkfrom" : ""}`} data-testid={`file-${id}`}>
+      <Resizer id={id} selected={selected} minWidth={150} minHeight={48} locked={d.locked} />
+      <Handles /><Ports show={d.ports} />
+      <span className="nm-ext mono" aria-hidden="true">{extOf(name)}</span>
+      <div className="nm-fi"><div className="nm-fn"><EditableText id={id} text={name} editing={d.editing} /></div>{d.bytes ? <div className="nm-fs mono">{humanSize(d.bytes)}</div> : null}</div>
+      <button type="button" className="nm-dl nodrag nopan" aria-label={`Download ${name}`} title="Download" data-testid={`download-${id}`}
+        onClick={(e) => { e.stopPropagation(); if (d.fileId) void downloadFile(d.fileId, name).catch(() => undefined); }} onPointerDown={(e) => e.stopPropagation()}>↓</button>
+      <NodeToolbar isVisible={selected && d.bar && !d.editing} position={Position.Top} offset={14}><ContextBar id={id} /></NodeToolbar>
     </div>
   );
 });
