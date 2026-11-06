@@ -42,8 +42,8 @@ npx -y "playwright@$PW_VERSION" install chromium > "$OUT/browser-install.log" 2>
 # The spec imports @playwright/test, which is not a dependency of the app: resolve it from the pinned npx install.
 PW_MODULES="$(npx -y -p "@playwright/test@$PW_VERSION" sh -c 'cd "$(dirname "$(command -v playwright)")/.." && pwd' 2>/dev/null | tail -n 1)"
 set +e
+# shellcheck disable=SC2086  # E2E_ARGS is split on purpose
 NODE_PATH="$PW_MODULES" E2E_WEB_URL="http://localhost:$WEB_PORT" E2E_API_URL="http://localhost:$API_PORT" E2E_EMAIL="$EMAIL" E2E_PASSWORD="$PASSWORD" \
-  # shellcheck disable=SC2086  # E2E_ARGS is split on purpose
   npx -y -p "@playwright/test@$PW_VERSION" playwright test -c e2e/playwright.config.ts ${E2E_ARGS:-} "$@"
 status=$?
 set -e
