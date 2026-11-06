@@ -1,6 +1,7 @@
 import { isTimed, itemRef } from "@/lib/items";
-import { PRAYERS, Prayer, ResolvedBlock, ResolvedDay, resolveDay, VaultScheduleData } from "@/lib/routine";
+import { computePrayerMinutes, dayTypeFor, PRAYERS, Prayer, ResolvedBlock, ResolvedDay, resolveDay, resolveTime, VaultScheduleData } from "@/lib/routine";
 import type { ItemData } from "@/lib/vault-types";
+import { addDays } from "@/lib/week";
 
 /** The calendar page's views, in the order V rotates through them. Week Grid is the Overview's WeekCalendar. */
 export const VIEWS = [
@@ -11,7 +12,6 @@ export const VIEWS = [
   { id: "week-grid", scope: "week", label: "Grid" },
   { id: "week-agenda", scope: "week", label: "Agenda" },
   { id: "week-strips", scope: "week", label: "Strips" },
-  { id: "week-rings", scope: "week", label: "Rings" },
   { id: "week-blocks", scope: "week", label: "Blocks" },
 ] as const;
 export type ViewId = (typeof VIEWS)[number]["id"];
@@ -48,6 +48,38 @@ export interface CalDay {
 /** The schedule for an ISO date. UTC noon keeps the date in every timezone the schedule can use. */
 export function resolveIso(schedule: VaultScheduleData, iso: string, known: ReadonlySet<string>): ResolvedDay | null {
   try { return resolveDay(schedule, new Date(`${iso}T12:00:00Z`), known); } catch { return null; }
+}
+
+/** A stretch of one date's column in the week grid: minutes since midnight, `from` < `to` <= 1440. */
+export interface Band { block: string; from: number; to: number; }
+
+/**
+ * The blocks as stretches of one date's column. A block that crosses midnight (isha to fajr-60) fills the evening of the date
+ * its row belongs to; its morning half sits in the next date's column, ended by that date's prayer times (the row of the
+ * evening before, the clock of the morning after).
+ */
+export function dayBands(schedule: VaultScheduleData, iso: string, known: ReadonlySet<string>): Band[] {
+  const own = resolveIso(schedule, iso, known);
+  const bands: Band[] = (own?.blocks ?? []).map((b) => ({ block: b.block, from: b.startMin, to: Math.min(b.endMin, 1440) }));
+  try {
+    const { meta } = schedule;
+    const prev = new Date(`${addDays(iso, -1)}T12:00:00Z`);
+    const type = dayTypeFor(prev, meta.tz, meta.weekend_days ?? ["fri", "sat"]);
+    const rows = schedule.days[type]?.length ? schedule.days[type] : schedule.days.weekday ?? [];
+    const before = computePrayerMinutes(meta, prev);
+    const after = computePrayerMinutes(meta, new Date(`${iso}T12:00:00Z`));
+    for (const row of rows) {
+      if (known.size > 0 && !known.has(row.block)) continue;
+      try {
+        const start = resolveTime(row.start, { ...before.prayers, sunrise: before.sunrise });
+        const end = resolveTime(row.end, { ...before.prayers, sunrise: before.sunrise });
+        if (end > start) continue;
+        const morning = resolveTime(row.end, { ...after.prayers, sunrise: after.sunrise });
+        if (morning > 0) bands.push({ block: row.block, from: 0, to: Math.min(morning, 1440) });
+      } catch { /* a row that cannot be read is skipped, as in resolveDay */ }
+    }
+  } catch { /* no location: no prayer times, no carried night */ }
+  return bands;
 }
 
 /** The minute falls in the span (a block crossing midnight also covers the early hours). */
