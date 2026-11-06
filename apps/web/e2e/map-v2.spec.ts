@@ -35,6 +35,8 @@ const boxes = async (page: Page) => page.evaluate(() => Object.fromEntries([...d
 type Box = { x: number; y: number; w: number; h: number };
 const overlaps = (m: Record<string, Box>) => { const v = Object.entries(m); const out: string[] = []; for (let i = 0; i < v.length; i++) for (let j = i + 1; j < v.length; j++) { const a = v[i][1], b = v[j][1]; if (a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1) out.push(`${v[i][0]}/${v[j][0]}`); } return out; };
 const menuIds = (page: Page) => page.locator('[data-testid="context-menu"] [data-top-item]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.cmd));
+/** Esc closes a submenu first (the pointer rests on the menu it opened from), then the menu. */
+const closeMenu = async (page: Page) => { for (let i = 0; i < 3 && (await page.getByTestId("context-menu").count()); i++) await page.keyboard.press("Escape"); };
 const rightClick = (page: Page, loc: ReturnType<Page["locator"]>) => loc.click({ button: "right" });
 
 /** A map with 3 branches of 2 children (depth 3 under the first), plus a second small map beside it. */
@@ -111,37 +113,37 @@ test("right-click menu item ids per kind", async ({ page, request }) => {
   await rightClick(page, mindEl(page, "a0"));
   expect(await menuIds(page)).toEqual(expect.arrayContaining(["child", "sibling", "parent", "edit", "note", "link", "color", "fill", "mshape", "size", "bold", "icon", "layout", "branchLines", "organizeMap", "fold", "detach", "connect", "delete"]));
   expect(await menuIds(page)).not.toContain("toSticky");        // a0 has branches
-  await page.keyboard.press("Escape");
+  await closeMenu(page);
   await rightClick(page, mindEl(page, "r"));
   const root = await menuIds(page);
   expect(root).toContain("child"); expect(root).not.toContain("sibling"); expect(root).not.toContain("detach");
-  await page.keyboard.press("Escape");
+  await closeMenu(page);
 
   await rightClick(page, page.getByTestId("sticky-st"));
-  expect(await menuIds(page)).toEqual(["edit", "color", "connect", "delete"]);
-  await page.keyboard.press("Escape");
+  expect(await menuIds(page)).toEqual(expect.arrayContaining(["edit", "color", "size", "bold", "talign", "convert", "copy", "cut", "duplicate", "order", "lock", "connect", "delete"]));
+  await closeMenu(page);
   await rightClick(page, page.getByTestId("shape-sh"));
   expect(await menuIds(page)).toEqual(expect.arrayContaining(["edit", "connect", "delete"]));
-  await page.keyboard.press("Escape");
+  await closeMenu(page);
   await rightClick(page, page.getByTestId("text-tx"));
   expect(await menuIds(page)).toEqual(expect.arrayContaining(["edit", "connect", "delete"]));
-  await page.keyboard.press("Escape");
+  await closeMenu(page);
   await page.getByTestId("frame-fr").click({ button: "right", position: { x: 20, y: 120 } });
   expect(await menuIds(page)).toEqual(expect.arrayContaining(["edit", "zoomFrame", "connect", "delete"]));
-  await page.keyboard.press("Escape");
+  await closeMenu(page);
 
   // selection: two stickies
   await page.getByTestId("sticky-st").click();
   await page.getByTestId("sticky-st2").click({ modifiers: ["Shift"] });
   await rightClick(page, page.getByTestId("sticky-st2"));
-  expect(await menuIds(page)).toEqual(["color", "delete"]);
-  await page.keyboard.press("Escape");
+  expect(await menuIds(page)).toEqual(expect.arrayContaining(["align", "color", "copy", "lock", "order", "delete"]));
+  await closeMenu(page);
 
   // pane: an empty spot
-  await page.keyboard.press("Escape");
+  await closeMenu(page);
   await page.mouse.click(1000, 140, { button: "right" });
   expect(await menuIds(page)).toEqual(expect.arrayContaining(["addSticky", "addMind", "addShape", "addText", "addFrame", "selectAll", "organizeAll", "fit", "minimap"]));
-  await page.keyboard.press("Escape");
+  await closeMenu(page);
   await expect(page.getByTestId("context-menu")).toHaveCount(0);
 });
 

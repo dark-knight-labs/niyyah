@@ -107,8 +107,11 @@ export function addItem(kind: "sticky" | "text" | "shape" | "frame", cx: number,
   return { ops: [up(n)], id: n.id };
 }
 
-export function edgeBetween(from: string, to: string): { op: Op; id: string } {
-  const edge: BoardEdge = { id: newId(), from_id: from, to_id: to, label: "", style: {}, updated_at: null };
+export function edgeBetween(from: string, to: string, sp?: string, tp?: string): { op: Op; id: string } {
+  const style: Record<string, unknown> = { path: "curved" };
+  if (sp) style.sp = sp;
+  if (tp) style.tp = tp;
+  const edge: BoardEdge = { id: newId(), from_id: from, to_id: to, label: "", style, updated_at: null };
   return { op: { op: "upsert_edge", edge, base_updated_at: null }, id: edge.id };
 }
 

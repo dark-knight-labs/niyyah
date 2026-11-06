@@ -6,6 +6,7 @@ import { EditableText } from "../editable";
 import { useMapActions } from "../map-context";
 import type { MapNode, MindData } from "../derive";
 import { ContextBar } from "../context-bar";
+import { Ports } from "./item-nodes";
 
 
 export const MindNode = memo(function MindNode({ id, data, selected }: NodeProps<MapNode>) {
@@ -26,6 +27,7 @@ export const MindNode = memo(function MindNode({ id, data, selected }: NodeProps
       <Handle id="tb" type="target" position={Position.Bottom} className="nm-hh" isConnectable={false} />
       <Handle id="st" type="source" position={Position.Top} className="nm-hh" isConnectable={false} />
       <Handle id="sb" type="source" position={Position.Bottom} className="nm-hh" isConnectable={false} />
+      <Ports show={d.ports} />
       <Handle id="cs" type="source" position={Position.Right} className="nm-hh nm-ch" isConnectable={false} />
       <Handle id="ct" type="target" position={Position.Left} className="nm-hh nm-ch" isConnectable={false} />
       {d.sub && <span className="nm-sub mono">{d.sub}</span>}

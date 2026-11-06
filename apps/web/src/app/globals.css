@@ -465,7 +465,7 @@ h1, h2, h3 {
 .niyyah-map .react-flow__handle.nm-conn { width: 10px; height: 10px; min-width: 10px; min-height: 10px; border: 1.5px solid var(--accent); background: var(--surface); border-radius: 50%; opacity: 0; right: -6px; top: 50%; transform: translateY(-50%); pointer-events: all; }
 .niyyah-map .react-flow__node:hover .nm-conn, .niyyah-map .react-flow__node.selected .nm-conn { opacity: 1; }
 .niyyah-map .react-flow__edge-path { stroke-width: 1.5; }
-.niyyah-map .nm-link { fill: none; stroke: var(--muted-foreground); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.niyyah-map .nm-link { fill: none; }
 .niyyah-map .nm-link.sel { stroke: var(--accent); }
 .niyyah-map .react-flow__resize-control.handle { width: 9px; height: 9px; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 0; }
 .niyyah-map .react-flow__resize-control.line { border-color: var(--accent); }
@@ -510,12 +510,26 @@ h1, h2, h3 {
 
 .nm-item { position: relative; width: 100%; height: 100%; }
 .nm-item .nm-t { white-space: pre-wrap; word-break: break-word; }
-.nm-sticky { padding: 12px; font-size: 0.8125rem; border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent); overflow: hidden; color: var(--foreground); border-radius: var(--map-r); }
+.nm-sticky { padding: 12px; font-size: 0.8125rem; border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent); color: var(--foreground); border-radius: var(--map-r); }
+.nm-sticky-in { height: 100%; overflow: hidden; }
 .nm-sticky.yellow { background: var(--map-sticky-yellow); } .nm-sticky.green { background: var(--map-sticky-green); }
 .nm-sticky.blue { background: var(--map-sticky-blue); } .nm-sticky.pink { background: var(--map-sticky-pink); }
 .nm-sticky.orange { background: var(--map-sticky-orange); } .nm-sticky.teal { background: var(--map-sticky-teal); } .nm-sticky.violet { background: var(--map-sticky-violet); } .nm-sticky.gray { background: var(--map-sticky-gray); }
 .nm-text { font-size: 1.0625rem; padding: 2px 4px; }
-.nm-shape { border: 1px solid var(--foreground); background: var(--surface); display: grid; place-items: center; text-align: center; padding: 8px; font-size: 0.8125rem; border-radius: var(--map-r); }
+.nm-shape { --sf: var(--surface); --sb: var(--foreground); --sw: 1px; --sd: solid; --sda: none; display: grid; place-items: center; text-align: center; font-size: 0.8125rem; }
+.nm-shape.css-box { background: var(--sf); border: var(--sw) var(--sd) var(--sb); border-radius: var(--map-r); padding: 8px; }
+.nm-shape.sh-rounded { border-radius: 14px; } .nm-shape.sh-ellipse { border-radius: 50%; }
+.nm-shape .nm-st { position: absolute; inset: 0; display: grid; place-items: center; padding: 4px; overflow: hidden; }
+.nm-shape.css-box .nm-st { position: static; }
+.nm-shape-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.nm-shape-svg path { fill: var(--sf); stroke: var(--sb); stroke-width: var(--sw); stroke-dasharray: var(--sda); vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.nm-shape-svg path.nm-shape-lip { fill: none; }
+.nm-item.size-S { font-size: 0.6875rem; } .nm-item.size-L { font-size: 1.0625rem; } .nm-text.size-S { font-size: 0.875rem; } .nm-text.size-L { font-size: 1.5rem; }
+.nm-item.bold .nm-t { font-weight: 700; }
+.nm-item.al-left { text-align: left; } .nm-item.al-center { text-align: center; } .nm-item.al-right { text-align: right; }
+.nm-shape.al-left .nm-st { place-items: center start; } .nm-shape.al-right .nm-st { place-items: center end; }
+.niyyah-map .react-flow__handle.nm-port { pointer-events: all; width: 9px; height: 9px; min-width: 9px; min-height: 9px; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 50%; }
+.niyyah-map .react-flow__handle.nm-port:hover { background: var(--accent); }
 .nm-unavailable { display: grid; place-content: center; gap: 4px; justify-items: center; text-align: center; padding: 10px; border: 1px dashed var(--rule); background: var(--surface); color: var(--muted-foreground); border-radius: var(--map-r); font-size: 0.75rem; }
 .nm-unavailable .nm-ut { font: 500 0.6875rem/1 var(--font-mono); letter-spacing: 0.09em; text-transform: uppercase; }
 .nm-unavailable .nm-un { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -622,3 +636,18 @@ h1, h2, h3 {
 .nm-organize { position: relative; display: flex; }
 .niyyah-map .nm-dim { opacity: 0.28; }
 .nm-mind.d0.own { border-color: var(--c); }
+.nm-search { top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 4px 6px; z-index: 30; }
+.nm-search input { font: inherit; background: var(--background); color: inherit; border: 1px solid var(--border); padding: 5px 8px; width: 240px; outline: none; border-radius: var(--map-r); }
+.nm-search input:focus { outline: 2px solid var(--accent); }
+.nm-search .mono { min-width: 48px; text-align: center; color: var(--muted-foreground); font-size: 11px; }
+.nm-search button { width: 26px; height: 26px; color: var(--muted-foreground); }
+.nm-search button:hover { color: var(--foreground); background: var(--muted); }
+.nm-help-sheet { position: static; width: 560px; max-width: 92%; max-height: 70vh; overflow: auto; padding: 14px 16px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); outline: none; }
+.nm-help-sheet .hd { display: flex; justify-content: space-between; color: var(--muted-foreground); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+.nm-help-sheet dl { margin: 0; display: grid; gap: 2px; }
+.nm-help-sheet dl > div { display: grid; grid-template-columns: 190px 1fr; gap: 12px; padding: 4px 0; border-top: 1px solid var(--border); font-size: 0.8125rem; }
+.nm-help-sheet dt { color: var(--accent); font-size: 11px; } .nm-help-sheet dd { margin: 0; }
+.nm-guides { position: absolute; pointer-events: none; overflow: visible; }
+.nm-guides line { stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 4 3; }
+.nm-elabel { font-size: 11px; }
+.nm-ctx .nm-more { font-size: 1rem; line-height: 1; padding: 0 10px; }

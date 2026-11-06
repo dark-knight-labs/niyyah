@@ -1,4 +1,4 @@
-import { MarkerType, type Edge, type Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { branchHandles, layoutMindMap, type Size } from "@/lib/map/layout";
 import { colorKeyOf, colorVar, descendantCount, dirOf, isMind, rootOf, visibleForest } from "@/lib/map/tree";
 import type { LiveInfo } from "@/lib/map/life-tree";
@@ -38,6 +38,7 @@ export type MindData = {
   orient: "h" | "v";
   dim: boolean;
   own: boolean;
+  ports: boolean;
 };
 export type ItemData = {
   kind: "sticky" | "text" | "shape" | "frame" | "image" | "file" | "unknown";
@@ -47,6 +48,9 @@ export type ItemData = {
   bar: boolean;
   linkFrom: boolean;
   dim?: boolean;
+  ports?: boolean;
+  /** Style keys of the object (shape, fill colour, border colour/width/dash, text align/size/bold, lock). */
+  shape?: string; fillc?: string; border?: string; bw?: number; dash?: string; align?: string; size?: string; bold?: boolean; locked?: boolean;
 };
 export type MapNodeData = MindData | ItemData;
 export type MapNode = Node<MapNodeData & Record<string, unknown>>;
@@ -65,6 +69,8 @@ export interface DeriveUi {
   sizes: ReadonlyMap<string, Size>;
   /** Focus mode: ids that stay bright (everything else is dimmed). Null = off. */
   focus?: ReadonlySet<string> | null;
+  /** A connector is being dragged: every node shows its ports. */
+  connecting?: boolean;
 }
 
 export interface Derived {
@@ -110,11 +116,14 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
     rects.set(f.id, { x: f.x, y: f.y, w: f.w, h: f.h });
     push({
       id: f.id, type: "frame", position: { x: l?.x ?? f.x, y: l?.y ?? f.y }, width: w, height: h, measured: { width: w, height: h }, zIndex: 0,
-      selected: ui.selected.has(f.id), data: { kind: "frame", text: f.text, color: "yellow", editing: ui.editing === f.id, bar: single(f.id), linkFrom: ui.linkFrom === f.id },
+      selected: ui.selected.has(f.id), draggable: !f.style.locked, data: { kind: "frame", text: f.text, color: "yellow", editing: ui.editing === f.id, bar: single(f.id), linkFrom: ui.linkFrom === f.id, ports: ui.selected.has(f.id) || !!ui.connecting, locked: !!f.style.locked },
     });
   }
 
-  for (const n of nodes.values()) {
+  const free = [...nodes.values()];
+  // stacking among free items: style.z (higher in front); equal z keeps the board's order (RF paints in array order)
+  const zs = free.some((n) => n.style.z !== undefined) ? [...free].sort((a, b) => (a.kind === "mind" || a.kind === "ref" ? 0 : (a.style.z ?? 0)) - (b.kind === "mind" || b.kind === "ref" ? 0 : (b.style.z ?? 0))) : free;
+  for (const n of zs) {
     if (!isKnownKind(n.kind)) {
       if (n.hidden) continue;
       // a later release's object: drawn inert (no select, drag, connect, no rect for fit or organize) and never written back
@@ -132,8 +141,11 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
     push({
       id: n.id, type: n.kind === "image" || n.kind === "file" ? "unavailable" : n.kind, parentId: fr?.id, position: { x: l?.x ?? n.x - (fr?.x ?? 0), y: l?.y ?? n.y - (fr?.y ?? 0) },
       width: w, height: n.kind === "text" ? undefined : h, measured: n.kind === "text" ? meas(n.id) ?? { width: w, height: h } : { width: w, height: h },
-      zIndex: 1, selected: ui.selected.has(n.id),
-      data: { kind: n.kind as ItemData["kind"], text: n.text, color: (n.style.color as StickyColor) ?? "yellow", editing: ui.editing === n.id, bar: single(n.id), linkFrom: ui.linkFrom === n.id, dim: !!ui.focus && !ui.focus.has(n.id) },
+      zIndex: 1, selected: ui.selected.has(n.id), draggable: !n.style.locked,
+      data: {
+        kind: n.kind as ItemData["kind"], text: n.text, color: (n.style.color as StickyColor) ?? "yellow", editing: ui.editing === n.id, bar: single(n.id), linkFrom: ui.linkFrom === n.id, dim: !!ui.focus && !ui.focus.has(n.id),
+        ports: ui.selected.has(n.id) || !!ui.connecting, shape: n.style.shape ?? "rect", fillc: n.style.color ?? "", border: n.style.border ?? "ink", bw: n.style.bw ?? 1, dash: n.style.dash ?? "solid", align: n.style.align ?? "", size: n.style.size ?? "M", bold: !!n.style.bold, locked: !!n.style.locked,
+      },
     } as MapNode);
   }
 
@@ -150,12 +162,12 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
     const kids = idx.get(id) ?? [];
     push({
       id, type: "mind", parentId: fr?.id, position: { x: l?.x ?? p.x - (fr?.x ?? 0), y: l?.y ?? p.y - (fr?.y ?? 0) },
-      measured: meas(id), zIndex: 2, selected: ui.selected.has(id), draggable: true,
+      measured: meas(id), zIndex: 2, selected: ui.selected.has(id), draggable: !n.style.locked,
       data: {
         kind: "mind", text: n.text, depth, dir: dirOf(nodes, id), color: colorVar(colorKeyOf(nodes, id)), hasChildren: kids.some((c) => !c.hidden),
         collapsed: n.collapsed, hiddenCount: n.collapsed ? descendantCount(idx, id) : 0, editing: ui.editing === id, bar: single(id), drop: ui.dropTarget === id, refKey: n.ref_key, parent: n.parent_id ?? "",
         fill: n.style.fill ?? (depth === 1 ? "tint" : "outline"), shape: n.style.shape ?? "rect", size: n.style.size ?? "M", bold: !!n.style.bold, icon: n.style.icon ?? "", url: n.style.url ?? "",
-        hasNotes: !!n.notes.trim(), locked: !!n.style.locked, orient: p.orient, dim: !!ui.focus && !ui.focus.has(id), own: !!n.style.color,
+        hasNotes: !!n.notes.trim(), locked: !!n.style.locked, orient: p.orient, dim: !!ui.focus && !ui.focus.has(id), own: !!n.style.color, ports: ui.selected.has(id) || !!ui.connecting,
         tag: ui.info.get(id)?.tag ?? "", tagNow: !!ui.info.get(id)?.tagNow, sub: ui.info.get(id)?.sub ?? "", gone: !!ui.info.get(id)?.gone, done: !!ui.info.get(id)?.done, flash: ui.flash === id,
       },
     });
@@ -174,7 +186,7 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
     if (!vis(e.from_id) || !vis(e.to_id)) continue;
     edges.push({
       id: e.id, source: e.from_id, target: e.to_id, type: "connector", sourceHandle: "cs", targetHandle: "ct", selected: ui.selected.has(e.id),
-      markerEnd: { type: MarkerType.ArrowClosed, color: "var(--muted-foreground)", width: 14, height: 14 }, data: { label: e.label },
+      data: { label: e.label, style: e.style },
     });
   }
 

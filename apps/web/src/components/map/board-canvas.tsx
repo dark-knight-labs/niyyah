@@ -3,7 +3,7 @@
 import "@xyflow/react/dist/base.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Background, BackgroundVariant, MiniMap, ReactFlow, SelectionMode, useNodesInitialized, useReactFlow,
+  Background, BackgroundVariant, ConnectionMode, MiniMap, ReactFlow, SelectionMode, ViewportPortal, useNodesInitialized, useReactFlow,
   type EdgeChange, type NodeChange, type OnConnect, type OnNodeDrag,
 } from "@xyflow/react";
 import { useRouter } from "next/navigation";
@@ -25,6 +25,9 @@ import { mapsOf, organizeOps } from "@/lib/map/organize";
 import type { Layout } from "@/lib/map/layout";
 import { STICKY_COLORS, isKnownKind } from "@/lib/map/types";
 import { ContextMenu, PromptDialog } from "./context-menu";
+import { HelpSheet, SearchBar } from "./overlays";
+import { copySelection, getClip, looksLikeOutline, outlineOf, outlineOps, parseOutline, pasteClip, setClip } from "@/lib/map/clipboard";
+import { snapMove } from "@/lib/map/arrange";
 import { BoardBar } from "./board-bar";
 import { MultiBar } from "./context-bar";
 import { derive, type Live, type MapNode } from "./derive";
@@ -124,6 +127,13 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[]; pos: { x: number; y: number } | null; label: string; groups: MenuItem[][] } | null>(null);
   const [prompt, setPrompt] = useState<{ title: string; initial: string; resolve: (v: string | null) => void } | null>(null);
   const [focus, setFocus] = useState<ReadonlySet<string> | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [search, setSearch] = useState<{ q: string; at: number } | null>(null);
+  const [help, setHelp] = useState(false);
+  const [guides, setGuides] = useState<{ vx: number[]; hy: number[] } | null>(null);
+  const [snapOn, setSnapOn] = useState(() => typeof window === "undefined" || window.localStorage.getItem("niyyah-map-snap") !== "0");
+  const pointer = useRef<{ x: number; y: number } | null>(null);
+  const inCanvas = useRef(false);
   const pendingAnim = useRef<Map<string, { x: number; y: number }> | null>(null);
   const [sizes, setSizes] = useState<ReadonlyMap<string, Size>>(new Map());
   // The minimap redraws every node on each pan frame: at ~1,000 nodes it costs ~10 fps, so big boards start without it (the button turns it on).
@@ -137,8 +147,8 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   const seeded = useRef(false);
 
   const derived = useMemo(
-    () => derive(data, idx, { selected, editing, dropTarget, linkFrom, flash, info: view.info, live, sizes, focus }, prevNodes),
-    [data, idx, selected, editing, dropTarget, linkFrom, flash, view.info, live, sizes, focus, prevNodes],
+    () => derive(data, idx, { selected, editing, dropTarget, linkFrom, flash, info: view.info, live, sizes, focus, connecting }, prevNodes),
+    [data, idx, selected, editing, dropTarget, linkFrom, flash, view.info, live, sizes, focus, connecting, prevNodes],
   );
   const initialized = useNodesInitialized();
 
@@ -158,10 +168,10 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     amend: (tag: string, ops: Op[]) => raw.amend(tag, isLife ? toStored(ops, view, raw.data) : ops),
     discard: (tag: string, ops: Op[]) => raw.discard(tag, isLife ? toStored(ops, view, raw.data) : ops),
   });
-  const L = useRef({ b: raw, data, idx, selected, tool, linkFrom, derived, info: view.info, plan, sizes });
+  const L = useRef({ b: raw, data, idx, selected, tool, linkFrom, derived, info: view.info, plan, sizes, snapOn });
   const envRef = useRef<Env | null>(null);
   const focusRef = useRef<ReadonlySet<string> | null>(null);
-  useEffect(() => { L.current = { b: wrapB(), data, idx, selected, tool, linkFrom, derived, info: view.info, plan, sizes }; });
+  useEffect(() => { L.current = { b: wrapB(), data, idx, selected, tool, linkFrom, derived, info: view.info, plan, sizes, snapOn }; });
 
   const select = useCallback((ids: Iterable<string>) => { cardTag.current = null; setSelected(new Set(ids)); }, []);
 
@@ -234,7 +244,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
 
   const startEdit = useCallback((id: string) => {
     const n = L.current.data.nodes.get(id);
-    if (!n || n.kind === "image" || n.kind === "file") return;
+    if (!n || n.kind === "image" || n.kind === "file" || n.style.locked) return;
     if (n.kind === "ref") {
       // a live node edits the real Plan row; the Unplaced branch and rows whose Plan object is gone cannot be edited
       const i = L.current.info.get(id);
@@ -263,7 +273,9 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
 
   const deleteSelection = useCallback(() => {
     const { selected: sel, data: d } = L.current;
-    const nodeIds = [...sel].filter((id) => d.nodes.has(id));
+    const lockedIds = [...sel].filter((id) => d.nodes.get(id)?.style.locked);
+    if (lockedIds.length) notify("Locked: unlock to delete");
+    const nodeIds = [...sel].filter((id) => d.nodes.has(id) && !d.nodes.get(id)?.style.locked);
     const edgeIds = [...sel].filter((id) => d.edges.has(id));
     // a live node is hidden from this board (the Plan item stays); the root cannot be; a thought or item is removed
     const live = nodeIds.filter((id) => d.nodes.get(id)?.kind === "ref");
@@ -361,11 +373,11 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     else if (how === "tab") createMind("child", id);
   }, [createMind, select, liveRename]);
 
-  const connectTo = useCallback((from: string, to: string) => {
+  const connectTo = useCallback((from: string, to: string, sp?: string, tp?: string) => {
     const { data: d, b: bd } = L.current;
     if (from === to || !d.nodes.has(from) || !d.nodes.has(to)) return;
     for (const e of d.edges.values()) if ((e.from_id === from && e.to_id === to) || (e.from_id === to && e.to_id === from)) return;
-    const { op, id } = A.edgeBetween(from, to);
+    const { op, id } = A.edgeBetween(from, to, sp, tp);
     bd.commit([op]);
     select([id]);
   }, [select]);
@@ -391,6 +403,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     let nextSizes: Map<string, Size> | null = null;
     let nextLive: Map<string, Live> | null = null;
     let nextSel: Set<string> | null = null;
+    let nextGuides: { vx: number[]; hy: number[] } | null | undefined;
     for (const c of changes) {
       if (c.type === "dimensions" && c.dimensions) {
         if (c.resizing || c.setAttributes) {
@@ -403,16 +416,31 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
         }
       } else if (c.type === "position" && c.position) {
         nextLive ??= new Map(live);
-        nextLive.set(c.id, { ...nextLive.get(c.id), x: c.position.x, y: c.position.y });
+        let pos = c.position;
+        const moving = changes.filter((x) => x.type === "position").length === 1;
+        const row = L.current.data.nodes.get(c.id);
+        if (c.dragging && moving && L.current.snapOn && row && !row.frame_id && row.kind !== "frame" && !(row.parent_id && row.kind === "mind")) {
+          const sz = row.kind === "mind" ? L.current.sizes.get(c.id) : { w: row.w, h: row.h };
+          if (sz) {
+            const zoom = rf.getZoom();
+            const others = [...L.current.derived.rects].filter(([id]) => id !== c.id && L.current.data.nodes.get(id)?.kind !== "frame").map(([, r]) => r);
+            const snap = snapMove({ x: pos.x, y: pos.y, w: sz.w, h: sz.h }, others, 6 / zoom);
+            pos = { x: pos.x + snap.dx, y: pos.y + snap.dy };
+            nextGuides = { vx: snap.vx, hy: snap.hy };
+          }
+        }
+        nextLive.set(c.id, { ...nextLive.get(c.id), x: pos.x, y: pos.y });
       } else if (c.type === "select") {
         nextSel ??= new Set(selected);
         if (c.selected) nextSel.add(c.id); else nextSel.delete(c.id);
       }
     }
+    const ng = nextGuides as { vx: number[]; hy: number[] } | null | undefined;
+    if (ng !== undefined) setGuides(ng && (ng.vx.length || ng.hy.length) ? ng : null);
     if (nextSizes) setSizes(nextSizes);
     if (nextLive) setLive(nextLive);
     if (nextSel) { cardTag.current = null; setSelected(nextSel); }
-  }, [live, sizes, selected]);
+  }, [live, sizes, selected, rf]);
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     let next: Set<string> | null = null;
@@ -420,7 +448,8 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     if (next) setSelected(next);
   }, [selected]);
 
-  const onConnect: OnConnect = useCallback((c) => connectTo(c.source, c.target), [connectTo]);
+  const side = (h: string | null | undefined) => (h && /^p-[trbl]$/.test(h) ? h[2] : undefined);
+  const onConnect: OnConnect = useCallback((c) => connectTo(c.source, c.target, side(c.sourceHandle), side(c.targetHandle)), [connectTo]);
 
   const onPaneClick = useCallback((e: React.MouseEvent) => {
     setEditing(null);
@@ -465,6 +494,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   const onNodeDragStop: OnNodeDrag<MapNode> = useCallback((e, node, dragged) => {
     const { data: d, idx: ix, b: bd } = L.current;
     setDropTarget(null);
+    setGuides(null);
     const ops: Op[] = [];
     const movedFrames = new Set(dragged.filter((x) => d.nodes.get(x.id)?.kind === "frame").map((x) => x.id));
     for (const dn of dragged) {
@@ -626,6 +656,21 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
         runCommand(env, makeSel({ ids: [one], data: d, idx: ix, rects: L.current.derived.rects }), key === "ArrowUp" ? "moveUp" : "moveDown");
         return;
       }
+      if (mod && env && sel.size > 0 && !e.shiftKey && ["c", "x", "d", "l"].includes(key.toLowerCase())) {
+        stop();
+        const cmd = { c: "copy", x: "cut", d: "duplicate", l: "lock" }[key.toLowerCase() as "c"];
+        runCommand(env, makeSel({ ids: [...sel], data: d, idx: ix, rects: L.current.derived.rects }), cmd);
+        return;
+      }
+      if (mod && key.toLowerCase() === "a" && env) { stop(); env.selectAll(); return; }
+      if (mod && key.toLowerCase() === "f" && env && inCanvas.current) { stop(); env.search(); return; }
+      if (mod && env && sel.size > 0 && (key === "]" || key === "[" || key === "}" || key === "{")) {
+        stop();
+        const mode = key === "]" ? "forward" : key === "[" ? "backward" : key === "}" ? "front" : "back";
+        runCommand(env, makeSel({ ids: [...sel], data: d, idx: ix, rects: L.current.derived.rects }), "order", mode);
+        return;
+      }
+      if (!mod && !e.altKey && key === "?" && env) { stop(); env.help(); return; }
       if (mod && key.toLowerCase() === "b" && env && sel.size > 0) { stop(); runCommand(env, makeSel({ ids: [...sel], data: d, idx: ix }), "bold"); return; }
       if (mod && key.toLowerCase() === "z") { stop(); if (e.shiftKey) bd.redo(); else bd.undo(); return; }
       if (mod && key.toLowerCase() === "y") { stop(); bd.redo(); return; }
@@ -664,6 +709,29 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [rf, chooseTool, createMind, deleteSelection, select, startEdit, toggleFold]);
+
+  // Find: matches by text (and notes) among the drawn objects, in reading order; stepping selects, centres and flashes one.
+  const searchQ = search?.q;
+  const matches = useMemo(() => {
+    const q = searchQ?.trim().toLowerCase();
+    if (!q) return [] as string[];
+    const out: { id: string; y: number; x: number }[] = [];
+    for (const n of data.nodes.values()) {
+      const r = derived.rects.get(n.id);
+      if (!r || !isKnownKind(n.kind)) continue;
+      if (n.text.toLowerCase().includes(q) || n.notes.toLowerCase().includes(q)) out.push({ id: n.id, x: r.x, y: r.y });
+    }
+    return out.sort((a, b) => a.y - b.y || a.x - b.x).map((m) => m.id);
+  }, [searchQ, data.nodes, derived.rects]);
+  const jump = useCallback((i: number, list: string[]) => {
+    const id = list[i];
+    const r = id ? L.current.derived.rects.get(id) : undefined;
+    if (!id || !r) return;
+    select([id]);
+    setFlash(id);
+    centerIn(r, Math.max(1, rf.getZoom()), true);
+    setTimeout(() => setFlash((f) => (f === id ? null : f)), 1600);
+  }, [select, centerIn, rf]);
 
   const frames = useMemo(() => [...data.nodes.values()].filter((n) => n.kind === "frame"), [data.nodes]);
   const hidden = useMemo(() => [...data.nodes.values()].filter((n) => n.hidden && (n.kind === "mind" || n.kind === "ref")), [data.nodes]);
@@ -707,6 +775,83 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     bd.commit(ops);
   }, [notify]);
 
+  // ---- clipboard: copy / cut / paste / duplicate (internal clipboard + a Markdown outline on the system one) ----
+  const placeFresh = useCallback(() => (pointer.current ? rf.screenToFlowPosition(pointer.current) : rf.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })), [rf]);
+  const copyCmd = useCallback((cut: boolean) => {
+    const { selected: sel, data: d } = L.current;
+    const ids = [...sel].filter((id) => d.nodes.has(id));
+    const clip = copySelection(d, ids);
+    if (!clip) { notify("Nothing to copy"); return; }
+    setClip(clip);
+    if (clip.text) void navigator.clipboard?.writeText(clip.text).catch(() => undefined);
+    if (cut) { const { ops } = removeOps(ids.filter((id) => d.nodes.get(id)?.kind !== "ref" && !d.nodes.get(id)?.style.locked), []); if (ops.length) { L.current.b.commit(ops); select([]); } notify("Cut", true); } else notify("Copied");
+  }, [notify, removeOps, select]);
+  const doPasteText = useCallback((text: string, parentId: string | null, pos: { x: number; y: number } | null) => {
+    const { data: d, b: bd } = L.current;
+    const parent = parentId ? d.nodes.get(parentId) ?? null : null;
+    const at = pos ?? placeFresh();
+    if (looksLikeOutline(text)) {
+      const made = outlineOps(parseOutline(text), parent && parent.kind === "mind" ? parent : null, at, d);
+      if (bd.commit(made.ops)) { select(made.ids); notify(parent ? "Pasted the outline under it" : "Pasted the outline as a map"); }
+      return;
+    }
+    const line = text.trim().slice(0, 4000);
+    if (!line) return;
+    if (parent && parent.kind === "mind") {
+      const made = A.addChild(d.nodes, L.current.idx, parent.id);
+      const op = made.ops.at(-1)!;
+      if (op.op === "upsert_node") op.node = { ...op.node, text: line };
+      if (bd.commit(made.ops)) select([made.id]);
+    } else {
+      const made = A.addItem("sticky", at.x, at.y, d.nodes, A.frameAt(d.nodes, at.x, at.y)?.id ?? null);
+      const op = made.ops[0];
+      if (op.op === "upsert_node") op.node = { ...op.node, text: line };
+      if (bd.commit(made.ops)) select([made.id]);
+    }
+  }, [placeFresh, select, notify]);
+  const pasteCmd = useCallback((parentId: string | null, pos: { x: number; y: number } | null) => {
+    const { data: d, b: bd } = L.current;
+    const clip = getClip();
+    if (clip && clip.nodes.length) {
+      const parent = parentId ? d.nodes.get(parentId) ?? null : null;
+      const made = pasteClip(clip, { parent: parent && parent.kind === "mind" ? parent : null, pos: parent ? null : pos, data: d });
+      if (bd.commit(made.ops)) { select(made.ids); notify("Pasted"); }
+      return;
+    }
+    void navigator.clipboard?.readText().then((t) => { if (t.trim()) doPasteText(t, parentId, pos); else notify("Nothing to paste"); }).catch(() => notify("Nothing to paste"));
+  }, [select, notify, doPasteText]);
+  const duplicateCmd = useCallback(() => {
+    const { selected: sel, data: d, b: bd } = L.current;
+    const ids = [...sel].filter((id) => d.nodes.has(id));
+    const clip = copySelection(d, ids);
+    if (!clip || !clip.nodes.length) return;
+    const one = ids.length === 1 ? d.nodes.get(ids[0]) : undefined;
+    const parent = one && one.kind === "mind" && one.parent_id ? d.nodes.get(one.parent_id) ?? null : null;
+    const made = pasteClip(clip, { parent, pos: null, data: d });
+    if (bd.commit(made.ops)) select(made.ids);
+  }, [select]);
+
+  // Paste: the system clipboard is read from the paste event (text and, later, images); our own copy wins when its outline is what is on it.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (typingTarget(e.target) || (e.target as HTMLElement | null)?.closest?.("[role=menu]")) return;
+      const { selected: sel, data: d } = L.current;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      const one = sel.size === 1 ? d.nodes.get([...sel][0]) : undefined;
+      const parent = one && one.kind === "mind" ? one.id : null;
+      const clip = getClip();
+      e.preventDefault();
+      if (clip && clip.nodes.length && (!text || text === clip.text)) pasteCmd(parent, null);
+      else if (text.trim()) doPasteText(text, parent, null);
+    };
+    const onMove = (e: PointerEvent) => { pointer.current = { x: e.clientX, y: e.clientY }; };
+    const onDown = (e: PointerEvent) => { inCanvas.current = !!(e.target as HTMLElement | null)?.closest?.(".niyyah-map"); };
+    window.addEventListener("paste", onPaste);
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onDown, true);
+    return () => { window.removeEventListener("paste", onPaste); window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerdown", onDown, true); };
+  }, [pasteCmd, doPasteText]);
+
   const env = useMemo<Env>(() => ({
     commit: (ops, tag) => L.current.b.commit(ops, tag),
     select, edit: startEdit,
@@ -727,7 +872,11 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     zoomToFrame: (id) => zoomFrame(id),
     toggleMinimap: () => setMinimap((m) => !(m ?? data.nodes.size <= 400)),
     sizes: () => L.current.sizes as Map<string, Size>,
-  }), [select, startEdit, createMind, toggleFold, deleteSelection, makeContext, makeItem, notify, organize, router, rf, addItemAt, zoomFrame, data.nodes.size]);
+    copy: (cut) => copyCmd(cut), paste: (parentId, pos) => pasteCmd(parentId, pos), duplicate: () => duplicateCmd(),
+    copyOutline: () => { const { selected: sel, data: d } = L.current; const t = outlineOf(d, [...sel]); if (t) { void navigator.clipboard?.writeText(t).catch(() => undefined); notify("Copied as an outline"); } },
+    search: () => setSearch((s) => s ?? { q: "", at: 0 }), help: () => setHelp(true),
+    toggleSnap: () => setSnapOn((v) => { const n = !v; try { window.localStorage.setItem("niyyah-map-snap", n ? "1" : "0"); } catch { /* private mode */ } return n; }),
+  }), [copyCmd, pasteCmd, duplicateCmd, select, startEdit, createMind, toggleFold, deleteSelection, makeContext, makeItem, notify, organize, router, rf, addItemAt, zoomFrame, data.nodes.size]);
   useEffect(() => { envRef.current = env; });
   useEffect(() => { focusRef.current = focus; }, [focus]);
 
@@ -763,6 +912,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
   }, [select, openMenuAt]);
   const onPaneContextMenu = useCallback((e: MouseEvent | React.MouseEvent) => {
     e.preventDefault();
+    if ((e.target as HTMLElement | null)?.closest?.(".react-flow__node, .react-flow__edge, .nm-cm")) return;   // React Flow reports a right-button release as a pane menu: a node's, a connector's or an open menu's own stays
     select([]);
     openMenuAt(e.clientX, e.clientY, [], rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }), "Board actions");
   }, [select, openMenuAt, rf]);
@@ -821,10 +971,19 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
           panOnDrag={boxSelect ? [1, 2] : true} panOnScroll zoomOnScroll={false} zoomOnDoubleClick={false} zoomActivationKeyCode={["Control", "Meta"]} panActivationKeyCode="Space"
           selectionOnDrag={boxSelect} selectionMode={SelectionMode.Partial} onPaneContextMenu={onPaneContextMenu} onNodeContextMenu={onNodeContextMenu} onSelectionContextMenu={onSelectionContextMenu} onEdgeContextMenu={onEdgeContextMenu}
           selectionKeyCode="Shift" multiSelectionKeyCode={["Shift", "Control", "Meta"]} deleteKeyCode={null} disableKeyboardA11y
+          connectionMode={ConnectionMode.Loose} onConnectStart={() => setConnecting(true)} onConnectEnd={() => setConnecting(false)}
           nodesDraggable={!panTool} elementsSelectable={!panTool} nodesConnectable={tool === "select"} nodeDragThreshold={4}
           connectionRadius={24}
           attributionPosition="bottom-left"
         >
+          {guides && (
+            <ViewportPortal>
+              <svg className="nm-guides" style={{ left: -100000, top: -100000, width: 200000, height: 200000 }} aria-hidden="true" data-testid="guides">
+                {guides.vx.map((x) => <line key={`v${x}`} x1={x + 100000} x2={x + 100000} y1={0} y2={200000} />)}
+                {guides.hy.map((y) => <line key={`h${y}`} y1={y + 100000} y2={y + 100000} x1={0} x2={200000} />)}
+              </svg>
+            </ViewportPortal>
+          )}
           <Background variant={BackgroundVariant.Dots} gap={24} size={1.3} color="var(--rule)" />
           {minimap && (
             <MiniMap pannable zoomable ariaLabel="Minimap: drag to move the view" maskStrokeWidth={2}
@@ -853,6 +1012,11 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
             onLane={(id, lane) => void liveLane(id, lane)} onMake={(id, stream, lane, product) => void makeItem(id, stream, lane, product)} onOpenPlan={() => router.push("/plan")} />
         )}
         {menu && <ContextMenu key={`${menu.x}:${menu.y}:${menu.ids.join(",")}`} x={menu.x} y={menu.y} label={menu.label} groups={menu.groups} onClose={() => setMenu(null)} onRun={(id, choice) => { runCommand(env, selFor(menu.ids, menu.pos), id, choice); }} />}
+        {search && <SearchBar q={search.q} count={matches.length} at={Math.min(search.at, Math.max(0, matches.length - 1))}
+          onQuery={(q) => setSearch({ q, at: 0 })}
+          onStep={(dlt) => { if (!matches.length) return; const at = (search.at + dlt + matches.length) % matches.length; setSearch({ q: search.q, at }); jump(at, matches); }}
+          onClose={() => setSearch(null)} />}
+        {help && <HelpSheet onClose={() => setHelp(false)} />}
         {prompt && <PromptDialog title={prompt.title} initial={prompt.initial} onDone={(v) => { prompt.resolve(v); setPrompt(null); }} />}
         {(b.status === "retrying" || b.status === "offline") && (
           <div className="nm-banner" role="alert">

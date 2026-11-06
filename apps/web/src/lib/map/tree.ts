@@ -115,3 +115,10 @@ export function nextBranch(idx: Map<string | null, BoardNode[]>, rootId: string)
   const right = ch.filter((c) => (c.style.side ?? "R") === "R").length;
   return { side: right <= ch.length - right ? "R" : "L", color: BRANCH_COLORS[ch.length % BRANCH_COLORS.length] };
 }
+
+/** Side and colour for the Nth first-level branch of a root (when several are created in one go the index counts them). */
+export function nextBranchOf(idx: Map<string | null, BoardNode[]>, rootId: string, index: number): { side: Side; color: string } {
+  const have = (idx.get(rootId) ?? []).length;
+  const n = Math.max(index, have);
+  return { side: n % 2 === 0 ? "R" : "L", color: BRANCH_COLORS[n % BRANCH_COLORS.length] };
+}

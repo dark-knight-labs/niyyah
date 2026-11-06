@@ -13,17 +13,19 @@
 - [x] Add parent, Move up/down (Alt+arrows), Detach as new map, Convert to sticky, Focus branch, Link…
 
 ## W2
-- [ ] all 12 shapes render; sticky offers 8 colours
-- [ ] connector style (path, width, dash, heads, colour) persists after reload; edge menu ids
-- [ ] copy / cut / paste / duplicate; outline paste -> subtree; Copy as outline
-- [ ] Ctrl+F search jumps to a node
-- [ ] lock: a locked item cannot be dragged or edited
-- [ ] z-order: bring to front / send to back
-- [ ] align and distribute from the selection menu; alignment guides while dragging
-- [ ] "?" shortcut sheet lists every command with a shortcut
+- [x] all 12 shapes render; sticky offers 8 colours
+- [x] connector style (path, width, dash, heads, colour) persists after reload; edge menu ids
+- [x] copy / cut / paste / duplicate; outline paste -> subtree; Copy as outline
+- [x] Ctrl+F search jumps to a node
+- [x] lock: a locked item cannot be dragged or edited
+- [x] z-order: bring to front / send to back
+- [x] align and distribute from the selection menu; alignment guides while dragging
+- [x] "?" shortcut sheet lists every command with a shortcut
 
 ## F
 - [ ] image paste / drop / picker: node visible after reload
 - [ ] file card downloads the file
 - [ ] Files panel lists files, marks unused, deletes
 - [ ] image and file menu ids; quota refusal shows how much is used
+
+(W2 extras covered in `map-v2b.spec.ts`: side ports remember their sides; make a mind map from stickies; frame selection; Alt+arrows and Ctrl+B live in `map-v2.spec.ts`.)

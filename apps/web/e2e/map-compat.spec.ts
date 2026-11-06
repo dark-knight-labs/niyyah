@@ -96,7 +96,7 @@ test("a kind this build does not know is inert and never appears in an ops reque
   const sb = (await sticky.boundingBox())!;
   await page.mouse.move(sb.x + 30, sb.y + 30); await page.mouse.down(); await page.mouse.move(sb.x + 40, sb.y + 40, { steps: 3 }); await page.mouse.move(sb.x + 80, sb.y + 60, { steps: 6 }); await page.mouse.up();
   await settled(page);
-  await page.getByTestId("frame-fr").click({ position: { x: 20, y: 300 } });
+  await page.getByTestId("frame-fr").click({ position: { x: 380, y: 380 } });
   await page.keyboard.press("Delete");
   await settled(page);
   expect(bodies.length).toBeGreaterThan(0);

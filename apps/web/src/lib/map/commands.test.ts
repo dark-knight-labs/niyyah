@@ -91,3 +91,35 @@ describe("running", () => {
     expect(barOf(sel(["live"])).map((b) => b.id)).toEqual(["child", "connect", "hide"]);
   });
 });
+
+describe("window 2: objects, locks, connectors", () => {
+  const more = [row("shp", { kind: "shape" }), row("lk", { kind: "sticky", style: { locked: true } }), row("e0", { kind: "sticky" })];
+  const d2 = dataFrom([...nodes, ...more], [edge, { id: "e2", from_id: "st", to_id: "sh", label: "x", style: { path: "elbow" } }]);
+  const s2 = (ids: string[]) => makeSel({ ids, data: d2, idx: childIndex(d2.nodes), rects: new Map(), canMake: true });
+  const mid = (ids: string[]) => resolveMenu(s2(ids)).flat().map((i) => i.id);
+  it("shape menu: 12 shapes, fill, border; edge menu: path, width, dash, heads, colour, label, swap", () => {
+    const shape = resolveMenu(s2(["shp"])).flat();
+    expect(shape.find((i) => i.id === "shapeKind")!.choices).toHaveLength(12);
+    expect(shape.map((i) => i.id)).toEqual(expect.arrayContaining(["color", "border", "bw", "dash", "talign", "convert", "order", "lock"]));
+    expect(mid(["e2"])).toEqual(["epath", "ewidth", "edash", "estart", "eend", "ecolor", "elabel", "eswap", "delete"]);
+    expect(resolveMenu(s2(["e2"])).flat().find((i) => i.id === "epath")!.choices!.find((c) => c.checked)!.id).toBe("elbow");
+  });
+  it("a locked object offers only what does not change it", () => {
+    const m = mid(["lk"]);
+    expect(m).toEqual(expect.arrayContaining(["lock", "copy", "duplicate", "order", "connect"]));
+    for (const bad of ["edit", "delete", "cut", "color", "convert", "size"]) expect(m, bad).not.toContain(bad);
+    expect(resolveMenu(s2(["lk"])).flat().find((i) => i.id === "lock")!.label).toBe("Unlock");
+  });
+  it("multi-selection: stickies get align/tidy/make-mind-map; a mixed one does not get the sticky-only command", () => {
+    expect(mid(["st", "e0"])).toEqual(expect.arrayContaining(["align", "tidy", "frameSel", "mindFromStickies", "color"]));
+    expect(mid(["st", "sh"])).not.toContain("mindFromStickies");
+  });
+  it("live nodes can be copied as text and locked but never cut or duplicated", () => {
+    const m = mid(["live"]);
+    expect(m).toEqual(expect.arrayContaining(["copy", "copyOutline", "lock"])); expect(m).not.toContain("cut"); expect(m).not.toContain("duplicate");
+  });
+  it("every command with a shortcut has a unique label+kbd pair (the sheet's rows)", () => {
+    const rows = COMMANDS.filter((c) => c.kbd).map((c) => `${c.kbd}|${typeof c.label === "string" ? c.label : c.id}`);
+    expect(new Set(rows).size).toBe(rows.length);
+  });
+});
