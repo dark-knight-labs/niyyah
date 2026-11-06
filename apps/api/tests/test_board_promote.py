@@ -99,3 +99,48 @@ async def test_other_users_board_is_404(db_client):
     finally:
         await other.aclose()
     assert await task_rows("Buy a label printer") == []
+
+
+async def test_promote_with_a_product_makes_it_the_first_tag(db_client):
+    c, _ = db_client
+    b = await board_with_thought(c, text="Fix the DNS")
+    res = await promote(c, b, product="infra")
+    assert res.status_code == 200, res.text
+    assert (await task_rows("Fix the DNS"))[0].products == ["infra"]
+
+
+async def test_promote_product_goes_before_text_tags(db_client):
+    c, _ = db_client
+    b = await board_with_thought(c, text="fix #router")
+    assert (await promote(c, b, product="infra")).status_code == 200
+    assert (await task_rows("fix"))[0].products == ["infra", "router"]
+
+
+async def test_promote_product_dedupes_case_insensitively_keeping_the_first_spelling(db_client):
+    c, _ = db_client
+    b = await board_with_thought(c, text="#Infra x")
+    assert (await promote(c, b, product="infra")).status_code == 200
+    assert (await task_rows("x"))[0].products == ["infra"]
+
+
+async def test_promote_product_strips_a_leading_hash(db_client):
+    c, _ = db_client
+    b = await board_with_thought(c, text="Fix the DNS")
+    assert (await promote(c, b, product="#infra")).status_code == 200
+    assert (await task_rows("Fix the DNS"))[0].products == ["infra"]
+
+
+async def test_promote_without_a_product_keeps_the_text_tags(db_client):
+    c, _ = db_client
+    b = await board_with_thought(c, text="fix #router")
+    assert (await promote(c, b)).status_code == 200
+    assert (await task_rows("fix"))[0].products == ["router"]
+
+
+async def test_promote_product_must_look_like_a_tag(db_client):
+    c, _ = db_client
+    b = await board_with_thought(c)
+    for bad in ("", "  ", "has space", "1abc", "-x", "a" * 41, "caf\u00e9", "a,b", "x]"):
+        assert (await promote(c, b, product=bad)).status_code == 422, bad
+    assert await task_rows("Buy a label printer") == []
+    assert (await promote(c, b, product="a" * 40)).status_code == 200

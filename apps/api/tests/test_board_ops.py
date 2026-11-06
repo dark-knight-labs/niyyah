@@ -2,6 +2,8 @@ import pytest
 
 from app.services import boards as boards_service
 
+from tests.conftest import TestSession
+
 URL = "/api/v1/boards"
 
 
@@ -128,6 +130,28 @@ async def test_validation_error_is_422_with_bad_ops_and_changes_nothing(auth_cli
     assert ids(await view(auth_client, b)) == []
     res = await ops(auth_client, b, {"op": "frobnicate", "id": "z"})
     assert res.status_code == 422 and res.json()["bad_ops"] == ["z"]
+
+
+async def test_prod_and_lane_ref_keys_are_accepted_and_junk_prefixes_are_not(auth_client):
+    b = await new_board(auth_client)
+    good = ["prod:kahf:infra", "lane:kahf:infra:now", "lane:kahf:_:backlog", "prod:kahf:x0123456789abcdef"]
+    res = await ops(auth_client, b, *[up(f"r{i}", kind="ref", ref_key=k) for i, k in enumerate(good)])
+    assert res.status_code == 200, res.text
+    assert sorted(n["ref_key"] for n in (await view(auth_client, b))["nodes"]) == sorted(good)
+    for bad in ("product:kahf:x", "lanes:kahf:x", "prod:", "lane:" + "a" * 73):
+        res = await ops(auth_client, b, up("bad", kind="ref", ref_key=bad))
+        assert res.status_code == 422 and res.json()["bad_ops"] == ["bad"], bad
+
+
+async def test_reading_a_board_never_revalidates_ref_keys(auth_client):
+    """A future prefix, or a rolled-back API, must not turn a stored row into a 500 on read."""
+    from app.models.board import BoardNode
+    b = await new_board(auth_client)
+    async with TestSession() as db:
+        db.add(BoardNode(board_id=b, id="future", kind="ref", ref_key="zone:kahf:x", text="", position=0, style={}, collapsed=False, hidden=False))
+        await db.commit()
+    res = await auth_client.get(f"{URL}/{b}")
+    assert res.status_code == 200 and [n["ref_key"] for n in res.json()["nodes"]] == ["zone:kahf:x"]
 
 
 async def test_ref_key_is_unique_per_board(auth_client):
