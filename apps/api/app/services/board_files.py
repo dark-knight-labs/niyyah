@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
 from app.models.board import Board, BoardFile, BoardNode
+from app.models.user import User
 
 MAX_FILE_BYTES = 10 * 1024 * 1024        # one file
 QUOTA_BYTES = 200 * 1024 * 1024          # all of a user's files
@@ -53,6 +54,8 @@ async def used_bytes(db: AsyncSession, user_id: int) -> int:
 async def store(db: AsyncSession, user_id: int, board_id: int | None, name: str, content: bytes) -> BoardFile:
     if len(content) > MAX_FILE_BYTES:
         raise FileTooLarge()
+    # Serialise this user's uploads (a row lock on PostgreSQL; a no-op on SQLite, which has one writer): two at once cannot both pass the quota check.
+    await db.execute(select(User.id).where(User.id == user_id).with_for_update())
     used = await used_bytes(db, user_id)
     if used + len(content) > QUOTA_BYTES:
         raise QuotaExceeded(used, QUOTA_BYTES)
