@@ -3,7 +3,7 @@ import { ResolvedDay, formatMinutes } from "@/lib/routine";
 import { currentBlock, duration, formatDuration, nextBlock } from "@/lib/ring";
 
 /** Sits under the ring, one row: how far through the current block you are and what comes next (the ring's centre has the time left). Public. */
-export function NowCard({ day, nowMin }: { day: ResolvedDay; nowMin: number }) {
+export function NowCard({ day, nowMin, preview }: { day: ResolvedDay; nowMin: number; /** Another date than today: its name instead of now and next (there is no now on it). */ preview?: string }) {
   const blocks = useBlocks();
   const current = currentBlock(day, nowMin);
   const next = nextBlock(day, nowMin);
@@ -12,6 +12,18 @@ export function NowCard({ day, nowMin }: { day: ResolvedDay; nowMin: number }) {
   const total = current ? duration(current) : 1;
   const pct = Math.round((elapsed / total) * 100);
   const mono = "font-mono text-sm font-medium tabular-nums";
+
+  if (preview) {
+    return (
+      <section className="mx-auto mt-3 grid w-full max-w-[35rem] grid-cols-[minmax(0,1fr)] gap-1.5" aria-label="Now" data-now-preview="">
+        <div className="h-1 bg-[var(--muted)]" aria-hidden="true" />
+        <p className="flex items-baseline justify-between gap-3 text-sm">
+          <span className="text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Preview</span>
+          <span className="min-w-0 truncate"><b className="font-semibold">{preview}</b> <span className="text-[var(--muted-foreground)]">· {day.dayType}</span></span>
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="mx-auto mt-3 grid w-full max-w-[35rem] grid-cols-[minmax(0,1fr)] gap-1.5" aria-label="Now">

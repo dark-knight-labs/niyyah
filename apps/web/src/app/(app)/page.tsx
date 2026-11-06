@@ -11,8 +11,7 @@ import { dateInTz, hasLocation, nowMinutes, resolveDay, VaultScheduleData } from
 import { useNow } from "@/hooks/use-now";
 import { currentBlock } from "@/lib/ring";
 import { TopBar } from "@/components/routine/top-bar";
-import { NowCard } from "@/components/routine/now-card";
-import { RoutineRing } from "@/components/routine/routine-ring";
+import { DayPreview } from "@/components/routine/day-preview";
 import { ThisWeek } from "@/components/routine/this-week";
 import { HabitsPanel } from "@/components/routine/habits-panel";
 import { VotesPanel } from "@/components/routine/votes-panel";
@@ -172,8 +171,7 @@ export default function OverviewPage() {
             <>
               <div className={`mb-5 grid gap-4 md:items-start ${sidebar ? "xl:grid-cols-[minmax(0,min(27rem,23.1%))_minmax(0,1fr)]" : ""}`}>
                 <div className={`mx-auto w-full max-w-lg xl:max-w-none ${sidebar ? "" : "hidden"}`}>
-                  <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} events={events?.events} /></div>
-                  <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
+                  <DayPreview schedule={schedule} known={knownBlocks} today={dayKey} todayDay={day} nowMin={nowMin} todayEvents={events?.events} canEdit />
                   {/* Mode and stars under the clock; while the sidebar is hidden they move into the calendar bar (barExtra). */}
                   <div className="mt-2"><TopBar look="row" dateLabel={dateLabel} city={schedule.meta.city} editDay={dayKey} today={today} onSaved={setToday} /></div>
                   <div className="mt-4"><ThisWeek quarter={quarter} objectives={objectives} week={week} goals={goals?.items ?? null} onChanged={loadPlanner} onTick={async (id, done) => setGoals(await vaultApi.tickGoalItem(id, done))} /></div>
@@ -189,10 +187,7 @@ export default function OverviewPage() {
             </>
           ) : (
             <div className="mx-auto max-w-xl">
-              <div className="font-clock"><RoutineRing day={day} nowMin={nowMin} /></div>
-              <div className="mt-6">
-                <div className="font-clock"><NowCard day={day} nowMin={nowMin} /></div>
-              </div>
+              <DayPreview schedule={schedule} known={knownBlocks} today={dayKey!} todayDay={day} nowMin={nowMin} canEdit={false} />
             </div>
           )}
         </>

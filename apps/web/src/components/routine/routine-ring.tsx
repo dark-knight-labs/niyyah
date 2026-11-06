@@ -12,10 +12,12 @@ export interface RoutineRingProps {
   nowMin: number;
   /** Today's calendar events (owner only); drawn on the ring's inner lane. */
   events?: VaultEvent[];
+  /** Another date than today: no now marker, and its date in the middle in place of the clock. */
+  preview?: { big: string; lines: string[] };
 }
 
 /** The 24h ring with a hover card per block and per event. */
-export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
+export function RoutineRing({ day, nowMin, events, preview }: RoutineRingProps) {
   const blocks = useBlocks();
   const [hover, setHover] = useState<number | null>(null);
   const [at, setAt] = useState({ x: 0, y: 0 });
@@ -28,7 +30,7 @@ export function RoutineRing({ day, nowMin, events }: RoutineRingProps) {
       <svg viewBox="110 42 420 384" className="block h-auto w-full select-none" role="group" aria-label="24-hour routine ring">
         <RingGraphic day={day} nowMin={nowMin} cx={320} cy={220} r={148} t={36} height={440} nameSize={16} clockSize={60} labelSize={16}
           hover={hover} onHover={(i, p) => { setHover(i); if (p) setAt(p); }} prayers sideLabels={false} centre="block" idPrefix="ring" events={events}
-          hoverEvent={hoverEvent} onHoverEvent={(i, p) => { setHoverEvent(i); if (p) setAt(p); }} />
+          noNow={!!preview} centreText={preview} hoverEvent={hoverEvent} onHoverEvent={(i, p) => { setHoverEvent(i); if (p) setAt(p); }} />
       </svg>
 
       {block && (
