@@ -76,7 +76,7 @@ async def promote_node(node_id: str, body: PromoteIn, board: Board = Depends(own
     today = _local_now().date()
     await _known_stream(db, user, body.stream, today)
     try:
-        return await boards_service.promote(db, user.id, board, node_id, body.stream, body.lane, body.checkpoint, today)
+        return await boards_service.promote(db, user.id, board, node_id, body.stream, body.lane, body.checkpoint, today, body.product)
     except LookupError as exc:
         await db.rollback()
         raise HTTPException(status_code=404, detail=str(exc))

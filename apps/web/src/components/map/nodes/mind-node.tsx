@@ -20,7 +20,7 @@ export const MindNode = memo(function MindNode({ id, data, selected }: NodeProps
   const style = { "--c": d.color } as React.CSSProperties;
   const foldSide = d.dir < 0 ? { left: -26 } : { right: -26 };
   return (
-    <div className={`nm-mind ${cls} ${d.refKey ? "ref" : ""} ${d.done ? "done" : ""} ${d.gone ? "gone" : ""} ${d.flash ? "nm-flash" : ""} ${selected ? "sel-ring" : ""} ${d.drop ? "drop" : ""} ${d.editing ? "editing" : ""}`} style={style} data-testid={`mind-${id}`}>
+    <div className={`nm-mind ${cls} ${d.refKey ? "ref" : ""} ${d.done ? "done" : ""} ${d.gone ? "gone" : ""} ${d.flash ? "nm-flash" : ""} ${selected ? "sel-ring" : ""} ${d.drop ? "drop" : ""} ${d.editing ? "editing" : ""}`} style={style} data-testid={`mind-${id}`} data-parent={d.parent || undefined}>
       <Handle id="tl" type="target" position={Position.Left} className="nm-hh" style={anchor(boxed)} isConnectable={false} />
       <Handle id="tr" type="target" position={Position.Right} className="nm-hh" style={anchor(boxed)} isConnectable={false} />
       <Handle id="sl" type="source" position={Position.Left} className="nm-hh" style={anchor(boxed)} isConnectable={false} />

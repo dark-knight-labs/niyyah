@@ -3584,6 +3584,9 @@
     "lane": {
      "type": "string"
     },
+    "product": {
+     "type": "string"
+    },
     "stream": {
      "type": "string"
     }

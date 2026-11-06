@@ -36,6 +36,7 @@ const lifeBoard = async (request: APIRequestContext) => {
 };
 
 const node = (page: Page, text: string) => page.locator(".nm-mind", { hasText: text }).first();
+const item = (page: Page, text: string) => page.locator('[data-testid^="mind-task:"]', { hasText: text }).first();
 const status = (page: Page) => page.getByTestId("save-status");
 const settled = async (page: Page) => { await page.waitForTimeout(700); await expect(status(page)).toHaveAttribute("data-status", "saved", { timeout: 15_000 }); };
 const editorReady = (page: Page) => page.waitForFunction(() => { const a = document.activeElement as HTMLElement | null; return !!a && a.isContentEditable && a.classList.contains("nm-t"); });
@@ -53,12 +54,16 @@ test("the Life board shows the plan: root, blocks, checkpoint, items with lane t
   await expect(page.getByTestId("board-name")).toHaveText("Life");
   await expect(page.locator(".nm-sub")).toHaveText(/Q4 · Super Objective/i);
   for (const t of ["Studio", "Shop", "Router live", "Wire the router", "Plan the DNS cutover", "Replace the switch"]) await expect(node(page, t).first()).toBeVisible();
-  await expect(node(page, "Plan the DNS cutover").locator(".nm-tag")).toHaveText("NEXT");
-  await expect(node(page, "Replace the switch").locator(".nm-tag")).toHaveText("SOMEDAY");
-  await expect(page.locator(".nm-mind", { hasText: "Wire the router" }).locator(".nm-tag.now")).toHaveText("NOW");
+  // lanes are nodes now: Now / Next / Someday under the block (or its product), the item under its lane
+  const parent = (text: string) => item(page, text).getAttribute("data-parent");
+  expect(await parent("Plan the DNS cutover")).toBe("lane:studio:_:next");
+  expect(await parent("Replace the switch")).toBe("lane:studio:_:backlog");
+  expect(await parent("Wire the router")).toBe("lane:studio:router:now");
+  await expect(page.getByTestId("mind-lane:studio:_:next")).toContainText("Next");
   await expect(node(page, "Order the modem")).toHaveCount(0);
-  // under its checkpoint: the card says so
-  await page.locator(".nm-mind", { has: page.locator(".nm-tag.now") }).first().click();
+  // the month is a tag on the item, and the card names the goal
+  await expect(item(page, "Wire the router").locator(".nm-tag")).toHaveText("NOV");
+  await item(page, "Wire the router").click();
   const card = page.getByTestId("side-card");
   await expect(card).toContainText("Plan item · live");
   await expect(card).toContainText("Studio");
@@ -109,7 +114,7 @@ test("collapsing a derived node stores one state row; Make item turns a thought 
   await make.locator('[data-mklane="backlog"]').click();
   await page.getByTestId("make-item-go").click();
   await expect(page.getByTestId("toast")).toContainText("Added to Shop · Someday. It is a live Plan item now.");
-  await expect(page.locator(".nm-mind", { hasText: "Draft the FAQ page" }).locator(".nm-tag")).toHaveText("SOMEDAY");
+  await expect.poll(async () => node(page, "Draft the FAQ page").getAttribute("data-parent")).toBe("lane:shop:_:backlog");
   const made = (await itemNamed(request, "Draft the FAQ page"))!;
   expect(made.stream).toBe("shop");
   expect(made.item.lane).toBe("backlog");
@@ -169,12 +174,12 @@ test("Make item then Ctrl+Z leaves the live item alone: no duplicate, still link
   await node(page, "Undo me not").click();
   await page.getByTestId("make-item-go").click();
   await expect(page.getByTestId("toast")).toContainText("It is a live Plan item now");
-  await expect(node(page, "Undo me not").locator(".nm-tag")).toHaveText("NEXT");
+  await expect.poll(async () => node(page, "Undo me not").getAttribute("data-parent")).toBe("lane:shop:_:next");
   await page.mouse.click(700, 150);                                       // off the card, the board has focus
   await page.keyboard.press("Control+z");
   await page.waitForTimeout(1200);
   await expect(page.locator(".nm-mind", { hasText: "Undo me not" })).toHaveCount(1);
-  await expect(node(page, "Undo me not").locator(".nm-tag")).toHaveText("NEXT");
+  expect(await node(page, "Undo me not").getAttribute("data-parent")).toBe("lane:shop:_:next");
   await settled(page);
   await page.reload();
   await page.waitForSelector(".nm-mind");

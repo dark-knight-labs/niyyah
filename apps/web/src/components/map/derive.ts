@@ -18,6 +18,7 @@ export type MindData = {
   bar: boolean;
   drop: boolean;
   refKey: string | null;
+  parent: string;
   /** Live Plan node: mono tag (NOW, NOV, W45), the root's micro-label, state flags. */
   tag: string;
   tagNow: boolean;
@@ -128,7 +129,7 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
       measured: meas(id), zIndex: 2, selected: ui.selected.has(id), draggable: true,
       data: {
         kind: "mind", text: n.text, depth, dir: dirOf(nodes, id), color: colorVar(colorKeyOf(nodes, id)), hasChildren: kids.some((c) => !c.hidden),
-        collapsed: n.collapsed, hiddenCount: n.collapsed ? descendantCount(idx, id) : 0, editing: ui.editing === id, bar: single(id), drop: ui.dropTarget === id, refKey: n.ref_key,
+        collapsed: n.collapsed, hiddenCount: n.collapsed ? descendantCount(idx, id) : 0, editing: ui.editing === id, bar: single(id), drop: ui.dropTarget === id, refKey: n.ref_key, parent: n.parent_id ?? "",
         tag: ui.info.get(id)?.tag ?? "", tagNow: !!ui.info.get(id)?.tagNow, sub: ui.info.get(id)?.sub ?? "", gone: !!ui.info.get(id)?.gone, done: !!ui.info.get(id)?.done, flash: ui.flash === id,
       },
     });

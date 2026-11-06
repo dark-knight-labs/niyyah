@@ -527,6 +527,8 @@ h1, h2, h3 {
 .nm-ctx { display: flex; height: 32px; white-space: nowrap; background: var(--surface); border: 1px solid var(--border); border-radius: var(--map-r); }
 .nm-ctx button { padding: 0 10px; border: 0; border-right: 1px solid var(--border); background: none; font: inherit; font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); display: flex; align-items: center; gap: 5px; cursor: pointer; }
 .nm-ctx button:last-child { border-right: 0; }
+.nm-ctx.nm-multi { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); z-index: 25; align-items: center; }
+.nm-ctx .nm-n { padding: 0 12px; font-size: 0.6875rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); border-right: 1px solid var(--border); height: 100%; display: flex; align-items: center; }
 .nm-ctx button:hover { color: var(--foreground); background: var(--muted); }
 .nm-ctx .sw { width: 14px; height: 14px; border: 1px solid var(--rule); padding: 0; margin: 0 3px; }
 .nm-ctx kbd { font: 500 10px var(--font-mono); color: var(--muted-foreground); }

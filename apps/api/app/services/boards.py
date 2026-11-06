@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.board import Board, BoardEdge, BoardNode
 from app.services import planner_work
+from app.services.rules import MAX_ITEM_TAGS, clean_products
 from app.schemas.board import DeleteEdgeOp, DeleteNodeOp, NodeIn, Op, UpsertEdgeOp, UpsertNodeOp
 
 LIFE_TITLE = "Life"
@@ -283,7 +284,7 @@ async def apply_ops(db: AsyncSession, board: Board, raw_ops: list) -> dict:
 
 # --- Promote -----------------------------------------------------------------------------------------------------
 
-async def promote(db: AsyncSession, user_id: int, board: Board, node_id: str, stream: str, lane: str, checkpoint: str | None, today: date) -> dict:
+async def promote(db: AsyncSession, user_id: int, board: Board, node_id: str, stream: str, lane: str, checkpoint: str | None, today: date, product: str | None = None) -> dict:
     """Turn a thought into a Plan item, in one transaction: create the pipeline row, set its checkpoint, make the node a ref to it.
 
     The caller has checked the stream. Raises LookupError for an unknown node and ValueError for input the Plan refuses.
@@ -301,6 +302,8 @@ async def promote(db: AsyncSession, user_id: int, board: Board, node_id: str, st
     task = created[0]
     if checkpoint:  # an explicit checkpoint wins over a #month typed in the text
         await planner_work.set_checkpoint(db, user_id, stream, task.id, checkpoint)
+    if product:  # the product leads, tags typed in the thought follow (case-insensitive dedupe keeps the first spelling)
+        task.products = clean_products([product, *task.products], MAX_ITEM_TAGS)
     node.kind, node.ref_key, node.text = "ref", f"task:{task.id}", task.text   # the Plan's cleaned title is the last-known one
     board.revision += 1
     await db.commit()

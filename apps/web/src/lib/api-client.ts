@@ -8,6 +8,13 @@ type RequestOptions = {
   keepalive?: boolean;
 };
 
+/** FastAPI sends `detail` as a string, or as a list of {msg, loc} for a body it refused: make either readable. */
+export function detailText(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) return detail.map((d) => (d && typeof d === "object" && "msg" in d ? String((d as { msg: unknown }).msg).replace(/^Value error, /, "") : String(d))).join("; ");
+  return "";
+}
+
 /** `body` is the parsed error response when there was one (e.g. a 422 carries machine-readable fields next to `detail`). */
 export type ApiError = Error & { status?: number; body?: unknown };
 
@@ -91,7 +98,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw httpError(err.detail || `API error: ${res.status}`, res.status, err);
+    throw httpError(detailText(err.detail) || `API error: ${res.status}`, res.status, err);
   }
   if (res.status === 204) return undefined as T;
   return res.json();

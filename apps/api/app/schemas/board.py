@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 MAX_TEXT = 4000
 MAX_TITLE = 200
 MAX_NOTES = 10000
-REF_KEY = re.compile(r"^(stream|cp|week|task|quarter):[A-Za-z0-9:_-]{1,72}$")
+REF_KEY = re.compile(r"^(stream|cp|week|task|quarter|prod|lane):[A-Za-z0-9:_-]{1,72}$")
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_TITLE)]
 Coord = Annotated[float, Field(allow_inf_nan=False, ge=-1e7, le=1e7)]
@@ -45,8 +45,8 @@ class BoardUpdate(BaseModel):
         return v if v is None else _small_json(v, 1000, "viewport")
 
 
-class NodeIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class NodeBase(BaseModel):
+    """The columns of one node. NodeIn checks them on the way in; NodeOut does not, so a stored row always reads back."""
     id: str = Field(min_length=1, max_length=36)
     kind: NodeKind
     parent_id: str | None = Field(default=None, max_length=36)
@@ -64,6 +64,10 @@ class NodeIn(BaseModel):
     ref_key: str | None = Field(default=None, max_length=80)
     frame_id: str | None = Field(default=None, max_length=36)
 
+
+class NodeIn(NodeBase):
+    model_config = ConfigDict(extra="forbid")
+
     @field_validator("style")
     @classmethod
     def _style(cls, v):
@@ -72,13 +76,13 @@ class NodeIn(BaseModel):
     @model_validator(mode="after")
     def _ref(self):
         if self.ref_key is not None and not REF_KEY.match(self.ref_key):
-            raise ValueError("ref_key must look like task:12, stream:studio, cp:studio:nov, week:studio:2026-W45 or quarter:2026-Q4")
+            raise ValueError("ref_key must look like task:12, stream:studio, cp:studio:nov, week:studio:2026-W45, quarter:2026-Q4, prod:studio:infra or lane:studio:infra:now")
         if (self.kind == "ref") != (self.ref_key is not None):
             raise ValueError("a ref node needs a ref_key, and only a ref node has one")
         return self
 
 
-class NodeOut(NodeIn):
+class NodeOut(NodeBase):
     model_config = ConfigDict(extra="ignore", from_attributes=True)
     updated_at: datetime
 
@@ -173,10 +177,24 @@ class OpsResult(BaseModel):
     _utc = field_validator("updated")(lambda cls, v: {k: _aware(t) for k, t in v.items()})
 
 
+PRODUCT_TAG = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,39}$")
+
+
 class PromoteIn(BaseModel):
     stream: str
     lane: Literal["now", "next", "backlog"] = "next"
     checkpoint: Literal["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"] | None = None
+    product: str | None = None  # becomes the item's first tag, which is its place under a block on the Life board
+
+    @field_validator("product")
+    @classmethod
+    def _product(cls, v):
+        if v is None:
+            return v
+        tag = v.strip().removeprefix("#")
+        if not PRODUCT_TAG.match(tag):
+            raise ValueError("product must be a tag: a letter, then letters, digits, - or _, at most 40 characters")
+        return tag
 
 
 class PromoteOut(BaseModel):
