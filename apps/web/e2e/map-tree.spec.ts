@@ -276,6 +276,36 @@ test("a done item that kept a state row is not shown as a gone Plan item while S
   await expect(node(page, "Unplaced")).toHaveCount(0);
 });
 
+test("thoughts under a done item hide with it while Show done is off, and come back when it is on; they are not Unplaced", async ({ page, request }) => {
+  await addItems(request, "lab", "next", ["Carry a thought"]);
+  await openLife(page);
+  await node(page, "Carry a thought").click();
+  await page.keyboard.press("Tab");
+  await editorReady(page);
+  await page.keyboard.type("Child thought");
+  await page.keyboard.press("Escape");
+  await node(page, "Child thought").click();
+  await page.keyboard.press("Tab");
+  await editorReady(page);
+  await page.keyboard.type("Grandchild thought");
+  await page.keyboard.press("Escape");
+  await settled(page);
+  const it = (await itemNamed(request, "Carry a thought"))!;
+  await call(request, "/vault/pipeline/move", { method: "PUT", data: { stream: "lab", line: it.item.line, hash: it.item.hash, lane: "done" } });
+  await page.reload();
+  await page.waitForSelector(".nm-mind");
+  await page.waitForTimeout(500);
+  for (const t of ["Carry a thought", "Child thought", "Grandchild thought", "Unplaced"]) await expect(node(page, t), t).toHaveCount(0);
+  await page.getByTestId("board-menu").click();
+  await page.getByTestId("show-done").click();
+  for (const t of ["Carry a thought", "Child thought", "Grandchild thought"]) await expect(node(page, t), t).toBeVisible();
+  expect(await node(page, "Child thought").getAttribute("data-parent")).toBe(`task:${it.item.line}`);
+  await expect(node(page, "Unplaced")).toHaveCount(0);
+  await page.getByTestId("board-menu").click();                          // leave Show done off for the tests after this one
+  await page.getByTestId("show-done").click();
+  await expect(node(page, "Child thought")).toHaveCount(0);
+});
+
 test("Life board screenshots with the production-mirroring plan: paper light and dark", async ({ page }) => {
   await openLife(page);
   await page.getByRole("button", { name: "Fit everything" }).click().catch(() => undefined);

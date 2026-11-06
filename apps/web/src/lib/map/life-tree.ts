@@ -199,7 +199,15 @@ export function deriveLifeTree(plan: PlanInput, stored: BoardData, opts: { showD
   // Stored rows whose Plan item is gone, and thoughts hung under a key nobody derives, collect under Unplaced on the root.
   const orphanRows = [...rowOfKey.entries()].filter(([k]) => !derived.has(k) && k.startsWith("task:") && !planItems.has(k));   // only a Plan item can be "gone"; goal, product and lane rows are state that simply stops applying
   const lostParent = (n: BoardNode) => !!n.parent_key && !derived.has(n.parent_key);
-  const thoughts = [...stored.nodes.values()].filter((n) => n.kind !== "ref");
+  // Thoughts under an item Plan still has but the tree leaves out (done, with Show done off) are hidden with it, with their branches;
+  // they come back under it when Show done is on. Only an item truly gone from Plan sends its thoughts to Unplaced.
+  const all = [...stored.nodes.values()].filter((n) => n.kind !== "ref");
+  const withHiddenItem = new Set(all.filter((n) => n.parent_key && planItems.has(n.parent_key) && !derived.has(n.parent_key)).map((n) => n.id));
+  for (let grew = withHiddenItem.size > 0; grew;) {
+    grew = false;
+    for (const n of all) if (n.parent_id && withHiddenItem.has(n.parent_id) && !withHiddenItem.has(n.id)) { withHiddenItem.add(n.id); grew = true; }
+  }
+  const thoughts = all.filter((n) => !withHiddenItem.has(n.id));
   const hasOrphan = orphanRows.length > 0 || thoughts.some((n) => n.kind === "mind" && lostParent(n));
   // With no quarter loaded there is no root to hang anything on: show the stored thoughts as they are.
   const unplacedOk = hasOrphan && rootKey !== null;
