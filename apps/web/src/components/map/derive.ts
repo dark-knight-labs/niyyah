@@ -3,7 +3,7 @@ import { layoutMindMap, type Size } from "@/lib/map/layout";
 import { colorKeyOf, colorVar, descendantCount, dirOf, isMind, rootOf, visibleForest } from "@/lib/map/tree";
 import type { LiveInfo } from "@/lib/map/life-tree";
 import type { BoardData } from "@/lib/map/state";
-import type { BoardNode, StickyColor } from "@/lib/map/types";
+import { isKnownKind, type BoardNode, type StickyColor } from "@/lib/map/types";
 
 export type MindData = {
   kind: "mind";
@@ -28,7 +28,7 @@ export type MindData = {
   flash: boolean;
 };
 export type ItemData = {
-  kind: "sticky" | "text" | "shape" | "frame";
+  kind: "sticky" | "text" | "shape" | "frame" | "image" | "file" | "unknown";
   text: string;
   color: StickyColor;
   editing: boolean;
@@ -59,7 +59,7 @@ export interface Derived {
   rects: Map<string, { x: number; y: number; w: number; h: number }>;
 }
 
-const ITEM_KINDS = new Set(["sticky", "text", "shape", "frame"]);
+const ITEM_KINDS = new Set(["sticky", "text", "shape", "frame", "image", "file"]);
 
 function same(a: MapNode, b: MapNode): boolean {
   if (a.type !== b.type || a.position.x !== b.position.x || a.position.y !== b.position.y || a.parentId !== b.parentId || a.selected !== b.selected
@@ -100,13 +100,22 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
   }
 
   for (const n of nodes.values()) {
+    if (!isKnownKind(n.kind)) {
+      if (n.hidden) continue;
+      // a later release's object: drawn inert (no select, drag, connect, no rect for fit or organize) and never written back
+      push({
+        id: n.id, type: "unknown", position: { x: n.x, y: n.y }, width: Math.max(n.w, 120), height: Math.max(n.h, 44), measured: { width: Math.max(n.w, 120), height: Math.max(n.h, 44) }, zIndex: 1,
+        selectable: false, draggable: false, connectable: false, focusable: false, deletable: false, data: { kind: "unknown", text: "", color: "yellow", editing: false, bar: false, linkFrom: false },
+      } as MapNode);
+      continue;
+    }
     if (!ITEM_KINDS.has(n.kind) || n.kind === "frame") continue;
     const fr = framed(n.frame_id);
     const l = ui.live.get(n.id);
     const w = l?.w ?? n.w, h = l?.h ?? n.h;
     rects.set(n.id, { x: n.x, y: n.y, w: n.w, h: n.h });
     push({
-      id: n.id, type: n.kind, parentId: fr?.id, position: { x: l?.x ?? n.x - (fr?.x ?? 0), y: l?.y ?? n.y - (fr?.y ?? 0) },
+      id: n.id, type: n.kind === "image" || n.kind === "file" ? "unavailable" : n.kind, parentId: fr?.id, position: { x: l?.x ?? n.x - (fr?.x ?? 0), y: l?.y ?? n.y - (fr?.y ?? 0) },
       width: w, height: n.kind === "text" ? undefined : h, measured: n.kind === "text" ? meas(n.id) ?? { width: w, height: h } : { width: w, height: h },
       zIndex: 1, selected: ui.selected.has(n.id),
       data: { kind: n.kind as ItemData["kind"], text: n.text, color: (n.style.color as StickyColor) ?? "yellow", editing: ui.editing === n.id, bar: single(n.id), linkFrom: ui.linkFrom === n.id },

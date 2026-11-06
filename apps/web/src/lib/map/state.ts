@@ -1,5 +1,5 @@
 import type { BoardEdge, BoardNode, Op } from "./types";
-import { opTarget } from "./types";
+import { isKnownKind, opTarget } from "./types";
 
 /** The client copy of a board: rows keyed by id. Replaced (not mutated) on every change so React sees it. */
 export interface BoardData {
@@ -35,7 +35,9 @@ export function applyOps(data: BoardData, ops: Op[]): BoardData {
  * Stamp each node op with the updated_at the client last saw for that row (the server's stale-write guard), and
  * return the ops that undo them, in reverse order. Rows written by this client take the server's `updated` stamp from each ops response (see use-board).
  */
-export function stampAndInvert(data: BoardData, ops: Op[]): { ops: Op[]; inverse: Op[] } {
+export function stampAndInvert(data: BoardData, rawOps: Op[]): { ops: Op[]; inverse: Op[] } {
+  // A row of a kind this build cannot draw is never written back (an older API would refuse the whole batch).
+  const ops = rawOps.filter((o) => (o.op === "upsert_node" ? isKnownKind(o.node.kind) : o.op === "delete_node" ? isKnownKind(data.nodes.get(o.id)?.kind ?? "mind") : true));
   const stamped: Op[] = [];
   const inverse: Op[] = [];
   let cur = data;

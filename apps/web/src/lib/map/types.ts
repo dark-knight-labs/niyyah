@@ -4,7 +4,10 @@
  */
 
 export type BoardKind = "life" | "free";
-export type NodeKind = "mind" | "ref" | "sticky" | "text" | "shape" | "frame";
+export type NodeKind = "mind" | "ref" | "sticky" | "text" | "shape" | "frame" | "image" | "file";
+/** Every kind this build can draw. A row of any other kind (written by a later release) stays on the board untouched: it is shown inert and never sent back in ops. */
+export const KNOWN_KINDS: ReadonlySet<string> = new Set(["mind", "ref", "sticky", "text", "shape", "frame", "image", "file"]);
+export const isKnownKind = (kind: string): kind is NodeKind => KNOWN_KINDS.has(kind);
 export type Side = "L" | "R";
 export type StickyColor = "yellow" | "green" | "blue" | "pink";
 
