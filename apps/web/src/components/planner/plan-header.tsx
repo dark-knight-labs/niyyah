@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { PageTitle } from "@/components/planner/page-title";
-import { VaultScheduleData, slotOwnerFor } from "@/lib/routine";
+import { VaultScheduleData, noonInTz, slotOwnerFor } from "@/lib/routine";
 import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { fmtDay, weekDays } from "@/lib/week";
 import { QuarterData, VaultObjectivesData } from "@/lib/vault-types";
@@ -66,7 +66,7 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
       {days.length > 0 && schedule && (
         <ol className="mb-4 grid grid-cols-7 border border-[var(--border)] bg-[var(--surface)]" aria-label="Days of the week and the block that owns OT">
           {days.map((d) => {
-            const ownerId = slotOwnerFor(schedule, new Date(`${d}T12:00:00Z`));
+            const ownerId = slotOwnerFor(schedule, noonInTz(d, schedule.meta.tz));
             const owner = streams.find((s) => s.id === ownerId);
             const isToday = d === today;
             return (

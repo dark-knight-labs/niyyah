@@ -27,7 +27,10 @@ const MICRO = "text-micro font-medium text-[var(--muted-foreground)]";
 
 /** A day's calendar events and own items (tasks), each list all day first, then by start. */
 export interface DayData { events: ItemData[]; tasks: ItemData[]; }
-export interface SleepSpan { from: number; to: number; }
+/** A block's stretch of a day column, with its colour and whether it is sleep (greyed and hatched: keep clear). */
+export interface WeekBand { block: string; name: string; from: number; to: number; colour: string; sleep: boolean; }
+/** A prayer's place in a day column. */
+export interface WeekPrayer { name: string; label: string; min: number; }
 
 /** Vertical positions for a day column. `collapsed[h]` squeezes hour h to a thin strip. */
 function makeScale(collapsed: boolean[], hourPx: number) {
@@ -163,9 +166,9 @@ function Marks({ item }: { item: ItemData }) {
 interface Drag { item: ItemData; day: string; allDay: boolean; duration: number; grab: number; }
 interface Draw { day: string; from: number; to: number; }
 
-/** The week as a 24-hour grid: drag an item to move it (an own item between the all-day row and the grid too), drag across an empty slot to draw a new event. Sleep is greyed out. */
-export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChanged, onEventsChanged, onOpenDay, card = true, dimmed, layoutKey }: {
-  week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; sleepFor: (day: string) => SleepSpan[]; onChanged: () => void; onEventsChanged: () => void;
+/** The week as a 24-hour grid: drag an item to move it (an own item between the all-day row and the grid too), drag across an empty slot to draw a new event. Each day shows its blocks as faint bands (sleep greyed and hatched) and its five prayers as hairlines. */
+export function WeekCalendar({ week, streams, nowMin, status, bandsFor, prayersFor, onChanged, onEventsChanged, onOpenDay, card = true, dimmed, layoutKey }: {
+  week: Week; streams: StreamMeta[]; nowMin: number; status: GoogleStatusData | null; bandsFor: (day: string) => WeekBand[]; prayersFor: (day: string) => WeekPrayer[]; onChanged: () => void; onEventsChanged: () => void;
   /** Show the picked item's details card above the grid (off when the page shows it elsewhere). */
   card?: boolean;
   /** A day header was clicked: show that day. */
@@ -194,7 +197,7 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
 
   // An hour collapses when every day of the week is asleep for all of it and no timed item touches it.
   const collapsible = Array.from({ length: 24 }, (_, h) => days.length > 0 && days.every((day) =>
-    sleepFor(day).some((s) => s.from <= h * 60 && s.to >= (h + 1) * 60)
+    bandsFor(day).some((b) => b.sleep && b.from <= h * 60 && b.to >= (h + 1) * 60)
     && !all(day).some((e) => isTimed(e) && (e.start_min as number) < (h + 1) * 60 && (e.end_min as number) > h * 60)));
   const collapsedCount = collapsible.filter(Boolean).length;
 
@@ -480,9 +483,17 @@ export function WeekCalendar({ week, streams, nowMin, status, sleepFor, onChange
               onPointerDown={(e) => startDraw(e, day)} onPointerMove={moveDraw} onPointerUp={endDraw} onPointerCancel={() => setDraw(null)}
               onDragOver={(e) => { if (accepts(false)) e.preventDefault(); }} onDrop={(e) => dropTimed(e, day)}>
               {tops.map((t, h) => <div key={h} aria-hidden="true" className="pointer-events-none absolute inset-x-0 border-t border-[var(--border)]" style={{ top: t }} />)}
-              {sleepFor(day).map((s, i) => (
-                <div key={i} aria-hidden="true" title="Sleep: keep clear" className="pointer-events-none absolute inset-x-0 bg-[var(--muted)] opacity-80"
-                  style={{ top: px(s.from), height: px(s.to - s.from), backgroundImage: "repeating-linear-gradient(135deg, transparent 0 5px, var(--border) 5px 6px)" }} />
+              {bandsFor(day).map((b, i) => (
+                <div key={`${b.block}-${i}`} aria-hidden="true" data-band={b.block} data-band-from={b.from} data-band-to={b.to} data-sleep={b.sleep ? "" : undefined}
+                  title={b.sleep ? "Sleep: keep clear" : b.name} className={`pointer-events-none absolute inset-x-0 ${b.sleep ? "bg-[var(--muted)] opacity-80" : ""}`}
+                  style={{ top: px(b.from), height: px(b.to) - px(b.from),
+                    ...(b.sleep ? { backgroundImage: "repeating-linear-gradient(135deg, transparent 0 5px, var(--border) 5px 6px)" } : { background: `color-mix(in srgb, ${b.colour} 12%, transparent)`, boxShadow: `inset 2px 0 0 color-mix(in srgb, ${b.colour} 45%, transparent)` }) }} />
+              ))}
+              {prayersFor(day).map((p) => (
+                <div key={p.name} data-prayer={p.name} data-min={p.min} title={`${p.label} ${formatMinutes(p.min)}`}
+                  className="pointer-events-none absolute inset-x-0 border-t border-dashed border-[color-mix(in_srgb,var(--foreground)_35%,transparent)]" style={{ top: px(p.min) }}>
+                  <span aria-hidden="true" className="absolute right-0.5 -top-[7px] bg-[var(--surface)] px-0.5 font-mono text-[9px] font-semibold uppercase leading-[13px] text-[var(--muted-foreground)]">{p.label[0]}</span>
+                </div>
               ))}
               {place(all(day)).filter(({ item }) => item.kind === "event" || week.showDone || !item.done).map(({ item: e, key, lane, lanes }) => {
                 const own = e.kind === "task";

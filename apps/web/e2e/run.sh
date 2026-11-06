@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Browser run of the Overview items: a fresh SQLite dev DB (one user + the sample account), the API on the calendar
 # fixture, a production build of the web app, then the Playwright spec. Results, logs and screenshots go to e2e/out.
-#   apps/web/e2e/run.sh            (SKIP_BUILD=1 reuses .next; API_PORT / WEB_PORT change the ports; extra args go to playwright, e.g. map-tree)
+#   apps/web/e2e/run.sh            (SKIP_BUILD=1 reuses .next; API_PORT / WEB_PORT change the ports; extra args or E2E_ARGS="-g name" go to playwright)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -42,8 +42,9 @@ npx -y "playwright@$PW_VERSION" install chromium > "$OUT/browser-install.log" 2>
 # The spec imports @playwright/test, which is not a dependency of the app: resolve it from the pinned npx install.
 PW_MODULES="$(npx -y -p "@playwright/test@$PW_VERSION" sh -c 'cd "$(dirname "$(command -v playwright)")/.." && pwd' 2>/dev/null | tail -n 1)"
 set +e
+# shellcheck disable=SC2086  # E2E_ARGS is split on purpose
 NODE_PATH="$PW_MODULES" E2E_WEB_URL="http://localhost:$WEB_PORT" E2E_API_URL="http://localhost:$API_PORT" E2E_EMAIL="$EMAIL" E2E_PASSWORD="$PASSWORD" \
-  npx -y -p "@playwright/test@$PW_VERSION" playwright test -c e2e/playwright.config.ts "$@"
+  npx -y -p "@playwright/test@$PW_VERSION" playwright test -c e2e/playwright.config.ts ${E2E_ARGS:-} "$@"
 status=$?
 set -e
 

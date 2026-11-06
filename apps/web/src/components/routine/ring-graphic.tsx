@@ -163,7 +163,7 @@ export function RingGraphic(p: RingGraphicProps) {
       {/* fixed hit areas: the slices move when hovered, so hover must not depend on them */}
       {day.blocks.map((b, i) => (
         <path key={`h-${b.block}-${b.startMin}`} d={g.arc(b.startMin, b.endMin)} fill="none" stroke="transparent" strokeWidth={t + 12}
-          pointerEvents="stroke" tabIndex={0} role="img" aria-label={`${blocks.label(b.block)}, ${formatMinutes(b.startMin)} to ${formatMinutes(b.endMin)}, ${formatDuration(duration(b))}, ${b.what}`}
+          data-slice={b.block} pointerEvents="stroke" tabIndex={0} role="img" aria-label={`${blocks.label(b.block)}, ${formatMinutes(b.startMin)} to ${formatMinutes(b.endMin)}, ${formatDuration(duration(b))}, ${b.what}`}
           style={{ cursor: "pointer", outline: "none" }}
           onPointerMove={(e) => p.onHover(i, { x: e.clientX, y: e.clientY })}
           onPointerLeave={() => p.onHover(null)}
@@ -187,7 +187,7 @@ export function RingGraphic(p: RingGraphicProps) {
       {p.overlay}
 
       {/* now marker: a hairline across the band with a small square head outside it, haloed by the background so it reads on any slice */}
-      {!p.noNow && <g pointerEvents="none">
+      {!p.noNow && <g pointerEvents="none" data-now-marker="">
         <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--background)" strokeWidth={4.5} strokeLinecap="butt" />
         <line x1={nx1} y1={ny1} x2={nx2} y2={ny2} stroke="var(--foreground)" strokeWidth={1.5} strokeLinecap="butt" />
         <rect x={nx2 - 3.5} y={ny2 - 3.5} width={7} height={7} transform={`rotate(45 ${nx2} ${ny2})`} fill="var(--foreground)" stroke="var(--background)" strokeWidth={1.5} />

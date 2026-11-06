@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * Overview items against a seeded dev API (run.sh): quick add, the details card (sub-tasks, tags, notes), annotating a
  * calendar fixture event, locked fields on calendar items, and the week calendar's task tick / move / pin.
- * Then /calendar: its nine views, V rotation, the stored choice, the card, the All day strip and the tag filter.
+ * Then /calendar: its eight views, V rotation, the stored choice, the card, the All day strip and the tag filter.
  * The tests share one database and run in order.
  */
 test.describe.configure({ mode: "serial" });
@@ -296,9 +296,9 @@ test("screenshots: light and dark", async ({ page }) => {
   await page.screenshot({ path: `${OUT}/overview-event-light.png`, fullPage: true });
 });
 
-/* ---------- the calendar on "/": the nine rotatable views ---------- */
+/* ---------- the calendar on "/": the eight rotatable views ---------- */
 
-const VIEWS = ["day-grid", "day-agenda", "day-ribbon", "day-ring", "week-grid", "week-agenda", "week-strips", "week-rings", "week-blocks"] as const;
+const VIEWS = ["day-grid", "day-agenda", "day-ribbon", "day-ring", "week-grid", "week-agenda", "week-strips", "week-blocks"] as const;
 const view = (page: Page) => page.locator("[data-cal-view]");
 const panel = (page: Page) => page.getByRole("complementary", { name: "Item panel" });
 
@@ -332,7 +332,6 @@ test("calendar: every view renders, with no console errors and no sideways page 
     "week-grid": `[data-grid-day="${today}"]`,
     "week-agenda": `[data-agenda-day="${today}"]`,
     "week-strips": `[data-strip-day="${today}"]`,
-    "week-rings": `[data-ring-day="${today}"] svg`,
     "week-blocks": "table",
   };
   for (const v of VIEWS) {
@@ -349,7 +348,7 @@ test("calendar: every view renders, with no console errors and no sideways page 
   expect(errors).toEqual([]);
 });
 
-test("calendar: V cycles through all nine views and back, Shift+V goes back, typing a v does not", async ({ page }) => {
+test("calendar: V cycles through all eight views and back, Shift+V goes back, typing a v does not", async ({ page }) => {
   await openCalendar(page, "day-grid");
   const seen: string[] = [];
   for (let n = 0; n < VIEWS.length; n++) {
@@ -360,10 +359,10 @@ test("calendar: V cycles through all nine views and back, Shift+V goes back, typ
   await page.keyboard.press("Shift+V");
   await expect(view(page)).toHaveAttribute("data-cal-view", "week-blocks");
   await page.keyboard.press("Shift+V");
-  await expect(view(page)).toHaveAttribute("data-cal-view", "week-rings");
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-strips");
   await page.locator("#quick-add-title").fill("v");
   await page.locator("#quick-add-title").press("v");
-  await expect(view(page)).toHaveAttribute("data-cal-view", "week-rings");
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-strips");
   await page.locator("#quick-add-title").fill("");
 });
 
@@ -378,9 +377,10 @@ test("calendar: a reload keeps the chosen view, ring variant and colour mode", a
   await menu(page);
   await expect(page.getByRole("button", { name: "Ring lanes: Lane per calendar" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("group", { name: "Block colours" }).getByRole("button", { name: "Alternate" })).toHaveAttribute("aria-pressed", "true");
+  // A week style is for the session: after a reload the week opens as Grid.
   await pickView(page, "week-strips");
   await page.reload();
-  await expect(view(page)).toHaveAttribute("data-cal-view", "week-strips", { timeout: 30_000 });
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-grid", { timeout: 30_000 });
 });
 
 test("calendar: clicking an item in a day view and in a week view opens its details card", async ({ page }) => {
@@ -471,9 +471,9 @@ test("calendar: screenshots of every view, light and dark", async ({ page }) => 
 const todayDay = day3(today);
 
 test("/calendar redirects to / and the stored view still applies", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("niy-calendar-view", "week-agenda"));
+  await page.addInitScript(() => localStorage.setItem("niy-calendar-view", "day-agenda"));
   await page.goto("/calendar");
-  await expect(view(page)).toHaveAttribute("data-cal-view", "week-agenda", { timeout: 30_000 });
+  await expect(view(page)).toHaveAttribute("data-cal-view", "day-agenda", { timeout: 30_000 });
   expect(new URL(page.url()).pathname).toBe("/");
   // The old nav entry is gone; the home page is the calendar.
   await expect(page.getByRole("navigation", { name: "Main" }).first().getByRole("link", { name: "Calendar" })).toHaveCount(0);
@@ -497,7 +497,7 @@ test("bar: in the 44px app header at 1440x900, one row even with a long line typ
   await page.locator("#quick-add-title").fill("");
   // Range, next / previous, Today.
   const range = bar(page).locator("[data-cal-range]");
-  const first = await range.innerText();
+  const first = (await range.textContent()) as string;
   await bar(page).getByRole("button", { name: "Next week" }).click();
   await expect(range).not.toHaveText(first);
   await expect(bar(page).getByRole("button", { name: "Today", exact: true })).toBeVisible();
@@ -525,9 +525,6 @@ test("bar: Day | Week, week headers open the day in the last day style, display 
   await pickView(page, "week-strips");
   await page.locator(`[data-open-day="${other}"]`).click();
   await expect(view(page)).toHaveAttribute("data-cal-view", "day-agenda");
-  await pickView(page, "week-rings");
-  await page.locator(`[data-open-day="${other}"]`).click();
-  await expect(view(page)).toHaveAttribute("data-cal-view", "day-ring");
 
   // Display menu: week grid has the done count; a ring view has ring lanes and block colours.
   await pickView(page, "week-grid");
@@ -760,9 +757,13 @@ test("first open with no stored view: day grid on a phone, week grid on a deskto
   await expect(view(page)).toHaveAttribute("data-cal-view", "week-grid", { timeout: 30_000 });
   // A stored choice wins on a phone, and a pick on a phone sticks.
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => localStorage.setItem("niy-calendar-view", "day-ribbon"));
+  await page.reload();
+  await expect(view(page)).toHaveAttribute("data-cal-view", "day-ribbon", { timeout: 30_000 });
+  // A stored week style is not reopened: the week opens as Grid.
   await page.evaluate(() => localStorage.setItem("niy-calendar-view", "week-agenda"));
   await page.reload();
-  await expect(view(page)).toHaveAttribute("data-cal-view", "week-agenda", { timeout: 30_000 });
+  await expect(view(page)).toHaveAttribute("data-cal-view", "week-grid", { timeout: 30_000 });
   await page.evaluate(() => localStorage.removeItem("niy-calendar-view"));
   await page.reload();
   await expect(view(page)).toHaveAttribute("data-cal-view", "day-grid", { timeout: 30_000 });

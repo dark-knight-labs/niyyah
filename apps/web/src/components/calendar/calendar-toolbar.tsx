@@ -155,7 +155,7 @@ export function CalendarBar(p: CalendarBarProps) {
         <button type="button" onClick={() => p.onStep(-1)} aria-label={p.scope === "day" ? "Previous day" : "Previous week"} aria-keyshortcuts="[" className={`${CHIP} px-1.5`}><ChevronLeft size={15} aria-hidden="true" /></button>
         <button type="button" onClick={() => p.onStep(1)} aria-label={p.scope === "day" ? "Next day" : "Next week"} aria-keyshortcuts="]" className={`${CHIP} border-l-0 px-1.5`}><ChevronRight size={15} aria-hidden="true" /></button>
       </span>
-      <h2 className={`min-w-0 shrink truncate font-serif font-medium leading-none ${header ? "text-[19px]" : "text-[17px]"}`} aria-label={p.rangeLong} title={p.rangeLong} data-cal-range>{p.range}</h2>
+      <h2 className="mono min-w-0 shrink truncate !text-[13px] !font-semibold text-[var(--foreground)]" aria-label={p.rangeLong} title={p.rangeLong} data-cal-range>{p.range}</h2>
       {!p.atToday && <button type="button" onClick={p.onToday} aria-keyshortcuts="t" title="Back to today (t)" className={CHIP}>Today</button>}
       {p.extra}
       <span className={header ? "min-w-2 flex-1" : "hidden"} aria-hidden="true" />
@@ -172,7 +172,7 @@ export function CalendarBar(p: CalendarBarProps) {
           <Section title={p.scope === "day" ? "Day views" : "Week views"}>
             {views.map((v) => <button key={v.id} type="button" aria-pressed={p.view === v.id} aria-label={viewName(v.id)} data-view-button={v.id} onClick={() => { p.onView(v.id); close(); }} className={SMALL}>{v.label}</button>)}
           </Section>
-          <p className="text-micro text-[var(--muted-foreground)]">V next style, Shift+V previous, all nine.</p>
+          <p className="text-micro text-[var(--muted-foreground)]">V next style, Shift+V previous, all eight.</p>
           {hasTags && (
             <Section title="Filter by tag">
               <button type="button" aria-pressed={!p.tag} onClick={() => p.onTag(null)} className={SMALL}>All</button>
