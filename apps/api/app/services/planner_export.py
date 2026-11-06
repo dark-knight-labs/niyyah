@@ -16,6 +16,7 @@ from app.models.planner import (
     Quarter, QuarterStream, Task,
 )
 from app.models.compass import Compass
+from app.services import board_transfer
 from app.models.persona import Persona
 from app.models.user import User
 from app.services.rules import checklist_from_text, checklist_progress, item_status
@@ -126,6 +127,7 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
                           for o in await rows(EventOverlay, EventOverlay.event_key)],
         "compass": None if compass is None else {"mission": compass.mission, "vision": compass.vision, "vision_horizon": compass.vision_horizon},
         "persona_streams": [{"name": p.name, "stream": p.stream} for p in personas],
+        "boards": await board_transfer.export_boards(db, uid),
     }
 
 

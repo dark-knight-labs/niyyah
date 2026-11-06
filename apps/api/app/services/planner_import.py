@@ -13,6 +13,7 @@ from app.models.compass import Compass
 from app.models.persona import Persona
 from app.models.vault import VaultBlockVote, VaultDay
 from app.schemas.snapshot import Snapshot
+from app.services import board_transfer
 from app.services.planner_mapping import map_planning
 from app.services.rules import (
     MAX_ITEM_TAGS, checklist_from_text, checklist_text, clean_checklist, clean_minutes, clean_products, clean_subtasks, item_status,
@@ -131,6 +132,10 @@ async def _link_pieces(db: AsyncSession, rows: list[tuple[Task, int | None, int 
 
 async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dict[str, int]:
     _check(snap)
+    if snap.boards is not None:
+        board_transfer.check_boards(snap.boards)  # before anything is wiped
+    # The Plan's rows are about to be renumbered; keep what each is (id, text, stream, lane) so board links can follow.
+    before = [(i, t, s, l) for i, t, s, l in (await db.execute(select(Task.id, Task.text, Task.stream, Task.lane).where(Task.user_id == user_id))).all()]
     await _wipe(db, user_id)
 
     days = []
@@ -190,8 +195,22 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
     db.add_all(checks)
     await db.flush()
     groups["habits"], groups["habit_checks"] = habits, checks
+    await _boards(db, user_id, snap, before, tasks + planning)
     await _compass(db, user_id, snap)  # not in USER_TABLES and not in the counts: an older file must not erase it
     return {name: len(rows) for name, rows in groups.items()}
+
+
+async def _boards(db: AsyncSession, user_id: int, snap: Snapshot, before: list[tuple], new_rows: list[Task]) -> None:
+    """Boards sit outside USER_TABLES and the counts. A file with `boards` replaces them; an older file leaves them. Either way their
+    `task:<id>` links are moved to the new row ids (board_transfer: matched by content, ambiguous ones are left alone)."""
+    now = [(t.id, t.text, t.stream, t.lane) for t in new_rows]
+    if snap.boards is not None:
+        # Links in the file speak the file's ids: its tasks and planning rows. (pipeline_items ids may be from the pre-planning_rows table.)
+        theirs = [(t.id, t.text, t.stream, None) for t in snap.tasks if t.id is not None]
+        theirs += [(r.id, r.text, r.stream, r.lane) for r in snap.planning_rows or [] if r.id is not None]
+        await board_transfer.replace_boards(db, user_id, snap.boards, board_transfer.content_map(theirs, now))
+    else:
+        await board_transfer.remap_existing(db, user_id, board_transfer.content_map(before, now))
 
 
 async def _compass(db: AsyncSession, user_id: int, snap: Snapshot) -> None:

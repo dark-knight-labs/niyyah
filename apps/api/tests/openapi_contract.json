@@ -1,4 +1,11 @@
 {
+ "DELETE /api/v1/boards/{board_id}": {
+  "params": [
+   "path:board_id*"
+  ],
+  "request": null,
+  "response": null
+ },
  "DELETE /api/v1/personas/{persona_id}": {
   "params": [
    "path:persona_id*"
@@ -235,6 +242,187 @@
     "locale",
     "subscription_tier",
     "timezone"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/boards": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "counts": {
+      "properties": {
+       "edges": {
+        "type": "integer"
+       },
+       "nodes": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "edges",
+       "nodes"
+      ],
+      "type": "object"
+     },
+     "id": {
+      "type": "integer"
+     },
+     "kind": {
+      "type": "string"
+     },
+     "revision": {
+      "type": "integer"
+     },
+     "title": {
+      "type": "string"
+     },
+     "updated_at": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "counts",
+     "id",
+     "kind",
+     "revision",
+     "title",
+     "updated_at"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
+ },
+ "GET /api/v1/boards/{board_id}": {
+  "params": [
+   "path:board_id*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "edges": {
+     "items": {
+      "properties": {
+       "from_id": {
+        "type": "string"
+       },
+       "id": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "style": {
+        "type": "object"
+       },
+       "to_id": {
+        "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "from_id",
+       "id",
+       "to_id",
+       "updated_at"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "nodes": {
+     "items": {
+      "properties": {
+       "collapsed": {
+        "type": "boolean"
+       },
+       "frame_id": {
+        "type": "string"
+       },
+       "h": {
+        "type": "number"
+       },
+       "hidden": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "notes": {
+        "type": "string"
+       },
+       "parent_id": {
+        "type": "string"
+       },
+       "parent_key": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "ref_key": {
+        "type": "string"
+       },
+       "style": {
+        "type": "object"
+       },
+       "text": {
+        "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
+       },
+       "w": {
+        "type": "number"
+       },
+       "x": {
+        "type": "number"
+       },
+       "y": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "id",
+       "kind",
+       "updated_at"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "title": {
+     "type": "string"
+    },
+    "viewport": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "edges",
+    "id",
+    "kind",
+    "nodes",
+    "revision",
+    "title",
+    "viewport"
    ],
    "type": "object"
   }
@@ -2379,6 +2567,148 @@
   "request": null,
   "response": null
  },
+ "PATCH /api/v1/boards/{board_id}": {
+  "params": [
+   "path:board_id*"
+  ],
+  "request": {
+   "properties": {
+    "title": {
+     "type": "string"
+    },
+    "viewport": {
+     "type": "object"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "edges": {
+     "items": {
+      "properties": {
+       "from_id": {
+        "type": "string"
+       },
+       "id": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "style": {
+        "type": "object"
+       },
+       "to_id": {
+        "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "from_id",
+       "id",
+       "to_id",
+       "updated_at"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "nodes": {
+     "items": {
+      "properties": {
+       "collapsed": {
+        "type": "boolean"
+       },
+       "frame_id": {
+        "type": "string"
+       },
+       "h": {
+        "type": "number"
+       },
+       "hidden": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "notes": {
+        "type": "string"
+       },
+       "parent_id": {
+        "type": "string"
+       },
+       "parent_key": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "ref_key": {
+        "type": "string"
+       },
+       "style": {
+        "type": "object"
+       },
+       "text": {
+        "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
+       },
+       "w": {
+        "type": "number"
+       },
+       "x": {
+        "type": "number"
+       },
+       "y": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "id",
+       "kind",
+       "updated_at"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "title": {
+     "type": "string"
+    },
+    "viewport": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "edges",
+    "id",
+    "kind",
+    "nodes",
+    "revision",
+    "title",
+    "viewport"
+   ],
+   "type": "object"
+  }
+ },
  "PATCH /api/v1/personas/{persona_id}": {
   "params": [
    "path:persona_id*"
@@ -3102,6 +3432,290 @@
    "type": "object"
   }
  },
+ "POST /api/v1/boards": {
+  "params": [],
+  "request": {
+   "properties": {
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "title"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "edges": {
+     "items": {
+      "properties": {
+       "from_id": {
+        "type": "string"
+       },
+       "id": {
+        "type": "string"
+       },
+       "label": {
+        "type": "string"
+       },
+       "style": {
+        "type": "object"
+       },
+       "to_id": {
+        "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "from_id",
+       "id",
+       "to_id",
+       "updated_at"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "kind": {
+     "type": "string"
+    },
+    "nodes": {
+     "items": {
+      "properties": {
+       "collapsed": {
+        "type": "boolean"
+       },
+       "frame_id": {
+        "type": "string"
+       },
+       "h": {
+        "type": "number"
+       },
+       "hidden": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "notes": {
+        "type": "string"
+       },
+       "parent_id": {
+        "type": "string"
+       },
+       "parent_key": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "ref_key": {
+        "type": "string"
+       },
+       "style": {
+        "type": "object"
+       },
+       "text": {
+        "type": "string"
+       },
+       "updated_at": {
+        "type": "string"
+       },
+       "w": {
+        "type": "number"
+       },
+       "x": {
+        "type": "number"
+       },
+       "y": {
+        "type": "number"
+       }
+      },
+      "required": [
+       "id",
+       "kind",
+       "updated_at"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "title": {
+     "type": "string"
+    },
+    "viewport": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "edges",
+    "id",
+    "kind",
+    "nodes",
+    "revision",
+    "title",
+    "viewport"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/boards/{board_id}/nodes/{node_id}/promote": {
+  "params": [
+   "path:board_id*",
+   "path:node_id*"
+  ],
+  "request": {
+   "properties": {
+    "checkpoint": {
+     "type": "string"
+    },
+    "lane": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "node": {
+     "properties": {
+      "collapsed": {
+       "type": "boolean"
+      },
+      "frame_id": {
+       "type": "string"
+      },
+      "h": {
+       "type": "number"
+      },
+      "hidden": {
+       "type": "boolean"
+      },
+      "id": {
+       "type": "string"
+      },
+      "kind": {
+       "type": "string"
+      },
+      "notes": {
+       "type": "string"
+      },
+      "parent_id": {
+       "type": "string"
+      },
+      "parent_key": {
+       "type": "string"
+      },
+      "position": {
+       "type": "integer"
+      },
+      "ref_key": {
+       "type": "string"
+      },
+      "style": {
+       "type": "object"
+      },
+      "text": {
+       "type": "string"
+      },
+      "updated_at": {
+       "type": "string"
+      },
+      "w": {
+       "type": "number"
+      },
+      "x": {
+       "type": "number"
+      },
+      "y": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "id",
+      "kind",
+      "updated_at"
+     ],
+     "type": "object"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "task_id": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "node",
+    "revision",
+    "task_id"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/boards/{board_id}/ops": {
+  "params": [
+   "path:board_id*"
+  ],
+  "request": {
+   "properties": {
+    "ops": {
+     "items": {
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "ops"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "bad_ops": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "stale_ops": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "updated": {
+     "type": "object"
+    }
+   },
+   "required": [
+    "revision"
+   ],
+   "type": "object"
+  }
+ },
  "POST /api/v1/import": {
   "params": [
    "query:replace"
@@ -3139,6 +3753,53 @@
       "type": "object"
      },
      "type": "array"
+    },
+    "boards": {
+     "items": {
+      "properties": {
+       "edges": {
+        "items": {
+         "ref": "SnapBoardEdge"
+        },
+        "type": "array"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "nodes": {
+        "items": {
+         "ref": "SnapBoardNode"
+        },
+        "type": "array"
+       },
+       "title": {
+        "type": "string"
+       },
+       "viewport": {
+        "type": "object"
+       }
+      },
+      "required": [
+       "title"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "compass": {
+     "properties": {
+      "mission": {
+       "type": "string"
+      },
+      "vision": {
+       "type": "string"
+      },
+      "vision_horizon": {
+       "type": "string"
+      }
+     },
+     "required": [],
+     "type": "object"
     },
     "days": {
      "items": {
@@ -3386,6 +4047,24 @@
        "kind",
        "stream",
        "title"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "persona_streams": {
+     "items": {
+      "properties": {
+       "name": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "name",
+       "stream"
       ],
       "type": "object"
      },

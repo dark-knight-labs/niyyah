@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.schemas.snapshot import Snapshot
-from app.services import planner_import
+from app.services import board_transfer, planner_import
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -21,6 +21,9 @@ async def import_data(snapshot: Snapshot, replace: bool = Query(False), user: Us
     try:
         counts = await planner_import.import_snapshot(db, user.id, snapshot)
         await db.commit()
+    except board_transfer.BoardLimitError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=413, detail=str(exc))
     except ValueError as exc:
         await db.rollback()
         raise HTTPException(status_code=422, detail=str(exc))
