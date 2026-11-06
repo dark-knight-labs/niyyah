@@ -28,6 +28,22 @@
   "POST"
  ],
  [
+  "/api/v1/boards/files",
+  "GET"
+ ],
+ [
+  "/api/v1/boards/files",
+  "POST"
+ ],
+ [
+  "/api/v1/boards/files/{file_id}",
+  "DELETE"
+ ],
+ [
+  "/api/v1/boards/files/{file_id}",
+  "GET"
+ ],
+ [
   "/api/v1/boards/{board_id}",
   "DELETE"
  ],

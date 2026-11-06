@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, func, Index, Integer, String, Text, text as sql_text
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, func, Index, Integer, LargeBinary, String, Text, text as sql_text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -63,3 +63,19 @@ class BoardEdge(Base):
     label: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default="")
     style: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=func.now())
+
+
+class BoardFile(Base):
+    """An uploaded image or file a board node points at (node.style.file_id). Bytes live in the row; list queries never load them."""
+    __tablename__ = "board_files"
+    __table_args__ = (Index("ix_board_files_user_id", "user_id"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    board_id: Mapped[int | None] = mapped_column(Integer, nullable=True)   # where it was uploaded from; informational, no FK (files outlive boards)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime: Mapped[str] = mapped_column(String(100), nullable=False)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, deferred=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())

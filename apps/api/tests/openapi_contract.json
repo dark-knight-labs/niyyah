@@ -1,4 +1,11 @@
 {
+ "DELETE /api/v1/boards/files/{file_id}": {
+  "params": [
+   "path:file_id*"
+  ],
+  "request": null,
+  "response": null
+ },
  "DELETE /api/v1/boards/{board_id}": {
   "params": [
    "path:board_id*"
@@ -295,6 +302,67 @@
    },
    "type": "array"
   }
+ },
+ "GET /api/v1/boards/files": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "files": {
+     "items": {
+      "properties": {
+       "created_at": {
+        "type": "string"
+       },
+       "id": {
+        "type": "string"
+       },
+       "mime": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "size": {
+        "type": "integer"
+       },
+       "used": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "created_at",
+       "id",
+       "mime",
+       "name",
+       "size",
+       "used"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "quota_bytes": {
+     "type": "integer"
+    },
+    "used_bytes": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "files",
+    "quota_bytes",
+    "used_bytes"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/boards/files/{file_id}": {
+  "params": [
+   "path:file_id*"
+  ],
+  "request": null,
+  "response": null
  },
  "GET /api/v1/boards/{board_id}": {
   "params": [
@@ -3567,6 +3635,44 @@
     "revision",
     "title",
     "viewport"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/boards/files": {
+  "params": [
+   "query:board",
+   "query:name"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "created_at": {
+     "type": "string"
+    },
+    "id": {
+     "type": "string"
+    },
+    "mime": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "size": {
+     "type": "integer"
+    },
+    "used": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "created_at",
+    "id",
+    "mime",
+    "name",
+    "size",
+    "used"
    ],
    "type": "object"
   }
