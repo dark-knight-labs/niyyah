@@ -1,5 +1,5 @@
 import { isTimed, itemRef } from "@/lib/items";
-import { computePrayerMinutes, dayTypeFor, PRAYERS, Prayer, ResolvedBlock, ResolvedDay, resolveDay, resolveTime, VaultScheduleData } from "@/lib/routine";
+import { computePrayerMinutes, dayTypeFor, noonInTz, PRAYERS, Prayer, ResolvedBlock, ResolvedDay, resolveDay, resolveTime, VaultScheduleData } from "@/lib/routine";
 import type { ItemData } from "@/lib/vault-types";
 import { addDays } from "@/lib/week";
 
@@ -45,9 +45,9 @@ export interface CalDay {
   nowMin: number | null;
 }
 
-/** The schedule for an ISO date. UTC noon keeps the date in every timezone the schedule can use. */
+/** The schedule for an ISO date, read at local noon in the schedule's zone so the date holds in every zone. */
 export function resolveIso(schedule: VaultScheduleData, iso: string, known: ReadonlySet<string>): ResolvedDay | null {
-  try { return resolveDay(schedule, new Date(`${iso}T12:00:00Z`), known); } catch { return null; }
+  try { return resolveDay(schedule, noonInTz(iso, schedule.meta.tz), known); } catch { return null; }
 }
 
 /** A stretch of one date's column in the week grid: minutes since midnight, `from` < `to` <= 1440. */
@@ -63,11 +63,11 @@ export function dayBands(schedule: VaultScheduleData, iso: string, known: Readon
   const bands: Band[] = (own?.blocks ?? []).map((b) => ({ block: b.block, from: b.startMin, to: Math.min(b.endMin, 1440) }));
   try {
     const { meta } = schedule;
-    const prev = new Date(`${addDays(iso, -1)}T12:00:00Z`);
+    const prev = noonInTz(addDays(iso, -1), meta.tz);
     const type = dayTypeFor(prev, meta.tz, meta.weekend_days ?? ["fri", "sat"]);
     const rows = schedule.days[type]?.length ? schedule.days[type] : schedule.days.weekday ?? [];
     const before = computePrayerMinutes(meta, prev);
-    const after = computePrayerMinutes(meta, new Date(`${iso}T12:00:00Z`));
+    const after = computePrayerMinutes(meta, noonInTz(iso, meta.tz));
     for (const row of rows) {
       if (known.size > 0 && !known.has(row.block)) continue;
       try {

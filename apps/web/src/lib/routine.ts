@@ -68,22 +68,43 @@ const METHODS: Record<string, () => ReturnType<typeof CalculationMethod.Karachi>
 
 const TIME_RE = /^(?:(\d{1,2}):(\d{2})|(fajr|sunrise|dhuhr|asr|maghrib|isha)(?:([+-])(\d+))?)$/;
 
+/** One formatter per locale, zone and option set: building an Intl.DateTimeFormat costs far more than using it. */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function formatter(locale: string, tz: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${tz}|${JSON.stringify(options)}`;
+  let f = formatters.get(key);
+  if (!f) { f = new Intl.DateTimeFormat(locale, { timeZone: tz, ...options }); formatters.set(key, f); }
+  return f;
+}
+
 /** Minutes since midnight of `date` as seen in `tz`. */
 function minutesInTz(date: Date, tz: string): number {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  }).formatToParts(date);
+  const parts = formatter("en-GB", tz, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
   return get("hour") * 60 + get("minute");
 }
 
 /** Calendar date (y, m, d) of `date` as seen in `tz`. */
 function ymdInTz(date: Date, tz: string): [number, number, number] {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(date);
+  const parts = formatter("en-CA", tz, { year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
   return [get("year"), get("month"), get("day")];
+}
+
+/**
+ * An instant at local noon of the ISO date in `tz`, so every reading of it in that zone (date, weekday, prayer times) lands
+ * on `iso`. UTC noon does not: in zones at UTC+12 and beyond it is already the next day. Noon never meets a DST change.
+ */
+export function noonInTz(iso: string, tz: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  const wanted = Date.UTC(y, m - 1, d, 12);
+  let guess = wanted;
+  for (let i = 0; i < 2; i++) {
+    const p = formatter("en-GB", tz, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(guess));
+    const get = (type: string) => Number(p.find((x) => x.type === type)?.value);
+    guess += wanted - Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
+  }
+  return new Date(guess);
 }
 
 /** "YYYY-MM-DD" of `date` as seen in `tz`. */
@@ -93,7 +114,7 @@ export function dateInTz(date: Date, tz: string): string {
 }
 
 export function dayTypeFor(date: Date, tz: string, weekendDays: string[]): DayType {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(date).toLowerCase().slice(0, 3);
+  const weekday = formatter("en-US", tz, { weekday: "short" }).format(date).toLowerCase().slice(0, 3);
   return weekendDays.includes(weekday) ? "weekend" : "weekday";
 }
 

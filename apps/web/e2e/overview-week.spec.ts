@@ -181,12 +181,31 @@ test("week grid: block bands follow the weekday and weekend templates, overnight
   }
 });
 
-test("week grid: bands do not block clicking an item or drawing on the grid", async ({ page }) => {
+test("week grid: bands and prayer lines sit under the items and never take a click", async ({ page }) => {
   await openOverview(page);
   await col(page, today).getByText("Daily standup").click();
   await expect(page.getByRole("region", { name: "Item details" })).toBeVisible();
-  const bands = col(page, today).locator("[data-band]").first();
-  expect(await bands.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe("none");
+  for (const sel of ["[data-band]", "[data-prayer]", "[data-prayer] > span"]) {
+    const all = await col(page, today).locator(sel).evaluateAll((els) => els.map((e) => getComputedStyle(e).pointerEvents));
+    expect(all.length).toBeGreaterThan(0);
+    expect(new Set(all)).toEqual(new Set(["none"]));
+  }
+  // Painted below: no z-index, and earlier in the column than every item.
+  const order = await col(page, today).evaluate((c) => {
+    const items = [...c.querySelectorAll("[data-item]")];
+    const under = [...c.querySelectorAll("[data-band], [data-prayer]")];
+    return {
+      items: items.length,
+      before: under.every((u) => items.every((i) => u.compareDocumentPosition(i) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      z: under.map((u) => getComputedStyle(u).zIndex),
+      // an item's centre is hit by the item, not by a line or band drawn under it
+      hit: items.every((i) => { const r = i.getBoundingClientRect(); return !!document.elementFromPoint(r.x + r.width / 2, r.y + Math.min(r.height / 2, 10))?.closest("[data-item]"); }),
+    };
+  });
+  expect(order.items).toBeGreaterThan(0);
+  expect(order.before).toBe(true);
+  expect(new Set(order.z)).toEqual(new Set(["auto"]));
+  expect(order.hit).toBe(true);
 });
 
 /* ---------- 2. the ring steps through other days ---------- */
@@ -200,11 +219,15 @@ test("ring: arrows step by one date and Today comes back; the preview carries no
   await openOverview(page);
   await expect(ring(page)).toHaveAttribute("data-date", today);
   await expect(todayBtn(page)).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Now" })).not.toContainText("Preview");
+  await expect(page.getByRole("region", { name: "Now" })).toBeVisible();
+  await expect(page.locator("[data-now-preview]")).toHaveCount(0);
   await next(page).click();
   await expect(ring(page)).toHaveAttribute("data-date", plus(today, 1));
-  await expect(page.getByRole("region", { name: "Now" })).toContainText("Preview");
-  await expect(page.getByRole("region", { name: "Now" })).not.toContainText("Next");
+  await expect(page.getByRole("region", { name: "Now" })).toHaveCount(0);
+  const card = page.locator("[data-now-preview]");
+  await expect(card).toHaveAttribute("aria-label", `Preview, ${await ring(page).getAttribute("data-label")}`);
+  await expect(card).toContainText("Preview");
+  await expect(card).not.toContainText("Next");
   await expect(ring(page).locator("[data-now-marker]")).toHaveCount(0);
   await next(page).click();
   await expect(ring(page)).toHaveAttribute("data-date", plus(today, 2));
@@ -290,6 +313,36 @@ test("screenshots: after (week grid with bands, ring on a weekend day, top bar)"
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${OUT}/overview-ring-weekend-${TAG}-paper-light.png`, fullPage: true });
 });
+
+/* ---------- zones at UTC+12 and beyond: the date is the date, not the next one ---------- */
+
+for (const zone of [
+  { tz: "Pacific/Auckland", lat: -36.85, lon: 174.76 },
+  { tz: "Pacific/Kiritimati", lat: 1.87, lon: -157.4 },
+]) {
+  test(`${zone.tz}: Saturday uses its own weekend template and Friday's night row`, async ({ page, request }) => {
+    const res = await request.put(`${API}/api/v1/vault/config/schedule`, { headers: auth(), data: { ...ROUTINE, meta: { ...META, ...zone } } });
+    expect(res.ok(), await res.text()).toBeTruthy();
+    await openOverview(page);
+    const days = await page.locator("[data-grid-day]").evaluateAll((els) => els.map((e) => e.getAttribute("data-grid-day") as string));
+    expect(days).toHaveLength(7);
+    // the week is Sunday to Saturday: the grid's own dates, whatever day it is in this zone now
+    expect(days.map(dow)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    for (const day of days) {
+      const keys = await col(page, day).locator("[data-band]").evaluateAll((els) => els.map((e) => e.getAttribute("data-band")));
+      expect(keys, day).toContain(isWeekend(day) ? "fnf" : "distribution");
+      expect(keys, day).not.toContain(isWeekend(day) ? "distribution" : "fnf");
+      const morning = col(page, day).locator('[data-band="sleep"][data-band-from="0"]');
+      expect(Number(await morning.getAttribute("data-band-to")), day).toBe((await minOf(page, day, "fajr")) - (isWeekend(plus(day, -1)) ? 90 : 60));
+    }
+    // the ring agrees on the template of the date it shows
+    for (let n = 0; n < 7; n++) {
+      const d = (await ring(page).getAttribute("data-date")) as string;
+      await expect(ring(page)).toHaveAttribute("data-day-type", isWeekend(d) ? "weekend" : "weekday");
+      await next(page).click();
+    }
+  });
+}
 
 test("put the seeded schedule back", async ({ request }) => {
   test.skip(!seeded, "the schedule was not read in this worker");

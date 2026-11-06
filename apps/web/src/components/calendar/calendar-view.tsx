@@ -25,6 +25,8 @@ import { WeekAgenda } from "@/components/calendar/week-agenda";
 import { WeekStrips } from "@/components/calendar/week-strips";
 import { WeekBlocks } from "@/components/calendar/week-blocks";
 
+const NO_BANDS: WeekBand[] = [];
+
 /** Stored UI choices (localStorage), like the skin and the Progress range. */
 const VIEW_KEY = "niy-calendar-view";
 const RING_KEY = "niy-calendar-ring";
@@ -75,9 +77,11 @@ export function CalendarView({ week, schedule, today, nowMin, streams, google, s
   const colourMap = useMemo(() => Object.fromEntries(days.map((d) => [d.iso, d.day ? blockColours(d.day.blocks, blocks.color, shade) : []])), [days, blocks.color, shade]);
   const colours = useCallback((iso: string) => colourMap[iso] ?? [], [colourMap]);
   const tags = useMemo(() => tagCounts(days.flatMap((d) => d.items)), [days]);
-  const bandsFor = useCallback((iso: string): WeekBand[] => (schedule ? dayBands(schedule, iso, known) : []).map((b) => ({
+  // One read of every day's bands per week (the grid asks for them per hour and per render): they change with the schedule, the week and the block names.
+  const bandMap = useMemo(() => Object.fromEntries(week.days.map((iso): [string, WeekBand[]] => [iso, dayBands(schedule, iso, known).map((b) => ({
     ...b, colour: blocks.color(b.block), sleep: b.block === "sleep" || blocks.label(b.block).toLowerCase() === "sleep", name: blocks.label(b.block),
-  })), [schedule, known, blocks]);
+  }))])), [schedule, week.days, known, blocks]);
+  const bandsFor = useCallback((iso: string): WeekBand[] => bandMap[iso] ?? NO_BANDS, [bandMap]);
   const prayersFor = useCallback((iso: string) => (resolved[iso] ? prayerMarks(resolved[iso], null) : []), [resolved]);
 
   const goDay = useCallback((iso: string) => { setFocusDay(iso); week.show(iso); }, [week]);

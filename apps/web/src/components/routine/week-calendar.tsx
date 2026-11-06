@@ -491,7 +491,7 @@ export function WeekCalendar({ week, streams, nowMin, status, bandsFor, prayersF
               ))}
               {prayersFor(day).map((p) => (
                 <div key={p.name} data-prayer={p.name} data-min={p.min} title={`${p.label} ${formatMinutes(p.min)}`}
-                  className="pointer-events-none absolute inset-x-0 z-[1] border-t border-dashed border-[color-mix(in_srgb,var(--foreground)_35%,transparent)]" style={{ top: px(p.min) }}>
+                  className="pointer-events-none absolute inset-x-0 border-t border-dashed border-[color-mix(in_srgb,var(--foreground)_35%,transparent)]" style={{ top: px(p.min) }}>
                   <span aria-hidden="true" className="absolute right-0.5 -top-[7px] bg-[var(--surface)] px-0.5 font-mono text-[9px] font-semibold uppercase leading-[13px] text-[var(--muted-foreground)]">{p.label[0]}</span>
                 </div>
               ))}

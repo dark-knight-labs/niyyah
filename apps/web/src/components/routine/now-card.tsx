@@ -15,7 +15,7 @@ export function NowCard({ day, nowMin, preview }: { day: ResolvedDay; nowMin: nu
 
   if (preview) {
     return (
-      <section className="mx-auto mt-3 grid w-full max-w-[35rem] grid-cols-[minmax(0,1fr)] gap-1.5" aria-label="Now" data-now-preview="">
+      <section className="mx-auto mt-3 grid w-full max-w-[35rem] grid-cols-[minmax(0,1fr)] gap-1.5" aria-label={`Preview, ${preview}`} data-now-preview="">
         <div className="h-1 bg-[var(--muted)]" aria-hidden="true" />
         <p className="flex items-baseline justify-between gap-3 text-sm">
           <span className="text-[0.6875rem] font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">Preview</span>
