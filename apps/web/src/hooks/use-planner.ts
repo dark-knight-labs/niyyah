@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { vaultApi } from "@/lib/vault-api";
 import { VaultScheduleData } from "@/lib/routine";
@@ -43,12 +43,18 @@ export function usePlanner(): Planner {
   const [schedule, setSchedule] = useState<VaultScheduleData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Reloads can overlap (the 60 s timer, a save, a Map action): only the newest request may land, or an older answer reverts a change.
+  const seq = useRef(0);
+
   const reload = useCallback(async () => {
+    const mine = ++seq.current;
     try {
       const access = await vaultApi.editAccess();
+      if (mine !== seq.current) return;
       setOwner(access.allowed);
       if (!access.allowed) return;
       const [q, p, o, n, sc] = await Promise.allSettled([vaultApi.quarter(), vaultApi.pipelines(), vaultApi.objectives(), vaultApi.notebooks(), vaultApi.schedule()]);
+      if (mine !== seq.current) return;
       if (q.status === "fulfilled") { setQuarter(q.value); setQuarterError(null); }
       else setQuarterError((q.reason as ApiError).status === 404 ? "This quarter's note is not in the synced vault yet." : message(q.reason, "Could not load the quarter."));
       if (p.status === "fulfilled") setPipelines(p.value);

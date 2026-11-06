@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { OctagonAlert } from "lucide-react";
 import { Pick } from "@/components/planner/pick";
@@ -152,6 +153,7 @@ export function ItemCard({ row, meta, goal, months, blockers, week, staleDays, b
         {at > 0 && <button type="button" disabled={busy} className={ghost} onClick={() => void run(() => vaultApi.movePipelineItem(stream, item, order[at - 1]))}>↑ Promote</button>}
         {at >= 0 && at < 2 && <button type="button" disabled={busy} className={ghost} onClick={() => void run(() => vaultApi.movePipelineItem(stream, item, order[at + 1]))}>↓ Demote</button>}
         {meta.weekly && item.lane !== "done" && !isOne && <button type="button" disabled={busy} className={ghost} onClick={() => void run(() => vaultApi.focusPipelineItem(stream, item))}>Make small domino</button>}
+        <Link href={`/map?board=life&node=task:${item.line}`} className={ghost}>Show on map</Link>
         <DeleteButton busy={busy} onDelete={() => void run(() => vaultApi.removePipelineItem(stream, item))} />
       </div>
     </>

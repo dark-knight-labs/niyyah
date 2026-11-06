@@ -4,13 +4,17 @@ type RequestOptions = {
   method?: string;
   body?: unknown;
   headers?: Record<string, string>;
+  /** Let the request outlive the page (pagehide flush). Browsers cap such bodies at 64 KB: the caller checks. */
+  keepalive?: boolean;
 };
 
-export type ApiError = Error & { status?: number };
+/** `body` is the parsed error response when there was one (e.g. a 422 carries machine-readable fields next to `detail`). */
+export type ApiError = Error & { status?: number; body?: unknown };
 
-function httpError(message: string, status?: number): ApiError {
+function httpError(message: string, status?: number, body?: unknown): ApiError {
   const err = new Error(message) as ApiError;
   err.status = status;
+  err.body = body;
   return err;
 }
 
@@ -59,6 +63,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     method: opts.method || "GET",
     headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
+    keepalive: opts.keepalive,
   });
 
   if (res.status === 401 && token) {
@@ -71,8 +76,9 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
         method: opts.method || "GET",
         headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
+        keepalive: opts.keepalive,
       });
-      if (!retry.ok) throw httpError(`API error: ${retry.status}`, retry.status);
+      if (!retry.ok) throw httpError(`API error: ${retry.status}`, retry.status, await retry.json().catch(() => undefined));
       if (retry.status === 204) return undefined as T;
       return retry.json();
     }
@@ -85,7 +91,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw httpError(err.detail || `API error: ${res.status}`, res.status);
+    throw httpError(err.detail || `API error: ${res.status}`, res.status, err);
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -94,7 +100,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 export const api = {
   get: <T>(path: string) => request<T>(path),
   put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body }),
-  post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body }),
+  post: <T>(path: string, body: unknown, opts?: { keepalive?: boolean }) => request<T>(path, { method: "POST", body, keepalive: opts?.keepalive }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body }),
   delete: <T = void>(path: string) => request<T>(path, { method: "DELETE" }),
 };

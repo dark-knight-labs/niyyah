@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { PageTitle } from "@/components/planner/page-title";
@@ -52,6 +53,7 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
         sub={quarter.objective_ar ? <span dir="rtl" lang="ar" className="text-base">{quarter.objective_ar}</span> : undefined}
         visual={
           <div className="grid gap-1.5 justify-items-end">
+            <Link href="/map?board=life" className="mono inline-flex min-h-8 items-center border border-[var(--rule)] px-3 text-[var(--accent)] hover:bg-[var(--muted)]">Map</Link>
             <p className="mono text-[var(--muted-foreground)]">Week <b className="font-medium tabular-nums text-[var(--foreground)]">{quarter.week_of_quarter}</b> of {quarter.weeks_in_quarter}</p>
             <div className="flex h-[22px] w-full min-w-[14rem] items-end gap-[3px] text-[var(--accent)] sm:w-[14.5rem]" role="img" aria-label={`Week ${quarter.week_of_quarter} of ${quarter.weeks_in_quarter}`}>
               {Array.from({ length: quarter.weeks_in_quarter }, (_, i) => (

@@ -139,7 +139,7 @@ export default function PlanPage() {
       ) : (
         <>
           <section aria-label="Map" className="mb-4 border border-[var(--border)] bg-[var(--surface)]">
-            <Strip n="01" title="Map" aside="Every block against every horizon. Click an item to open it below." />
+            <Strip n="01" title="Horizons" aside="Every block against every horizon. Click an item to open it below." />
             <PlanMap streams={streams} quarter={quarter} notebooks={notebooks} rows={rows} picked={stream} selected={sel} week={pipelines.week}
               onOpen={(r, tab) => open(r, tab)} onPickStream={pick}
               onTag={(s, t) => { setPicked(s); setEditing(null); setViewState((v) => ({ ...v, tab: "now", tag: t })); window.history.replaceState(null, "", `?stream=${s}`); document.getElementById("plan-work")?.scrollIntoView({ block: "start", behavior: "smooth" }); }} />

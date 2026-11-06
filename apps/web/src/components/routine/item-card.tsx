@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Star, X } from "lucide-react";
 import { useState } from "react";
 import { Checklist } from "@/components/planner/checklist";
@@ -184,6 +185,7 @@ export function ItemCard({ item, streams, items, pinned, onPin, onClose, onChang
         {!own && item.location && item.location !== item.meeting_url && <p className="text-[var(--muted-foreground)]">{item.location}</p>}
         <div className="flex flex-wrap gap-2">
           <button type="button" aria-pressed={pinned} onClick={onPin} className={`${action} ${pinned ? "text-[var(--accent)]" : ""}`}><Star size={12} aria-hidden="true" className={pinned ? "fill-[var(--accent)]" : ""} />{pinned ? "Important" : "Mark important"}</button>
+          {own && item.id !== null && item.lane && <Link href={`/map?board=life&node=task:${item.id}`} className={`${action} text-[var(--accent)]`}>Show on map</Link>}
           {item.meeting_url && <a href={item.meeting_url} target="_blank" rel="noopener noreferrer" className={`${action} text-[var(--accent)]`}>Join {meetingName(item.meeting_url)}</a>}
           {!own && item.event_id && (
             <button type="button" disabled={removing === "busy"} onClick={() => void removeGoogle()} onBlur={() => removing === "ask" && setRemoving(null)}
