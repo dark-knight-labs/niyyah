@@ -294,3 +294,15 @@ async def test_existing_boards_get_gone_keys_when_nothing_matches(db_client):
     got = (await c.get(f"{URL}/{b}")).json()
     assert {n["id"]: (n["ref_key"], n["parent_key"]) for n in got["nodes"]} == {"r": ("task:gone-999999", None), "t": (None, "task:gone-999999")}
     assert got["edges"][0]["to_id"] == "task:gone-999999"
+
+
+async def test_image_and_file_rows_round_trip_through_export_and_import(db_client):
+    """(iii) a board holding image/file rows (a later release made them) exports and imports on this release without dropping them."""
+    c, _ = db_client
+    b = (await c.post(URL, json={"title": "Media"})).json()["id"]
+    style = {"file_id": "5f0c3a3e-1111-4222-8333-444455556666"}
+    await c.post(f"{URL}/{b}/ops", json={"ops": [up("pic", kind="image", x=1, y=2, w=170, h=120, style=style), up("doc", kind="file", x=5, y=6, w=200, h=60, style=style)]})
+    snap = (await c.get(E)).json()
+    assert (await c.post(I, json=snap)).status_code == 200
+    got = await board_by_title(c, "Media")
+    assert {n["id"]: (n["kind"], n["style"]) for n in got["nodes"]} == {"pic": ("image", style), "doc": ("file", style)}
