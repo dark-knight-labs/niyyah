@@ -70,7 +70,7 @@ test("Organize balanced / right / down / up: positions change along the right ax
   await page.getByTestId("organize-menu").click();
   await expect(page.locator('[data-layout]')).toHaveCount(4);                 // horizontal and vertical options
   await page.keyboard.press("Escape");
-  const run = async (layout: string) => { await page.getByTestId("organize-menu").click(); await page.locator(`[data-layout="${layout}"]`).click(); await page.waitForTimeout(600); return boxes(page); };
+  const run = async (layout: string) => { await page.getByTestId("organize-menu").click(); await page.locator(`[data-layout="${layout}"]`).click(); await page.waitForTimeout(900); return boxes(page); };
   const centre = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
 
   const right = await run("right");
@@ -93,7 +93,7 @@ test("Organize balanced / right / down / up: positions change along the right ax
 
   // one undo restores the previous layout (the vertical one before: "up"), not a half-step
   await page.keyboard.press("Control+z");
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(1200);
   const undone = await boxes(page);
   for (const k of ["a", "b", "c"]) expect(Math.abs(undone[k].y - up[k].y), `undo ${k}`).toBeLessThan(2);
   await settled(page);

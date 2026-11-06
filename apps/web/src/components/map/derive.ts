@@ -39,6 +39,8 @@ export type MindData = {
   dim: boolean;
   own: boolean;
   ports: boolean;
+  /** Which branch handles this node carries: "<target>|<source,source>" (a root has no target). Rendering only these keeps 1,000 nodes cheap. */
+  hs: string;
 };
 export type ItemData = {
   kind: "sticky" | "text" | "shape" | "frame" | "image" | "file" | "unknown";
@@ -79,6 +81,15 @@ export interface Derived {
   /** Absolute rectangles by node id (committed layout, no live overrides): minimap, fit, frame hit-testing. */
   rects: Map<string, { x: number; y: number; w: number; h: number }>;
 }
+
+/** Handle ids a mind node needs: its own target (where its branch edge arrives) and the sources its children leave from. */
+function handlesOf(side: 1 | -1, orient: "h" | "v", depth: number, layout: string): string {
+  const own = branchHandles(side, orient);
+  if (depth > 0) return `${own.target}|${own.source}`;
+  const src = layout === "both" ? "sr,sl" : layout === "right" ? "sr" : layout === "left" ? "sl" : layout === "down" ? "sb" : "st";
+  return `|${src}`;
+}
+const rootLayout = (nodes: Map<string, BoardNode>, id: string) => (rootOf(nodes, id)?.style.layout as string | undefined) ?? "both";
 
 const ITEM_KINDS = new Set(["sticky", "text", "shape", "frame", "image", "file"]);
 
@@ -167,7 +178,7 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
         kind: "mind", text: n.text, depth, dir: dirOf(nodes, id), color: colorVar(colorKeyOf(nodes, id)), hasChildren: kids.some((c) => !c.hidden),
         collapsed: n.collapsed, hiddenCount: n.collapsed ? descendantCount(idx, id) : 0, editing: ui.editing === id, bar: single(id), drop: ui.dropTarget === id, refKey: n.ref_key, parent: n.parent_id ?? "",
         fill: n.style.fill ?? (depth === 1 ? "tint" : "outline"), shape: n.style.shape ?? "rect", size: n.style.size ?? "M", bold: !!n.style.bold, icon: n.style.icon ?? "", url: n.style.url ?? "",
-        hasNotes: !!n.notes.trim(), locked: !!n.style.locked, orient: p.orient, dim: !!ui.focus && !ui.focus.has(id), own: !!n.style.color, ports: ui.selected.has(id) || !!ui.connecting,
+        hasNotes: !!n.notes.trim(), locked: !!n.style.locked, orient: p.orient, dim: !!ui.focus && !ui.focus.has(id), own: !!n.style.color, ports: ui.selected.has(id) || !!ui.connecting, hs: handlesOf(p.side, p.orient, depth, rootLayout(nodes, id)),
         tag: ui.info.get(id)?.tag ?? "", tagNow: !!ui.info.get(id)?.tagNow, sub: ui.info.get(id)?.sub ?? "", gone: !!ui.info.get(id)?.gone, done: !!ui.info.get(id)?.done, flash: ui.flash === id,
       },
     });
@@ -185,7 +196,7 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
     const vis = (id: string) => { const n = nodes.get(id)!; return isMind(n) ? placed.has(id) : !n.hidden; };
     if (!vis(e.from_id) || !vis(e.to_id)) continue;
     edges.push({
-      id: e.id, source: e.from_id, target: e.to_id, type: "connector", sourceHandle: "cs", targetHandle: "ct", selected: ui.selected.has(e.id),
+      id: e.id, source: e.from_id, target: e.to_id, type: "connector", selected: ui.selected.has(e.id),
       data: { label: e.label, style: e.style },
     });
   }

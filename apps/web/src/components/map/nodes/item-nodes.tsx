@@ -10,11 +10,13 @@ import { ContextBar } from "../context-bar";
 
 /** Four side ports, shown while the object is selected or a connector is being dragged (so a 1,000-object board carries none at rest). */
 export function Ports({ show }: { show?: boolean }) {
+  return show ? <PortHandles /> : null;
+}
+function PortHandles() {
   const id = useNodeId();
   const update = useUpdateNodeInternals();
   // React Flow measures a node's handles when it measures the node: ports that appear later must be announced
-  useEffect(() => { if (show && id) update(id); }, [show, id, update]);
-  if (!show) return null;
+  useEffect(() => { if (id) update(id); }, [id, update]);
   return (
     <>
       <Handle id="p-t" type="source" position={Position.Top} className="nm-port" />
