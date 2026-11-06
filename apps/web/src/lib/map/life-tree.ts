@@ -53,6 +53,8 @@ export const isKey = (id: string) => id.includes(":");
 
 export const LANE_TAG: Record<Lane, string> = { now: "NOW", next: "NEXT", backlog: "SOMEDAY", done: "DONE" };
 export const LANE_LABEL: Record<Lane, string> = { now: "Now", next: "Next", backlog: "Someday", done: "Done" };
+/** What the API accepts as a promote product (schemas/board.py PRODUCT_TAG). Other tags still get product nodes, but cannot be set from the map. */
+export const PRODUCT_TAG = /^[A-Za-z][A-Za-z0-9_-]{0,39}$/;
 const LANE_ORDER: Lane[] = ["now", "next", "backlog", "done"];
 const MONTH_ORDER: MonthKey[] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
@@ -84,12 +86,13 @@ function sha256Hex(text: string): string {
 }
 
 /**
- * The key part of a product tag. Tags group case-insensitively (the label is the first spelling seen); a plain lowercase tag is its own
- * key, anything else (spaces, non-ASCII, longer than 32) becomes x + 16 hex of its SHA-256. Keying lives only here, never on the server.
+ * The key part of a product tag. Tags group case-insensitively (the label is the first spelling seen); a plain lowercase tag that starts with a
+ * letter is its own key, anything else (spaces, non-ASCII, a leading digit, longer than 32) becomes _ + 16 hex of its SHA-256, so a
+ * tag key can never equal a hash key. Keying lives only here, never on the server.
  */
 export function tagKey(tag: string): string {
   const low = tag.toLowerCase();
-  return /^[a-z0-9_-]{1,32}$/.test(low) ? low : `x${sha256Hex(low).slice(0, 16)}`;
+  return /^[a-z][a-z0-9_-]{0,31}$/.test(low) ? low : `_${sha256Hex(low).slice(0, 16)}`;
 }
 
 /** Deterministic id for a state row the client creates (<= 36 chars): the same key always maps to the same row. */
@@ -188,10 +191,13 @@ export function deriveLifeTree(plan: PlanInput, stored: BoardData, opts: { showD
     }
   }
   const derived = new Set(nodes.keys());
+  // every item the Plan still has, shown or not (Show done off hides done items from the tree, but they are not gone)
+  const planItems = new Set<string>();
+  for (const ps of plan.pipelines?.streams ?? []) for (const it of ps.items) planItems.add(`task:${it.line}`);
   const rootKey = [...nodes.values()].find((n) => n.parent_id === null)?.id ?? null;
 
   // Stored rows whose Plan item is gone, and thoughts hung under a key nobody derives, collect under Unplaced on the root.
-  const orphanRows = [...rowOfKey.entries()].filter(([k]) => !derived.has(k) && k.startsWith("task:"));   // only a Plan item can be "gone"; goal, product and lane rows are state that simply stops applying
+  const orphanRows = [...rowOfKey.entries()].filter(([k]) => !derived.has(k) && k.startsWith("task:") && !planItems.has(k));   // only a Plan item can be "gone"; goal, product and lane rows are state that simply stops applying
   const lostParent = (n: BoardNode) => !!n.parent_key && !derived.has(n.parent_key);
   const thoughts = [...stored.nodes.values()].filter((n) => n.kind !== "ref");
   const hasOrphan = orphanRows.length > 0 || thoughts.some((n) => n.kind === "mind" && lostParent(n));

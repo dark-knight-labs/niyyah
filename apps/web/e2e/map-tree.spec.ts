@@ -125,14 +125,14 @@ test("order: Now above Next above Someday, products alphabetical, items in pipel
   await expect(node(page, name("kahf", "now", "", 1)).locator(".nm-tag")).toHaveCount(0);
 });
 
-test("tags group case-insensitively under the first spelling; a tag with spaces or non-ASCII still gets a product", async ({ page, request }) => {
+test("tags group case-insensitively under the first spelling; a tag with spaces or non-ASCII still gets a product (hash key starting with _)", async ({ page, request }) => {
   await addStream(request, "lab", "Lab", "rose");
   await addItems(request, "lab", "next", ["lab one #Router", "lab two #router", "lab three [product:: Café au lait]"]);
   await openLife(page);
   await expect(page.locator('[data-testid^="mind-prod:lab:"]')).toHaveCount(2);
   await expect(key(page, "prod:lab:router")).toContainText("Router");
   expect(await countOf(page, "lane:lab:router:next")).toBe("2");
-  const cafe = page.locator('[data-testid^="mind-prod:lab:x"]');
+  const cafe = page.locator('[data-testid^="mind-prod:lab:_"]');
   await expect(cafe).toHaveCount(1);
   await expect(cafe).toContainText("Café au lait");
 });
@@ -222,6 +222,58 @@ test("live items still snap back: dropping an item on another lane changes nothi
   expect((await itemNamed(request, t))!.item.lane).toBe("next");
   const after = (await node(page, t).boundingBox())!;
   expect(Math.abs(after.x - from.x)).toBeLessThan(2);
+});
+
+test("Make item under a product whose tag the API refuses: no product is sent, the card says why", async ({ page, request }) => {
+  await openLife(page, "&node=stream:lab");
+  const lane = page.locator('[data-testid^="mind-lane:lab:_"]').first();      // the Café au lait product's lane
+  await expect(lane).toBeVisible();
+  await lane.click();
+  await page.keyboard.press("Tab");
+  await editorReady(page);
+  await page.keyboard.type("Brew a test pot");
+  await page.keyboard.press("Escape");
+  await node(page, "Brew a test pot").click();
+  const make = page.getByTestId("make-item");
+  await expect(make.getByLabel("Product")).toHaveValue("");
+  await expect(make.getByLabel("Product").locator("option", { hasText: "Café" })).toHaveCount(0);
+  await expect(page.getByTestId("product-note")).toContainText("can't be set from the map");
+  await page.getByTestId("make-item-go").click();
+  await expect(page.getByTestId("toast")).toContainText("Added to Lab · Next");
+  const made = (await itemNamed(request, "Brew a test pot"))!;
+  expect(made.item.products ?? []).toEqual([]);
+});
+
+test("a refused product shows a readable message, not [object Object]", async ({ page }) => {
+  await openLife(page, "&node=stream:lab");
+  await key(page, "lane:lab:router:next").click();
+  await page.keyboard.press("Tab");
+  await editorReady(page);
+  await page.keyboard.type("Send a bad tag");
+  await page.keyboard.press("Escape");
+  await page.route("**/nodes/*/promote", (route) => route.continue({ postData: JSON.stringify({ ...JSON.parse(route.request().postData() ?? "{}"), product: "bad tag" }) }));
+  await node(page, "Send a bad tag").click();
+  await page.getByTestId("make-item-go").click();
+  const toast = page.getByTestId("toast");
+  await expect(toast).toContainText("product must be a tag");
+  await expect(toast).not.toContainText("[object");
+  await page.unroute("**/nodes/*/promote");
+});
+
+test("a done item that kept a state row is not shown as a gone Plan item while Show done is off", async ({ page, request }) => {
+  await addItems(request, "lab", "next", ["Finish me early"]);
+  await openLife(page);
+  await node(page, "Finish me early").click();
+  await page.keyboard.press("Delete");                                       // hides it: one stored task: state row
+  await settled(page);
+  expect((await lifeBoard(request)).nodes.some((n) => n.ref_key?.startsWith("task:") && n.hidden)).toBe(true);
+  const it = (await itemNamed(request, "Finish me early"))!;
+  await call(request, "/vault/pipeline/move", { method: "PUT", data: { stream: "lab", line: it.item.line, hash: it.item.hash, lane: "done" } });
+  await page.reload();
+  await page.waitForSelector(".nm-mind");
+  await page.waitForTimeout(500);
+  await expect(node(page, "Finish me early")).toHaveCount(0);
+  await expect(node(page, "Unplaced")).toHaveCount(0);
 });
 
 test("Life board screenshots with the production-mirroring plan: paper light and dark", async ({ page }) => {

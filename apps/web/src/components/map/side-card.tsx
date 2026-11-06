@@ -20,6 +20,8 @@ export interface MakeModel {
   /** Lane and product (tag) of the lane or product node it hangs under, if any. */
   lane: "now" | "next" | "backlog" | null;
   product: string | null;
+  /** The product it hangs under has a tag the API refuses (spaces, non-ASCII, too long): none is offered. */
+  productBlocked: boolean;
   /** The tags in use per block, offered by the Product select. */
   productsOf: Record<string, string[]>;
 }
@@ -169,6 +171,7 @@ function MakeItem({ id, make, onMake }: { id: string; make: MakeModel; onMake: (
         <option value="">Product: none</option>
         {shown.map((t) => <option key={t} value={t}>{t}</option>)}
       </select>
+      {make.productBlocked && <p className="note" style={{ marginTop: 4 }} data-testid="product-note">This product&apos;s tag can&apos;t be set from the map.</p>}
       <div className="chips" style={{ marginTop: 8 }}>
         {LANES.slice(0, 3).map((l) => <button key={l.id} type="button" className="chip" data-mklane={l.id} aria-pressed={lane === l.id} onClick={() => setLane(l.id as "now" | "next" | "backlog")}>{l.label}</button>)}
       </div>

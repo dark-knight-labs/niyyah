@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useBoard } from "@/hooks/use-board";
 import type { Planner } from "@/hooks/use-planner";
 import { boardsApi } from "@/lib/map/boards-api";
-import { deriveLifeTree, enrichRefs, LANE_LABEL, toStored, UNPLACED, type LifeView, type LiveInfo } from "@/lib/map/life-tree";
+import { deriveLifeTree, enrichRefs, LANE_LABEL, PRODUCT_TAG, toStored, UNPLACED, type LifeView, type LiveInfo } from "@/lib/map/life-tree";
 import { vaultApi } from "@/lib/vault-api";
 import { compassApi, type CompassData } from "@/lib/compass-api";
 import { MONTH_LABEL } from "@/lib/streams";
@@ -548,7 +548,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     else if (key === "sib") createMind("sibling", id);
     else if (key === "fold") toggleFold(id);
     else if (key === "del") deleteSelection();
-    else if (key === "make") { const c = makeContext(id); if (c.stream) void makeItem(id, c.stream, c.lane ?? "next", c.product); else notify("Choose a block in the details card"); }
+    else if (key === "make") { const c = makeContext(id); if (c.stream) void makeItem(id, c.stream, c.lane ?? "next", c.product && PRODUCT_TAG.test(c.product) ? c.product : null); else notify("Choose a block in the details card"); }
     else if (key === "link") { setTool("link"); setLinkFrom(id); }
     else if (key.startsWith("color:")) { const n = d.nodes.get(id); if (n) bd.commit([A.setColor(n, key.slice(6) as StickyColor)]); }
   }, [createMind, toggleFold, deleteSelection, makeContext, makeItem, notify]);
@@ -582,10 +582,10 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
         const productsOf: Record<string, string[]> = {};
         for (const s of plan.pipelines?.streams ?? []) {
           const seen = new Map<string, string>();
-          for (const it of s.items) for (const t of it.products ?? []) if (/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(t) && !seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
+          for (const it of s.items) for (const t of it.products ?? []) if (PRODUCT_TAG.test(t) && !seen.has(t.toLowerCase())) seen.set(t.toLowerCase(), t);
           productsOf[s.stream] = [...seen.values()].sort((x, y) => x.toLowerCase().localeCompare(y.toLowerCase()));
         }
-        const make = mc && streams.length && n.text.trim() ? { streams, stream: mc.stream, checkpoint: mc.month ? mc.month.toUpperCase() : null, lane: mc.lane, product: mc.product, productsOf } : null;
+        const make = mc && streams.length && n.text.trim() ? { streams, stream: mc.stream, checkpoint: mc.month ? mc.month.toUpperCase() : null, lane: mc.lane, product: mc.product && PRODUCT_TAG.test(mc.product) ? mc.product : null, productBlocked: !!mc.product && !PRODUCT_TAG.test(mc.product), productsOf } : null;
         return { type: "mind", id, text: n.text, notes: n.notes, below: descendantCount(idx, id), depth: depthOf(data.nodes, id), readOnly: n.kind === "ref", make };
       }
       return { type: "item", id, kind: n.kind as "sticky" | "text" | "shape" | "frame", text: n.text, color: (n.style.color as StickyColor) ?? "yellow" };
