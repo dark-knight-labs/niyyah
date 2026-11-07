@@ -39,15 +39,6 @@ const open = async (page: Page, id: string) => { await page.goto(`/map?board=${i
 const menuIds = (page: Page) => page.locator('[data-testid="context-menu"] [data-top-item]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.cmd));
 
 const SUBS = ["@format", "@branch", "@arrange"];
-/** Every command a menu offers, submenus (Format, Branch, Arrange) opened. */
-async function menuAll(page: Page) {
-  const tops = (await menuIds(page)) as string[]; const out = tops.filter((i) => !i.startsWith("@"));
-  for (const s of tops.filter((i) => i.startsWith("@"))) {
-    await page.locator(`[data-top-item][data-cmd="${s}"]`).hover();
-    out.push(...(await page.locator(`[data-sub="${s}"] button`).evaluateAll((els) => [...new Set(els.map((e) => (e as HTMLElement).dataset.owner as string))])));
-  }
-  return out;
-}
 /** A menu item by command id; a command that lives in Format, Branch or Arrange opens that submenu first. With `choice`: that choice of the command. */
 async function menuItem(page: Page, cmd: string, choice?: string) {
   const top = page.locator(`[data-top-item][data-cmd="${cmd}"]`);
