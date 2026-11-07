@@ -163,6 +163,30 @@ test("copy, cut, paste, duplicate; outline paste makes a subtree; Copy as outlin
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("- Alpha\n  - Alpha child");
 });
 
+test("copying or duplicating a frame that holds a promoted (live) item makes no live copy and no 422; the selection is the created rows", async ({ page, request }) => {
+  const id = await board(request, "Frame with a live item", [
+    node("fr", "frame", { x: 100, y: 100, w: 520, h: 360, text: "Frame" }),
+    node("st", "sticky", { x: 140, y: 160, w: 170, h: 130, text: "Inside", frame_id: "fr" }),
+    node("lv", "ref", { ref_key: "task:9", x: 340, y: 160, w: 200, h: 80, text: "Promoted", frame_id: "fr" }),
+  ]);
+  const refused: string[] = [];
+  page.on("response", (r) => { if (r.url().includes("/ops") && r.status() >= 400) refused.push(`${r.status()}`); });
+  await open(page, id);
+  await page.getByTestId("frame-fr").locator(".nm-ft").click();
+  await page.keyboard.press("Control+c"); await page.keyboard.press("Control+v");
+  await page.keyboard.press("Control+d");
+  await settled(page);
+  expect(refused).toEqual([]);
+  const s = await server(request, id);
+  expect(s.nodes.filter((n) => n.kind === "frame")).toHaveLength(3);
+  expect(s.nodes.filter((n) => n.kind === "sticky")).toHaveLength(3);
+  expect(s.nodes.filter((n) => n.kind === "ref")).toHaveLength(1);                       // no copy of the live item
+  const sel = await page.locator(".react-flow__node.selected").evaluateAll((els) => els.map((e) => e.getAttribute("data-id")));
+  expect(sel).toHaveLength(2);                                                            // the duplicate frame and its sticky: exactly the rows just created
+  expect(sel.every((i) => !["fr", "st", "lv"].includes(i ?? ""))).toBe(true);
+  expect(s.nodes.filter((n) => sel.includes(n.id)).map((n) => n.kind).sort()).toEqual(["frame", "sticky"]);
+});
+
 test("Ctrl+F finds a thought and selects it; outside the canvas the browser keeps Ctrl+F", async ({ page, request }) => {
   const id = await board(request, "Find", [node("r", "mind", { x: 0, y: 0, text: "Root" }), node("a", "mind", { parent_id: "r", text: "Needle in a haystack", style: { side: "R", color: "violet" } }), node("b", "mind", { parent_id: "r", position: 1, text: "Hay", style: { side: "L", color: "orange" } })]);
   await open(page, id);

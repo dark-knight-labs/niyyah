@@ -44,6 +44,19 @@ describe("copy and paste", () => {
     expect(copySelection(data, ["live"])!.text).toBe("- live");
     expect(copySelection(data, ["fr"])!.nodes.map((n) => n.id).sort()).toEqual(["fr", "in"]);
   });
+  it("a frame's copy skips live (promoted) and unknown-kind members; paste creates no ref rows and returns only created ids", () => {
+    const d = dataFrom([row("fr", { kind: "frame", x: 0, y: 0, w: 400, h: 300 }), row("ok", { kind: "sticky", x: 10, y: 10, w: 100, h: 100, frame_id: "fr" }),
+      row("promoted", { kind: "ref", ref_key: "task:9", x: 20, y: 20, frame_id: "fr" }), row("odd", { kind: "hologram" as BoardNode["kind"], x: 30, y: 30, frame_id: "fr" })], []);
+    const clip = copySelection(d, ["fr"])!;
+    expect(clip.nodes.map((n) => n.id).sort()).toEqual(["fr", "ok"]);
+    expect(copySelection(d, ["odd"])?.nodes ?? []).toEqual([]);
+    const { ops, ids } = pasteClip(clip, { parent: null, pos: null, data: d });
+    const rows = ops.filter((o) => o.op === "upsert_node").map((o) => (o as { node: BoardNode }).node);
+    expect(rows.map((n) => n.kind).sort()).toEqual(["frame", "sticky"]);
+    expect(rows.every((n) => n.kind !== "ref" && n.ref_key === null)).toBe(true);
+    expect(ids.every((id) => rows.some((n) => n.id === id))).toBe(true); expect(ids).toHaveLength(2);
+    const after = applyOps(d, ops); expect([...after.nodes.values()].filter((n) => n.kind === "ref")).toHaveLength(1);   // still only the original
+  });
   it("paste as child: fresh ids, parent links remapped, top branch hangs under the target", () => {
     const clip = copySelection(data, ["a"])!;
     const { ops, ids } = pasteClip(clip, { parent: data.nodes.get("b")!, pos: null, data });

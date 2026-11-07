@@ -1,7 +1,7 @@
 import * as A from "./actions";
 import { childIndex, nextBranchOf, subtreeIds } from "./tree";
 import type { BoardData } from "./state";
-import type { BoardEdge, BoardNode, Op } from "./types";
+import { isKnownKind, type BoardEdge, type BoardNode, type Op } from "./types";
 
 /** What copy puts on the internal clipboard: full rows (ids as they were), the connectors between them, and the text twin (an outline). */
 export interface Clip { nodes: BoardNode[]; edges: BoardEdge[]; text: string; /** where the first item sat, to offset a paste */ at: { x: number; y: number } }
@@ -30,15 +30,18 @@ export function outlineOf(data: BoardData, ids: string[]): string {
   return lines.join("\n");
 }
 
+/** Rows a copy can carry: known kinds only. Live (ref) rows belong to the Plan and unknown kinds are not ours to duplicate; both would be refused by the API on paste. */
+const copyable = (n: BoardNode) => isKnownKind(n.kind) && n.kind !== "ref";
+
 /** Copy the selection: mind nodes with their branches, frames with what sits in them. Live (Plan) nodes are not copied as rows, only as text. */
 export function copySelection(data: BoardData, ids: string[]): Clip | null {
   const idx = childIndex(data.nodes);
   const take = new Set<string>();
   for (const id of ids) {
     const n = data.nodes.get(id);
-    if (!n || n.kind === "ref") continue;
+    if (!n || !copyable(n)) continue;
     if (n.kind === "mind") subtreeIds(idx, id).forEach((x) => { if (data.nodes.get(x)?.kind === "mind") take.add(x); });
-    else if (n.kind === "frame") { take.add(id); for (const m of data.nodes.values()) if (m.frame_id === id) take.add(m.id); }
+    else if (n.kind === "frame") { take.add(id); for (const m of data.nodes.values()) if (m.frame_id === id && copyable(m)) take.add(m.id); }
     else take.add(id);
   }
   const text = outlineOf(data, ids);
