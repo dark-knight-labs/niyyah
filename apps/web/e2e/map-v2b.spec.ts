@@ -37,6 +37,30 @@ const server = async (request: APIRequestContext, id: string) => (await api(requ
 const settled = async (page: Page) => { await page.waitForTimeout(700); await expect(page.getByTestId("save-status")).toHaveAttribute("data-status", "saved", { timeout: 15_000 }); };
 const open = async (page: Page, id: string) => { await page.goto(`/map?board=${id}`); await page.waitForSelector('[data-testid="map-canvas"] .react-flow__renderer'); await page.waitForSelector(".react-flow__node"); await page.waitForTimeout(700); };
 const menuIds = (page: Page) => page.locator('[data-testid="context-menu"] [data-top-item]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.cmd));
+
+const SUBS = ["@format", "@branch", "@arrange"];
+/** Every command a menu offers, submenus (Format, Branch, Arrange) opened. */
+async function menuAll(page: Page) {
+  const tops = (await menuIds(page)) as string[]; const out = tops.filter((i) => !i.startsWith("@"));
+  for (const s of tops.filter((i) => i.startsWith("@"))) {
+    await page.locator(`[data-top-item][data-cmd="${s}"]`).hover();
+    out.push(...(await page.locator(`[data-sub="${s}"] button`).evaluateAll((els) => [...new Set(els.map((e) => (e as HTMLElement).dataset.owner as string))])));
+  }
+  return out;
+}
+/** A menu item by command id; a command that lives in Format, Branch or Arrange opens that submenu first. With `choice`: that choice of the command. */
+async function menuItem(page: Page, cmd: string, choice?: string) {
+  const top = page.locator(`[data-top-item][data-cmd="${cmd}"]`);
+  if (await top.count()) { if (!choice) return top; await top.hover(); return page.locator(`[data-sub="${cmd}"] [data-choice="${choice}"]`); }
+  for (const s of SUBS) {
+    const t = page.locator(`[data-top-item][data-cmd="${s}"]`);
+    if (!(await t.count())) continue;
+    await t.hover();
+    const it = page.locator(`[data-sub="${s}"] [data-owner="${cmd}"]${choice ? `[data-choice="${choice}"]` : ""}`);
+    if (await it.count()) return it.first();
+  }
+  throw new Error(`no menu item ${cmd}`);
+}
 const pickSub = async (page: Page, cmd: string, choice: string) => { await page.locator(`[data-cmd="${cmd}"]`).hover(); await page.locator(`[data-sub="${cmd}"] [data-choice="${choice}"]`).click(); };
 const sticky = (page: Page, id: string) => page.getByTestId(`sticky-${id}`);
 const centre = async (loc: ReturnType<Page["locator"]>) => { const b = (await loc.boundingBox())!; return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
@@ -162,7 +186,7 @@ test("copy, cut, paste, duplicate; outline paste makes a subtree; Copy as outlin
   expect(p1.parent_id).toBe("r"); expect(s3.nodes.filter((n) => n.parent_id === p1.id).map((n) => n.text).sort()).toEqual(["Build", "Design"]); expect(s3.nodes.find((n) => n.text === "Phase two")!.parent_id).toBe("r");
   // Copy as outline (menu) puts Markdown on the system clipboard
   await page.mouse.click(900, 200);
-  await page.getByTestId("mind-a").click({ button: "right" }); await page.locator('[data-cmd="copyOutline"]').click();
+  await page.getByTestId("mind-a").click({ button: "right" }); await (await menuItem(page, "copyOutline")).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("- Alpha\n  - Alpha child");
 });
 

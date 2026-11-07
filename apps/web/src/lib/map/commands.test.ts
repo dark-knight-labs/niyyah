@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMMANDS, LIVE_BLOCKED, MENUS, REGISTRY, appliesTo, barOf, makeSel, resolveMenu, runCommand, type Env, type Kind } from "./commands";
+import { COMMANDS, LIVE_BLOCKED, MENUS, menuCommandIds, SUBMENUS, REGISTRY, appliesTo, barOf, makeSel, resolveMenu, runCommand, type Env, type Kind, type MenuItem } from "./commands";
 import { dataFrom } from "./state";
 import { childIndex } from "./tree";
 import type { BoardEdge, BoardNode, Op } from "./types";
@@ -16,7 +16,9 @@ const edge: BoardEdge = { id: "e1", from_id: "st", to_id: "sh", label: "", style
 const data = dataFrom(nodes, [edge]);
 const idx = childIndex(data.nodes);
 const sel = (ids: string[], extra = {}) => makeSel({ ids, data, idx, canMake: true, rects: new Map(nodes.map((n) => [n.id, { x: 0, y: 0, w: 100, h: 30 }])), ...extra });
-const ids = (s: ReturnType<typeof sel>) => resolveMenu(s).flat().map((i) => i.id);
+/** Every command a menu offers, submenus opened. */
+const flatten = (items: MenuItem[]): string[] => items.flatMap((i) => (i.children ? flatten(i.children) : [i.id]));
+const ids = (s: ReturnType<typeof sel>) => flatten(resolveMenu(s).flat());
 
 describe("selection kinds", () => {
   it("classifies", () => {
@@ -29,10 +31,13 @@ describe("selection kinds", () => {
 describe("registry", () => {
   it("every menu entry names a registered command, ids are unique", () => {
     expect(new Set(COMMANDS.map((c) => c.id)).size).toBe(COMMANDS.length);
-    for (const [kind, groups] of Object.entries(MENUS)) for (const g of groups) for (const id of g) expect(REGISTRY.has(id), `${kind}: ${id}`).toBe(true);
+    for (const [kind, groups] of Object.entries(MENUS)) for (const id of menuCommandIds(groups)) expect(REGISTRY.has(id), `${kind}: ${id}`).toBe(true);
   });
   it("every menu entry applies to the kind it is listed under", () => {
-    for (const [kind, groups] of Object.entries(MENUS)) for (const id of groups.flat()) expect(REGISTRY.get(id)!.kinds, `${kind}/${id}`).toContain(kind);
+    for (const [kind, groups] of Object.entries(MENUS)) for (const id of groups.flat()) {
+      const ids = id.startsWith("@") ? SUBMENUS[id].ids : [id];
+      expect(ids.some((i) => REGISTRY.get(i)!.kinds.includes(kind as Kind)), `${kind}/${id}`).toBe(true);   // a submenu may list commands of other kinds (they drop out), but not be empty for its own
+    }
   });
   it("mind menu offers structure, style, layout, and delete", () => {
     const m = ids(sel(["a"]));
@@ -50,6 +55,26 @@ describe("registry", () => {
   it("sticky gets eight colours", () => {
     const c = resolveMenu(sel(["st"])).flat().find((i) => i.id === "color")!;
     expect(c.choices!.map((x) => x.id)).toEqual(["yellow", "orange", "green", "teal", "blue", "violet", "pink", "gray"]);
+  });
+});
+
+describe("the thought menu", () => {
+  const OLD_MIND = ["child", "sibling", "parent", "edit", "note", "link", "unlink", "color", "fill", "mshape", "size", "bold", "icon", "layout", "branchLines", "organizeMap", "fold", "collapseBelow", "expandBelow", "focusBranch", "selectBranch", "moveUp", "moveDown", "copy", "cut", "pasteChild", "duplicate", "copyOutline", "detach", "toSticky", "lock", "attachImage", "attachFile", "make", "connect", "delete"];
+  it("keeps every command it had, but the top level is short: the rest sit in Format, Branch and Arrange", () => {
+    const m = resolveMenu(sel(["a"]), MENUS);
+    const top = m.flat();
+    expect(top.length).toBeLessThanOrEqual(18);
+    expect(top.filter((i) => i.children).map((i) => i.id)).toEqual(["@format", "@branch", "@arrange"]);
+    const offered = new Set(flatten(top));
+    for (const id of OLD_MIND) { const c = REGISTRY.get(id)!; if (appliesTo(c, sel(["a"]))) expect(offered, id).toContain(id); }
+    const arrange = top.find((i) => i.id === "@arrange")!.children!.map((i) => i.id);
+    expect(arrange).toEqual(expect.arrayContaining(["moveDown", "detach", "lock"]));
+    expect(top.find((i) => i.id === "@branch")!.children!.map((i) => i.id)).toEqual(expect.arrayContaining(["collapseBelow", "expandBelow", "focusBranch", "selectBranch", "copyOutline"]));
+    expect(top.map((i) => i.id)).toEqual(expect.arrayContaining(["child", "sibling", "edit", "color", "layout", "copy", "cut", "pasteChild", "duplicate", "delete"]));
+  });
+  it("a submenu with nothing that applies is not shown (a live node has no Arrange moves, but Lock stays)", () => {
+    const top = resolveMenu(sel(["live"])).flat();
+    expect(top.find((i) => i.id === "@arrange")!.children!.map((i) => i.id)).not.toEqual(expect.arrayContaining(["detach", "moveUp"]));
   });
 });
 
@@ -96,7 +121,7 @@ describe("window 2: objects, locks, connectors", () => {
   const more = [row("shp", { kind: "shape" }), row("lk", { kind: "sticky", style: { locked: true } }), row("e0", { kind: "sticky" })];
   const d2 = dataFrom([...nodes, ...more], [edge, { id: "e2", from_id: "st", to_id: "sh", label: "x", style: { path: "elbow" } }]);
   const s2 = (ids: string[]) => makeSel({ ids, data: d2, idx: childIndex(d2.nodes), rects: new Map(), canMake: true });
-  const mid = (ids: string[]) => resolveMenu(s2(ids)).flat().map((i) => i.id);
+  const mid = (ids: string[]) => flatten(resolveMenu(s2(ids)).flat());
   it("shape menu: 12 shapes, fill, border; edge menu: path, width, dash, heads, colour, label, swap", () => {
     const shape = resolveMenu(s2(["shp"])).flat();
     expect(shape.find((i) => i.id === "shapeKind")!.choices).toHaveLength(12);
@@ -128,7 +153,7 @@ describe("window F: images and files", () => {
   const media = [row("img", { kind: "image", style: { file_id: "f1", nw: 800, nh: 600 } }), row("doc", { kind: "file", text: "plan.pdf", style: { file_id: "f2" } })];
   const d3 = dataFrom([...nodes, ...media], []);
   const s3 = (ids: string[]) => makeSel({ ids, data: d3, idx: childIndex(d3.nodes), rects: new Map(), canMake: true });
-  const mid = (ids: string[]) => resolveMenu(s3(ids)).flat().map((i) => i.id);
+  const mid = (ids: string[]) => flatten(resolveMenu(s3(ids)).flat());
   it("image menu: caption, replace, reset size, open, download; file menu: rename, replace, download", () => {
     expect(mid(["img"])).toEqual(["edit", "replace", "resetSize", "openFull", "download", "copy", "cut", "duplicate", "order", "lock", "connect", "delete"]);
     expect(mid(["doc"])).toEqual(["edit", "replace", "download", "copy", "cut", "duplicate", "order", "lock", "connect", "delete"]);
@@ -140,7 +165,7 @@ describe("window F: images and files", () => {
   });
   it("a locked image can still be downloaded but not replaced or deleted", () => {
     const d4 = dataFrom([row("li", { kind: "image", style: { file_id: "f", locked: true } })], []);
-    const m = resolveMenu(makeSel({ ids: ["li"], data: d4, idx: childIndex(d4.nodes) })).flat().map((i) => i.id);
+    const m = flatten(resolveMenu(makeSel({ ids: ["li"], data: d4, idx: childIndex(d4.nodes) })).flat());
     expect(m).toEqual(expect.arrayContaining(["download", "openFull", "lock"])); expect(m).not.toContain("replace"); expect(m).not.toContain("delete");
   });
 });

@@ -35,6 +35,30 @@ const boxes = async (page: Page) => page.evaluate(() => Object.fromEntries([...d
 type Box = { x: number; y: number; w: number; h: number };
 const overlaps = (m: Record<string, Box>) => { const v = Object.entries(m); const out: string[] = []; for (let i = 0; i < v.length; i++) for (let j = i + 1; j < v.length; j++) { const a = v[i][1], b = v[j][1]; if (a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1) out.push(`${v[i][0]}/${v[j][0]}`); } return out; };
 const menuIds = (page: Page) => page.locator('[data-testid="context-menu"] [data-top-item]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.cmd));
+
+const SUBS = ["@format", "@branch", "@arrange"];
+/** Every command a menu offers, submenus (Format, Branch, Arrange) opened. */
+async function menuAll(page: Page) {
+  const tops = (await menuIds(page)) as string[]; const out = tops.filter((i) => !i.startsWith("@"));
+  for (const s of tops.filter((i) => i.startsWith("@"))) {
+    await page.locator(`[data-top-item][data-cmd="${s}"]`).hover();
+    out.push(...(await page.locator(`[data-sub="${s}"] button`).evaluateAll((els) => [...new Set(els.map((e) => (e as HTMLElement).dataset.owner as string))])));
+  }
+  return out;
+}
+/** A menu item by command id; a command that lives in Format, Branch or Arrange opens that submenu first. With `choice`: that choice of the command. */
+async function menuItem(page: Page, cmd: string, choice?: string) {
+  const top = page.locator(`[data-top-item][data-cmd="${cmd}"]`);
+  if (await top.count()) { if (!choice) return top; await top.hover(); return page.locator(`[data-sub="${cmd}"] [data-choice="${choice}"]`); }
+  for (const s of SUBS) {
+    const t = page.locator(`[data-top-item][data-cmd="${s}"]`);
+    if (!(await t.count())) continue;
+    await t.hover();
+    const it = page.locator(`[data-sub="${s}"] [data-owner="${cmd}"]${choice ? `[data-choice="${choice}"]` : ""}`);
+    if (await it.count()) return it.first();
+  }
+  throw new Error(`no menu item ${cmd}`);
+}
 /** Esc closes a submenu first (the pointer rests on the menu it opened from), then the menu. */
 const closeMenu = async (page: Page) => { for (let i = 0; i < 3 && (await page.getByTestId("context-menu").count()); i++) await page.keyboard.press("Escape"); };
 const rightClick = (page: Page, loc: ReturnType<Page["locator"]>) => loc.click({ button: "right" });
@@ -111,11 +135,15 @@ test("right-click menu item ids per kind", async ({ page, request }) => {
   await page.waitForTimeout(500);
 
   await rightClick(page, mindEl(page, "a0"));
-  expect(await menuIds(page)).toEqual(expect.arrayContaining(["child", "sibling", "parent", "edit", "note", "link", "color", "fill", "mshape", "size", "bold", "icon", "layout", "branchLines", "organizeMap", "fold", "detach", "connect", "delete"]));
-  expect(await menuIds(page)).not.toContain("toSticky");        // a0 has branches
+  const tops = await menuIds(page);
+  expect(tops.length, "the top level stays short").toBeLessThanOrEqual(18);
+  expect(tops).toEqual(expect.arrayContaining(["child", "sibling", "edit", "note", "link", "color", "@format", "layout", "fold", "@branch", "copy", "cut", "pasteChild", "duplicate", "@arrange", "connect", "delete"]));
+  const all = await menuAll(page);
+  expect(all).toEqual(expect.arrayContaining(["child", "sibling", "parent", "edit", "note", "link", "color", "fill", "mshape", "size", "bold", "icon", "layout", "branchLines", "organizeMap", "fold", "collapseBelow", "expandBelow", "focusBranch", "selectBranch", "copyOutline", "moveUp", "moveDown", "detach", "lock", "attachImage", "attachFile", "connect", "delete"]));
+  expect(all).not.toContain("toSticky");        // a0 has branches
   await closeMenu(page);
   await rightClick(page, mindEl(page, "r"));
-  const root = await menuIds(page);
+  const root = await menuAll(page);
   expect(root).toContain("child"); expect(root).not.toContain("sibling"); expect(root).not.toContain("detach");
   await closeMenu(page);
 
@@ -147,6 +175,27 @@ test("right-click menu item ids per kind", async ({ page, request }) => {
   await expect(page.getByTestId("context-menu")).toHaveCount(0);
 });
 
+test("a menu taller than the window scrolls inside it; every item can be reached and submenus stay on screen", async ({ page, request }) => {
+  const id = await board(request, "Tall menu", tree());
+  await page.setViewportSize({ width: 1400, height: 420 });
+  await open(page, `/map?board=${id}`);
+  await rightClick(page, mindEl(page, "a0"));
+  const menu = page.getByTestId("context-menu");
+  const box = (await menu.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0); expect(box.y + box.height).toBeLessThanOrEqual(420);
+  expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);                  // taller than the window: it scrolls
+  const ids = await menuIds(page);
+  await page.locator(`[data-cmd="${ids[0]}"]`).scrollIntoViewIfNeeded(); await expect(page.locator(`[data-cmd="${ids[0]}"]`)).toBeInViewport();
+  await page.locator(`[data-cmd="${ids.at(-1)}"]`).scrollIntoViewIfNeeded(); await expect(page.locator(`[data-cmd="${ids.at(-1)}"]`)).toBeInViewport();
+  await page.locator('[data-cmd="color"]').scrollIntoViewIfNeeded(); await page.locator('[data-cmd="color"]').hover();
+  const sub = page.locator('[data-sub="color"]'); await expect(sub).toBeVisible();
+  const sb = (await sub.boundingBox())!;
+  expect(sb.x).toBeGreaterThanOrEqual(0); expect(sb.x + sb.width).toBeLessThanOrEqual(1400); expect(sb.y).toBeGreaterThanOrEqual(0); expect(sb.y + sb.height).toBeLessThanOrEqual(420);
+  await sub.locator('[data-choice="rose"]').click();                                                  // and a choice in it still runs
+  await settled(page);
+  expect((await api(request, `/boards/${id}`)).nodes.find((n: { id: string }) => n.id === "a0").style.color).toBe("rose");
+});
+
 test("the board bar's Organize button is padded and divided like its neighbours", async ({ page, request }) => {
   const id = await board(request, "Bar", tree());
   await open(page, `/map?board=${id}`);
@@ -161,25 +210,23 @@ test("the board bar's Organize button is padded and divided like its neighbours"
   expect(m.lead).toBeGreaterThanOrEqual(11); expect(m.gap).toBeLessThanOrEqual(1);
 });
 
-test("a menu taller than the window scrolls inside it; every item can be reached and submenus stay on screen", async ({ page, request }) => {
-  const id = await board(request, "Tall menu", tree());
-  await page.setViewportSize({ width: 1400, height: 620 });
+test("while a right-click menu is open the floating bar is hidden, and it comes back after", async ({ page, request }) => {
+  const id = await board(request, "Bar under menu", tree());
   await open(page, `/map?board=${id}`);
+  await mindEl(page, "a0").click();
+  const bar = page.locator(".react-flow__node-toolbar").first();
+  await expect(bar).toBeVisible();
   await rightClick(page, mindEl(page, "a0"));
-  const menu = page.getByTestId("context-menu");
-  const box = (await menu.boundingBox())!;
-  expect(box.y).toBeGreaterThanOrEqual(0); expect(box.y + box.height).toBeLessThanOrEqual(620);
-  expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);                  // taller than the window: it scrolls
-  const ids = await menuIds(page);
-  await page.locator(`[data-cmd="${ids[0]}"]`).scrollIntoViewIfNeeded(); await expect(page.locator(`[data-cmd="${ids[0]}"]`)).toBeInViewport();
-  await page.locator(`[data-cmd="${ids.at(-1)}"]`).scrollIntoViewIfNeeded(); await expect(page.locator(`[data-cmd="${ids.at(-1)}"]`)).toBeInViewport();
-  await page.locator('[data-cmd="color"]').scrollIntoViewIfNeeded(); await page.locator('[data-cmd="color"]').hover();
-  const sub = page.locator('[data-sub="color"]'); await expect(sub).toBeVisible();
-  const sb = (await sub.boundingBox())!;
-  expect(sb.x).toBeGreaterThanOrEqual(0); expect(sb.x + sb.width).toBeLessThanOrEqual(1400); expect(sb.y).toBeGreaterThanOrEqual(0); expect(sb.y + sb.height).toBeLessThanOrEqual(620);
-  await sub.locator('[data-choice="rose"]').click();                                                  // and a choice in it still runs
-  await settled(page);
-  expect((await api(request, `/boards/${id}`)).nodes.find((n: { id: string }) => n.id === "a0").style.color).toBe("rose");
+  await expect(page.getByTestId("context-menu")).toBeVisible();
+  await expect(bar).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("context-menu")).toHaveCount(0);
+  await expect(bar).toBeVisible();
+  // the multi-selection bar too
+  await page.keyboard.press("Control+a");
+  await expect(page.getByTestId("multi-bar")).toBeVisible();
+  await rightClick(page, mindEl(page, "a0"));
+  await expect(page.getByTestId("multi-bar")).toBeHidden();
 });
 
 test("the floating bar's more button opens the same menu; the menu runs commands", async ({ page, request }) => {
@@ -227,8 +274,7 @@ test("mind style from the menu persists after reload; Link, Add parent, Move dow
   const clear = async (p: Page) => { await p.keyboard.press("Escape"); await p.mouse.click(1100, 140); };   // the floating bar of the last pick can sit over the next node
   const pick = async (nodeId: string, cmd: string, choice?: string) => {
     await clear(page); await rightClick(page, mindEl(page, nodeId));
-    const item = page.locator(`[data-cmd="${cmd}"]`);
-    if (choice) { await item.hover(); await page.locator(`[data-sub="${cmd}"] [data-choice="${choice}"]`).click(); } else await item.click();
+    await (await menuItem(page, cmd, choice)).click();
   };
   await pick("b", "color", "rose"); await pick("b", "fill", "solid"); await pick("b", "mshape", "pill"); await pick("b", "size", "L"); await pick("b", "icon", "💡"); await pick("b", "bold");
   await settled(page);
@@ -248,7 +294,7 @@ test("mind style from the menu persists after reload; Link, Add parent, Move dow
   expect(pos).toEqual(["c1", "c0"]);
 
   // Add parent
-  await clear(page); await rightClick(page, mindEl(page, "a1")); await page.locator('[data-cmd="parent"]').click();
+  await clear(page); await rightClick(page, mindEl(page, "a1")); await (await menuItem(page, "parent")).click();
   await page.waitForFunction(() => { const a = document.activeElement as HTMLElement | null; return !!a && a.isContentEditable; });
   await page.keyboard.type("Middle"); await page.keyboard.press("Escape"); await settled(page);
   const s2 = await api(request, `/boards/${id}`);
@@ -256,16 +302,16 @@ test("mind style from the menu persists after reload; Link, Add parent, Move dow
   expect(mid.parent_id).toBe("a"); expect(s2.nodes.find((n: { id: string }) => n.id === "a1").parent_id).toBe(mid.id);
 
   // Detach as new map
-  await clear(page); await rightClick(page, mindEl(page, "c1")); await page.locator('[data-cmd="detach"]').click(); await settled(page);
+  await clear(page); await rightClick(page, mindEl(page, "c1")); await (await menuItem(page, "detach")).click(); await settled(page);
   const s3 = await api(request, `/boards/${id}`);
   expect(s3.nodes.find((n: { id: string }) => n.id === "c1").parent_id).toBeNull();
 
   // Convert to sticky (a leaf)
-  await clear(page); await rightClick(page, mindEl(page, "c0")); await page.locator('[data-cmd="toSticky"]').click(); await settled(page);
+  await clear(page); await rightClick(page, mindEl(page, "c0")); await (await menuItem(page, "toSticky")).click(); await settled(page);
   expect((await api(request, `/boards/${id}`)).nodes.find((n: { id: string }) => n.id === "c0").kind).toBe("sticky");
 
   // Focus branch dims the rest, Esc clears it
-  await clear(page); await rightClick(page, mindEl(page, "a")); await page.locator('[data-cmd="focusBranch"]').click();
+  await clear(page); await rightClick(page, mindEl(page, "a")); await (await menuItem(page, "focusBranch")).click();
   await expect(mindEl(page, "r2")).toHaveClass(/nm-dim/);
   await page.keyboard.press("Escape");
   await expect(mindEl(page, "r2")).not.toHaveClass(/nm-dim/);
@@ -276,7 +322,7 @@ test("live node menu has none of Edit text, Delete, Delete branch, Cut, Convert,
   await page.getByRole("button", { name: "Fit everything" }).click(); await page.waitForTimeout(400);
   const live = page.locator('[data-testid^="mind-stream:"]').first();
   await rightClick(page, live);
-  const ids = await menuIds(page);
+  const ids = await menuAll(page);
   expect(ids).toEqual(expect.arrayContaining(["hide", "color", "layout", "connect"]));
   for (const bad of ["edit", "delete", "deleteBranch", "cut", "convert", "toSticky", "detach", "parent", "sibling", "note", "make"]) expect(ids, bad).not.toContain(bad);
   await page.keyboard.press("Escape");

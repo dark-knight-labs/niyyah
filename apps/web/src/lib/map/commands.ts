@@ -431,8 +431,8 @@ export const REGISTRY: ReadonlyMap<string, Command> = new Map(COMMANDS.map((c) =
 
 /** Menu layout per kind: groups (a hairline between them), each a list of command ids. Resolution hides what does not apply. */
 export const MENUS: Record<Kind, string[][]> = {
-  mind: [["child", "sibling", "parent"], ["edit", "note", "link", "unlink"], ["color", "fill", "mshape", "size", "bold", "icon"], ["layout", "branchLines", "organizeMap"], ["fold", "collapseBelow", "expandBelow", "focusBranch", "selectBranch"], ["moveUp", "moveDown"], ["copy", "cut", "pasteChild", "duplicate", "copyOutline"], ["detach", "toSticky", "lock"], ["attachImage", "attachFile"], ["make", "connect"], ["delete"]],
-  live: [["child"], ["link", "unlink"], ["color", "fill", "mshape", "size", "bold", "icon"], ["layout", "branchLines", "organizeMap"], ["fold", "collapseBelow", "expandBelow", "focusBranch", "selectBranch"], ["copy", "copyOutline", "lock"], ["showInPlan", "connect"], ["hide"]],
+  mind: [["child", "sibling"], ["edit", "note", "link"], ["color", "@format", "layout"], ["fold", "@branch"], ["copy", "cut", "pasteChild", "duplicate"], ["@arrange"], ["make", "connect"], ["delete"]],
+  live: [["child"], ["link"], ["color", "@format", "layout"], ["fold", "@branch"], ["copy"], ["@arrange"], ["showInPlan", "connect"], ["hide"]],
   sticky: [["edit"], ["color", "size", "bold", "talign"], ["convert"], ["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
   shape: [["edit"], ["shapeKind", "color", "border", "bw", "dash", "size", "bold", "talign"], ["convert"], ["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
   text: [["edit"], ["size", "bold", "talign"], ["convert"], ["copy", "cut", "duplicate"], ["order", "lock"], ["connect"], ["delete"]],
@@ -444,6 +444,18 @@ export const MENUS: Record<Kind, string[][]> = {
   pane: [["addSticky", "addMind", "addShape", "addText", "addFrame", "addImage"], ["paste", "selectAll", "find"], ["organizeAll", "toggleSnap"], ["fit", "minimap", "help"]],
 };
 
+/**
+ * Menu entries that open a submenu of other commands (an id starting with "@" in MENUS). Every command stays in the registry and keeps its
+ * own id, shortcut and rules; a submenu only drops from the menu what does not apply, and disappears when nothing in it does.
+ */
+export const SUBMENUS: Record<string, { label: string; ids: string[] }> = {
+  "@format": { label: "Format", ids: ["fill", "mshape", "size", "icon", "bold", "branchLines"] },
+  "@branch": { label: "Branch", ids: ["collapseBelow", "expandBelow", "focusBranch", "selectBranch", "copyOutline"] },
+  "@arrange": { label: "Arrange", ids: ["parent", "moveUp", "moveDown", "organizeMap", "detach", "toSticky", "unlink", "lock", "attachImage", "attachFile"] },
+};
+/** Every command id a menu layout names, submenus expanded. */
+export const menuCommandIds = (groups: string[][]): string[] => groups.flat().flatMap((id) => (id.startsWith("@") ? SUBMENUS[id].ids : [id]));
+
 export interface MenuItem {
   id: string;
   label: string;
@@ -453,6 +465,8 @@ export interface MenuItem {
   danger?: boolean;
   /** A submenu: the choices, one of them checked. */
   choices?: (Choice & { checked: boolean })[];
+  /** A submenu of commands (a "@…" entry): each child is a normal item, a child with choices is listed as a labelled section. */
+  children?: MenuItem[];
 }
 
 /** The menu for a selection: groups of the commands that apply, empty groups dropped. */
@@ -460,14 +474,20 @@ export function resolveMenu(s: Sel, menus: Record<Kind, string[][]> = MENUS): Me
   const out: MenuItem[][] = [];
   for (const group of menus[s.kind]) {
     const items: MenuItem[] = [];
-    for (const id of group) {
+    const one = (id: string): MenuItem | null => {
       const c = REGISTRY.get(id);
-      if (!c || !appliesTo(c, s)) continue;
+      if (!c || !appliesTo(c, s)) return null;
       const cur = c.current?.(s);
       const item: MenuItem = { id, label: labelOf(c, s), kbd: c.kbd, disabled: !isEnabled(c, s), danger: c.danger };
       if (c.choices) item.choices = c.choices(s).map((ch) => ({ ...ch, checked: cur === ch.id }));
       else if (typeof cur === "boolean") item.checked = cur;
-      items.push(item);
+      return item;
+    };
+    for (const id of group) {
+      if (id.startsWith("@")) {
+        const children = SUBMENUS[id].ids.map(one).filter((i): i is MenuItem => !!i);
+        if (children.length) items.push({ id, label: SUBMENUS[id].label, children });
+      } else { const item = one(id); if (item) items.push(item); }
     }
     if (items.length) out.push(items);
   }

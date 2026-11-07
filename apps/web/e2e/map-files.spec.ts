@@ -35,6 +35,30 @@ const settled = async (page: Page) => { await page.waitForTimeout(700); await ex
 const open = async (page: Page, id: string) => { await page.goto(`/map?board=${id}`); await page.waitForSelector('[data-testid="map-canvas"] .react-flow__renderer'); await page.waitForTimeout(700); };
 const menuIds = (page: Page) => page.locator('[data-testid="context-menu"] [data-top-item]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.cmd));
 
+const SUBS = ["@format", "@branch", "@arrange"];
+/** Every command a menu offers, submenus (Format, Branch, Arrange) opened. */
+async function menuAll(page: Page) {
+  const tops = (await menuIds(page)) as string[]; const out = tops.filter((i) => !i.startsWith("@"));
+  for (const s of tops.filter((i) => i.startsWith("@"))) {
+    await page.locator(`[data-top-item][data-cmd="${s}"]`).hover();
+    out.push(...(await page.locator(`[data-sub="${s}"] button`).evaluateAll((els) => [...new Set(els.map((e) => (e as HTMLElement).dataset.owner as string))])));
+  }
+  return out;
+}
+/** A menu item by command id; a command that lives in Format, Branch or Arrange opens that submenu first. With `choice`: that choice of the command. */
+async function menuItem(page: Page, cmd: string, choice?: string) {
+  const top = page.locator(`[data-top-item][data-cmd="${cmd}"]`);
+  if (await top.count()) { if (!choice) return top; await top.hover(); return page.locator(`[data-sub="${cmd}"] [data-choice="${choice}"]`); }
+  for (const s of SUBS) {
+    const t = page.locator(`[data-top-item][data-cmd="${s}"]`);
+    if (!(await t.count())) continue;
+    await t.hover();
+    const it = page.locator(`[data-sub="${s}"] [data-owner="${cmd}"]${choice ? `[data-choice="${choice}"]` : ""}`);
+    if (await it.count()) return it.first();
+  }
+  throw new Error(`no menu item ${cmd}`);
+}
+
 /** A PNG made in the page (noise, so it is big): returns base64. */
 const makePng = (page: Page, w: number, h: number) => page.evaluate(({ w, h }) => {
   const c = document.createElement("canvas"); c.width = w; c.height = h;
@@ -146,8 +170,8 @@ test("a thought attaches an image and gets a connector to it", async ({ page, re
   const id = await board(request, "Attach", [node("r", "mind", { x: 0, y: 0, text: "Idea" })]);
   await open(page, id);
   await page.getByTestId("mind-r").click({ button: "right" });
-  expect(await menuIds(page)).toEqual(expect.arrayContaining(["attachImage", "attachFile"]));
-  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator('[data-cmd="attachImage"]').click()]);
+  expect(await menuAll(page)).toEqual(expect.arrayContaining(["attachImage", "attachFile"]));
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), (await menuItem(page, "attachImage")).click()]);
   await chooser.setFiles({ name: "dot.png", mimeType: "image/png", buffer: Buffer.from(PNG1, "base64") });
   await expect(page.locator('[data-testid^="image-"]')).toBeVisible({ timeout: 15_000 });
   await settled(page);

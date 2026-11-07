@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MenuItem } from "@/lib/map/commands";
 
 /**
  * The right-click menu. Groups divided by hairlines; items with choices open a submenu. Keyboard: Up/Down/Home/End move, Right opens a
  * submenu, Left or Esc closes it (Esc on the top level closes the menu), Enter or Space runs. Opens at (x, y) and flips at the edges.
  */
+/** What a submenu lists, flattened to runnable entries: the choices of a choice item, or the children of a command submenu (a child with choices becomes a labelled section). */
+type Entry = { cmd: string; choice?: string; label: string; checked?: boolean; swatch?: string; disabled?: boolean; kbd?: string; section?: string; danger?: boolean };
+function entriesOf(it: MenuItem): Entry[] {
+  if (it.choices) return it.choices.map((c) => ({ cmd: it.id, choice: c.id, label: c.label, checked: c.checked, swatch: c.swatch }));
+  return (it.children ?? []).flatMap((c): Entry[] => c.choices
+    ? c.choices.map((ch, i) => ({ cmd: c.id, choice: ch.id, label: ch.label, checked: ch.checked, swatch: ch.swatch, section: i === 0 ? c.label : undefined }))
+    : [{ cmd: c.id, label: c.label, checked: c.checked, disabled: c.disabled, kbd: c.kbd, danger: c.danger }]);
+}
+const hasSub = (it: MenuItem | undefined) => !!(it?.choices || it?.children);
+
 export function ContextMenu({ x, y, groups, label, onRun, onClose }: {
   x: number; y: number; groups: MenuItem[][]; label: string; onRun: (id: string, choice?: string) => void; onClose: () => void;
 }) {
@@ -38,7 +48,7 @@ export function ContextMenu({ x, y, groups, label, onRun, onClose }: {
 
   useEffect(() => {
     const el = ref.current;
-    const items = el?.querySelectorAll<HTMLElement>(open ? `[data-sub="${open}"] [role=menuitemradio]` : "[data-top-item]");
+    const items = el?.querySelectorAll<HTMLElement>(open ? `[data-sub="${open}"] button` : "[data-top-item]");
     items?.[open ? subActive : active]?.focus();
   }, [active, open, subActive]);
 
@@ -56,9 +66,10 @@ export function ContextMenu({ x, y, groups, label, onRun, onClose }: {
     return from;
   };
 
+  const firstSub = (it: MenuItem) => Math.max(0, entriesOf(it).findIndex((c) => c.checked));
   const onKeyDown = (e: React.KeyboardEvent) => {
     const cur = flat[active];
-    const subs = open ? cur?.choices ?? [] : [];
+    const subs = open && cur ? entriesOf(cur) : [];
     const stop = () => { e.preventDefault(); e.stopPropagation(); };
     if (e.key === "Escape") { stop(); if (open) setOpen(null); else onClose(); return; }
     if (e.key === "Tab") { stop(); onClose(); return; }
@@ -66,17 +77,17 @@ export function ContextMenu({ x, y, groups, label, onRun, onClose }: {
       if (e.key === "ArrowDown") { stop(); setSubActive(step(subActive, 1, subs)); }
       else if (e.key === "ArrowUp") { stop(); setSubActive(step(subActive, -1, subs)); }
       else if (e.key === "ArrowLeft") { stop(); setOpen(null); }
-      else if (e.key === "Enter" || e.key === " ") { stop(); const c = subs[subActive]; if (c) { onRun(cur.id, c.id); onClose(); } }
+      else if (e.key === "Enter" || e.key === " ") { stop(); const c = subs[subActive]; if (c && !c.disabled) { onRun(c.cmd, c.choice); onClose(); } }
       return;
     }
     if (e.key === "ArrowDown") { stop(); setActive(step(active, 1, flat)); }
     else if (e.key === "ArrowUp") { stop(); setActive(step(active, -1, flat)); }
     else if (e.key === "Home") { stop(); setActive(step(-1, 1, flat)); }
     else if (e.key === "End") { stop(); setActive(step(flat.length, -1, flat)); }
-    else if (e.key === "ArrowRight" && cur?.choices) { stop(); setOpen(cur.id); setSubActive(Math.max(0, cur.choices.findIndex((c) => c.checked))); }
+    else if (e.key === "ArrowRight" && hasSub(cur)) { stop(); setOpen(cur.id); setSubActive(firstSub(cur)); }
     else if ((e.key === "Enter" || e.key === " ") && cur && !cur.disabled) {
       stop();
-      if (cur.choices) { setOpen(cur.id); setSubActive(Math.max(0, cur.choices.findIndex((c) => c.checked))); } else { onRun(cur.id); onClose(); }
+      if (hasSub(cur)) { setOpen(cur.id); setSubActive(firstSub(cur)); } else { onRun(cur.id); onClose(); }
     }
   };
 
@@ -88,26 +99,31 @@ export function ContextMenu({ x, y, groups, label, onRun, onClose }: {
           {gi > 0 && <hr />}
           {g.map((it) => {
             const i = ++n;
-            const sub = open === it.id && it.choices;
+            const sub = open === it.id && hasSub(it);
             return (
-              <div key={it.id} className="nm-cm-row" onPointerEnter={() => { if (!it.disabled) { setActive(i); setOpen(it.choices ? it.id : null); setSubActive(0); } }}>
-                <button type="button" role={it.checked !== undefined ? "menuitemcheckbox" : "menuitem"} aria-checked={it.checked} aria-haspopup={it.choices ? "menu" : undefined} aria-expanded={it.choices ? open === it.id : undefined}
+              <div key={it.id} className="nm-cm-row" onPointerEnter={() => { if (!it.disabled) { setActive(i); setOpen(hasSub(it) ? it.id : null); setSubActive(0); } }}>
+                <button type="button" role={it.checked !== undefined ? "menuitemcheckbox" : "menuitem"} aria-checked={it.checked} aria-haspopup={hasSub(it) ? "menu" : undefined} aria-expanded={hasSub(it) ? open === it.id : undefined}
                   aria-disabled={it.disabled || undefined} tabIndex={-1} data-top-item data-cmd={it.id} className={it.danger ? "danger" : undefined}
-                  onClick={() => { if (it.disabled) return; if (it.choices) { setOpen(it.id); return; } onRun(it.id); onClose(); }}>
+                  onClick={() => { if (it.disabled) return; if (hasSub(it)) { setOpen(it.id); return; } onRun(it.id); onClose(); }}>
                   <span className="nm-cm-ck" aria-hidden="true">{it.checked ? "✓" : ""}</span>
                   <span className="nm-cm-l">{it.label}</span>
                   {it.kbd && <kbd>{it.kbd}</kbd>}
-                  {it.choices && <span className="nm-cm-ar" aria-hidden="true">▸</span>}
+                  {hasSub(it) && <span className="nm-cm-ar" aria-hidden="true">▸</span>}
                 </button>
                 {sub && (
                   <div ref={subRef} className="nm-cm nm-cm-sub" role="menu" aria-label={it.label} data-sub={it.id} style={subPos ? { left: subPos.left, top: subPos.top } : { visibility: "hidden" }}>
-                    {it.choices!.map((c, ci) => (
-                      <button key={c.id || "none"} type="button" role="menuitemradio" aria-checked={c.checked} tabIndex={-1} data-choice={c.id} className={ci === subActive ? "act" : undefined}
-                        onPointerEnter={() => setSubActive(ci)} onClick={() => { onRun(it.id, c.id); onClose(); }}>
-                        <span className="nm-cm-ck" aria-hidden="true">{c.checked ? "✓" : ""}</span>
-                        {c.swatch && <i className="nm-cm-sw" style={{ background: c.swatch }} />}
-                        <span className="nm-cm-l">{c.label}</span>
-                      </button>
+                    {entriesOf(it).map((c, ci) => (
+                      <Fragment key={`${c.cmd}:${c.choice ?? ""}`}>
+                        {c.section && <div className="nm-cm-h" aria-hidden="true">{c.section}</div>}
+                        <button type="button" role={c.choice !== undefined ? "menuitemradio" : "menuitem"} aria-checked={c.checked} aria-disabled={c.disabled || undefined} tabIndex={-1} data-cmd={c.choice === undefined ? c.cmd : undefined} data-choice={c.choice ?? c.cmd} data-owner={c.cmd}
+                          className={`${ci === subActive ? "act" : ""} ${c.danger ? "danger" : ""}`.trim() || undefined}
+                          onPointerEnter={() => setSubActive(ci)} onClick={() => { if (c.disabled) return; onRun(c.cmd, c.choice); onClose(); }}>
+                          <span className="nm-cm-ck" aria-hidden="true">{c.checked ? "✓" : ""}</span>
+                          {c.swatch && <i className="nm-cm-sw" style={{ background: c.swatch }} />}
+                          <span className="nm-cm-l">{c.label}</span>
+                          {c.kbd && <kbd>{c.kbd}</kbd>}
+                        </button>
+                      </Fragment>
                     ))}
                   </div>
                 )}
