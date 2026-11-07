@@ -52,9 +52,12 @@ async function drag(page: Page, from: { x: number; y: number }, to: { x: number;
 test("all 12 shapes render; a sticky offers 8 colours", async ({ page, request }) => {
   const ops = SHAPE_IDS.map((s, i) => node(`sh-${s}`, "shape", { x: (i % 4) * 230, y: Math.floor(i / 4) * 150, w: 170, h: 100, text: s, style: s === "rect" ? {} : { shape: s, color: i % 2 ? "teal" : "orange" } }));
   ops.push(node("st", "sticky", { x: 1000, y: 0, w: 170, h: 130, style: { color: "yellow" } }));
+  ops.push(node("odd", "shape", { x: 1000, y: 300, w: 170, h: 100, text: "odd", style: { shape: "diamond", color: "sky", border: "nope" } }));   // a colour key the shape palette does not have
   const id = await board(request, "Shapes", ops);
   await open(page, id);
   expect(SHAPE_IDS).toHaveLength(12);
+  const odd = await page.getByTestId("shape-odd").locator("svg path").first().evaluate((p) => ({ fill: getComputedStyle(p).fill, stroke: getComputedStyle(p).stroke }));
+  expect(odd.fill, "an unknown fill key falls back to paper, not black").not.toBe("rgb(0, 0, 0)"); expect(odd.stroke).not.toBe("none");
   for (const s of SHAPE_IDS) {
     const el = page.getByTestId(`shape-sh-${s}`);
     await expect(el, s).toBeVisible();

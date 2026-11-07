@@ -68,8 +68,8 @@ export const TextNode = memo(function TextNode({ id, data, selected }: NodeProps
   );
 });
 
-const fillVar = (c: string | undefined) => (!c ? "var(--surface)" : c === "none" ? "transparent" : `var(--map-sticky-${c})`);
-const strokeVar = (k: string | undefined) => (!k || k === "ink" ? "var(--foreground)" : `var(--stream-${k})`);
+const fillVar = (c: string | undefined) => (!c ? "var(--surface)" : c === "none" ? "transparent" : `var(--map-sticky-${c}, var(--surface))`);   // an unknown key (old row, import, a mind colour such as "sky") falls back to paper, never to black
+const strokeVar = (k: string | undefined) => (!k || k === "ink" ? "var(--foreground)" : `var(--stream-${k}, var(--foreground))`);
 const DASH_ARR: Record<string, string> = { solid: "none", dashed: "7 5", dotted: "1.5 4" };
 
 /** One of 12 shapes: rectangle, rounded and ellipse are bordered boxes; the rest are SVG paths stretched to the object. */
