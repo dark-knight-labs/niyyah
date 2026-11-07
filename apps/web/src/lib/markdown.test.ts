@@ -28,3 +28,35 @@ describe("markdown", () => {
     expect(parseMarkdown("one\ntwo")).toEqual([{ t: "p", c: [{ t: "text", v: "one two" }] }]);
   });
 });
+
+describe("markdown limits", () => {
+  it("renders a 200 KB markup-free answer fast", () => {
+    const src = "word ".repeat(40_000);
+    const t0 = performance.now();
+    const spans = inline(src);
+    expect(performance.now() - t0).toBeLessThan(200);
+    expect(spans).toHaveLength(1);
+    const t1 = performance.now();
+    parseMarkdown(src);
+    expect(performance.now() - t1).toBeLessThan(200);
+  });
+  it("does not throw on 50 KB of alternating unmatched emphasis", () => {
+    const src = "*a _b ".repeat(8_500);
+    const t0 = performance.now();
+    expect(() => inline(src)).not.toThrow();
+    expect(performance.now() - t0).toBeLessThan(2000);
+  });
+  it("is linear on unmatched ** and backticks and brackets", () => {
+    for (const unit of ["** ", "` ", "[a](", "_a "]) {
+      const t0 = performance.now();
+      inline(unit.repeat(20_000));
+      expect(performance.now() - t0).toBeLessThan(2000);
+    }
+  });
+  it("shows emphasis nested deeper than the limit as plain text", () => {
+    const deep = inline("*a **b *c **d *e* d** c* b** a*");
+    const depthOf = (spans: ReturnType<typeof inline>): number => Math.max(0, ...spans.map((x) => ("c" in x ? 1 + depthOf(x.c) : 0)));
+    expect(depthOf(deep)).toBeLessThanOrEqual(3);
+    expect(depthOf(inline("*".repeat(5_000) + "a" + "*".repeat(5_000)))).toBeLessThanOrEqual(3);
+  });
+});

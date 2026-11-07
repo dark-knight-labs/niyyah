@@ -20,29 +20,47 @@ export function safeHref(href: string): string | null {
   return /^(https?:\/\/|mailto:)/i.test(h) ? h : null;
 }
 
-export function inline(src: string): Span[] {
+// Sticky patterns, tried at the cursor only; every body is length-bounded so one failed attempt costs O(500), never O(rest of the answer).
+const CODE = /`([^`\n]{1,500})`/y;
+const STRONG = /\*\*(?=\S)([^\n]{1,500}?)(?<=\S)\*\*/y;
+const EM = /(?:\*(?=\S)([^*\n]{1,500}?)(?<=\S)\*|_(?=\S)([^_\n]{1,500}?)(?<=\S)_)/y;
+const LINK = /\[([^\]\n]{1,300})\]\(([^)\s]{1,2000})\)/y;
+const SPECIAL = /[`*_[]/g;
+
+/** Emphasis, links and code nested deeper than this are shown as plain text. */
+export const MAX_NESTING = 3;
+
+function matchAt(re: RegExp, src: string, i: number): RegExpExecArray | null {
+  re.lastIndex = i;
+  return re.exec(src);
+}
+
+export function inline(src: string, depth = 0): Span[] {
   const out: Span[] = [];
   let i = 0;
-  let buf = "";
-  const flush = () => { if (buf) out.push({ t: "text", v: buf }); buf = ""; };
+  let from = 0; // start of the pending plain text
+  const flush = (to: number) => { if (to > from) out.push({ t: "text", v: src.slice(from, to) }); };
   while (i < src.length) {
-    const rest = src.slice(i);
-    let m: RegExpMatchArray | null;
-    if ((m = rest.match(/^`([^`\n]+)`/))) { flush(); out.push({ t: "code", v: m[1] }); i += m[0].length; continue; }
-    if ((m = rest.match(/^\*\*(?=\S)([\s\S]+?)(?<=\S)\*\*/))) { flush(); out.push({ t: "strong", c: inline(m[1]) }); i += m[0].length; continue; }
-    if ((m = rest.match(/^(?:\*(?=\S)([^*\n]+?)(?<=\S)\*|_(?=\S)([^_\n]+?)(?<=\S)_)/))) { flush(); out.push({ t: "em", c: inline(m[1] ?? m[2]) }); i += m[0].length; continue; }
-    if ((m = rest.match(/^\[([^\]\n]+)\]\(([^)\s]+)\)/))) {
+    SPECIAL.lastIndex = i;
+    const next = SPECIAL.exec(src);
+    if (!next) break;
+    i = next.index;
+    let m: RegExpExecArray | null;
+    let span: Span | null = null;
+    if ((m = matchAt(CODE, src, i))) span = { t: "code", v: m[1] };
+    else if (depth < MAX_NESTING && (m = matchAt(STRONG, src, i))) span = { t: "strong", c: inline(m[1], depth + 1) };
+    else if (depth < MAX_NESTING && (m = matchAt(EM, src, i))) span = { t: "em", c: inline(m[1] ?? m[2], depth + 1) };
+    else if (depth < MAX_NESTING && (m = matchAt(LINK, src, i))) {
       const href = safeHref(m[2]);
-      flush();
-      if (href) out.push({ t: "link", href, c: inline(m[1]) });
-      else out.push({ t: "text", v: m[1] });
-      i += m[0].length;
-      continue;
+      span = href ? { t: "link", href, c: inline(m[1], depth + 1) } : { t: "text", v: m[1] };
     }
-    buf += src[i];
-    i += 1;
+    if (!span || !m) { i += 1; continue; }
+    flush(i);
+    out.push(span);
+    i += m[0].length;
+    from = i;
   }
-  flush();
+  flush(src.length);
   return out;
 }
 

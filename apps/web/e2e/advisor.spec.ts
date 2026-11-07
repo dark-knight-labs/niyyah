@@ -124,15 +124,16 @@ test("approve reloads the plan and moves the proposal to decisions; reject does 
   const seen = await mockAdvisor(page);
   await openPlan(page);
   await expect(panel(page).getByText("2 waiting")).toBeVisible();
+  await expect(panel(page).getByRole("button", { name: "Approve: Call the electrician" })).toBeVisible();
   const before = seen.pipelinesLoads;
   expect(seen.proposalGets).toBe(1); // the probe, once
-  await panel(page).getByRole("button", { name: "Approve" }).first().click();
+  await panel(page).getByRole("button", { name: /^Approve/ }).first().click();
   await expect(panel(page).getByText("1 waiting")).toBeVisible();
   expect(seen.decisions).toEqual(["approve 1"]);
   await expect.poll(() => seen.proposalGets).toBe(2); // refreshed by the same call, not a new probe on a remounted panel
   await expect.poll(() => seen.pipelinesLoads).toBeGreaterThan(before);
   const after = seen.pipelinesLoads;
-  await panel(page).getByRole("button", { name: "Reject" }).click();
+  await panel(page).getByRole("button", { name: /^Reject/ }).click();
   await expect(panel(page).getByText(/^nothing waiting · /)).toBeVisible();
   expect(seen.decisions).toEqual(["approve 1", "reject 2"]);
   await page.waitForTimeout(500);
@@ -145,12 +146,12 @@ test("approve refusals show the server's detail: 422 stays pending, stale 409 ex
   let refuse: { status: number; detail: string } = { status: 422, detail: "item not found" };
   await mockAdvisor(page, { "POST /proposals/1/approve": (r) => json(r, refuse.status, { detail: refuse.detail }) });
   await openPlan(page);
-  await panel(page).getByRole("button", { name: "Approve" }).first().click();
+  await panel(page).getByRole("button", { name: /^Approve/ }).first().click();
   await expect(panel(page).getByRole("alert")).toContainText("item not found");
   await expect(panel(page).getByRole("alert")).toContainText("still waiting");
   await expect(panel(page).getByText("2 waiting")).toBeVisible();
   refuse = { status: 409, detail: "stale: the item moved" };
-  await panel(page).getByRole("button", { name: "Approve" }).first().click();
+  await panel(page).getByRole("button", { name: /^Approve/ }).first().click();
   await expect(panel(page).getByRole("alert")).toContainText("the item moved");
   await expect(panel(page).getByRole("alert")).toContainText("not applied");
 });

@@ -2,13 +2,13 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { advisorApi, type Proposal } from "@/lib/advisor-api";
-import { QUICK_PROMPTS, askErrorMessage, askWithTimeout, decide, filteredNote, isAbort, kindLabel, probeAdvisor } from "@/lib/advisor";
+import { ASK_TIMEOUT_MS, QUICK_PROMPTS, askErrorMessage, askWithTimeout, decide, filteredNote, isAbort, kindLabel, probeAdvisor } from "@/lib/advisor";
 import { parseMarkdown, type Block, type Span } from "@/lib/markdown";
 
 const COLLAPSED_KEY = "niyyah.advisor.collapsed";
 const BUTTON = "min-h-9 rounded-lg border border-[var(--border)] px-3 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-50";
 const CHIP = "min-h-8 rounded-full border border-[var(--border)] px-2.5 text-xs text-[var(--muted-foreground)] hover:bg-[var(--muted)]";
-const MAX_WAIT = 95;
+const MAX_WAIT = ASK_TIMEOUT_MS / 1000;
 
 interface Turn {
   id: number;
@@ -67,6 +67,7 @@ export function AdvisorPanel({ onApplied }: { onApplied: () => Promise<unknown> 
   const textarea = useRef<HTMLTextAreaElement>(null);
   const inFlight = useRef(false); // set synchronously: a second Ctrl+Enter before the next render must not send a second ask
   const page = useRef<AbortController | null>(null);
+  const decidingRef = useRef(false); // one decision at a time, set synchronously like inFlight
 
   const refresh = useCallback(async () => {
     try { setProposals(await advisorApi.proposals()); } catch { /* keep the list we have; the panel is already visible */ }
@@ -125,10 +126,13 @@ export function AdvisorPanel({ onApplied }: { onApplied: () => Promise<unknown> 
   }
 
   async function choose(action: "approve" | "reject", p: Proposal) {
+    if (decidingRef.current) return;
+    decidingRef.current = true;
     setDeciding(p.id);
     setErrors((e) => Object.fromEntries(Object.entries(e).filter(([k]) => Number(k) !== p.id)));
     const result = await decide(advisorApi, action, p.id, { onApplied, onSettled: refresh });
     if (!result.ok) setErrors((e) => ({ ...e, [p.id]: result.error }));
+    decidingRef.current = false;
     setDeciding(null);
   }
 
@@ -194,9 +198,9 @@ export function AdvisorPanel({ onApplied }: { onApplied: () => Promise<unknown> 
                   {p.reason && <p className="text-xs text-[var(--muted-foreground)]">Why: {p.reason}</p>}
                   {errors[p.id] && <p role="alert" className="border border-[var(--destructive)] px-3 py-1.5 text-xs text-[var(--destructive)]">{errors[p.id]}</p>}
                   <div className="flex gap-2">
-                    <button type="button" disabled={deciding !== null} onClick={() => void choose("approve", p)}
+                    <button type="button" disabled={deciding !== null} aria-label={`Approve: ${p.summary || p.text}`} onClick={() => void choose("approve", p)}
                       className="min-h-9 rounded-lg bg-[var(--accent)] px-4 text-xs font-bold text-[var(--accent-fg)] disabled:opacity-50">Approve</button>
-                    <button type="button" disabled={deciding !== null} onClick={() => void choose("reject", p)} className={BUTTON}>Reject</button>
+                    <button type="button" disabled={deciding !== null} aria-label={`Reject: ${p.summary || p.text}`} onClick={() => void choose("reject", p)} className={BUTTON}>Reject</button>
                   </div>
                 </li>
               ))}

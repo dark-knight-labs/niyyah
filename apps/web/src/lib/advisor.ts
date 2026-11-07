@@ -88,17 +88,23 @@ export async function decide(
   id: number,
   hooks: { onApplied?: () => Promise<unknown> | void; onSettled?: () => Promise<unknown> | void } = {},
 ): Promise<Decision> {
+  let proposal: Proposal;
   try {
-    const proposal = await calls[action](id);
-    if (action === "approve") await hooks.onApplied?.();
-    await hooks.onSettled?.();
-    return { ok: true, proposal };
+    proposal = await calls[action](id);
   } catch (err) {
     const m = decisionErrorMessage(err);
     // A stale or already-decided proposal changed state on the server: refresh so the list shows it.
-    if (status(err) === 409) await hooks.onSettled?.();
+    if (status(err) === 409) await runHook(hooks.onSettled);
     return { ok: false, error: m.text, stale: m.stale };
   }
+  // The decision is saved. A follow-up that fails must never read as "could not save": the change was applied.
+  if (action === "approve") await runHook(hooks.onApplied);
+  await runHook(hooks.onSettled);
+  return { ok: true, proposal };
+}
+
+async function runHook(hook?: () => Promise<unknown> | void): Promise<void> {
+  try { await hook?.(); } catch { /* the panel and the plan refresh on their own next load */ }
 }
 
 /** Note shown under an answer the output filter edited. */

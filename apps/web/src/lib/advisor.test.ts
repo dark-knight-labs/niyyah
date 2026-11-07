@@ -68,6 +68,14 @@ describe("decide", () => {
     expect(onApplied).not.toHaveBeenCalled();
     expect(onSettled).not.toHaveBeenCalled();
   });
+  it("a failing follow-up hook never reads as a failed decision", async () => {
+    const onSettled = vi.fn();
+    const r = await decide(calls(), "approve", 1, { onApplied: () => { throw new Error("plan reload failed"); }, onSettled });
+    expect(r.ok).toBe(true);
+    expect(onSettled).toHaveBeenCalledOnce();
+    const r2 = await decide(calls(), "reject", 1, { onSettled: async () => { throw new Error("list failed"); } });
+    expect(r2.ok).toBe(true);
+  });
   it("a stale 409 is flagged and the list refreshes (it is now stale there)", async () => {
     const onSettled = vi.fn();
     const r = await decide(calls({ approve: async () => { throw fail(409, "stale: moved"); } }), "approve", 1, { onSettled });
