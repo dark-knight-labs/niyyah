@@ -5,6 +5,7 @@ import { Handle, NodeToolbar, Position, useUpdateNodeInternals, type NodeProps }
 import { EditableText } from "../editable";
 import { useMapActions } from "../map-context";
 import type { MapNode, MindData } from "../derive";
+import { isHttpUrl } from "@/lib/map/url";
 import { ContextBar } from "../context-bar";
 import { Ports } from "./item-nodes";
 
@@ -35,7 +36,7 @@ export const MindNode = memo(function MindNode({ id, data, selected }: NodeProps
       {d.depth === 0 && !d.text && !d.editing && !d.refKey && <span className="nm-tag">Central idea</span>}
       {d.icon && <span className="nm-ic" aria-hidden="true">{d.icon}</span>}
       <EditableText id={id} text={d.text} editing={d.editing} />
-      {d.url && !d.editing && <a className="nm-url nodrag nopan" href={d.url} target="_blank" rel="noopener noreferrer" title={`${d.url} (Ctrl/Cmd-click)`} onClick={(e) => { if (!(e.ctrlKey || e.metaKey)) e.preventDefault(); e.stopPropagation(); }} onPointerDown={(e) => e.stopPropagation()}>↗</a>}
+      {isHttpUrl(d.url) && !d.editing && <a className="nm-url nodrag nopan" href={d.url} target="_blank" rel="noopener noreferrer" title={`${d.url} (Ctrl/Cmd-click)`} onClick={(e) => { if (!(e.ctrlKey || e.metaKey)) e.preventDefault(); e.stopPropagation(); }} onPointerDown={(e) => e.stopPropagation()}>↗</a>}
       {d.hasNotes && !d.editing && <span className="nm-note" title="Has a note" />}
       {d.tag && !d.editing && <span className={`nm-tag ${d.tagNow ? "now" : ""} ${d.gone ? "warn" : ""}`}>{d.tag}</span>}
       {d.hasChildren && d.depth > 0 && (

@@ -190,6 +190,16 @@ async def test_import_validates_boards(db_client):
     assert [b["title"] for b in (await c.get(URL)).json()] == ["Life", "Two"]   # a refused import changed nothing
 
 
+async def test_import_refuses_a_javascript_link_on_a_thought(db_client):
+    c, _ = db_client
+    snap = (await c.get(E)).json()
+    bad = {**snap, "boards": [{"title": "X", "kind": "free", "viewport": {}, "nodes": [{"id": "a", "kind": "mind", "text": "a", "style": {"url": "javascript:alert(1)"}}], "edges": []}]}
+    res = await c.post(I, json=bad)
+    assert res.status_code == 422 and "http" in str(res.json())
+    ok = {**snap, "boards": [{"title": "X", "kind": "free", "viewport": {}, "nodes": [{"id": "a", "kind": "mind", "text": "a", "style": {"url": "https://example.com"}}], "edges": []}]}
+    assert (await c.post(I, json=ok)).status_code == 200
+
+
 async def test_import_refuses_loops_big_viewports_and_oversized_files(db_client, monkeypatch):
     c, _ = db_client
     snap = (await c.get(E)).json()

@@ -3,6 +3,7 @@ import { branchHandles, layoutMindMap, type Size } from "@/lib/map/layout";
 import { colorKeyOf, colorVar, descendantCount, dirOf, isMind, rootOf, visibleForest } from "@/lib/map/tree";
 import type { LiveInfo } from "@/lib/map/life-tree";
 import type { BoardData } from "@/lib/map/state";
+import { safeUrl } from "@/lib/map/url";
 import { isKnownKind, type BoardNode, type StickyColor } from "@/lib/map/types";
 
 export type MindData = {
@@ -178,7 +179,7 @@ export function derive(data: BoardData, idx: Map<string | null, BoardNode[]>, ui
       data: {
         kind: "mind", text: n.text, depth, dir: dirOf(nodes, id), color: colorVar(colorKeyOf(nodes, id)), hasChildren: kids.some((c) => !c.hidden),
         collapsed: n.collapsed, hiddenCount: n.collapsed ? descendantCount(idx, id) : 0, editing: ui.editing === id, bar: single(id), drop: ui.dropTarget === id, refKey: n.ref_key, parent: n.parent_id ?? "",
-        fill: n.style.fill ?? (depth === 1 ? "tint" : "outline"), shape: n.style.shape ?? "rect", size: n.style.size ?? "M", bold: !!n.style.bold, icon: n.style.icon ?? "", url: n.style.url ?? "",
+        fill: n.style.fill ?? (depth === 1 ? "tint" : "outline"), shape: n.style.shape ?? "rect", size: n.style.size ?? "M", bold: !!n.style.bold, icon: n.style.icon ?? "", url: safeUrl(n.style.url),
         hasNotes: !!n.notes.trim(), locked: !!n.style.locked, orient: p.orient, dim: !!ui.focus && !ui.focus.has(id), own: !!n.style.color, ports: ui.selected.has(id) || !!ui.connecting, hs: handlesOf(p.side, p.orient, depth, rootLayout(nodes, id)),
         tag: ui.info.get(id)?.tag ?? "", tagNow: !!ui.info.get(id)?.tagNow, sub: ui.info.get(id)?.sub ?? "", gone: !!ui.info.get(id)?.gone, done: !!ui.info.get(id)?.done, flash: ui.flash === id,
       },

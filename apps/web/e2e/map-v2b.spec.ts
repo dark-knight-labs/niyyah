@@ -187,6 +187,22 @@ test("copying or duplicating a frame that holds a promoted (live) item makes no 
   expect(s.nodes.filter((n) => sel.includes(n.id)).map((n) => n.kind).sort()).toEqual(["frame", "sticky"]);
 });
 
+test("a thought link with a javascript: scheme (old row, import) is never rendered as a link", async ({ page, request }) => {
+  const id = await board(request, "Links", [node("r", "mind", { x: 0, y: 0, text: "Root" }), node("ok", "mind", { parent_id: "r", text: "Fine", style: { side: "R", url: "https://example.com/a" } }), node("bad", "mind", { parent_id: "r", position: 1, text: "Evil", style: { side: "R" } })]);
+  // the API now refuses such a link, so serve one the way an old row would arrive
+  await page.route(new RegExp(`/api/v1/boards/${id}$`), async (route) => {
+    const res = await route.fetch(); const j = await res.json();
+    for (const n of j.nodes) if (n.id === "bad") n.style = { ...n.style, url: "javascript:window.__xss=1" };
+    await route.fulfill({ response: res, json: j });
+  });
+  await open(page, id);
+  await expect(page.getByTestId("mind-ok").locator("a.nm-url")).toHaveAttribute("href", "https://example.com/a");
+  await expect(page.getByTestId("mind-bad")).toBeVisible();
+  await expect(page.getByTestId("mind-bad").locator("a")).toHaveCount(0);
+  await page.getByTestId("mind-bad").click({ modifiers: ["Control"] });
+  expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
+});
+
 test("Ctrl+F finds a thought and selects it; outside the canvas the browser keeps Ctrl+F", async ({ page, request }) => {
   const id = await board(request, "Find", [node("r", "mind", { x: 0, y: 0, text: "Root" }), node("a", "mind", { parent_id: "r", text: "Needle in a haystack", style: { side: "R", color: "violet" } }), node("b", "mind", { parent_id: "r", position: 1, text: "Hay", style: { side: "L", color: "orange" } })]);
   await open(page, id);
