@@ -16,6 +16,18 @@ export function ContextMenu({ x, y, groups, label, onRun, onClose }: {
   const [active, setActive] = useState(() => Math.max(0, flat.findIndex((i) => !i.disabled)));
   const [open, setOpen] = useState<string | null>(null);
   const [subActive, setSubActive] = useState(0);
+  const subRef = useRef<HTMLDivElement | null>(null);
+  const [subPos, setSubPos] = useState<{ left: number; top: number } | null>(null);
+
+  // A submenu is fixed to the viewport (the menu itself scrolls when it is taller than the window, which would clip an absolute child):
+  // beside its row, flipped to the left at the right edge, pulled up to fit.
+  useLayoutEffect(() => {
+    const sub = subRef.current, row = sub?.parentElement;
+    if (!open || !sub || !row) { setSubPos(null); return; }
+    const r = row.getBoundingClientRect(), w = sub.offsetWidth, h = sub.offsetHeight;
+    const left = r.right + 2 + w > window.innerWidth - 4 ? Math.max(4, r.left - w - 2) : r.right + 2;
+    setSubPos({ left, top: Math.max(4, Math.min(r.top - 5, window.innerHeight - h - 4)) });
+  }, [open, pos]);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -70,7 +82,7 @@ export function ContextMenu({ x, y, groups, label, onRun, onClose }: {
 
   let n = -1;
   return (
-    <div ref={ref} className="nm-cm nodrag nopan" role="menu" aria-label={label} data-testid="context-menu" data-top style={{ left: pos.x, top: pos.y }} onKeyDown={onKeyDown} onContextMenu={(e) => e.preventDefault()}>
+    <div ref={ref} className="nm-cm nodrag nopan" role="menu" aria-label={label} data-testid="context-menu" data-top style={{ left: pos.x, top: pos.y }} onKeyDown={onKeyDown} onScroll={() => setOpen(null)} onContextMenu={(e) => e.preventDefault()}>
       {groups.map((g, gi) => (
         <div key={gi} className="nm-cm-grp" role="group">
           {gi > 0 && <hr />}
@@ -88,7 +100,7 @@ export function ContextMenu({ x, y, groups, label, onRun, onClose }: {
                   {it.choices && <span className="nm-cm-ar" aria-hidden="true">▸</span>}
                 </button>
                 {sub && (
-                  <div className="nm-cm nm-cm-sub" role="menu" aria-label={it.label} data-sub={it.id}>
+                  <div ref={subRef} className="nm-cm nm-cm-sub" role="menu" aria-label={it.label} data-sub={it.id} style={subPos ? { left: subPos.left, top: subPos.top } : { visibility: "hidden" }}>
                     {it.choices!.map((c, ci) => (
                       <button key={c.id || "none"} type="button" role="menuitemradio" aria-checked={c.checked} tabIndex={-1} data-choice={c.id} className={ci === subActive ? "act" : undefined}
                         onPointerEnter={() => setSubActive(ci)} onClick={() => { onRun(it.id, c.id); onClose(); }}>

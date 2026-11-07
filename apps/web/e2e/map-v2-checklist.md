@@ -9,6 +9,7 @@ Each line names the e2e test that proves it (`W1` = `map-v2.spec.ts`, `W2` = `ma
 - [x] right-click menu ids: mind, sticky, shape, text, frame, selection, pane — "right-click menu item ids per kind"
 - [x] live node menu has none of Edit text, Delete, Delete branch, Cut, Convert, Detach as new map — "live node menu has none of Edit text, Delete, Delete branch, Cut, Convert, Detach as new map"
 - [x] menu keyboard (context-menu key, arrows, Right opens a submenu, Enter runs, Esc closes) — "menu keyboard: context-menu key opens, arrows move, Right opens a submenu, Enter runs, Esc closes"
+- [x] a menu taller than the window scrolls; every item reachable, submenus stay on screen — "a menu taller than the window scrolls inside it; every item can be reached and submenus stay on screen"
 - [x] floating bar "⋯" opens the same menu — "the floating bar's more button opens the same menu; the menu runs commands"
 - [x] mind style from the menu persists after reload; Link, Add parent, Move down, Detach, Convert to sticky, Focus branch — "mind style from the menu persists after reload; Link, Add parent, Move down, Detach, Convert to sticky, Focus branch"
 - [x] Life board: layout and colour on a Life root and a live branch survive a reload; the Plan item is untouched — "Life board: layout and colour set on a Life root and on a live branch survive a reload; the Plan item is untouched"

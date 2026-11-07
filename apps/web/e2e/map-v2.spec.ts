@@ -147,6 +147,27 @@ test("right-click menu item ids per kind", async ({ page, request }) => {
   await expect(page.getByTestId("context-menu")).toHaveCount(0);
 });
 
+test("a menu taller than the window scrolls inside it; every item can be reached and submenus stay on screen", async ({ page, request }) => {
+  const id = await board(request, "Tall menu", tree());
+  await page.setViewportSize({ width: 1400, height: 620 });
+  await open(page, `/map?board=${id}`);
+  await rightClick(page, mindEl(page, "a0"));
+  const menu = page.getByTestId("context-menu");
+  const box = (await menu.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0); expect(box.y + box.height).toBeLessThanOrEqual(620);
+  expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);                  // taller than the window: it scrolls
+  const ids = await menuIds(page);
+  await page.locator(`[data-cmd="${ids[0]}"]`).scrollIntoViewIfNeeded(); await expect(page.locator(`[data-cmd="${ids[0]}"]`)).toBeInViewport();
+  await page.locator(`[data-cmd="${ids.at(-1)}"]`).scrollIntoViewIfNeeded(); await expect(page.locator(`[data-cmd="${ids.at(-1)}"]`)).toBeInViewport();
+  await page.locator('[data-cmd="color"]').scrollIntoViewIfNeeded(); await page.locator('[data-cmd="color"]').hover();
+  const sub = page.locator('[data-sub="color"]'); await expect(sub).toBeVisible();
+  const sb = (await sub.boundingBox())!;
+  expect(sb.x).toBeGreaterThanOrEqual(0); expect(sb.x + sb.width).toBeLessThanOrEqual(1400); expect(sb.y).toBeGreaterThanOrEqual(0); expect(sb.y + sb.height).toBeLessThanOrEqual(620);
+  await sub.locator('[data-choice="rose"]').click();                                                  // and a choice in it still runs
+  await settled(page);
+  expect((await api(request, `/boards/${id}`)).nodes.find((n: { id: string }) => n.id === "a0").style.color).toBe("rose");
+});
+
 test("the floating bar's more button opens the same menu; the menu runs commands", async ({ page, request }) => {
   const id = await board(request, "Bar", tree());
   await open(page, `/map?board=${id}`);
