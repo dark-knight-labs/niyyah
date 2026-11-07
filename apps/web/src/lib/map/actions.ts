@@ -1,6 +1,7 @@
 import { isDescendant, nextBranch, subtreeIds, type NodeMap } from "./tree";
 import type { BoardEdge, BoardNode, NodeKind, Op, Side, StickyColor } from "./types";
 import { MAX_TEXT, STICKY_COLORS, STICKY_CYCLE } from "./types";
+import { cleanStyle } from "./url";
 
 /** Pure op builders for the canvas. Each returns the ops (unstamped: use-board stamps base_updated_at) and the id of what it made. */
 
@@ -137,8 +138,8 @@ export function frameAt(nodes: NodeMap, px: number, py: number, skip?: string): 
 export function patchStyle(nodes: BoardNode[], patch: Record<string, unknown>): Op[] {
   const ops: Op[] = [];
   for (const n of nodes) {
-    const style: Record<string, unknown> = { ...n.style };
-    let changed = false;
+    const style: Record<string, unknown> = cleanStyle({ ...n.style });
+    let changed = style.url !== n.style.url;   // a bad old link is dropped by whatever edit comes next
     for (const [k, v] of Object.entries(patch)) {
       if (v === undefined || v === null) { if (k in style) { delete style[k]; changed = true; } } else if (style[k] !== v) { style[k] = v; changed = true; }
     }

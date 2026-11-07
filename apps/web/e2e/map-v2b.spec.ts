@@ -232,6 +232,16 @@ test("a thought link with a javascript: scheme (old row, import) is never render
   await expect(page.getByTestId("mind-bad").locator("a")).toHaveCount(0);
   await page.getByTestId("mind-bad").click({ modifiers: ["Control"] });
   expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
+  // an old row like that stays editable: a recolour is accepted (the web drops the bad link from what it writes)
+  const bodies: string[] = []; const refused: number[] = [];
+  page.on("request", (r) => { if (r.url().endsWith(`/boards/${id}/ops`)) bodies.push(r.postData() ?? ""); });
+  page.on("response", (r) => { if (r.url().endsWith(`/boards/${id}/ops`) && r.status() >= 400) refused.push(r.status()); });
+  await page.getByTestId("mind-bad").click({ button: "right" });
+  await pickSub(page, "color", "rose");
+  await settled(page);
+  expect(refused).toEqual([]);
+  expect(bodies.length).toBeGreaterThan(0); expect(bodies.join("")).not.toContain("javascript:");
+  expect((await server(request, id)).nodes.find((n) => n.id === "bad")!.style.color).toBe("rose");
 });
 
 test("Ctrl+F finds a thought and selects it; outside the canvas the browser keeps Ctrl+F", async ({ page, request }) => {

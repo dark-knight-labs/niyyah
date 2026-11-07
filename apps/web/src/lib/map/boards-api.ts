@@ -8,6 +8,8 @@ import type { Board, BoardDetail, BadOpsBody, CreateBoardRequest, Op, PromoteReq
 
 type RawBoard = Omit<Board, "id" | "viewport"> & { id: number | string; viewport: Board["viewport"] | Record<string, never> | null };
 
+import { cleanStyle } from "./url";
+
 const board = (b: RawBoard): Board => ({
   ...b,
   id: String(b.id),
@@ -16,7 +18,7 @@ const board = (b: RawBoard): Board => ({
 
 /** The server validates payloads strictly: updated_at is output-only. */
 function wire(op: Op): Op {
-  if (op.op === "upsert_node") { const { updated_at: _u, ...node } = op.node; void _u; return { ...op, node: node as typeof op.node }; }
+  if (op.op === "upsert_node") { const { updated_at: _u, ...node } = op.node; void _u; return { ...op, node: { ...node, style: cleanStyle(node.style) } as typeof op.node }; }
   if (op.op === "upsert_edge") { const { updated_at: _u, ...edge } = op.edge; void _u; return { ...op, edge }; }
   return op;
 }
