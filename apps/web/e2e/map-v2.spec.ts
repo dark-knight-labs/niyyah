@@ -147,6 +147,20 @@ test("right-click menu item ids per kind", async ({ page, request }) => {
   await expect(page.getByTestId("context-menu")).toHaveCount(0);
 });
 
+test("the board bar's Organize button is padded and divided like its neighbours", async ({ page, request }) => {
+  const id = await board(request, "Bar", tree());
+  await open(page, `/map?board=${id}`);
+  const m = await page.evaluate(() => {
+    const r = (el: Element) => el.getBoundingClientRect(); const cs = (el: Element) => getComputedStyle(el);
+    const files = document.querySelector('[data-testid="files-button"]')!; const wrap = document.querySelector(".nm-organize")!; const org = document.querySelector('[data-testid="organize"]')!;
+    return { filesBorder: cs(files).borderRightWidth, filesPad: cs(files).paddingLeft, wrapPad: cs(wrap).paddingLeft, wrapBorder: cs(wrap).borderRightWidth, lead: r(org).left - r(wrap).left, gap: r(wrap).left - r(files).right };
+  });
+  expect(m.filesBorder).toBe("1px");                      // the hairline after Files is the one before Organize
+  expect(m.wrapPad).toBe(m.filesPad);                      // same inner padding as the other bar buttons
+  expect(m.wrapBorder).toBe("1px");
+  expect(m.lead).toBeGreaterThanOrEqual(11); expect(m.gap).toBeLessThanOrEqual(1);
+});
+
 test("a menu taller than the window scrolls inside it; every item can be reached and submenus stay on screen", async ({ page, request }) => {
   const id = await board(request, "Tall menu", tree());
   await page.setViewportSize({ width: 1400, height: 620 });

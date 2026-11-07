@@ -51,9 +51,9 @@ export function BoardBar({ board, boards, frames, hidden, status, onOpen, onNew,
         Frames{frames.length ? ` (${frames.length})` : ""}
       </button>
       <button type="button" className="mono" aria-pressed={filesOpen} data-testid="files-button" onClick={onFiles}>Files</button>
-      <span className="nm-organize" style={{ padding: 0 }}>
+      <span className="nm-organize">
         <button type="button" className="mono" data-testid="organize" title="Organize the selected map (or every map) in its current layout" onClick={() => onOrganize("keep")}>Organize</button>
-        <button type="button" aria-haspopup="menu" aria-expanded={menu === "organize"} aria-label="Organize options" data-testid="organize-menu" onClick={() => setMenu(menu === "organize" ? null : "organize")} style={{ padding: "0 8px 0 0" }}><span className="mono" style={{ color: "var(--muted-foreground)" }}>▾</span></button>
+        <button type="button" aria-haspopup="menu" aria-expanded={menu === "organize"} aria-label="Organize options" data-testid="organize-menu" onClick={() => setMenu(menu === "organize" ? null : "organize")}><span className="mono" style={{ color: "var(--muted-foreground)" }}>▾</span></button>
       </span>
       <span className={`mono st ${bad ? "bad" : ""}`} role="status" data-testid="save-status" data-status={status}>
         {STATUS_TEXT[status]}
