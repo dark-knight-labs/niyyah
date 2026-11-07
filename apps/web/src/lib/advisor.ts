@@ -58,9 +58,10 @@ export function askErrorMessage(err: unknown): string {
   switch (status(err)) {
     case 429: return "The hourly limit of questions is used up. Try again later.";
     case 504: return "The advisor took too long to answer. Try a narrower question.";
-    case 403: return "The advisor is not available for this account.";
+    case 403: return "The advisor is switched off right now.";
+    case 502: return "The advisor could not answer right now. Try again in a minute.";
     case undefined: return "Could not reach the server. Check the connection and try again.";
-    default: return "The advisor could not answer right now. Try again in a moment.";
+    default: return "Something went wrong asking the advisor. Try again in a moment.";
   }
 }
 

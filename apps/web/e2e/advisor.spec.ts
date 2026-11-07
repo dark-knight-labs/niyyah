@@ -111,7 +111,13 @@ test("ask errors: 429, 504, 502 each read clearly", async ({ page }) => {
   await expect(panel(page).getByRole("alert").first()).toContainText("narrower");
   status = 502;
   await box.fill("three"); await send.click();
-  await expect(panel(page).getByRole("alert").first()).toContainText("could not answer");
+  await expect(panel(page).getByRole("alert").first()).toContainText("Try again in a minute");
+  status = 503;
+  await box.fill("four"); await send.click();
+  await expect(panel(page).getByRole("alert").first()).toContainText("Something went wrong");
+  status = 403;
+  await box.fill("five"); await send.click();
+  await expect(panel(page).getByRole("alert").first()).toHaveText("The advisor is switched off right now.");
 });
 
 test("approve reloads the plan and moves the proposal to decisions; reject does not reload", async ({ page }) => {

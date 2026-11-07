@@ -21,8 +21,10 @@ describe("error mapping", () => {
   it("ask: cap, timeout, down, network", () => {
     expect(askErrorMessage(fail(429))).toMatch(/limit/i);
     expect(askErrorMessage(fail(504))).toMatch(/too long.*narrower/i);
-    expect(askErrorMessage(fail(502))).toMatch(/could not answer/i);
-    expect(askErrorMessage(fail(503))).toMatch(/could not answer/i);
+    expect(askErrorMessage(fail(403))).toBe("The advisor is switched off right now.");
+    expect(askErrorMessage(fail(502))).toBe("The advisor could not answer right now. Try again in a minute.");
+    expect(askErrorMessage(fail(503))).toBe("Something went wrong asking the advisor. Try again in a moment.");
+    expect(askErrorMessage(fail(500))).toBe("Something went wrong asking the advisor. Try again in a moment.");
     expect(askErrorMessage(fail(undefined))).toMatch(/reach the server/i);
   });
   it("decision: stale, filter 409, core 422", () => {
