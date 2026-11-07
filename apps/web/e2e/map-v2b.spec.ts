@@ -173,8 +173,12 @@ test("copying or duplicating a frame that holds a promoted (live) item makes no 
   page.on("response", (r) => { if (r.url().includes("/ops") && r.status() >= 400) refused.push(`${r.status()}`); });
   await open(page, id);
   await page.getByTestId("frame-fr").locator(".nm-ft").click();
-  await page.keyboard.press("Control+c"); await page.keyboard.press("Control+v");
+  await page.keyboard.press("Control+c");
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("- Frame");   // the system clipboard write is async: paste only after it landed (an earlier test leaves other text there)
+  await page.keyboard.press("Control+v");
+  await expect(page.locator('[data-testid^="frame-"]')).toHaveCount(2);
   await page.keyboard.press("Control+d");
+  await expect(page.locator('[data-testid^="frame-"]')).toHaveCount(3);
   await settled(page);
   expect(refused).toEqual([]);
   const s = await server(request, id);
