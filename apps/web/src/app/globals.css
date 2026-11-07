@@ -40,6 +40,10 @@
   --map-sticky-green: #d6ead9;
   --map-sticky-blue: #d9e4f2;
   --map-sticky-pink: #f2dbe2;
+  --map-sticky-orange: #f6d9b5;
+  --map-sticky-teal: #cfe6e3;
+  --map-sticky-violet: #e3dcf1;
+  --map-sticky-gray: #e4e2dc;
 
   --font-sans: "Geist Variable", system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
@@ -83,6 +87,10 @@
   --map-sticky-green: #233a2a;
   --map-sticky-blue: #22314a;
   --map-sticky-pink: #46262f;
+  --map-sticky-orange: #4a3520;
+  --map-sticky-teal: #1f3b3a;
+  --map-sticky-violet: #34294d;
+  --map-sticky-gray: #34322e;
 }
 
 /* Skins: pick-and-choose looks as alternative token sets (list in components/skin-switch.tsx). Paper is the default (no data-skin). Switch with ?skin=<id> or the corner picker; independent of light/dark. Each skin sets the same variables, the radius scale (--r-*) and optionally the fonts. */
@@ -269,6 +277,10 @@
   --map-sticky-green: #233a2a;
   --map-sticky-blue: #22314a;
   --map-sticky-pink: #46262f;
+  --map-sticky-orange: #4a3520;
+  --map-sticky-teal: #1f3b3a;
+  --map-sticky-violet: #34294d;
+  --map-sticky-gray: #34322e;
 }
 
 @theme inline {
@@ -439,7 +451,7 @@ h1, h2, h3 {
 
 /* --- Map (Miro-style boards on React Flow). Tokens only; radius from the --r-* scale (unitless in some skins, hence calc). ---------- */
 .niyyah-map { --map-r: calc(var(--r-sm) * 1px); position: relative; width: 100%; height: 100%; background: var(--background); color: var(--foreground); font-size: 0.875rem; line-height: 1.45; }
-.niyyah-map { user-select: none; }
+.niyyah-map { user-select: none; outline: none; }
 .niyyah-map .nm-t[contenteditable], .niyyah-map textarea, .niyyah-map input { user-select: text; }
 .niyyah-map .react-flow { background: var(--background); --xy-edge-stroke-default: var(--muted-foreground); }
 .niyyah-map .react-flow__pane { cursor: default; }
@@ -453,7 +465,7 @@ h1, h2, h3 {
 .niyyah-map .react-flow__handle.nm-conn { width: 10px; height: 10px; min-width: 10px; min-height: 10px; border: 1.5px solid var(--accent); background: var(--surface); border-radius: 50%; opacity: 0; right: -6px; top: 50%; transform: translateY(-50%); pointer-events: all; }
 .niyyah-map .react-flow__node:hover .nm-conn, .niyyah-map .react-flow__node.selected .nm-conn { opacity: 1; }
 .niyyah-map .react-flow__edge-path { stroke-width: 1.5; }
-.niyyah-map .nm-link { fill: none; stroke: var(--muted-foreground); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.niyyah-map .nm-link { fill: none; }
 .niyyah-map .nm-link.sel { stroke: var(--accent); }
 .niyyah-map .react-flow__resize-control.handle { width: 9px; height: 9px; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 0; }
 .niyyah-map .react-flow__resize-control.line { border-color: var(--accent); }
@@ -463,9 +475,23 @@ h1, h2, h3 {
 .nm-mind { position: relative; width: max-content; max-width: 260px; white-space: pre-wrap; word-break: break-word; }
 .nm-mind .nm-t, .nm-item .nm-t { outline: none; }
 .nm-mind .nm-t { display: inline-block; min-width: 1.5ch; }
-.nm-mind.d0 { font-family: var(--font-serif); font-size: 1.1875rem; font-weight: 500; line-height: 1.25; padding: 12px 18px; border: 1px solid var(--foreground); background: var(--surface); max-width: 300px; border-radius: var(--map-r); }
-.nm-mind.d1 { font-weight: 600; padding: 7px 12px 7px 15px; border: 1px solid var(--border); background: var(--surface); box-shadow: inset 3px 0 0 var(--c); border-radius: var(--map-r); }
-.nm-mind.dn { font-size: 0.8125rem; padding: 3px 6px 4px; border-bottom: 2px solid var(--c); }
+/* Every level is a box. d0: the idea, 2px foreground. d1: branch tint with the branch colour as border. dn: paper with a hairline in the branch colour. */
+.nm-mind { --r: var(--map-r); border-radius: var(--r); background: var(--surface); border: 1px solid var(--c); line-height: 1.3; }
+.nm-mind.d0 { font-family: var(--font-serif); font-size: 1.1875rem; font-weight: 500; line-height: 1.25; padding: 12px 18px; border: 2px solid var(--foreground); max-width: 300px; }
+.nm-mind.d1 { font-weight: 600; padding: 7px 12px; border-width: 1.5px; background: color-mix(in srgb, var(--c) 13%, var(--surface)); }
+.nm-mind.dn { font-size: 0.8125rem; padding: 4px 9px; }
+.nm-mind.fill-outline { background: var(--surface); }
+.nm-mind.fill-tint { background: color-mix(in srgb, var(--c) 13%, var(--surface)); }
+.nm-mind.fill-solid { background: var(--c); color: #fff; }
+.nm-mind.fill-solid .nm-tag, .nm-mind.fill-solid .nm-sub { color: rgb(255 255 255 / 0.8); }
+.nm-mind.d0.fill-solid { background: var(--foreground); color: var(--background); border-color: var(--foreground); }
+.nm-mind.shape-rounded { --r: 10px; } .nm-mind.shape-pill { --r: 999px; padding-inline: 16px; }
+.nm-mind.size-S { font-size: 0.75rem; } .nm-mind.size-L { font-size: 1.0625rem; } .nm-mind.d0.size-S { font-size: 1rem; } .nm-mind.d0.size-L { font-size: 1.5rem; }
+.nm-mind.bold .nm-t { font-weight: 700; }
+.nm-mind .nm-ic { margin-right: 6px; }
+.nm-mind .nm-url { margin-left: 6px; color: var(--accent); font: 600 11px/1 var(--font-mono); text-decoration: none; }
+.nm-mind .nm-note { position: absolute; right: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 1.5px solid var(--surface); }
+.nm-mind.locked::after, .nm-item.locked::after { content: ""; position: absolute; right: -5px; bottom: -5px; width: 9px; height: 9px; background: var(--foreground) ; clip-path: polygon(0 40%, 100% 40%, 100% 100%, 0 100%); }
 .nm-mind.sel-ring, .nm-item.sel-ring { outline: 2px solid var(--accent); outline-offset: 3px; }
 .nm-mind.drop { background: var(--accent-light); }
 .nm-mind .nm-tag.now { color: var(--accent); }
@@ -484,11 +510,26 @@ h1, h2, h3 {
 
 .nm-item { position: relative; width: 100%; height: 100%; }
 .nm-item .nm-t { white-space: pre-wrap; word-break: break-word; }
-.nm-sticky { padding: 12px; font-size: 0.8125rem; border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent); overflow: hidden; color: var(--foreground); border-radius: var(--map-r); }
+.nm-sticky { padding: 12px; font-size: 0.8125rem; border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent); color: var(--foreground); border-radius: var(--map-r); }
+.nm-sticky-in { height: 100%; overflow: hidden; }
 .nm-sticky.yellow { background: var(--map-sticky-yellow); } .nm-sticky.green { background: var(--map-sticky-green); }
 .nm-sticky.blue { background: var(--map-sticky-blue); } .nm-sticky.pink { background: var(--map-sticky-pink); }
+.nm-sticky.orange { background: var(--map-sticky-orange); } .nm-sticky.teal { background: var(--map-sticky-teal); } .nm-sticky.violet { background: var(--map-sticky-violet); } .nm-sticky.gray { background: var(--map-sticky-gray); }
 .nm-text { font-size: 1.0625rem; padding: 2px 4px; }
-.nm-shape { border: 1px solid var(--foreground); background: var(--surface); display: grid; place-items: center; text-align: center; padding: 8px; font-size: 0.8125rem; border-radius: var(--map-r); }
+.nm-shape { --sf: var(--surface); --sb: var(--foreground); --sw: 1px; --sd: solid; --sda: none; display: grid; place-items: center; text-align: center; font-size: 0.8125rem; }
+.nm-shape.css-box { background: var(--sf); border: var(--sw) var(--sd) var(--sb); border-radius: var(--map-r); padding: 8px; }
+.nm-shape.sh-rounded { border-radius: 14px; } .nm-shape.sh-ellipse { border-radius: 50%; }
+.nm-shape .nm-st { position: absolute; inset: 0; display: grid; place-items: center; padding: 4px; overflow: hidden; }
+.nm-shape.css-box .nm-st { position: static; }
+.nm-shape-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.nm-shape-svg path { fill: var(--sf); stroke: var(--sb); stroke-width: var(--sw); stroke-dasharray: var(--sda); vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.nm-shape-svg path.nm-shape-lip { fill: none; }
+.nm-item.size-S { font-size: 0.6875rem; } .nm-item.size-L { font-size: 1.0625rem; } .nm-text.size-S { font-size: 0.875rem; } .nm-text.size-L { font-size: 1.5rem; }
+.nm-item.bold .nm-t { font-weight: 700; }
+.nm-item.al-left { text-align: left; } .nm-item.al-center { text-align: center; } .nm-item.al-right { text-align: right; }
+.nm-shape.al-left .nm-st { place-items: center start; } .nm-shape.al-right .nm-st { place-items: center end; }
+.niyyah-map .react-flow__handle.nm-port { pointer-events: all; width: 9px; height: 9px; min-width: 9px; min-height: 9px; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 50%; }
+.niyyah-map .react-flow__handle.nm-port:hover { background: var(--accent); }
 .nm-unavailable { display: grid; place-content: center; gap: 4px; justify-items: center; text-align: center; padding: 10px; border: 1px dashed var(--rule); background: var(--surface); color: var(--muted-foreground); border-radius: var(--map-r); font-size: 0.75rem; }
 .nm-unavailable .nm-ut { font: 500 0.6875rem/1 var(--font-mono); letter-spacing: 0.09em; text-transform: uppercase; }
 .nm-unavailable .nm-un { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -547,6 +588,7 @@ h1, h2, h3 {
 .nm-card .chip[aria-pressed="true"] { border-color: var(--foreground); color: var(--foreground); box-shadow: inset 0 -2px 0 var(--foreground); }
 .nm-card .chip.yellow { background: var(--map-sticky-yellow); } .nm-card .chip.green { background: var(--map-sticky-green); }
 .nm-card .chip.blue { background: var(--map-sticky-blue); } .nm-card .chip.pink { background: var(--map-sticky-pink); }
+.nm-card .chip.orange { background: var(--map-sticky-orange); } .nm-card .chip.teal { background: var(--map-sticky-teal); } .nm-card .chip.violet { background: var(--map-sticky-violet); } .nm-card .chip.gray { background: var(--map-sticky-gray); }
 .nm-card .btn { border: 1px solid var(--border); padding: 7px 12px; font-size: 0.75rem; font-weight: 600; text-align: center; background: none; cursor: pointer; color: inherit; border-radius: var(--map-r); }
 .nm-card .btn:hover { border-color: var(--rule); }
 .nm-card .kv { display: grid; grid-template-columns: 84px 1fr; gap: 6px 10px; font-size: 0.8125rem; }
@@ -568,3 +610,68 @@ h1, h2, h3 {
   .nm-card { top: auto; height: 55%; width: 100%; border-width: 1px 0 0 0; }
 }
 @media (prefers-reduced-motion: reduce) { .niyyah-map * { animation: none !important; transition: none !important; } }
+
+/* --- Map: right-click menu, prompt, search, help (Map v2) -------------------------------------------------------------------- */
+.nm-cm { position: fixed; z-index: 60; min-width: 232px; padding: 4px 0; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); border-radius: var(--map-r); font-size: 0.8125rem; color: var(--foreground); user-select: none; max-height: calc(100vh - 8px); overflow-y: auto; overscroll-behavior: contain; }
+/* While a context menu is open the floating selection bars sit under it: hide them (visibility keeps their layout, so nothing jumps). */
+.niyyah-map[data-menu] .react-flow__node-toolbar, .niyyah-map[data-menu] .nm-multi { visibility: hidden; }
+.nm-cm hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.nm-cm-row { position: relative; }
+.nm-cm button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; color: inherit; }
+.nm-cm button:hover, .nm-cm button:focus-visible, .nm-cm button.act { background: var(--accent-light); outline: none; }
+.nm-cm button[aria-disabled] { color: var(--muted-foreground); cursor: default; opacity: 0.6; }
+.nm-cm button.danger { color: var(--destructive); }
+.nm-cm .nm-cm-ck { width: 14px; flex: none; color: var(--accent); font-size: 11px; text-align: center; }
+.nm-cm .nm-cm-l { flex: 1; }
+.nm-cm kbd { color: var(--muted-foreground); font: 500 11px var(--font-mono); }
+.nm-cm .nm-cm-ar { color: var(--muted-foreground); font-size: 10px; }
+.nm-cm .nm-cm-sw { width: 12px; height: 12px; border: 1px solid var(--rule); flex: none; }
+.nm-cm .nm-cm-h { padding: 6px 12px 2px 26px; font: 500 10px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-foreground); }
+.nm-cm-sub { position: fixed; max-height: calc(100vh - 8px); }
+.nm-prompt-wrap { position: absolute; inset: 0; z-index: 70; display: grid; place-items: start center; padding-top: 18vh; background: color-mix(in srgb, var(--background) 55%, transparent); }
+.nm-prompt { position: static; width: 360px; padding: 14px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); }
+.nm-prompt label { color: var(--muted-foreground); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.nm-prompt input { font: inherit; background: var(--background); color: inherit; border: 1px solid var(--border); padding: 7px 8px; outline: none; border-radius: var(--map-r); }
+.nm-prompt input:focus { outline: 2px solid var(--accent); }
+.nm-prompt .row { display: flex; gap: 8px; justify-content: flex-end; }
+.nm-prompt .row button { border: 1px solid var(--border); padding: 6px 12px; font-size: 0.75rem; font-weight: 600; border-radius: var(--map-r); }
+.nm-prompt .row .pri { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.nm-organize { position: relative; display: flex; }
+.niyyah-map .nm-dim { opacity: 0.28; }
+.nm-mind.d0.own { border-color: var(--c); }
+.nm-search { top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 4px 6px; z-index: 30; }
+.nm-search input { font: inherit; background: var(--background); color: inherit; border: 1px solid var(--border); padding: 5px 8px; width: 240px; outline: none; border-radius: var(--map-r); }
+.nm-search input:focus { outline: 2px solid var(--accent); }
+.nm-search .mono { min-width: 48px; text-align: center; color: var(--muted-foreground); font-size: 11px; }
+.nm-search button { width: 26px; height: 26px; color: var(--muted-foreground); }
+.nm-search button:hover { color: var(--foreground); background: var(--muted); }
+.nm-help-sheet { position: static; width: 560px; max-width: 92%; max-height: 70vh; overflow: auto; padding: 14px 16px; box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); outline: none; }
+.nm-help-sheet .hd { display: flex; justify-content: space-between; color: var(--muted-foreground); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+.nm-help-sheet dl { margin: 0; display: grid; gap: 2px; }
+.nm-help-sheet dl > div { display: grid; grid-template-columns: 190px 1fr; gap: 12px; padding: 4px 0; border-top: 1px solid var(--border); font-size: 0.8125rem; }
+.nm-help-sheet dt { color: var(--accent); font-size: 11px; } .nm-help-sheet dd { margin: 0; }
+.nm-guides { position: absolute; pointer-events: none; overflow: visible; }
+.nm-guides line { stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 4 3; }
+.nm-elabel { font-size: 11px; }
+.nm-ctx .nm-more { font-size: 1rem; line-height: 1; padding: 0 10px; }
+/* image and file objects */
+.nm-image { background: var(--surface); border: 1px solid var(--border); border-radius: var(--map-r); display: flex; flex-direction: column; }
+.nm-image img { display: block; width: 100%; flex: 1; min-height: 0; object-fit: contain; border-radius: var(--map-r); pointer-events: none; user-select: none; }
+.nm-img-wait { flex: 1; background: linear-gradient(90deg, var(--muted), var(--surface), var(--muted)); background-size: 200% 100%; animation: nm-shimmer 1.2s linear infinite; }
+@keyframes nm-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .nm-img-wait { animation: none; } }
+.nm-cap { padding: 4px 8px; font-size: 0.75rem; color: var(--muted-foreground); border-top: 1px solid var(--border); background: var(--surface); }
+.nm-file { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--map-r); }
+.nm-file .nm-ext { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--rule); color: var(--accent); font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
+.nm-file .nm-fi { min-width: 0; flex: 1; } .nm-file .nm-fn { font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm-file .nm-fs { color: var(--muted-foreground); font-size: 10px; margin-top: 2px; }
+.nm-file .nm-dl { flex: none; width: 28px; height: 28px; border: 1px solid var(--border); border-radius: var(--map-r); color: var(--muted-foreground); background: none; cursor: pointer; }
+.nm-file .nm-dl:hover { color: var(--foreground); background: var(--muted); }
+.nm-files { position: absolute; z-index: 30; left: 12px; top: 54px; width: 380px; max-height: 60vh; overflow: auto; padding: 10px 0; box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); }
+.nm-files .hd { display: flex; justify-content: space-between; padding: 0 12px 8px; color: var(--muted-foreground); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.nm-files .row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 6px 12px; border-top: 1px solid var(--border); font-size: 0.8125rem; }
+.nm-files .row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .nm-files .row .mono { font-size: 11px; color: var(--muted-foreground); }
+.nm-files .row .un { color: var(--warn); } .nm-files .row button { border: 1px solid var(--border); padding: 3px 8px; font-size: 0.75rem; border-radius: var(--map-r); }
+.nm-files .row button:hover { color: var(--destructive); }
+.nm-files .foot { padding: 8px 12px 0; display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 0.75rem; }
+.nm-drop { position: absolute; inset: 8px; z-index: 35; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); display: grid; place-items: center; pointer-events: none; font: 600 0.8125rem var(--font-mono); color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }

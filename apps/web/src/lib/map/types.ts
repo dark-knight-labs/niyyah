@@ -9,12 +9,33 @@ export type NodeKind = "mind" | "ref" | "sticky" | "text" | "shape" | "frame" | 
 export const KNOWN_KINDS: ReadonlySet<string> = new Set(["mind", "ref", "sticky", "text", "shape", "frame", "image", "file"]);
 export const isKnownKind = (kind: string): kind is NodeKind => KNOWN_KINDS.has(kind);
 export type Side = "L" | "R";
-export type StickyColor = "yellow" | "green" | "blue" | "pink";
+export type StickyColor = "yellow" | "orange" | "green" | "teal" | "blue" | "violet" | "pink" | "gray";
 
 /** Free-form per-node style. `color`: a stream colour key ("violet") on mind nodes, a StickyColor on stickies. `side`: which side of its root a first-level branch sits on. */
 export interface NodeStyle {
   color?: string;
   side?: Side;
+  /** Mind roots: how the map grows (both | right | left | down | up). Default both. */
+  layout?: "both" | "right" | "left" | "down" | "up";
+  /** Mind roots: shape of the branch lines in this map. */
+  edge?: "curved" | "elbow" | "straight";
+  /** Mind nodes and shapes: how the box is filled. */
+  fill?: "outline" | "tint" | "solid";
+  /** Mind nodes: box corners; shape objects: one of the 12 shapes. */
+  shape?: string;
+  bold?: boolean;
+  size?: "S" | "M" | "L";
+  /** An emoji shown before the text. */
+  icon?: string;
+  /** A link: shown as a chip, Ctrl/Cmd-click opens it. */
+  url?: string;
+  locked?: boolean;
+  /** Stacking order among free items (higher is in front). */
+  z?: number;
+  /** Shapes and text. */
+  border?: string; dash?: "solid" | "dashed" | "dotted"; bw?: 1 | 2 | 4; align?: "left" | "center" | "right";
+  /** Image and file nodes: the id of the uploaded file, its size and type, and (images) the natural size in pixels. */
+  file_id?: string; bytes?: number; mime?: string; nw?: number; nh?: number;
 }
 
 export interface BoardNode {
@@ -136,6 +157,8 @@ export const MAX_EDGES = 5000;
 export const MAX_TEXT = 4000;
 export const MAX_OPS = 500;
 
-export const STICKY_COLORS: StickyColor[] = ["yellow", "green", "blue", "pink"];
+export const STICKY_COLORS: StickyColor[] = ["yellow", "orange", "green", "teal", "blue", "violet", "pink", "gray"];
+/** New stickies take these in turn (the first four, as before); all eight stay available. */
+export const STICKY_CYCLE: StickyColor[] = ["yellow", "green", "blue", "pink"];
 /** Branch colours for first-level branches of a free board's mind map (stream colour keys, so they follow the skin). */
 export const BRANCH_COLORS = ["violet", "cyan", "orange", "indigo", "lime", "fuchsia", "rose", "sky", "emerald", "amber"];

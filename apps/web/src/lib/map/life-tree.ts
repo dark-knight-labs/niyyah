@@ -45,6 +45,8 @@ export interface LifeView {
   info: Map<string, LiveInfo>;
   /** Stored state row by key (promote-created rows included). */
   rowOfKey: Map<string, BoardNode>;
+  /** The style Plan derives for each live node (a block's colour, the default side): what is not worth storing. */
+  defaults: Map<string, BoardNode["style"]>;
 }
 
 export const UNPLACED = "unplaced:life";
@@ -104,6 +106,14 @@ export function stateRowId(key: string): string {
   return `k-${(h2 >>> 0).toString(36)}${(h1 >>> 0).toString(36)}-${key.length.toString(36)}`;
 }
 
+/** The style keys a derived (live) node keeps in its state row: how it is drawn and laid out. Never its title or place, which Plan owns (planner v2 B2). */
+export const LIFE_STYLE_KEYS = ["side", "layout", "edge", "color", "fill", "shape", "bold", "size", "icon", "locked", "z"] as const;
+const pickStyle = (style: BoardNode["style"] | undefined): BoardNode["style"] => {
+  const out: Record<string, unknown> = {};
+  if (style) for (const k of LIFE_STYLE_KEYS) if (style[k] !== undefined) out[k] = style[k];
+  return out as BoardNode["style"];
+};
+
 const blank = (id: string, p: Partial<BoardNode>): BoardNode => ({
   id, kind: "ref", parent_id: null, parent_key: null, position: 0, x: 0, y: 0, w: 0, h: 0, text: "", notes: "", style: {}, collapsed: false,
   hidden: false, ref_key: null, frame_id: null, updated_at: null, ...p,
@@ -114,6 +124,7 @@ export function deriveLifeTree(plan: PlanInput, stored: BoardData, opts: { showD
   const info = new Map<string, LiveInfo>();
   const rowOfKey = new Map<string, BoardNode>();
   const keyOfRow = new Map<string, string>();
+  const defaults = new Map<string, BoardNode["style"]>();
   for (const n of stored.nodes.values()) if (n.kind === "ref" && n.ref_key) { rowOfKey.set(n.ref_key, n); keyOfRow.set(n.id, n.ref_key); }
 
   /** Add a derived node; the stored state row (if any) supplies collapsed / hidden / side. */
@@ -121,8 +132,9 @@ export function deriveLifeTree(plan: PlanInput, stored: BoardData, opts: { showD
     const row = rowOfKey.get(key);
     nodes.set(key, blank(key, {
       parent_id: parent, position, text, ref_key: key, collapsed: row?.collapsed ?? false, hidden: row?.hidden ?? false,
-      style, updated_at: row?.updated_at ?? null, notes: row?.notes ?? "",
+      style: { ...style, ...pickStyle(row?.style) }, updated_at: row?.updated_at ?? null, notes: row?.notes ?? "",
     }));
+    defaults.set(key, style);
     info.set(key, i);
   };
 
@@ -237,7 +249,7 @@ export function deriveLifeTree(plan: PlanInput, stored: BoardData, opts: { showD
 
   const edges = new Map<string, BoardEdge>();
   for (const e of stored.edges.values()) edges.set(e.id, { ...e, from_id: keyOfRow.get(e.from_id) ?? e.from_id, to_id: keyOfRow.get(e.to_id) ?? e.to_id });
-  return { data: { nodes, edges }, info, rowOfKey };
+  return { data: { nodes, edges }, info, rowOfKey, defaults };
 }
 
 /**
@@ -259,7 +271,7 @@ export function enrichRefs(stored: BoardData, plan: PlanInput): LifeView {
       info.set(n.id, { key: n.ref_key, type: "task", stream: hit.stream, streamName: hit.name, item: hit.item, lane: hit.item.lane, tag: LANE_TAG[hit.item.lane], tagNow: hit.item.lane === "now", done: hit.item.lane === "done" });
     } else if (plan.pipelines) info.set(n.id, { key: n.ref_key, type: "task", tag: "GONE", gone: true });
   }
-  return { data: { nodes, edges: stored.edges }, info, rowOfKey };
+  return { data: { nodes, edges: stored.edges }, info, rowOfKey, defaults: new Map() };
 }
 
 /**
@@ -267,6 +279,20 @@ export function enrichRefs(stored: BoardData, plan: PlanInput): LifeView {
  * a derived node's state change becomes an upsert of its "ref" row; a thought under a derived node stores the parent's key.
  * Derived nodes never get a row until some state changes, and never a row for the Unplaced branch.
  */
+const withoutLifeKeys = (style: BoardNode["style"] | undefined): BoardNode["style"] => {
+  const out: Record<string, unknown> = { ...(style ?? {}) };
+  for (const k of LIFE_STYLE_KEYS) delete out[k];
+  return out as BoardNode["style"];
+};
+
+/** What of a derived node's style goes to its state row: the allow-listed keys the owner set. A value equal to what Plan derives (a block's colour) stays out, so a Plan colour change still shows. */
+function storedStyle(style: BoardNode["style"], derived: BoardNode["style"] | undefined): BoardNode["style"] {
+  const out: Record<string, unknown> = {};
+  const picked = pickStyle(style) as Record<string, unknown>;
+  for (const k of Object.keys(picked)) if (k === "side" ? !!picked[k] : picked[k] !== (derived as Record<string, unknown> | undefined)?.[k]) out[k] = picked[k];
+  return out as BoardNode["style"];
+}
+
 export function toStored(ops: import("./types").Op[], view: LifeView | null, stored: BoardData): import("./types").Op[] {
   if (!view) return ops;
   const out: import("./types").Op[] = [];
@@ -283,7 +309,7 @@ export function toStored(ops: import("./types").Op[], view: LifeView | null, sto
         // Only state is stored for a derived node; its title and place come from Plan.
         out.push({ op: "upsert_node", base_updated_at: null, node: {
           ...(prev ?? blank(rowId(n.id), {})), id: rowId(n.id), kind: "ref", ref_key: n.id, parent_id: null, parent_key: null,
-          text: prev?.text || n.text, collapsed: n.collapsed, hidden: n.hidden, style: { ...(prev?.style ?? {}), ...(n.style.side ? { side: n.style.side } : {}) },
+          text: prev?.text || n.text, collapsed: n.collapsed, hidden: n.hidden, style: { ...withoutLifeKeys(prev?.style), ...storedStyle(n.style, view.defaults.get(n.id)) },
         } });
         continue;
       }

@@ -11,6 +11,7 @@ const ICONS: Record<string, string> = {
   shape: "M4 6h16v12H4z",
   frame: "M7 3v18M17 3v18M3 7h18M3 17h18",
   link: "M5 19L19 5M12 5h7v7",
+  image: "M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M9 9.5a1 1 0 100-2 1 1 0 000 2",
   undo: "M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3",
   redo: "M15 14l5-5-5-5M20 9H10a6 6 0 000 12h3",
 };
@@ -25,8 +26,8 @@ export function Icon({ name }: { name: string }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS[name]} /></svg>;
 }
 
-export function ToolRail({ tool, onTool, canUndo, canRedo, onUndo, onRedo }: {
-  tool: Tool; onTool: (t: Tool) => void; canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
+export function ToolRail({ tool, onTool, canUndo, canRedo, onUndo, onRedo, onImage }: {
+  onImage: () => void; tool: Tool; onTool: (t: Tool) => void; canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
 }) {
   return (
     <div className="nm-ui nm-tools" role="toolbar" aria-label="Board tools" aria-orientation="vertical">
@@ -35,6 +36,7 @@ export function ToolRail({ tool, onTool, canUndo, canRedo, onUndo, onRedo }: {
           <Icon name={t.id} />
         </button>
       ))}
+      <button type="button" data-tool="image" title="Image or file (I)" aria-label="Image or file" aria-keyshortcuts="I" onClick={onImage}><Icon name="image" /></button>
       <hr />
       <button type="button" data-tool="undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled={!canUndo} onClick={onUndo}><Icon name="undo" /></button>
       <button type="button" data-tool="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled={!canRedo} onClick={onRedo}><Icon name="redo" /></button>

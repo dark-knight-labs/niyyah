@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 MAX_TEXT = 4000
 MAX_TITLE = 200
 MAX_NOTES = 10000
+HTTP_URL = re.compile(r"^https?://", re.IGNORECASE)
 REF_KEY = re.compile(r"^(stream|cp|week|task|quarter|prod|lane):[A-Za-z0-9:_-]{1,72}$")
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_TITLE)]
@@ -73,6 +74,9 @@ class NodeIn(NodeBase):
     @field_validator("style")
     @classmethod
     def _style(cls, v):
+        url = v.get("url")
+        if url is not None and not (isinstance(url, str) and HTTP_URL.match(url.strip())):
+            raise ValueError("style.url must be an http or https link")   # a thought's link is rendered as an anchor: javascript: and data: must never be stored
         return _small_json(v, 2000, "style")
 
     @model_validator(mode="after")

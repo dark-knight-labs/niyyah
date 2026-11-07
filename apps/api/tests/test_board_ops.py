@@ -282,6 +282,22 @@ async def test_style_is_opaque_but_size_limited(auth_client):
     assert res.status_code == 422 and res.json()["bad_ops"] == ["a"]
 
 
+@pytest.mark.parametrize("url", ["javascript:alert(1)", " JaVaScRiPt:alert(1)", "data:text/html,<script>1</script>", "//evil.example", "ftp://x", 5, ""])
+async def test_a_thought_link_must_be_http_or_https(auth_client, url):
+    b = await new_board(auth_client)
+    res = await ops(auth_client, b, up("a", style={"url": url}))
+    assert res.status_code == 422 and res.json()["bad_ops"] == ["a"]
+    assert "http" in str(res.json()["detail"])
+    assert (await view(auth_client, b))["nodes"] == []
+
+
+async def test_http_and_https_links_are_kept(auth_client):
+    b = await new_board(auth_client)
+    res = await ops(auth_client, b, up("a", style={"url": "https://example.com/x?y=1"}), up("b", style={"url": "HTTP://example.com"}), up("c", style={"url": None}))
+    assert res.status_code == 200
+    assert {n["id"]: n["style"]["url"] for n in (await view(auth_client, b))["nodes"]} == {"a": "https://example.com/x?y=1", "b": "HTTP://example.com", "c": None}
+
+
 # --- cross-review fixes ------------------------------------------------------------------------------------------------
 
 async def test_ref_keys_can_be_swapped_and_moved_in_one_batch(auth_client):

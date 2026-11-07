@@ -36,8 +36,9 @@ export function ContextBar({ id }: { id: string }) {
       {items.map((it) => it.swatch ? (
         <button key={it.key} type="button" className={`sw nm-sw-${it.swatch}`} style={{ background: `var(--map-sticky-${it.swatch})` }} title={it.label} aria-label={it.label} onClick={() => runBar(id, it.key)} />
       ) : (
-        <button key={it.key} type="button" onClick={() => runBar(id, it.key)}>{it.label}{it.kbd && <kbd>{it.kbd}</kbd>}</button>
+        <button key={it.key} type="button" data-bar={it.key} onClick={(e) => runBar(id, it.key, e.currentTarget.getBoundingClientRect())}>{it.label}{it.kbd && <kbd>{it.kbd}</kbd>}</button>
       ))}
+      <button type="button" className="nm-more" data-bar="more" aria-label="More actions" aria-haspopup="menu" title="More (right-click)" onClick={(e) => runBar(id, "more", e.currentTarget.getBoundingClientRect())}>⋯</button>
     </div>
   );
 }

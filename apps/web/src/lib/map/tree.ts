@@ -1,6 +1,6 @@
 import type { BoardNode, Side } from "./types";
 import { BRANCH_COLORS } from "./types";
-import type { MindTree } from "./layout";
+import { growth, isLayout, orientOf, type Layout, type MindTree } from "./layout";
 
 /** Pure helpers over a board's mind nodes (kind mind/ref with a parent chain). */
 
@@ -41,12 +41,19 @@ export function rootOf(nodes: NodeMap, id: string): BoardNode | undefined {
   return n;
 }
 
-/** 1 = right of the root, -1 = left, 0 = the root. */
+/** How the map a node belongs to grows (a root's own style.layout; both when unset). */
+export function layoutOfRoot(root: BoardNode | undefined): Layout {
+  return root && isLayout(root.style.layout) ? root.style.layout : "both";
+}
+export function layoutOf(nodes: NodeMap, id: string): Layout { return layoutOfRoot(rootOf(nodes, id)); }
+
+/** 1 = right/down of the root, -1 = left/up, 0 = the root (the way the branch grows along its map's axis). */
 export function dirOf(nodes: NodeMap, id: string): 1 | -1 | 0 {
   const n = nodes.get(id);
   if (!n || !n.parent_id) return 0;
-  return topOf(nodes, id)?.style.side === "L" ? -1 : 1;
+  return growth(layoutOf(nodes, id), topOf(nodes, id)?.style.side);
 }
+export const orientOfNode = (nodes: NodeMap, id: string) => orientOf(layoutOf(nodes, id));
 
 /** The branch colour key: the nearest own colour going up. */
 export function colorKeyOf(nodes: NodeMap, id: string): string {
@@ -99,7 +106,7 @@ export function visibleForest(nodes: NodeMap, idx: Map<string | null, BoardNode[
     side: n.style.side ?? null,
     children: n.collapsed ? [] : (idx.get(n.id) ?? []).filter((c) => !c.hidden).map(walk),
   });
-  return (idx.get(null) ?? []).filter((r) => !r.hidden).map((r) => ({ ...walk(r), cx: r.x, cy: r.y }));
+  return (idx.get(null) ?? []).filter((r) => !r.hidden).map((r) => ({ ...walk(r), cx: r.x, cy: r.y, layout: layoutOfRoot(r) }));
 }
 
 /** Side and colour a new first-level branch gets under a root: balance the sides, rotate the palette. */
@@ -107,4 +114,11 @@ export function nextBranch(idx: Map<string | null, BoardNode[]>, rootId: string)
   const ch = idx.get(rootId) ?? [];
   const right = ch.filter((c) => (c.style.side ?? "R") === "R").length;
   return { side: right <= ch.length - right ? "R" : "L", color: BRANCH_COLORS[ch.length % BRANCH_COLORS.length] };
+}
+
+/** Side and colour for the Nth first-level branch of a root (when several are created in one go the index counts them). */
+export function nextBranchOf(idx: Map<string | null, BoardNode[]>, rootId: string, index: number): { side: Side; color: string } {
+  const have = (idx.get(rootId) ?? []).length;
+  const n = Math.max(index, have);
+  return { side: n % 2 === 0 ? "R" : "L", color: BRANCH_COLORS[n % BRANCH_COLORS.length] };
 }

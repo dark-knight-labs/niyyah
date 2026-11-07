@@ -2,33 +2,33 @@
 
 import { memo } from "react";
 import { BaseEdge, EdgeLabelRenderer, useInternalNode, type EdgeProps, type InternalNode } from "@xyflow/react";
+import { connectorGeometry, DASH, headShape, pointAlong, readEdgeStyle } from "@/lib/map/connector";
 
-function centre(n: InternalNode) {
-  const w = n.measured.width ?? 0, h = n.measured.height ?? 0;
-  return { x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w, h };
+function rectOf(n: InternalNode) {
+  return { x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w: n.measured.width ?? 0, h: n.measured.height ?? 0 };
 }
+export const edgeColor = (key: string) => (key === "ink" ? "var(--muted-foreground)" : `var(--stream-${key})`);
 
-/** Where the line from the rectangle's centre toward (tx, ty) leaves the rectangle (6px outside, so the arrow does not touch the border). */
-function clip(r: { x: number; y: number; w: number; h: number }, tx: number, ty: number): [number, number] {
-  const cx = r.x + r.w / 2, cy = r.y + r.h / 2, dx = tx - cx, dy = ty - cy;
-  if (!dx && !dy) return [cx, cy];
-  const s = Math.min(Math.abs((r.w / 2 + 6) / (dx || 1e-9)), Math.abs((r.h / 2 + 6) / (dy || 1e-9)));
-  return [cx + dx * s, cy + dy * s];
-}
-
-/** Dashed arrow between any two objects; it floats to the nearest side of each. */
-export const ConnectorEdge = memo(function ConnectorEdge({ id, source, target, markerEnd, selected, data }: EdgeProps) {
+/** A connector between any two objects: straight, curved or elbow, 1/2/3/5 px, solid, dashed or dotted, an arrowhead at each end, a colour, a label that can sit anywhere along it. */
+export const ConnectorEdge = memo(function ConnectorEdge({ id, source, target, selected, data }: EdgeProps) {
   const a = useInternalNode(source), b = useInternalNode(target);
   if (!a || !b) return null;
-  const ra = centre(a), rb = centre(b);
-  const [x1, y1] = clip(ra, rb.x + rb.w / 2, rb.y + rb.h / 2);
-  const [x2, y2] = clip(rb, ra.x + ra.w / 2, ra.y + ra.h / 2);
-  const label = (data as { label?: string } | undefined)?.label;
+  const d = (data ?? {}) as { label?: string; style?: Record<string, unknown> };
+  const st = readEdgeStyle(d.style);
+  const g = connectorGeometry(rectOf(a), rectOf(b), st);
+  const color = selected ? "var(--accent)" : edgeColor(st.color);
+  const sHead = headShape(st.start, g.start.x, g.start.y, g.start.angle, st.width);
+  const eHead = headShape(st.end, g.end.x, g.end.y, g.end.angle, st.width);
+  const mid = pointAlong(g.pts, st.labelPos);
+  const head = (h: NonNullable<ReturnType<typeof headShape>>, k: string) => (
+    <path key={k} d={h.d} fill={h.filled ? color : "none"} stroke={color} strokeWidth={st.width <= 2 ? 1.5 : 2} strokeLinejoin="round" strokeLinecap="round" />
+  );
   return (
     <>
-      <BaseEdge id={id} path={`M${x1} ${y1}L${x2} ${y2}`} markerEnd={markerEnd} interactionWidth={16} className={`nm-link ${selected ? "sel" : ""}`}
-        style={{ stroke: selected ? "var(--accent)" : "var(--muted-foreground)", strokeDasharray: "5 4", strokeWidth: 1.5 }} />
-      {label ? <EdgeLabelRenderer><div className="mono nodrag nopan" style={{ position: "absolute", transform: `translate(-50%,-50%) translate(${(x1 + x2) / 2}px,${(y1 + y2) / 2}px)`, background: "var(--surface)", padding: "2px 4px" }}>{label}</div></EdgeLabelRenderer> : null}
+      <BaseEdge id={id} path={g.d} interactionWidth={18} className={`nm-link ${selected ? "sel" : ""}`}
+        style={{ stroke: color, strokeWidth: st.width, strokeDasharray: DASH[st.dash] ?? "none", strokeLinecap: st.dash === "dotted" ? "round" : "butt", fill: "none" }} />
+      {sHead && head(sHead, "s")}{eHead && head(eHead, "e")}
+      {d.label ? <EdgeLabelRenderer><div className="mono nodrag nopan nm-elabel" style={{ position: "absolute", transform: `translate(-50%,-50%) translate(${mid.x}px,${mid.y}px)`, background: "var(--surface)", padding: "2px 4px" }}>{d.label}</div></EdgeLabelRenderer> : null}
     </>
   );
 });

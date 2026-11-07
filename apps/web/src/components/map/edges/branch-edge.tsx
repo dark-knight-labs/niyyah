@@ -2,10 +2,11 @@
 
 import { memo } from "react";
 import { BaseEdge, type EdgeProps } from "@xyflow/react";
+import { branchPath, branchWidth } from "@/lib/map/connector";
 
-/** Parent-to-child bezier in the branch colour; the control points sit halfway across, like the mock. */
+/** Parent-to-child line in the branch colour. The map's `edge` style picks curved, elbow or straight; thickness tapers with depth. */
 export const BranchEdge = memo(function BranchEdge({ sourceX, sourceY, targetX, targetY, data }: EdgeProps) {
-  const mx = (sourceX + targetX) / 2;
-  const d = `M${sourceX} ${sourceY}C${mx} ${sourceY} ${mx} ${targetY} ${targetX} ${targetY}`;
-  return <BaseEdge path={d} style={{ stroke: (data as { color?: string } | undefined)?.color ?? "var(--muted-foreground)", strokeWidth: 1.5, fill: "none" }} />;
+  const d = (data ?? {}) as { color?: string; kind?: string; depth?: number; orient?: "h" | "v" };
+  const path = branchPath(sourceX, sourceY, targetX, targetY, (d.kind as "curved") ?? "curved", d.orient ?? "h");
+  return <BaseEdge path={path} style={{ stroke: d.color ?? "var(--muted-foreground)", strokeWidth: branchWidth(d.depth ?? 1), fill: "none", strokeLinecap: "round", strokeLinejoin: "round" }} />;
 });
