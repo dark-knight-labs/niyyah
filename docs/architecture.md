@@ -13,6 +13,7 @@ browser ──► web (Next.js)  ──► api (FastAPI) ──► PostgreSQL
 - **Per-user defaults**: a new account is seeded with a starter set of blocks and a prayer-anchored schedule (`planner_defaults.py`). Blocks, schedule, weekend days, streams and goals are all user-defined.
 - **Calendar feeds**: iCal addresses are private and are fetched by the server only after an SSRF check (https, port 443, public addresses only, redirects re-checked, 5 MB cap).
 - **Export, import and tokens**: `GET /api/v1/export` returns one user's data as versioned JSON ([format](export-format.md)). `POST /api/v1/import?replace=true` is its inverse (signed-in session only). API tokens (`nyt_...`) are hashed at rest, can be revoked, and are accepted on the export endpoint only.
+- **Suggestions**: bundles of proposed plan changes the user applies line by line and can undo for 7 days, through the same services the screens use ([suggestions](suggestions.md)).
 - **Migrations**: Alembic (`apps/api/alembic`). The Docker image applies them on start when `RUN_MIGRATIONS=1`.
 
 Everything lives in the database. Moving in from a folder of markdown notes (an Obsidian vault, for instance) is a one-time conversion to the export format, done by a separate tool, then `POST /api/v1/import`; mirroring out again is a separate tool reading the export.

@@ -14,6 +14,7 @@ cd ../web && npm ci && npx tsc --noEmit -p . && npm run lint
 ## Guidelines
 
 - Add or change tests with the code. Run the API suite and `tsc` before opening a pull request.
+- `TEST_DATABASE_URL=postgresql+asyncpg://user:pass@host/db` runs the same suite on Postgres (the suggestion tests also run there in CI).
 - Database changes need an Alembic migration (`make migration msg="what changed"`). Tests create tables directly, so also run `alembic upgrade head` against an empty Postgres once.
 - Planner data is per user: every query filters by `user_id`, and every new endpoint needs a test that a second user cannot see the first user's rows.
 - Keep it simple: prefer plain code and the existing patterns (see `apps/api/app/services/planner_*.py`) over new abstractions.

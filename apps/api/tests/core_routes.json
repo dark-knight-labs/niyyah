@@ -156,6 +156,30 @@
   "PATCH"
  ],
  [
+  "/api/v1/suggestions",
+  "GET"
+ ],
+ [
+  "/api/v1/suggestions",
+  "POST"
+ ],
+ [
+  "/api/v1/suggestions/{suggestion_id}",
+  "GET"
+ ],
+ [
+  "/api/v1/suggestions/{suggestion_id}/apply",
+  "POST"
+ ],
+ [
+  "/api/v1/suggestions/{suggestion_id}/reject",
+  "POST"
+ ],
+ [
+  "/api/v1/suggestions/{suggestion_id}/undo",
+  "POST"
+ ],
+ [
   "/api/v1/tokens",
   "GET"
  ],

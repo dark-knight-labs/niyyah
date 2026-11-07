@@ -875,6 +875,166 @@
    "type": "object"
   }
  },
+ "GET /api/v1/suggestions": {
+  "params": [
+   "query:status"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "items": {
+     "items": {
+      "properties": {
+       "created_at": {
+        "type": "string"
+       },
+       "decided_at": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "lines": {
+        "type": "integer"
+       },
+       "run_id": {
+        "type": "string"
+       },
+       "source": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "created_at",
+       "decided_at",
+       "id",
+       "lines",
+       "run_id",
+       "source",
+       "status",
+       "title"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "pending": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "items",
+    "pending"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/suggestions/{suggestion_id}": {
+  "params": [
+   "path:suggestion_id*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "created_at": {
+     "type": "string"
+    },
+    "decided_at": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "lines": {
+     "items": {
+      "properties": {
+       "base": {
+        "type": "object"
+       },
+       "created_key": {
+        "type": "object"
+       },
+       "entity": {
+        "type": "string"
+       },
+       "error": {
+        "type": "string"
+       },
+       "op": {
+        "type": "string"
+       },
+       "payload": {
+        "type": "object"
+       },
+       "ref": {
+        "type": "string"
+       },
+       "seq": {
+        "type": "integer"
+       },
+       "status": {
+        "type": "string"
+       },
+       "target": {
+        "type": "object"
+       }
+      },
+      "required": [
+       "base",
+       "created_key",
+       "entity",
+       "error",
+       "op",
+       "payload",
+       "ref",
+       "seq",
+       "status",
+       "target"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "reason": {
+     "type": "string"
+    },
+    "run_id": {
+     "type": "string"
+    },
+    "source": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "undo_until": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "created_at",
+    "decided_at",
+    "id",
+    "lines",
+    "reason",
+    "run_id",
+    "source",
+    "status",
+    "title",
+    "undo_until"
+   ],
+   "type": "object"
+  }
+ },
  "GET /api/v1/tokens": {
   "params": [],
   "request": null,
@@ -3235,6 +3395,9 @@
     "text": {
      "type": "string"
     },
+    "unschedule": {
+     "type": "boolean"
+    },
     "weight": {
      "type": "integer"
     }
@@ -4901,6 +5064,462 @@
     "order",
     "persona_id",
     "start_time"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/suggestions": {
+  "params": [],
+  "request": {
+   "properties": {
+    "lines": {
+     "items": {
+      "properties": {
+       "base": {
+        "type": "object"
+       },
+       "entity": {
+        "type": "string"
+       },
+       "op": {
+        "type": "string"
+       },
+       "payload": {
+        "type": "object"
+       },
+       "ref": {
+        "type": "string"
+       },
+       "target": {
+        "type": "object"
+       }
+      },
+      "required": [
+       "entity",
+       "op"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "reason": {
+     "type": "string"
+    },
+    "run_id": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "lines",
+    "title"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "created_at": {
+     "type": "string"
+    },
+    "decided_at": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "lines": {
+     "items": {
+      "properties": {
+       "base": {
+        "type": "object"
+       },
+       "created_key": {
+        "type": "object"
+       },
+       "entity": {
+        "type": "string"
+       },
+       "error": {
+        "type": "string"
+       },
+       "op": {
+        "type": "string"
+       },
+       "payload": {
+        "type": "object"
+       },
+       "ref": {
+        "type": "string"
+       },
+       "seq": {
+        "type": "integer"
+       },
+       "status": {
+        "type": "string"
+       },
+       "target": {
+        "type": "object"
+       }
+      },
+      "required": [
+       "base",
+       "created_key",
+       "entity",
+       "error",
+       "op",
+       "payload",
+       "ref",
+       "seq",
+       "status",
+       "target"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "reason": {
+     "type": "string"
+    },
+    "run_id": {
+     "type": "string"
+    },
+    "source": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "undo_until": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "created_at",
+    "decided_at",
+    "id",
+    "lines",
+    "reason",
+    "run_id",
+    "source",
+    "status",
+    "title",
+    "undo_until"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/suggestions/{suggestion_id}/apply": {
+  "params": [
+   "path:suggestion_id*"
+  ],
+  "request": {
+   "properties": {
+    "lines": {
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "created_at": {
+     "type": "string"
+    },
+    "decided_at": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "lines": {
+     "items": {
+      "properties": {
+       "base": {
+        "type": "object"
+       },
+       "created_key": {
+        "type": "object"
+       },
+       "entity": {
+        "type": "string"
+       },
+       "error": {
+        "type": "string"
+       },
+       "op": {
+        "type": "string"
+       },
+       "payload": {
+        "type": "object"
+       },
+       "ref": {
+        "type": "string"
+       },
+       "seq": {
+        "type": "integer"
+       },
+       "status": {
+        "type": "string"
+       },
+       "target": {
+        "type": "object"
+       }
+      },
+      "required": [
+       "base",
+       "created_key",
+       "entity",
+       "error",
+       "op",
+       "payload",
+       "ref",
+       "seq",
+       "status",
+       "target"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "reason": {
+     "type": "string"
+    },
+    "run_id": {
+     "type": "string"
+    },
+    "source": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "undo_until": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "created_at",
+    "decided_at",
+    "id",
+    "lines",
+    "reason",
+    "run_id",
+    "source",
+    "status",
+    "title",
+    "undo_until"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/suggestions/{suggestion_id}/reject": {
+  "params": [
+   "path:suggestion_id*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "created_at": {
+     "type": "string"
+    },
+    "decided_at": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "lines": {
+     "items": {
+      "properties": {
+       "base": {
+        "type": "object"
+       },
+       "created_key": {
+        "type": "object"
+       },
+       "entity": {
+        "type": "string"
+       },
+       "error": {
+        "type": "string"
+       },
+       "op": {
+        "type": "string"
+       },
+       "payload": {
+        "type": "object"
+       },
+       "ref": {
+        "type": "string"
+       },
+       "seq": {
+        "type": "integer"
+       },
+       "status": {
+        "type": "string"
+       },
+       "target": {
+        "type": "object"
+       }
+      },
+      "required": [
+       "base",
+       "created_key",
+       "entity",
+       "error",
+       "op",
+       "payload",
+       "ref",
+       "seq",
+       "status",
+       "target"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "reason": {
+     "type": "string"
+    },
+    "run_id": {
+     "type": "string"
+    },
+    "source": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "undo_until": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "created_at",
+    "decided_at",
+    "id",
+    "lines",
+    "reason",
+    "run_id",
+    "source",
+    "status",
+    "title",
+    "undo_until"
+   ],
+   "type": "object"
+  }
+ },
+ "POST /api/v1/suggestions/{suggestion_id}/undo": {
+  "params": [
+   "path:suggestion_id*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "created_at": {
+     "type": "string"
+    },
+    "decided_at": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "lines": {
+     "items": {
+      "properties": {
+       "base": {
+        "type": "object"
+       },
+       "created_key": {
+        "type": "object"
+       },
+       "entity": {
+        "type": "string"
+       },
+       "error": {
+        "type": "string"
+       },
+       "op": {
+        "type": "string"
+       },
+       "payload": {
+        "type": "object"
+       },
+       "ref": {
+        "type": "string"
+       },
+       "seq": {
+        "type": "integer"
+       },
+       "status": {
+        "type": "string"
+       },
+       "target": {
+        "type": "object"
+       }
+      },
+      "required": [
+       "base",
+       "created_key",
+       "entity",
+       "error",
+       "op",
+       "payload",
+       "ref",
+       "seq",
+       "status",
+       "target"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "reason": {
+     "type": "string"
+    },
+    "run_id": {
+     "type": "string"
+    },
+    "source": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "title": {
+     "type": "string"
+    },
+    "undo_until": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "created_at",
+    "decided_at",
+    "id",
+    "lines",
+    "reason",
+    "run_id",
+    "source",
+    "status",
+    "title",
+    "undo_until"
    ],
    "type": "object"
   }
@@ -7623,6 +8242,9 @@
      "type": "string"
     },
     "text": {
+     "type": "string"
+    },
+    "week": {
      "type": "string"
     }
    },

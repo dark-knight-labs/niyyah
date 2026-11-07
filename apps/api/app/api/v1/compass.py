@@ -24,4 +24,4 @@ async def get_compass(user: User = Depends(get_current_user), db: AsyncSession =
 
 @router.put("", response_model=CompassResponse)
 async def put_compass(body: CompassUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return _view(await compass_service.update(db, user.id, body.model_dump(exclude_unset=True)))
+    return _view(await compass_service.save(db, user.id, body.model_dump(exclude_unset=True)))

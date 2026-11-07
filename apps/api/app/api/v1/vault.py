@@ -100,7 +100,7 @@ from app.services.rules import quarter_for, week_for
 
 router = APIRouter(prefix="/vault", tags=["vault"])
 
-EDIT_WINDOW_DAYS = 7
+EDIT_WINDOW_DAYS = planner_day.EDIT_WINDOW_DAYS
 
 
 def _day_to_response(day: VaultDay) -> VaultDayResponse:
@@ -130,16 +130,18 @@ def _local_now() -> datetime:
 
 
 def _check_day(day: date) -> None:
-    today = _local_now().date()
-    if not today - timedelta(days=EDIT_WINDOW_DAYS) <= day <= today:
-        raise HTTPException(status_code=422, detail=f"Only the last {EDIT_WINDOW_DAYS} days can be edited")
+    try:
+        planner_day.check_edit_day(day, _local_now().date())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 def _check_task_day(day: date) -> None:
     """Tasks can be planned ahead (up to a year), unlike the log and votes, which only cover days that have happened."""
-    today = _local_now().date()
-    if not today - timedelta(days=EDIT_WINDOW_DAYS) <= day <= today + timedelta(days=366):
-        raise HTTPException(status_code=422, detail="That day is out of range for a task")
+    try:
+        planner_items.check_task_day(day, _local_now().date())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 async def _db_run(db: AsyncSession, work):
@@ -716,21 +718,19 @@ async def get_objectives(user: User = Depends(get_current_user), db: AsyncSessio
 
 @router.put("/objectives", response_model=ObjectivesResponse)
 async def put_objective(data: ObjectiveIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Edit a week objective. For blocks with a pipeline the objective is its small-domino item: the item is renamed,
-    created in Now (new text) or moved to Done / back to Now (done flag) in the same commit."""
+    """Edit a week objective (this week, or `week`: from 4 weeks back to 13 ahead). For blocks with a pipeline, in this week,
+    the objective is its small-domino item: the item is renamed, created in Now (new text) or moved to Done / back to Now
+    (done flag) in the same commit. Another week is saved as text only."""
     today = _local_now().date()
-    week = week_for(today)[2]
-    streams = await planner_store.streams_for(db, user.id, today)
-    block = next((s for s in streams if s.id == data.stream), None)
+    week = data.week or week_for(today)[2]
 
     async def work():
-        await planner_work.update_objective(db, user.id, today, data.stream, data.text, data.done, data.checkpoint, streams)
-        if block and block.goal and not block.archived and (data.text is not None or data.done is not None):
-            await planner_work.sync_focus(db, user.id, data.stream, week, today, text=data.text, done=data.done)
+        return await planner_work.week_objective_set(db, user.id, today, data.stream, data.text, data.done, data.checkpoint, week=week)
 
-    await _db_run(db, work)
+    streams = await _db_run(db, work)
+    anchor = today if week == week_for(today)[2] else planner_work.week_anchor(week)
     parsed = await planner_store.week_objectives(db, user.id, week, streams)
-    return objectives_response(parsed, streams, today)
+    return objectives_response(parsed, streams, anchor)
 
 
 async def _quarter(db: AsyncSession, user: User, today: date) -> QuarterResponse:
@@ -824,16 +824,7 @@ async def post_pipeline_items(stream: str, data: PipelineAddIn, user: User = Dep
 async def put_pipeline_move(data: PipelineMoveIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
     await _known_stream(db, user, data.stream, today)
-    week = week_for(today)[2]
-    streams = await planner_store.streams_for(db, user.id, today)
-
-    async def work():
-        item = await planner_work.item_row(db, user.id, data.stream, data.line)
-        if item.focus_week == week and (data.lane == "done") != item.done:  # finishing the small domino ticks the objective
-            await planner_work.update_objective(db, user.id, today, data.stream, None, data.lane == "done", None, streams)
-        await planner_work.move_item(db, user.id, data.stream, data.line, data.lane, today)
-
-    return await _day_write(db, work)
+    return await _day_write(db, lambda: planner_work.pipeline_move(db, user.id, data.stream, data.line, data.lane, today))
 
 
 @router.put("/pipeline/focus", response_model=EditResponse)
@@ -841,15 +832,7 @@ async def put_pipeline_focus(data: PipelineRefIn, user: User = Depends(get_curre
     """Make a pipeline item this week's small domino: it goes to Now and the objective line follows."""
     today = _local_now().date()
     await _known_stream(db, user, data.stream, today)
-    week = week_for(today)[2]
-    streams = await planner_store.streams_for(db, user.id, today)
-
-    async def work():
-        item = await planner_work.item_row(db, user.id, data.stream, data.line)
-        await planner_work.update_objective(db, user.id, today, data.stream, item.text, False, item.checkpoint or "", streams)
-        await planner_work.set_focus(db, user.id, data.stream, data.line, week, today)
-
-    return await _day_write(db, work)
+    return await _day_write(db, lambda: planner_work.pipeline_focus(db, user.id, data.stream, data.line, today))
 
 
 @router.put("/pipeline/checkpoint", response_model=EditResponse)
@@ -880,16 +863,7 @@ async def put_pipeline_blocked_by(data: PipelineBlockedByIn, user: User = Depend
 async def post_pipeline_remove(data: PipelineRefIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
     await _known_stream(db, user, data.stream, today)
-    week = week_for(today)[2]
-    streams = await planner_store.streams_for(db, user.id, today)
-
-    async def work():
-        item = await planner_work.item_row(db, user.id, data.stream, data.line)
-        if item.focus_week == week:
-            await planner_work.update_objective(db, user.id, today, data.stream, "", None, "", streams)
-        await planner_work.remove_item(db, user.id, data.stream, data.line)
-
-    return await _day_write(db, work)
+    return await _day_write(db, lambda: planner_work.pipeline_remove(db, user.id, data.stream, data.line, today))
 
 
 # --- Stream notebooks: ideas, meetings, blockers ------------------------------------------------------------------

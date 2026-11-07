@@ -6,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import check_secrets, settings
 from app.core.deps import get_current_user
-from app.core.plugins import API_PREFIX, check_collisions, discover_entry_points, flat_routes, load_plugins, parse_specs
-from app.api.v1 import auth, personas, schedule, principles, tracker, settings as settings_router, dashboard, vault, tokens, export, import_data, compass, boards, board_files
+from app.core.plugins import API_PREFIX, check_collisions, discover_entry_points, flat_routes, load_plugins, parse_specs, suggestion_checks
+from app.services import suggestions as suggestions_service
+from app.api.v1 import auth, personas, schedule, principles, tracker, settings as settings_router, dashboard, vault, tokens, export, import_data, compass, boards, board_files, suggestions
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -43,6 +44,7 @@ def create_app(plugin_specs: Iterable[str] | None = None, entry_points: Callable
     app.include_router(compass.router, prefix="/api/v1")
     app.include_router(board_files.router, prefix="/api/v1")   # before boards: /boards/files is not /boards/{board_id}
     app.include_router(boards.router, prefix="/api/v1")
+    app.include_router(suggestions.router, prefix="/api/v1")
 
     @app.get("/health")
     async def health():
@@ -58,6 +60,7 @@ def create_app(plugin_specs: Iterable[str] | None = None, entry_points: Callable
         for router in routers:
             app.include_router(router, prefix=API_PREFIX)
     app.state.plugins = plugins
+    suggestions_service.set_checks(suggestion_checks(plugins))
     return app
 
 

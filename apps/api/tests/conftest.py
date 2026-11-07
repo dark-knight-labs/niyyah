@@ -8,14 +8,18 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base, get_db
 from app.main import app
 
-TEST_DB_URL = "sqlite+aiosqlite:///./test.db"
+# CI runs the suite on sqlite. Set TEST_DATABASE_URL (postgresql+asyncpg://...) to run it on Postgres, which the
+# suggestion tests need for row locks and the unique-index write order.
+TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+ON_POSTGRES = TEST_DB_URL.startswith("postgresql")
 
-engine = create_async_engine(TEST_DB_URL, echo=False)
+engine = create_async_engine(TEST_DB_URL, echo=False, **({"poolclass": NullPool} if ON_POSTGRES else {}))
 TestSession = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
