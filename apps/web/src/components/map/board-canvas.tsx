@@ -1028,7 +1028,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
 
   return (
     <MapCtx.Provider value={actions}>
-      <div className="niyyah-map" tabIndex={-1} data-tool={tool} data-card={cardOpen ? "1" : undefined} data-testid="map-canvas" data-board={board.id}
+      <div className="niyyah-map" tabIndex={-1} data-menu={menu ? "1" : undefined} data-tool={tool} data-card={cardOpen ? "1" : undefined} data-testid="map-canvas" data-board={board.id}
         onDragOver={(e) => { if (e.dataTransfer?.types.includes("Files")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; setDropping(true); } }}
         onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false); }}
         onDrop={(e) => { setDropping(false); const files = [...(e.dataTransfer?.files ?? [])]; if (!files.length) return; e.preventDefault(); void ingest(files, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })); }}>

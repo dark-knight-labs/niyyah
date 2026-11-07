@@ -613,6 +613,8 @@ h1, h2, h3 {
 
 /* --- Map: right-click menu, prompt, search, help (Map v2) -------------------------------------------------------------------- */
 .nm-cm { position: fixed; z-index: 60; min-width: 232px; padding: 4px 0; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 12px 30px rgb(0 0 0 / 0.2); border-radius: var(--map-r); font-size: 0.8125rem; color: var(--foreground); user-select: none; max-height: calc(100vh - 8px); overflow-y: auto; overscroll-behavior: contain; }
+/* While a context menu is open the floating selection bars sit under it: hide them (visibility keeps their layout, so nothing jumps). */
+.niyyah-map[data-menu] .react-flow__node-toolbar, .niyyah-map[data-menu] .nm-multi { visibility: hidden; }
 .nm-cm hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
 .nm-cm-row { position: relative; }
 .nm-cm button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; color: inherit; }
