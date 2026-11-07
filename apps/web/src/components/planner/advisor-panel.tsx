@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { advisorApi, type Proposal } from "@/lib/advisor-api";
-import { QUICK_PROMPTS, askErrorMessage, decide, filteredNote, kindLabel, probeAdvisor } from "@/lib/advisor";
+import { QUICK_PROMPTS, askErrorMessage, askWithTimeout, decide, filteredNote, isAbort, kindLabel, probeAdvisor } from "@/lib/advisor";
 import { parseMarkdown, type Block, type Span } from "@/lib/markdown";
 
 const COLLAPSED_KEY = "niyyah.advisor.collapsed";
@@ -65,6 +65,8 @@ export function AdvisorPanel({ onApplied }: { onApplied: () => Promise<unknown> 
   const [errors, setErrors] = useState<Record<number, string>>({});
   const nextId = useRef(1);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const inFlight = useRef(false); // set synchronously: a second Ctrl+Enter before the next render must not send a second ask
+  const page = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => {
     try { setProposals(await advisorApi.proposals()); } catch { /* keep the list we have; the panel is already visible */ }
@@ -74,6 +76,13 @@ export function AdvisorPanel({ onApplied }: { onApplied: () => Promise<unknown> 
     let live = true;
     void probeAdvisor(advisorApi).then((list) => { if (live) setProposals(list); });
     return () => { live = false; };
+  }, []);
+
+  // Leaving the page cancels an ask in flight (each one costs from the hourly cap and holds a bridge turn).
+  useEffect(() => {
+    const ctl = new AbortController();
+    page.current = ctl;
+    return () => ctl.abort();
   }, []);
 
   useEffect(() => {
@@ -96,18 +105,21 @@ export function AdvisorPanel({ onApplied }: { onApplied: () => Promise<unknown> 
 
   async function send() {
     const q = question.trim();
-    if (!q || asking) return;
+    if (!q || inFlight.current) return;
+    inFlight.current = true;
     const id = nextId.current++;
     setTurns((t) => [{ id, question: q, state: "waiting" }, ...t]);
     setQuestion("");
     setAsking(true);
     try {
-      const r = await advisorApi.ask(q);
+      const r = await askWithTimeout((signal) => advisorApi.ask(q, signal), page.current?.signal);
       setTurns((t) => t.map((x) => (x.id === id ? { ...x, state: "done", answer: r.answer, note: filteredNote(r) } : x)));
       if (r.proposals_pending > 0) await refresh();
     } catch (err) {
+      if (isAbort(err) && page.current?.signal.aborted) return; // the page is gone: nothing to show
       setTurns((t) => t.map((x) => (x.id === id ? { ...x, state: "error", error: askErrorMessage(err) } : x)));
     } finally {
+      inFlight.current = false;
       setAsking(false);
     }
   }

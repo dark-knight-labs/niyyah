@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Proposal } from "@/lib/advisor-api";
-import { askErrorMessage, decide, decisionErrorMessage, filteredNote, probeAdvisor } from "@/lib/advisor";
+import { askErrorMessage, askWithTimeout, decide, decisionErrorMessage, filteredNote, probeAdvisor } from "@/lib/advisor";
 
 const prop = (id: number, status = "pending"): Proposal => ({ id, kind: "note_add", payload: {}, text: "t", summary: "t", reason: null, status, created_at: null, decided_at: null });
 const fail = (status: number | undefined, message = "x") => Object.assign(new Error(message), { status });
@@ -9,7 +9,7 @@ describe("probeAdvisor", () => {
   it("returns the list on 200", async () => {
     expect(await probeAdvisor({ proposals: async () => [prop(1)] })).toEqual([prop(1)]);
   });
-  it.each([403, 404, 500, 502, undefined])("is null (panel hidden) on %s", async (status) => {
+  it.each([401, 403, 404, 500, 502, undefined])("is null (panel hidden) on %s", async (status) => {
     expect(await probeAdvisor({ proposals: async () => { throw fail(status); } })).toBeNull();
   });
   it("is null when the body is not a list", async () => {
@@ -33,8 +33,8 @@ describe("error mapping", () => {
   });
   it("filtered note", () => {
     expect(filteredNote({ filtered: false, removed: 0 })).toBeNull();
-    expect(filteredNote({ filtered: true, removed: 1 })).toBe("1 passage removed (not in the verified set)");
-    expect(filteredNote({ filtered: true, removed: 3 })).toBe("3 passages removed (not in the verified set)");
+    expect(filteredNote({ filtered: true, removed: 1 })).toBe("1 passage removed: quotes and references are shown only from the verified set");
+    expect(filteredNote({ filtered: true, removed: 3 })).toBe("3 passages removed: quotes and references are shown only from the verified set");
   });
 });
 
@@ -71,5 +71,33 @@ describe("decide", () => {
     const r = await decide(calls({ approve: async () => { throw fail(409, "stale: moved"); } }), "approve", 1, { onSettled });
     expect(r).toMatchObject({ ok: false, stale: true });
     expect(onSettled).toHaveBeenCalledOnce();
+  });
+});
+
+describe("askWithTimeout", () => {
+  afterEach(() => vi.useRealTimers());
+  const hang = (signal: AbortSignal) => new Promise<never>((_, reject) => signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }))));
+
+  it("passes the answer through and clears the timer", async () => {
+    vi.useFakeTimers();
+    expect(await askWithTimeout(async () => "ok", undefined, 1000)).toBe("ok");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("aborts at the client timeout and reads like a 504", async () => {
+    vi.useFakeTimers();
+    let seen: AbortSignal | undefined;
+    const p = askWithTimeout((s) => { seen = s; return hang(s); }, undefined, 100_000);
+    const caught = p.catch((e) => e);
+    await vi.advanceTimersByTimeAsync(100_000);
+    const err = await caught;
+    expect(seen?.aborted).toBe(true);
+    expect(err.status).toBe(504);
+    expect(askErrorMessage(err)).toMatch(/too long.*narrower/i);
+  });
+  it("aborts when the page goes away and keeps the AbortError", async () => {
+    const outer = new AbortController();
+    const p = askWithTimeout(hang, outer.signal, 100_000);
+    outer.abort();
+    await expect(p).rejects.toMatchObject({ name: "AbortError" });
   });
 });

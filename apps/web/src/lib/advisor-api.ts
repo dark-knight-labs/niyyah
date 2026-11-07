@@ -22,7 +22,7 @@ export interface AskResult {
 
 export const advisorApi = {
   proposals: () => api.get<Proposal[]>("/advisor/proposals"),
-  ask: (question: string) => api.post<AskResult>("/advisor/ask", { question }),
+  ask: (question: string, signal?: AbortSignal) => api.post<AskResult>("/advisor/ask", { question }, { signal }),
   approve: (id: number) => api.post<Proposal>(`/advisor/proposals/${id}/approve`, {}),
   reject: (id: number) => api.post<Proposal>(`/advisor/proposals/${id}/reject`, {}),
 };

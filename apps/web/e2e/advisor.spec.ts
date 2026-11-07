@@ -21,11 +21,11 @@ const proposal = (id: number, over: Record<string, unknown> = {}) => ({
 });
 const json = (route: Route, status: number, body: unknown) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
-interface Mock { asks: string[]; pipelinesLoads: number; decisions: string[] }
+interface Mock { asks: string[]; pipelinesLoads: number; decisions: string[]; proposalGets: number }
 
 /** Mock the advisor routes; `behave` overrides any route by "METHOD /path". */
 async function mockAdvisor(page: Page, behave: Record<string, (route: Route) => Promise<void> | void> = {}): Promise<Mock> {
-  const seen: Mock = { asks: [], pipelinesLoads: 0, decisions: [] };
+  const seen: Mock = { asks: [], pipelinesLoads: 0, decisions: [], proposalGets: 0 };
   let list = [proposal(1), proposal(2, { kind: "stream_checkpoint_set", payload: { text: "Router live" }, text: "Router live", summary: "Router live", reason: null }), proposal(9, { status: "rejected", summary: "Old idea", text: "Old idea" })];
   page.on("request", (r) => { if (new URL(r.url()).pathname.endsWith("/vault/pipelines")) seen.pipelinesLoads++; });
   await page.route("**/api/v1/advisor/**", async (route) => {
@@ -33,7 +33,7 @@ async function mockAdvisor(page: Page, behave: Record<string, (route: Route) => 
     const path = new URL(req.url()).pathname.replace(/^.*\/api\/v1\/advisor/, "");
     const key = `${req.method()} ${path}`;
     if (behave[key]) return behave[key](route);
-    if (key === "GET /proposals") return json(route, 200, list);
+    if (key === "GET /proposals") { seen.proposalGets++; return json(route, 200, list); }
     if (key === "POST /ask") {
       const q = req.postDataJSON().question as string;
       seen.asks.push(q);
@@ -54,7 +54,7 @@ async function mockAdvisor(page: Page, behave: Record<string, (route: Route) => 
 const panel = (page: Page) => page.getByRole("region", { name: "Advisor" });
 const openPlan = async (page: Page) => { await page.goto("/plan"); await expect(page.getByRole("region", { name: "Compass" })).toBeVisible(); };
 
-for (const status of [403, 404, 500]) {
+for (const status of [401, 403, 404, 500]) {
   test(`hidden when the advisor routes answer ${status}`, async ({ page }) => {
     await mockAdvisor(page, { "GET /proposals": (r) => json(r, status, { detail: "nope" }) });
     await openPlan(page);
@@ -88,7 +88,7 @@ test("ask, answer rendered safely, filtered note, proposals refreshed, chips fil
   await expect(convo.getByRole("strong")).toHaveText("three");
   await expect(convo.getByRole("heading", { name: "Week" })).toHaveCount(0); // headings render as styled paragraphs, not h-tags
   await expect(convo.getByText("1 passage")).toHaveCount(0);
-  await expect(convo.getByText("2 passages removed (not in the verified set)")).toBeVisible();
+  await expect(convo.getByText("2 passages removed: quotes and references are shown only from the verified set")).toBeVisible();
   await expect(convo.getByText("<script>window.__xss=1</script>", { exact: false })).toBeVisible(); // shown as text
   expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
   await expect(convo.getByRole("link", { name: "ok" })).toHaveAttribute("href", "https://example.com");
@@ -119,9 +119,11 @@ test("approve reloads the plan and moves the proposal to decisions; reject does 
   await openPlan(page);
   await expect(panel(page).getByText("2 waiting")).toBeVisible();
   const before = seen.pipelinesLoads;
+  expect(seen.proposalGets).toBe(1); // the probe, once
   await panel(page).getByRole("button", { name: "Approve" }).first().click();
   await expect(panel(page).getByText("1 waiting")).toBeVisible();
   expect(seen.decisions).toEqual(["approve 1"]);
+  await expect.poll(() => seen.proposalGets).toBe(2); // refreshed by the same call, not a new probe on a remounted panel
   await expect.poll(() => seen.pipelinesLoads).toBeGreaterThan(before);
   const after = seen.pipelinesLoads;
   await panel(page).getByRole("button", { name: "Reject" }).click();
@@ -157,4 +159,35 @@ test("collapsed state is remembered", async ({ page }) => {
   await page.reload();
   await expect(panel(page).getByRole("button", { name: /Advisor/ })).toHaveAttribute("aria-expanded", "false");
   await expect(panel(page).getByLabel("Ask the advisor")).toHaveCount(0);
+});
+
+test("one ask at a time: Send is disabled in flight and a second Ctrl+Enter sends nothing", async ({ page }) => {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => { release = r; });
+  let asks = 0;
+  await mockAdvisor(page, { "POST /ask": async (r) => { asks++; await gate; await json(r, 200, { answer: "done", proposals_pending: 0, filtered: false, removed: 0 }); } });
+  await openPlan(page);
+  const box = panel(page).getByLabel("Ask the advisor");
+  await box.fill("first");
+  await box.press("Control+Enter");
+  await expect(panel(page).getByRole("status")).toContainText("Thinking");
+  await expect(panel(page).getByRole("button", { name: "Send" })).toBeDisabled();
+  await box.fill("second");
+  await box.press("Control+Enter");
+  await page.waitForTimeout(300);
+  expect(asks).toBe(1);
+  release();
+  await expect(panel(page).getByText("done", { exact: true })).toBeVisible();
+});
+
+test("leaving the page aborts an ask in flight", async ({ page }) => {
+  let aborted = false;
+  page.on("requestfailed", (r) => { if (r.url().includes("/advisor/ask")) aborted = true; });
+  await mockAdvisor(page, { "POST /ask": async () => { await new Promise(() => undefined); } });
+  await openPlan(page);
+  await panel(page).getByLabel("Ask the advisor").fill("slow");
+  await panel(page).getByRole("button", { name: "Send" }).click();
+  await expect(panel(page).getByRole("status")).toBeVisible();
+  await page.getByRole("link", { name: "Overview" }).first().click();
+  await expect.poll(() => aborted).toBe(true);
 });

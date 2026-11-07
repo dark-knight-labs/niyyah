@@ -23,6 +23,36 @@ export async function probeAdvisor(calls: Pick<AdvisorCalls, "proposals">): Prom
 const status = (err: unknown) => (err && typeof err === "object" && "status" in err ? (err as { status?: number }).status : undefined);
 const text = (err: unknown) => (err instanceof Error ? err.message : "");
 
+/** The ingress gives up at 100 s; the client stops waiting at the same moment. */
+export const ASK_TIMEOUT_MS = 100_000;
+
+/** Thrown when the client timeout fires: the same as the server's 504, so it reads the same. */
+export const askTimeout = () => Object.assign(new Error("The advisor took too long to answer"), { status: 504 });
+
+/**
+ * One ask with a client timeout. `signal` aborts it early (the page went away): that rejects with an AbortError the caller ignores.
+ * Without a response in `ms` the request is aborted and the result is a 504-shaped error.
+ */
+export async function askWithTimeout<T>(run: (signal: AbortSignal) => Promise<T>, outer?: AbortSignal, ms = ASK_TIMEOUT_MS): Promise<T> {
+  const ctl = new AbortController();
+  let timedOut = false;
+  const onOuter = () => ctl.abort();
+  if (outer?.aborted) ctl.abort();
+  outer?.addEventListener("abort", onOuter);
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, ms);
+  try {
+    return await run(ctl.signal);
+  } catch (err) {
+    if (timedOut) throw askTimeout();
+    throw err;
+  } finally {
+    clearTimeout(timer);
+    outer?.removeEventListener("abort", onOuter);
+  }
+}
+
+export const isAbort = (err: unknown) => err instanceof Error && err.name === "AbortError";
+
 /** What the owner reads when an ask fails. */
 export function askErrorMessage(err: unknown): string {
   switch (status(err)) {
@@ -74,7 +104,7 @@ export async function decide(
 export function filteredNote(r: Pick<AskResult, "filtered" | "removed">): string | null {
   if (!r.filtered) return null;
   const n = Math.max(1, r.removed);
-  return `${n} passage${n === 1 ? "" : "s"} removed (not in the verified set)`;
+  return `${n} passage${n === 1 ? "" : "s"} removed: quotes and references are shown only from the verified set`;
 }
 
 export const KIND_LABEL: Record<string, string> = {
