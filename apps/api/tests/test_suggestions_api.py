@@ -221,10 +221,20 @@ async def test_refs_are_checked_when_the_bundle_is_made_and_when_lines_are_picke
 
 # --- A failing line ------------------------------------------------------------------------------------------------
 
-async def test_a_failing_line_rolls_everything_back_and_is_marked_failed(ctx):
+async def test_a_failing_line_rolls_everything_back_and_is_marked_failed(ctx, monkeypatch):
     """Includes the compass service: it used to commit by itself, so a line before a failing one would have stuck."""
     http, today, uid = ctx
-    bid = await make(uid, [compass(mission="Should not stick"), create_item("Nowhere", stream="no-such-stream"), note(today)], today=today)
+    bid = await make(uid, [compass(mission="Should not stick"), create_item("Nowhere"), note(today)], today=today)
+    from app.services import planner_items
+
+    real = planner_items.create_item
+
+    async def refusing(db, user_id, day, fields, today_):  # the stream was removed between create and apply
+        if fields["text"] == "Nowhere":
+            raise ValueError("unknown stream 'no-such-stream'")
+        return await real(db, user_id, day, fields, today_)
+
+    monkeypatch.setattr(planner_items, "create_item", refusing)
     before = await dump(uid, keep_ids=True)
     res = await http.post(f"{S}/{bid}/apply")
     assert res.status_code == 422 and "no-such-stream" in res.json()["detail"]
@@ -255,9 +265,9 @@ async def test_a_unique_rule_broken_by_a_change_made_meanwhile_fails_the_line(ct
                 await other.commit()
         return found
 
-    monkeypatch.setattr(planner_work, "_week_row", racing)
     line = {"entity": "week_objective", "op": "update", "target": {"week": week, "stream": "studio"}, "payload": {"text": "Mine"}}
     bid = await make(uid, [line], today=today)
+    monkeypatch.setattr(planner_work, "_week_row", racing)  # after create: create rehearses the line and would race itself
     before = await dump(uid, keep_ids=True)
     with pytest.raises(suggestions.ApplyFailed, match="unique rule"):
         await apply(uid, bid, today)

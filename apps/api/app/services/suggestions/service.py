@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.models.suggestion import SuggestionBundle, SuggestionChange
+from app.models.user import User
 from app.services.suggestions import registry, snapshot
 from app.services.suggestions.registry import Ctx
 from app.services.suggestions.snapshot import RowRef
@@ -171,9 +172,10 @@ async def _create(db, user_id: int, source: str, title: str, reason: str, lines:
         raise SuggestionError("run_id is longer than 36 characters")
     if not 1 <= len(lines) <= MAX_LINES:
         raise SuggestionError(f"a bundle has 1-{MAX_LINES} lines")
-    pending = (await db.execute(select(func.count(SuggestionBundle.id)).where(
-        SuggestionBundle.user_id == user_id, SuggestionBundle.status == "pending"))).scalar_one()
-    if pending >= MAX_PENDING:
+    # Count-then-insert would let two creates at once both pass: queue them per user on the user's row (NO KEY UPDATE, so
+    # inserts that only reference the user are not held up). Postgres only; sqlite has one writer anyway.
+    await db.execute(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
+    if await pending_count(db, user_id) >= MAX_PENDING:
         raise SuggestionError(f"{MAX_PENDING} suggestions are waiting: apply or reject some first")
     ctx = Ctx(db, user_id, today or local_today())
     changes, defined, checked = [], set(), []
@@ -184,6 +186,7 @@ async def _create(db, user_id: int, source: str, title: str, reason: str, lines:
             defined.add(change.ref)
         checked.append((registry.lookup(change.entity, change.op), change.payload))
     run_checks(_all_checks(checks), source, title, reason, checked)
+    await _rehearse(ctx, changes)
     bundle = SuggestionBundle(user_id=user_id, source=source, run_id=run_id, title=title, reason=reason, status="pending")
     db.add(bundle)
     await db.flush()
@@ -211,7 +214,9 @@ async def create_for_owner(db, user_id: int, title: str, reason: str, lines: Seq
 
 async def _bundle(db, user_id: int, bundle_id: int, lock: bool = False) -> SuggestionBundle:
     query = select(SuggestionBundle).where(SuggestionBundle.id == bundle_id, SuggestionBundle.user_id == user_id)
-    row = (await db.execute(query.with_for_update() if lock else query)).scalar_one_or_none()
+    if lock:  # re-read the row, not the copy in the session: its status may have changed under us
+        query = query.with_for_update().execution_options(populate_existing=True)
+    row = (await db.execute(query)).scalar_one_or_none()
     if row is None:
         raise NotFound("no such suggestion")
     return row
@@ -287,31 +292,63 @@ def _delta(before: dict[RowRef, dict], after: dict[RowRef, dict]) -> list[dict]:
     return out
 
 
-async def _apply_line(ctx: Ctx, change: SuggestionChange, created: dict[str, dict]) -> bool:
-    """Apply one line. False = stale (skipped, nothing written)."""
+async def _apply_line(ctx: Ctx, change: SuggestionChange, created: dict[str, dict], dry: bool = False) -> bool:
+    """Apply one line. False = stale (skipped, nothing written).
+
+    `dry` is the create-time rehearsal: the same code runs (so it refuses what apply would refuse), but no row is locked and
+    the line itself is left as it is; the caller rolls the writes back."""
     entry = registry.lookup(change.entity, change.op)
     assert entry is not None, f"{change.entity}.{change.op} is not in the registry"
+    lock = not dry
     by_ref = change.target.get("ref") is not None
     target_raw, payload_raw = _resolve(change.target, change.payload, created)
     target = entry.target_model.model_validate(target_raw)
     payload = entry.payload_model.model_validate(payload_raw)
     if entry.compares_base and not by_ref:
-        seen = await entry.read_base(ctx, target, entry.payload_model.model_validate(change.payload), True)
+        seen = await entry.read_base(ctx, target, entry.payload_model.model_validate(change.payload), lock)
         if seen is None or _plain(seen) != _plain(change.base):
-            change.status, change.error = "stale", "changed since this was suggested"
+            if not dry:
+                change.status, change.error = "stale", "changed since this was suggested"
             return False
-    touched = set(await entry.touched(ctx, target, payload, True))
-    before = await snapshot.read_rows(ctx.db, touched, lock=True)
+    touched = set(await entry.touched(ctx, target, payload, lock))
+    before = await snapshot.read_rows(ctx.db, touched, lock=lock)
     with _Scope(ctx.db, touched) as scope:
         key = await entry.apply(ctx, target, payload)
         await ctx.db.flush()
+    if change.ref and key:
+        created[change.ref] = key
+    if dry:
+        return True
     after = await snapshot.read_rows(ctx.db, touched | set(scope.created))
     change.inverse = _delta(before, after)
     change.created_key = key
     change.status, change.error = "applied", None
-    if change.ref and key:
-        created[change.ref] = key
     return True
+
+
+class _Rehearsed(Exception):
+    """Raised to leave the rehearsal's SAVEPOINT."""
+
+
+async def _rehearse(ctx: Ctx, changes: Sequence[SuggestionChange]) -> None:
+    """Run every line as apply would, in order, inside a SAVEPOINT that is always rolled back.
+
+    Why this and not a `validate()` per entry: apply and create then share one code path, so create refuses a line with the
+    message apply would give, and cannot drift from it when a service changes. It also sees what earlier lines of the bundle
+    make (a new item, a moved stream). It is safe because the services only flush (nothing commits, nothing leaves the
+    database) and `_Scope` already fences what a line may write."""
+    created: dict[str, dict] = {}
+    nested = await ctx.db.begin_nested()
+    try:
+        for change in changes:
+            try:
+                await _apply_line(ctx, change, created, dry=True)
+            except IntegrityError as exc:
+                raise SuggestionError(f"line {change.seq}: a unique rule would be broken by this change") from exc
+            except ValueError as exc:
+                raise SuggestionError(f"line {change.seq}: {exc}") from exc
+    finally:
+        await nested.rollback()
 
 
 async def apply(db, user_id: int, bundle_id: int, lines: Sequence[int] | None = None, *, today: date,
@@ -358,8 +395,10 @@ async def apply(db, user_id: int, bundle_id: int, lines: Sequence[int] | None = 
         if not isinstance(exc, ValueError):
             log.exception("suggestions.apply bundle=%s failed", bundle_pk)
         if current_id is not None:
-            row = await db.get(SuggestionChange, current_id)
-            row.status, row.error = "failed", message[:500]
+            # Re-take the bundle lock: it may have been rejected or applied by someone else since; only a pending one is marked.
+            if (await _bundle(db, user_id, bundle_pk, lock=True)).status == "pending":
+                row = await db.get(SuggestionChange, current_id)
+                row.status, row.error = "failed", message[:500]
             await db.commit()
         raise ApplyFailed(message) from exc
     log.info("suggestions.apply bundle=%s lines=%s ms=%d", bundle_pk, len(picked), (time.perf_counter() - started) * 1000)
@@ -399,6 +438,9 @@ async def _line_undoable(db, user_id: int, rows: list[dict]) -> str | None:
             return f"{r['t']} {r['id']} changed since"
         if r["kind"] == "insert" and r["t"] == registry.TASKS and await registry.pointers_at_task(db, user_id, r["id"]):
             return f"item {r['id']} is used by something else now"
+        if r["kind"] == "insert" and r["t"] == registry.QUARTERS and await registry.streams_in_quarter(
+                db, user_id, r["after"]["label"], {x["id"] for x in rows if x["t"] == registry.STREAMS}):
+            return f"quarter {r['after']['label']} has streams now"
     return None
 
 

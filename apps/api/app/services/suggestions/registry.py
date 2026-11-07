@@ -412,7 +412,8 @@ entry("log_note", "create", DayTarget, LogNote, ("section", "span", "text"), _no
 
 async def _stream_row(ctx: Ctx, target: CheckpointTarget, lock=False) -> dict | None:
     refs = await snapshot.read_where(ctx.db, STREAMS, QuarterStream.user_id == ctx.user_id,
-                                     QuarterStream.quarter == quarter_for(ctx.today), QuarterStream.slug == target.stream, lock=lock)
+                                     QuarterStream.quarter == quarter_for(ctx.today), QuarterStream.slug == target.stream,
+                                     QuarterStream.in_note.is_(True), lock=lock)  # as planner_work.update_stream finds it
     return next(iter((await snapshot.read_rows(ctx.db, refs[:1])).values()), None)
 
 
@@ -490,6 +491,14 @@ entry("compass", "update", NoTarget, CompassUpdate, ("mission", "vision"), _comp
 
 
 # --- Things that point at an item, for the undo guard --------------------------------------------------------------
+
+async def streams_in_quarter(db, user_id: int, label: str, own: set[int]) -> bool:
+    """Does the user have a stream of this quarter that the line being undone did not make itself?"""
+    from sqlalchemy import select
+
+    rows = (await db.execute(select(QuarterStream.id).where(QuarterStream.user_id == user_id, QuarterStream.quarter == label))).scalars().all()
+    return any(pk not in own for pk in rows)
+
 
 async def pointers_at_task(db, user_id: int, task_id: int) -> bool:
     """Is a row of this user still pointing at the item: a piece (parent_id), a board node (ref_key, parent_key) or edge end."""

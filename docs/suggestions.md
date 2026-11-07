@@ -19,6 +19,8 @@ All routes need a sign-in (a login token); an API token (`nyt_...`) gets 401.
 
 Limits: 40 lines to a bundle, 30 pending bundles per user, the same field caps as the screens.
 
+When a bundle is made, every line is tried as apply would try it, inside a transaction that is rolled back: a line that could only fail at apply (a week out of range, a checkpoint on an item that is not in a pipeline, an unknown stream) is refused then, with the message apply would give. A line whose base has changed is not an error; it is marked `stale` at apply.
+
 A **line** is `{entity, op, target, payload, base?, ref?}`:
 
 | Entity.op | `target` | `payload` (what changes) | Same as |
@@ -47,7 +49,7 @@ If a picked line fails, everything in that apply is rolled back, the line is mar
 
 ## Undo
 
-For each applied line the server keeps the rows it changed, before and after. Undo goes line by line from the last: if every row of the line is still exactly as the apply left it, the line is restored; otherwise it is left as it is and says why. A created item is deleted only when nothing points at it (a piece, a Map node or connector). Undo works for 7 days after applying.
+For each applied line the server keeps the rows it changed, before and after. Undo goes line by line from the last: if every row of the line is still exactly as the apply left it, the line is restored; otherwise it is left as it is and says why. A created item is deleted only when nothing points at it (a piece, a Map node or connector). A quarter row that an applied objective line created is kept if the quarter has streams now. Undo works for 7 days after applying.
 
 Suggestions are working state, not part of your data: they are not in the export and an import does not touch them.
 
