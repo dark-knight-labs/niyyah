@@ -217,10 +217,14 @@ test("Ctrl+F finds a thought and selects it; outside the canvas the browser keep
   await expect(page.getByTestId("search-bar")).toHaveCount(0);
   // focus outside the canvas (the nav): the app does not take Ctrl+F
   await page.getByRole("link", { name: "Overview" }).focus();
-  await page.evaluate(() => { (window as unknown as { __f: boolean }).__f = false; window.addEventListener("keydown", (e) => { (window as unknown as { __f: boolean }).__f = e.defaultPrevented; }, { once: true }); });
-  await page.getByRole("link", { name: "Overview" }).dispatchEvent("pointerdown", { bubbles: true });
+  await page.evaluate(() => { (window as unknown as { __f: boolean }).__f = false; window.addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "f") (window as unknown as { __f: boolean }).__f = e.defaultPrevented; }); });
   await page.keyboard.press("Control+f");
   await expect(page.getByTestId("search-bar")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __f: boolean }).__f)).toBe(false);   // not preventDefault-ed: the browser's own find stays
+  // focus tracks the canvas, not the last click: tabbing/focusing back into it re-arms Ctrl+F
+  await page.mouse.click(1200, 150);
+  await page.keyboard.press("Control+f");
+  await expect(page.getByTestId("search-input")).toBeFocused();
 });
 
 test("lock: a locked sticky cannot be moved, edited or deleted; the menu offers Unlock", async ({ page, request }) => {

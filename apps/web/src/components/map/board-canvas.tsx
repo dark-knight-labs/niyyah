@@ -907,11 +907,15 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
       else if (text.trim()) doPasteText(text, parent, null);
     };
     const onMove = (e: PointerEvent) => { pointer.current = { x: e.clientX, y: e.clientY }; };
-    const onDown = (e: PointerEvent) => { inCanvas.current = !!(e.target as HTMLElement | null)?.closest?.(".niyyah-map"); };
     window.addEventListener("paste", onPaste);
     window.addEventListener("pointermove", onMove, { passive: true });
-    window.addEventListener("pointerdown", onDown, true);
-    return () => { window.removeEventListener("paste", onPaste); window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerdown", onDown, true); };
+    // Ctrl+F belongs to the map only while focus is in it (a focused wrapper, node or input). A removed element (the closed search box) fires no focusout, so the flag then keeps its value.
+    const inMap = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.(".niyyah-map");
+    const onFocusIn = (e: FocusEvent) => { inCanvas.current = inMap(e.target); };
+    const onFocusOut = (e: FocusEvent) => { if (!e.relatedTarget && document.hasFocus() && inMap(e.target)) inCanvas.current = false; };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => { window.removeEventListener("paste", onPaste); window.removeEventListener("pointermove", onMove); document.removeEventListener("focusin", onFocusIn); document.removeEventListener("focusout", onFocusOut); };
   }, [pasteCmd, doPasteText, ingest]);
 
   const env = useMemo<Env>(() => ({
@@ -1024,7 +1028,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
 
   return (
     <MapCtx.Provider value={actions}>
-      <div className="niyyah-map" data-tool={tool} data-card={cardOpen ? "1" : undefined} data-testid="map-canvas" data-board={board.id}
+      <div className="niyyah-map" tabIndex={-1} data-tool={tool} data-card={cardOpen ? "1" : undefined} data-testid="map-canvas" data-board={board.id}
         onDragOver={(e) => { if (e.dataTransfer?.types.includes("Files")) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; setDropping(true); } }}
         onDragLeave={(e) => { if (e.currentTarget === e.target) setDropping(false); }}
         onDrop={(e) => { setDropping(false); const files = [...(e.dataTransfer?.files ?? [])]; if (!files.length) return; e.preventDefault(); void ingest(files, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })); }}>

@@ -451,7 +451,7 @@ h1, h2, h3 {
 
 /* --- Map (Miro-style boards on React Flow). Tokens only; radius from the --r-* scale (unitless in some skins, hence calc). ---------- */
 .niyyah-map { --map-r: calc(var(--r-sm) * 1px); position: relative; width: 100%; height: 100%; background: var(--background); color: var(--foreground); font-size: 0.875rem; line-height: 1.45; }
-.niyyah-map { user-select: none; }
+.niyyah-map { user-select: none; outline: none; }
 .niyyah-map .nm-t[contenteditable], .niyyah-map textarea, .niyyah-map input { user-select: text; }
 .niyyah-map .react-flow { background: var(--background); --xy-edge-stroke-default: var(--muted-foreground); }
 .niyyah-map .react-flow__pane { cursor: default; }
