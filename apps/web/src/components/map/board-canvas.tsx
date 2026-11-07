@@ -26,13 +26,13 @@ import { derive, type Live, type MapNode } from "./derive";
 import { BranchEdge } from "./edges/branch-edge";
 import { ConnectorEdge } from "./edges/connector-edge";
 import { MapCtx, type BarItem, type EditHow, type MapActions } from "./map-context";
-import { FrameNode, ShapeNode, StickyNode, TextNode } from "./nodes/item-nodes";
+import { FrameNode, ShapeNode, StickyNode, TextNode, UnavailableNode, UnknownNode } from "./nodes/item-nodes";
 import { MindNode } from "./nodes/mind-node";
 import { SideCard, type CardModel } from "./side-card";
 import { ToolRail, TOOLS, type Tool } from "./tool-rail";
 import { ZoomBar } from "./zoom-bar";
 
-const nodeTypes = { mind: MindNode, sticky: StickyNode, text: TextNode, shape: ShapeNode, frame: FrameNode };
+const nodeTypes = { mind: MindNode, sticky: StickyNode, text: TextNode, shape: ShapeNode, frame: FrameNode, unavailable: UnavailableNode, unknown: UnknownNode };
 const edgeTypes = { branch: BranchEdge, connector: ConnectorEdge };
 const ADD_TOOLS = new Set<Tool>(["mind", "sticky", "text", "shape", "frame"]);
 const typingTarget = (t: EventTarget | null) => {
@@ -217,7 +217,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
 
   const startEdit = useCallback((id: string) => {
     const n = L.current.data.nodes.get(id);
-    if (!n) return;
+    if (!n || n.kind === "image" || n.kind === "file") return;
     if (n.kind === "ref") {
       // a live node edits the real Plan row; the Unplaced branch and rows whose Plan object is gone cannot be edited
       const i = L.current.info.get(id);
@@ -588,7 +588,7 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
         const make = mc && streams.length && n.text.trim() ? { streams, stream: mc.stream, checkpoint: mc.month ? mc.month.toUpperCase() : null, lane: mc.lane, product: mc.product && PRODUCT_TAG.test(mc.product) ? mc.product : null, productBlocked: !!mc.product && !PRODUCT_TAG.test(mc.product), productsOf } : null;
         return { type: "mind", id, text: n.text, notes: n.notes, below: descendantCount(idx, id), depth: depthOf(data.nodes, id), readOnly: n.kind === "ref", make };
       }
-      return { type: "item", id, kind: n.kind as "sticky" | "text" | "shape" | "frame", text: n.text, color: (n.style.color as StickyColor) ?? "yellow" };
+      return { type: "item", id, kind: n.kind as "sticky" | "text" | "shape" | "frame" | "image" | "file", text: n.text, color: (n.style.color as StickyColor) ?? "yellow" };
     }
     const e = data.edges.get(id);
     return e ? { type: "edge", id, label: e.label } : null;

@@ -8,7 +8,7 @@ import type { Lane } from "@/lib/vault-types";
 export type CardModel =
   | { type: "mind"; id: string; text: string; notes: string; below: number; depth: number; readOnly: boolean; make: MakeModel | null }
   | { type: "live"; id: string; text: string; below: number; depth: number; info: LiveInfo; head: string; stream: string | null; checkpoint: string | null; editable: boolean; hideable: boolean; compass: { mission: string; vision: string; week: string } | null }
-  | { type: "item"; id: string; kind: "sticky" | "text" | "shape" | "frame"; text: string; color: StickyColor }
+  | { type: "item"; id: string; kind: "sticky" | "text" | "shape" | "frame" | "image" | "file"; text: string; color: StickyColor }
   | { type: "edge"; id: string; label: string }
   | { type: "many"; count: number };
 
@@ -28,7 +28,7 @@ export interface MakeModel {
 
 const LANES: { id: Lane; label: string }[] = [{ id: "now", label: "Now" }, { id: "next", label: "Next" }, { id: "backlog", label: "Someday" }, { id: "done", label: "Done" }];
 
-const HEAD = { sticky: "Sticky note", text: "Text", shape: "Shape", frame: "Frame" } as const;
+const HEAD = { sticky: "Sticky note", text: "Text", shape: "Shape", frame: "Frame", image: "Image", file: "File" } as const;
 
 /** Right-hand details card (330 px; a bottom sheet under 760 px). Edits are debounced so a burst of typing is one undo step. */
 export function SideCard({ model, onText, onNotes, onLabel, onColor, onChild, onConnect, onDelete, onClose, onLane, onMake, onOpenPlan }: {

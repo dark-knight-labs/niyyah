@@ -489,6 +489,10 @@ h1, h2, h3 {
 .nm-sticky.blue { background: var(--map-sticky-blue); } .nm-sticky.pink { background: var(--map-sticky-pink); }
 .nm-text { font-size: 1.0625rem; padding: 2px 4px; }
 .nm-shape { border: 1px solid var(--foreground); background: var(--surface); display: grid; place-items: center; text-align: center; padding: 8px; font-size: 0.8125rem; border-radius: var(--map-r); }
+.nm-unavailable { display: grid; place-content: center; gap: 4px; justify-items: center; text-align: center; padding: 10px; border: 1px dashed var(--rule); background: var(--surface); color: var(--muted-foreground); border-radius: var(--map-r); font-size: 0.75rem; }
+.nm-unavailable .nm-ut { font: 500 0.6875rem/1 var(--font-mono); letter-spacing: 0.09em; text-transform: uppercase; }
+.nm-unavailable .nm-un { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm-unknown { pointer-events: none; opacity: 0.7; }
 .nm-frame { border: 1px solid var(--rule); background: color-mix(in srgb, var(--surface) 55%, transparent); border-radius: var(--map-r); }
 .nm-frame .nm-ft { position: absolute; left: 0; top: -22px; color: var(--muted-foreground); white-space: nowrap; font: 500 0.6875rem/1 var(--font-mono); letter-spacing: 0.09em; text-transform: uppercase; }
 .nm-linkfrom { outline: 2px dashed var(--accent); outline-offset: 3px; }

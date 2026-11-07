@@ -57,6 +57,24 @@ export const ShapeNode = memo(function ShapeNode({ id, data, selected }: NodePro
   );
 });
 
+/** An image or file row on a build that cannot show it yet: a movable placeholder. Position, size and style.file_id stay untouched. */
+export const UnavailableNode = memo(function UnavailableNode({ id, data, selected }: NodeProps<MapNode>) {
+  const d = data as ItemData;
+  return (
+    <div className={`nm-item nm-unavailable ${selected ? "sel-ring" : ""} ${d.linkFrom ? "nm-linkfrom" : ""}`} data-testid={`unavailable-${id}`}>
+      <Handles />
+      <span className="mono nm-ut">File unavailable</span>
+      {d.text && <span className="nm-un">{d.text}</span>}
+      <NodeToolbar isVisible={selected && d.bar} position={Position.Top} offset={14}><ContextBar id={id} /></NodeToolbar>
+    </div>
+  );
+});
+
+/** A kind written by a later release: shown, never touched. */
+export const UnknownNode = memo(function UnknownNode({ id }: NodeProps<MapNode>) {
+  return <div className="nm-item nm-unavailable nm-unknown" data-testid={`unknown-${id}`}><span className="mono nm-ut">Unsupported object</span></div>;
+});
+
 export const FrameNode = memo(function FrameNode({ id, data, selected }: NodeProps<MapNode>) {
   const d = data as ItemData;
   const { resizeEnd } = useMapActions();

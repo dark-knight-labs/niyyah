@@ -12,7 +12,8 @@ REF_KEY = re.compile(r"^(stream|cp|week|task|quarter|prod|lane):[A-Za-z0-9:_-]{1
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_TITLE)]
 Coord = Annotated[float, Field(allow_inf_nan=False, ge=-1e7, le=1e7)]
-NodeKind = Literal["mind", "ref", "sticky", "text", "shape", "frame"]
+# image and file are accepted before anything can upload them (R0), so a rolled-back API still reads and writes rows a later release made.
+NodeKind = Literal["mind", "ref", "sticky", "text", "shape", "frame", "image", "file"]
 
 
 def _aware(value: datetime) -> datetime:
@@ -48,7 +49,7 @@ class BoardUpdate(BaseModel):
 class NodeBase(BaseModel):
     """The columns of one node. NodeIn checks them on the way in; NodeOut does not, so a stored row always reads back."""
     id: str = Field(min_length=1, max_length=36)
-    kind: NodeKind
+    kind: str
     parent_id: str | None = Field(default=None, max_length=36)
     parent_key: str | None = Field(default=None, max_length=80)
     position: int = 0
@@ -67,6 +68,7 @@ class NodeBase(BaseModel):
 
 class NodeIn(NodeBase):
     model_config = ConfigDict(extra="forbid")
+    kind: NodeKind
 
     @field_validator("style")
     @classmethod

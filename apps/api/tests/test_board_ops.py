@@ -346,3 +346,31 @@ async def test_board_deleted_during_a_retry_is_404_not_500(auth_client, monkeypa
     assert res.status_code == 404 and len(calls) == 1
     monkeypatch.undo()
     assert real is boards_service._apply
+
+
+# --- image and file rows (R0): accepted before any upload exists, so a rolled-back API still serves boards that hold them -----------------
+
+async def test_image_and_file_rows_are_accepted_and_ordinary_writes_around_them_work(auth_client):
+    b = await new_board(auth_client)
+    pic = {"x": 10, "y": 20, "w": 170, "h": 120, "style": {"file_id": "5f0c3a3e-1111-4222-8333-444455556666"}}
+    assert (await ops(auth_client, b, up("pic", kind="image", **pic), up("doc", kind="file", **pic), up("n", x=0, y=0))).status_code == 200
+    # (i) moving another node in the same batch as the image row
+    res = await ops(auth_client, b, up("n", x=50, y=60), up("pic", kind="image", **{**pic, "x": 99}))
+    assert res.status_code == 200 and res.json()["bad_ops"] == []
+    got = {n["id"]: n for n in (await view(auth_client, b))["nodes"]}
+    assert got["n"]["x"] == 50 and got["pic"]["x"] == 99 and got["pic"]["style"] == pic["style"] and got["doc"]["kind"] == "file"
+    # (ii) deleting the image row
+    assert (await ops(auth_client, b, {"op": "delete_node", "id": "pic"})).status_code == 200
+    assert ids(await view(auth_client, b)) == ["doc", "n"]
+
+
+async def test_a_kind_this_api_does_not_know_still_reads_back_but_is_not_accepted(auth_client):
+    """NodeOut.kind is a plain str: a row written by a later release never turns a board read into a 500. NodeIn keeps the allow-list."""
+    from app.models.board import BoardNode
+    b = await new_board(auth_client)
+    async with TestSession() as db:
+        db.add(BoardNode(board_id=b, id="later", kind="video", text="", position=0, style={}, collapsed=False, hidden=False))
+        await db.commit()
+    res = await auth_client.get(f"{URL}/{b}")
+    assert res.status_code == 200 and [(n["id"], n["kind"]) for n in res.json()["nodes"]] == [("later", "video")]
+    assert (await ops(auth_client, b, up("x", kind="video"))).status_code == 422
