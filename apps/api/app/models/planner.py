@@ -279,3 +279,50 @@ class PlannerHabitCheck(Base):
     habit_id: Mapped[int] = mapped_column(Integer, ForeignKey("planner_habits.id", ondelete="CASCADE"), nullable=False, index=True)
     day: Mapped[dt.date] = mapped_column(Date, nullable=False)
     level: Mapped[str] = mapped_column(String(4), nullable=False)  # done | min
+
+
+class PlannerArea(Base):
+    """A life area (stream) defined once per user. In the shadow phase it is built from the latest quarter that defines the slug."""
+    __tablename__ = "planner_areas"
+    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_planner_area_slug"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    slug: Mapped[str] = mapped_column(String(24), nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    color: Mapped[str] = mapped_column(String(20), nullable=False)
+    icon: Mapped[str] = mapped_column(String(30), nullable=False)
+    slot: Mapped[str] = mapped_column(String(200), default="", nullable=False)
+    weekly: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    has_pipeline: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    in_note: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class PlannerItem(Base):
+    """One node of the item tree. Its kind is not stored: app.services.item_rules derives it from period, horizon and parent."""
+    __tablename__ = "planner_items"
+    __table_args__ = (UniqueConstraint("user_id", "legacy_ref", name="uq_planner_item_legacy_ref"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    area: Mapped[str | None] = mapped_column(String(24), nullable=True)  # the area's slug
+    parent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("planner_items.id", ondelete="CASCADE"), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    subtitle: Mapped[str | None] = mapped_column(Text, nullable=True)  # a second line, e.g. the Arabic line of the Super Objective
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    period: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "2026-Q4", "2026-10", "2026-W45"
+    horizon: Mapped[str | None] = mapped_column(String(10), nullable=True)  # now | next | someday (work items only)
+    status: Mapped[str] = mapped_column(String(10), default="open", nullable=False)  # open | done | dropped
+    commitment: Mapped[str | None] = mapped_column(String(20), nullable=True)  # active | committed | paused | archived (quarter goals only)
+    day: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    start_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    end_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weight: Mapped[int] = mapped_column(SmallInteger, default=0, server_default=sql_text("0"), nullable=False)
+    blocked_by: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    done_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    created_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
+    legacy_ref: Mapped[str | None] = mapped_column(String(80), nullable=True)  # the legacy row this item mirrors, while legacy is authoritative
