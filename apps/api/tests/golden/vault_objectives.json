@@ -1,0 +1,33 @@
+{
+  "items": [
+    {
+      "checkpoint": "nov",
+      "color": "violet",
+      "done": false,
+      "icon": "server",
+      "name": "Alpha",
+      "stream": "alpha",
+      "text": "Finish the outline"
+    },
+    {
+      "checkpoint": null,
+      "color": "amber",
+      "done": false,
+      "icon": "heart",
+      "name": "Gamma",
+      "stream": "gamma",
+      "text": ""
+    },
+    {
+      "checkpoint": null,
+      "color": "violet",
+      "done": false,
+      "icon": "server",
+      "name": "Extra",
+      "stream": "extra",
+      "text": ""
+    }
+  ],
+  "period": "2026-11-08/2026-11-14",
+  "week": "2026-W46"
+}

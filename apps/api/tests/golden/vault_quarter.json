@@ -1,0 +1,180 @@
+{
+  "colors": [
+    "emerald",
+    "amber",
+    "violet",
+    "fuchsia",
+    "cyan",
+    "rose",
+    "slate",
+    "teal",
+    "orange",
+    "indigo",
+    "lime",
+    "sky"
+  ],
+  "current_month": "nov",
+  "ends": "2026-12-31",
+  "icons": [
+    "moon",
+    "dumbbell",
+    "server",
+    "shopping-bag",
+    "clapperboard",
+    "users",
+    "landmark",
+    "bed",
+    "briefcase",
+    "book-open",
+    "heart",
+    "home",
+    "car",
+    "wrench",
+    "plane",
+    "shopping-cart",
+    "graduation-cap",
+    "wallet",
+    "target",
+    "circle-dot"
+  ],
+  "months": [
+    "oct",
+    "nov",
+    "dec"
+  ],
+  "objective": "Finish the sample plan",
+  "objective_ar": "خطة تجريبية",
+  "quarter": "2026-Q4",
+  "starts": "2026-10-01",
+  "streams": [
+    {
+      "checkpoints": [
+        {
+          "checklist": [
+            {
+              "done": true,
+              "id": "c1000001",
+              "text": "Outline"
+            },
+            {
+              "done": false,
+              "id": "c1000002",
+              "text": "Sketch"
+            }
+          ],
+          "month": "oct",
+          "text": "Outline · Sketch"
+        },
+        {
+          "checklist": [],
+          "month": "nov",
+          "text": ""
+        },
+        {
+          "checklist": [
+            {
+              "done": false,
+              "id": "c3000001",
+              "text": "Publish"
+            }
+          ],
+          "month": "dec",
+          "text": "Publish"
+        }
+      ],
+      "color": "violet",
+      "goal": "Draft the outline · Review with a friend",
+      "goal_checklist": [
+        {
+          "done": true,
+          "id": "g1a2b3c4",
+          "text": "Draft the outline"
+        },
+        {
+          "done": false,
+          "id": "g5d6e7f8",
+          "text": "Review with a friend"
+        }
+      ],
+      "icon": "server",
+      "name": "Alpha",
+      "slot": "Mon 09:00-11:00",
+      "status": "active",
+      "stream": "alpha",
+      "weekly": true
+    },
+    {
+      "checkpoints": [],
+      "color": "teal",
+      "goal": "",
+      "goal_checklist": [],
+      "icon": "book",
+      "name": "Beta",
+      "slot": "",
+      "status": "committed",
+      "stream": "beta",
+      "weekly": false
+    },
+    {
+      "checkpoints": [
+        {
+          "checklist": [
+            {
+              "done": false,
+              "id": "c9000001",
+              "text": "Out of quarter"
+            }
+          ],
+          "month": "jan",
+          "text": "Out of quarter"
+        },
+        {
+          "checklist": [
+            {
+              "done": false,
+              "id": "026fdf84",
+              "text": "Plain month text"
+            }
+          ],
+          "month": "oct",
+          "text": "Plain month text"
+        }
+      ],
+      "color": "amber",
+      "goal": "Plain goal text",
+      "goal_checklist": [
+        {
+          "done": false,
+          "id": "dbb4369c",
+          "text": "Plain goal text"
+        }
+      ],
+      "icon": "heart",
+      "name": "Gamma",
+      "slot": "",
+      "status": "paused",
+      "stream": "gamma",
+      "weekly": true
+    },
+    {
+      "checkpoints": [],
+      "color": "rose",
+      "goal": "Done long ago",
+      "goal_checklist": [
+        {
+          "done": true,
+          "id": "d1000001",
+          "text": "Done long ago"
+        }
+      ],
+      "icon": "moon",
+      "name": "Delta",
+      "slot": "",
+      "status": "archived",
+      "stream": "delta",
+      "weekly": true
+    }
+  ],
+  "week_of_quarter": 6,
+  "weeks_in_quarter": 14
+}

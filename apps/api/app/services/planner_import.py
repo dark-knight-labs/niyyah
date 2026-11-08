@@ -13,7 +13,7 @@ from app.models.compass import Compass
 from app.models.persona import Persona
 from app.models.vault import VaultBlockVote, VaultDay
 from app.schemas.snapshot import Snapshot
-from app.services import board_transfer
+from app.services import board_transfer, tree_shadow
 from app.services.planner_mapping import map_planning
 from app.services.rules import (
     MAX_ITEM_TAGS, checklist_from_text, checklist_text, clean_checklist, clean_minutes, clean_products, clean_subtasks, item_status,
@@ -29,6 +29,7 @@ async def _wipe(db: AsyncSession, user_id: int) -> None:
     await db.execute(delete(VaultDay).where(VaultDay.user_id == user_id))
     for model in USER_TABLES:
         await db.execute(delete(model).where(model.user_id == user_id))
+    tree_shadow.touch(db, user_id)  # a bulk delete is invisible to the session hook; this also covers an import with no quarters
 
 
 def _check(snap: Snapshot) -> None:

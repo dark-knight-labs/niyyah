@@ -10,6 +10,7 @@ from datetime import date
 
 from sqlalchemy import func, select, update
 
+from app.services import tree_shadow  # noqa: F401  (importing it installs the session hook that keeps the shadow item tree current)
 from app.models.planner import NotebookEntry, Quarter, QuarterStream, Task
 from app.services import planner_store
 from app.services.rules import (

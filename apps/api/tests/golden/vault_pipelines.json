@@ -1,0 +1,90 @@
+{
+  "now_limit": 3,
+  "stale_days": 14,
+  "streams": [
+    {
+      "color": "violet",
+      "icon": "server",
+      "items": [
+        {
+          "added": "2026-11-01",
+          "age_days": 9,
+          "blocked_by": [],
+          "checkpoint": "nov",
+          "description": "",
+          "done": false,
+          "done_on": null,
+          "focus": null,
+          "hash": "",
+          "lane": "now",
+          "line": 1,
+          "product": null,
+          "products": [],
+          "stale": false,
+          "text": "Write the first page"
+        },
+        {
+          "added": "2026-10-01",
+          "age_days": 40,
+          "blocked_by": [],
+          "checkpoint": null,
+          "description": "",
+          "done": false,
+          "done_on": null,
+          "focus": null,
+          "hash": "",
+          "lane": "next",
+          "line": 2,
+          "product": null,
+          "products": [],
+          "stale": true,
+          "text": "Collect sources"
+        }
+      ],
+      "name": "Alpha",
+      "slot": "Mon 09:00-11:00",
+      "status": "active",
+      "stream": "alpha",
+      "weekly": true
+    },
+    {
+      "color": "teal",
+      "icon": "book",
+      "items": [
+        {
+          "added": "2026-10-20",
+          "age_days": 21,
+          "blocked_by": [],
+          "checkpoint": null,
+          "description": "",
+          "done": true,
+          "done_on": "2026-10-25",
+          "focus": null,
+          "hash": "",
+          "lane": "done",
+          "line": 3,
+          "product": null,
+          "products": [],
+          "stale": false,
+          "text": "Name the project"
+        }
+      ],
+      "name": "Beta",
+      "slot": "",
+      "status": "committed",
+      "stream": "beta",
+      "weekly": false
+    },
+    {
+      "color": "violet",
+      "icon": "server",
+      "items": [],
+      "name": "Extra",
+      "slot": "",
+      "status": "committed",
+      "stream": "extra",
+      "weekly": true
+    }
+  ],
+  "week": "2026-W46"
+}
