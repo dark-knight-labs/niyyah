@@ -1,0 +1,566 @@
+{
+  "blocks": [
+    {
+      "archived": false,
+      "color": "emerald",
+      "counts_for_stars": true,
+      "key": "soul",
+      "label": "Soul",
+      "ring_name": "SOUL"
+    },
+    {
+      "archived": false,
+      "color": "amber",
+      "counts_for_stars": true,
+      "key": "body",
+      "label": "Body",
+      "ring_name": "BODY"
+    },
+    {
+      "archived": false,
+      "color": "violet",
+      "counts_for_stars": true,
+      "key": "work",
+      "label": "Deep work",
+      "ring_name": "WORK"
+    },
+    {
+      "archived": false,
+      "color": "sky",
+      "counts_for_stars": false,
+      "key": "planning",
+      "label": "Planning",
+      "ring_name": "PLAN"
+    },
+    {
+      "archived": false,
+      "color": "rose",
+      "counts_for_stars": true,
+      "key": "fnf",
+      "label": "Family and friends",
+      "ring_name": "FAM"
+    },
+    {
+      "archived": false,
+      "color": "slate",
+      "counts_for_stars": true,
+      "key": "sleep",
+      "label": "Sleep",
+      "ring_name": "SLEEP"
+    }
+  ],
+  "boards": [],
+  "compass": null,
+  "days": [],
+  "feeds": [],
+  "goals": [],
+  "habits": [],
+  "item_overlays": [],
+  "notebook_entries": [],
+  "persona_streams": [],
+  "pipeline_items": [
+    {
+      "added_on": "2026-11-01",
+      "blocked_by": [],
+      "checkpoint": "nov",
+      "description": "",
+      "done": false,
+      "done_on": null,
+      "focus_week": null,
+      "id": 1,
+      "lane": "now",
+      "product": null,
+      "products": [],
+      "stream": "alpha",
+      "text": "Write the first page"
+    },
+    {
+      "added_on": "2026-10-01",
+      "blocked_by": [],
+      "checkpoint": null,
+      "description": "",
+      "done": false,
+      "done_on": null,
+      "focus_week": null,
+      "id": 2,
+      "lane": "next",
+      "product": null,
+      "products": [],
+      "stream": "alpha",
+      "text": "Collect sources"
+    },
+    {
+      "added_on": "2026-10-20",
+      "blocked_by": [],
+      "checkpoint": null,
+      "description": "",
+      "done": true,
+      "done_on": "2026-10-25",
+      "focus_week": null,
+      "id": 3,
+      "lane": "done",
+      "product": null,
+      "products": [],
+      "stream": "beta",
+      "text": "Name the project"
+    }
+  ],
+  "planning_rows": [
+    {
+      "added_on": "2026-11-01",
+      "blocked_by": [],
+      "checklist": [],
+      "checkpoint": "nov",
+      "description": "",
+      "done": false,
+      "done_on": null,
+      "due_on": null,
+      "end_min": null,
+      "focus_checkpoint": null,
+      "focus_week": null,
+      "id": 1,
+      "lane": "now",
+      "lane_position": 0,
+      "objective_done": null,
+      "objective_text": null,
+      "origin": null,
+      "parent_ref": null,
+      "products": [],
+      "scheduled_on": null,
+      "source_path": null,
+      "start_min": null,
+      "start_on": null,
+      "status": "open",
+      "stream": "alpha",
+      "text": "Write the first page",
+      "weight": 0
+    },
+    {
+      "added_on": "2026-10-01",
+      "blocked_by": [],
+      "checklist": [],
+      "checkpoint": null,
+      "description": "",
+      "done": false,
+      "done_on": null,
+      "due_on": null,
+      "end_min": null,
+      "focus_checkpoint": null,
+      "focus_week": null,
+      "id": 2,
+      "lane": "next",
+      "lane_position": 1,
+      "objective_done": null,
+      "objective_text": null,
+      "origin": null,
+      "parent_ref": null,
+      "products": [],
+      "scheduled_on": null,
+      "source_path": null,
+      "start_min": null,
+      "start_on": null,
+      "status": "open",
+      "stream": "alpha",
+      "text": "Collect sources",
+      "weight": 0
+    },
+    {
+      "added_on": "2026-10-20",
+      "blocked_by": [],
+      "checklist": [],
+      "checkpoint": null,
+      "description": "",
+      "done": true,
+      "done_on": "2026-10-25",
+      "due_on": null,
+      "end_min": null,
+      "focus_checkpoint": null,
+      "focus_week": null,
+      "id": 3,
+      "lane": "done",
+      "lane_position": 0,
+      "objective_done": null,
+      "objective_text": null,
+      "origin": null,
+      "parent_ref": null,
+      "products": [],
+      "scheduled_on": null,
+      "source_path": null,
+      "start_min": null,
+      "start_on": null,
+      "status": "done",
+      "stream": "beta",
+      "text": "Name the project",
+      "weight": 0
+    },
+    {
+      "added_on": null,
+      "blocked_by": [],
+      "checklist": [],
+      "checkpoint": null,
+      "description": "",
+      "done": false,
+      "done_on": null,
+      "due_on": null,
+      "end_min": null,
+      "focus_checkpoint": "nov",
+      "focus_week": "2026-W46",
+      "id": 4,
+      "lane": null,
+      "lane_position": null,
+      "objective_done": false,
+      "objective_text": "Finish the outline",
+      "origin": null,
+      "parent_ref": null,
+      "products": [],
+      "scheduled_on": null,
+      "source_path": null,
+      "start_min": null,
+      "start_on": null,
+      "status": "open",
+      "stream": "alpha",
+      "text": "Finish the outline",
+      "weight": 0
+    }
+  ],
+  "quarters": [
+    {
+      "ends": "2026-09-30",
+      "label": "2026-Q3",
+      "objective": "Prepare the sample plan",
+      "objective_ar": "",
+      "starts": "2026-07-01",
+      "streams": [
+        {
+          "checkpoints": [
+            {
+              "checklist": [
+                {
+                  "done": false,
+                  "id": "q3c00001",
+                  "text": "Collect"
+                }
+              ],
+              "month": "aug",
+              "text": "Collect"
+            }
+          ],
+          "color": "blue",
+          "goal": "Collect notes",
+          "goal_checklist": [
+            {
+              "done": false,
+              "id": "q3a00001",
+              "text": "Collect notes"
+            }
+          ],
+          "has_pipeline": true,
+          "icon": "book",
+          "in_note": true,
+          "name": "Alpha (old)",
+          "slot": "Tue 14:00-16:00",
+          "slug": "alpha",
+          "status": "committed",
+          "weekly": true
+        },
+        {
+          "checkpoints": [],
+          "color": "teal",
+          "goal": "Warm up",
+          "goal_checklist": [
+            {
+              "done": false,
+              "id": "1ebbd92b",
+              "text": "Warm up"
+            }
+          ],
+          "has_pipeline": true,
+          "icon": "book",
+          "in_note": true,
+          "name": "Beta (old)",
+          "slot": "",
+          "slug": "beta",
+          "status": "active",
+          "weekly": true
+        }
+      ]
+    },
+    {
+      "ends": "2026-12-31",
+      "label": "2026-Q4",
+      "objective": "Finish the sample plan",
+      "objective_ar": "خطة تجريبية",
+      "starts": "2026-10-01",
+      "streams": [
+        {
+          "checkpoints": [
+            {
+              "checklist": [
+                {
+                  "done": true,
+                  "id": "c1000001",
+                  "text": "Outline"
+                },
+                {
+                  "done": false,
+                  "id": "c1000002",
+                  "text": "Sketch"
+                }
+              ],
+              "month": "oct",
+              "text": "Outline · Sketch"
+            },
+            {
+              "checklist": [],
+              "month": "nov",
+              "text": ""
+            },
+            {
+              "checklist": [
+                {
+                  "done": false,
+                  "id": "c3000001",
+                  "text": "Publish"
+                }
+              ],
+              "month": "dec",
+              "text": "Publish"
+            }
+          ],
+          "color": "violet",
+          "goal": "Draft the outline · Review with a friend",
+          "goal_checklist": [
+            {
+              "done": true,
+              "id": "g1a2b3c4",
+              "text": "Draft the outline"
+            },
+            {
+              "done": false,
+              "id": "g5d6e7f8",
+              "text": "Review with a friend"
+            }
+          ],
+          "has_pipeline": true,
+          "icon": "server",
+          "in_note": true,
+          "name": "Alpha",
+          "slot": "Mon 09:00-11:00",
+          "slug": "alpha",
+          "status": "active",
+          "weekly": true
+        },
+        {
+          "checkpoints": [],
+          "color": "teal",
+          "goal": "",
+          "goal_checklist": [],
+          "has_pipeline": true,
+          "icon": "book",
+          "in_note": true,
+          "name": "Beta",
+          "slot": "",
+          "slug": "beta",
+          "status": "committed",
+          "weekly": false
+        },
+        {
+          "checkpoints": [
+            {
+              "checklist": [
+                {
+                  "done": false,
+                  "id": "c9000001",
+                  "text": "Out of quarter"
+                }
+              ],
+              "month": "jan",
+              "text": "Out of quarter"
+            },
+            {
+              "checklist": [
+                {
+                  "done": false,
+                  "id": "026fdf84",
+                  "text": "Plain month text"
+                }
+              ],
+              "month": "oct",
+              "text": "Plain month text"
+            }
+          ],
+          "color": "amber",
+          "goal": "Plain goal text",
+          "goal_checklist": [
+            {
+              "done": false,
+              "id": "dbb4369c",
+              "text": "Plain goal text"
+            }
+          ],
+          "has_pipeline": false,
+          "icon": "heart",
+          "in_note": true,
+          "name": "Gamma",
+          "slot": "",
+          "slug": "gamma",
+          "status": "paused",
+          "weekly": true
+        },
+        {
+          "checkpoints": [],
+          "color": "rose",
+          "goal": "Done long ago",
+          "goal_checklist": [
+            {
+              "done": true,
+              "id": "d1000001",
+              "text": "Done long ago"
+            }
+          ],
+          "has_pipeline": true,
+          "icon": "moon",
+          "in_note": true,
+          "name": "Delta",
+          "slot": "",
+          "slug": "delta",
+          "status": "archived",
+          "weekly": true
+        },
+        {
+          "checkpoints": [],
+          "color": "violet",
+          "goal": "",
+          "goal_checklist": [],
+          "has_pipeline": true,
+          "icon": "server",
+          "in_note": false,
+          "name": "Extra",
+          "slot": "",
+          "slug": "extra",
+          "status": "committed",
+          "weekly": true
+        }
+      ]
+    }
+  ],
+  "schedule": {
+    "days": {
+      "weekday": [
+        {
+          "block": "soul",
+          "end": "sunrise",
+          "start": "fajr",
+          "stream": null,
+          "what": "Quran and adhkar"
+        },
+        {
+          "block": "body",
+          "end": "07:45",
+          "start": "sunrise+10",
+          "stream": null,
+          "what": "Walk or train"
+        },
+        {
+          "block": "work",
+          "end": "dhuhr-10",
+          "start": "08:30",
+          "stream": null,
+          "what": "Deep work"
+        },
+        {
+          "block": "soul",
+          "end": "dhuhr+25",
+          "start": "dhuhr",
+          "stream": null,
+          "what": "Dhuhr and lunch"
+        },
+        {
+          "block": "work",
+          "end": "asr-15",
+          "start": "13:30",
+          "stream": null,
+          "what": "Deep work"
+        },
+        {
+          "block": "fnf",
+          "end": "isha+40",
+          "start": "maghrib",
+          "stream": null,
+          "what": "Family dinner"
+        },
+        {
+          "block": "sleep",
+          "end": "fajr-20",
+          "start": "isha+90",
+          "stream": null,
+          "what": "Sleep"
+        }
+      ],
+      "weekend": [
+        {
+          "block": "soul",
+          "end": "sunrise",
+          "start": "fajr",
+          "stream": null,
+          "what": "Quran and adhkar"
+        },
+        {
+          "block": "planning",
+          "end": "10:30",
+          "start": "09:00",
+          "stream": null,
+          "what": "Weekly planning"
+        },
+        {
+          "block": "work",
+          "end": "asr-15",
+          "start": "11:00",
+          "stream": null,
+          "what": "Side project"
+        },
+        {
+          "block": "fnf",
+          "end": "isha+60",
+          "start": "maghrib",
+          "stream": null,
+          "what": "Family and friends"
+        },
+        {
+          "block": "sleep",
+          "end": "fajr-20",
+          "start": "isha+100",
+          "stream": null,
+          "what": "Sleep"
+        }
+      ]
+    },
+    "meta": {
+      "city": null,
+      "lat": null,
+      "lon": null,
+      "madhab": "shafi",
+      "method": "mwl",
+      "tz": "UTC",
+      "weekend_days": [
+        "sat",
+        "sun"
+      ]
+    }
+  },
+  "tasks": [],
+  "user": {
+    "email": "test@niyyah.app",
+    "timezone": "UTC"
+  },
+  "version": 1,
+  "week_objectives": [
+    {
+      "checkpoint": "nov",
+      "done": false,
+      "stream": "alpha",
+      "text": "Finish the outline",
+      "week": "2026-W46"
+    }
+  ]
+}
