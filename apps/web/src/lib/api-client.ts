@@ -6,6 +6,8 @@ type RequestOptions = {
   headers?: Record<string, string>;
   /** Let the request outlive the page (pagehide flush). Browsers cap such bodies at 64 KB: the caller checks. */
   keepalive?: boolean;
+  /** Abort the request (a client timeout, or the page going away). */
+  signal?: AbortSignal;
 };
 
 /** FastAPI sends `detail` as a string, or as a list of {msg, loc} for a body it refused: make either readable. */
@@ -71,6 +73,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
     headers,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
     keepalive: opts.keepalive,
+    signal: opts.signal,
   });
 
   if (res.status === 401 && token) {
@@ -84,6 +87,7 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
         headers,
         body: opts.body ? JSON.stringify(opts.body) : undefined,
         keepalive: opts.keepalive,
+        signal: opts.signal,
       });
       if (!retry.ok) throw httpError(`API error: ${retry.status}`, retry.status, await retry.json().catch(() => undefined));
       if (retry.status === 204) return undefined as T;
@@ -127,7 +131,7 @@ export const api = {
   raw,
   get: <T>(path: string) => request<T>(path),
   put: <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body }),
-  post: <T>(path: string, body: unknown, opts?: { keepalive?: boolean }) => request<T>(path, { method: "POST", body, keepalive: opts?.keepalive }),
+  post: <T>(path: string, body: unknown, opts?: { keepalive?: boolean; signal?: AbortSignal }) => request<T>(path, { method: "POST", body, keepalive: opts?.keepalive, signal: opts?.signal }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body }),
   delete: <T = void>(path: string) => request<T>(path, { method: "DELETE" }),
 };
