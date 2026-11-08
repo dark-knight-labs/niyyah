@@ -13,15 +13,18 @@ legacy_ref values:
   qs:<label>:<slug>:m:<mon>:<id>      line of a checkpoint checklist
 A repeated ref (same line id twice, same month twice) gets the suffix ":dup1", ":dup2", ... ; the line id is the ref minus that suffix.
 """
-import datetime as dt
 import logging
 import os
 import re
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, event, insert, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.planner import PlannerArea, PlannerItem, Quarter, QuarterStream
 from app.services import item_rules
 from app.services.rules import checklist_from_text
@@ -33,7 +36,7 @@ AREAS = PlannerArea.__table__
 _TOUCHED = "tree_shadow_touched"
 _DUP = re.compile(r":dup\d+$")
 _ITEM_FIELDS = ("area", "title", "subtitle", "period", "horizon", "status", "commitment", "position", "parent_id")
-_AREA_FIELDS = ("name", "color", "icon", "slot", "weekly", "has_pipeline", "in_note", "position", "archived")
+_AREA_FIELDS = ("legacy_ref", "name", "color", "icon", "slot", "weekly", "has_pipeline", "in_note", "position", "archived")
 
 
 def enabled() -> bool:
@@ -63,11 +66,11 @@ def desired(quarters: list[dict], streams: list[dict]) -> tuple[list[dict], list
     items: list[dict] = []
     for q in sorted(quarters, key=lambda r: r["label"]):
         label = q["label"]
-        items.append({"ref": f"q:{label}", "parent_ref": None, "area": None, "title": q["objective"], "subtitle": q["objective_ar"] or None, "horizon": None,
+        items.append({"ref": f"q:{label}", "parent_ref": None, "area": None, "title": q["objective"], "subtitle": q["objective_ar"] or None,
                       "horizon": None, "period": item_rules.quarter_period(label), "commitment": None, "status": "open", "position": 0})
         for s in sorted((s for s in streams if s["quarter"] == label and s["in_note"]), key=lambda r: r["position"]):
             goal = _uniq(seen, f"qs:{label}:{s['slug']}")
-            items.append({"ref": goal, "parent_ref": None, "area": s["slug"], "title": s["goal"], "subtitle": None, "horizon": None,
+            items.append({"ref": goal, "parent_ref": None, "area": s["slug"], "title": s["goal"], "subtitle": None,
                           "horizon": None, "period": item_rules.quarter_period(label), "commitment": s["status"], "status": "open", "position": s["position"]})
             items += _line_items(s["goal_checklist"], f"{goal}:g:", goal, s["slug"], seen)
             for n, c in enumerate(s["checkpoints"] or []):
@@ -81,7 +84,7 @@ def desired(quarters: list[dict], streams: list[dict]) -> tuple[list[dict], list
     latest: dict[str, dict] = {}
     for s in sorted(streams, key=lambda r: r["quarter"]):
         latest[s["slug"]] = s
-    areas = [{"slug": s["slug"], "name": s["name"], "color": s["color"], "icon": s["icon"], "slot": s["slot"], "weekly": s["weekly"],
+    areas = [{"legacy_ref": f"area:{s['slug']}", "slug": s["slug"], "name": s["name"], "color": s["color"], "icon": s["icon"], "slot": s["slot"], "weekly": s["weekly"],
               "has_pipeline": s["has_pipeline"], "in_note": s["in_note"], "position": s["position"], "archived": s["status"] == "archived"}
              for s in sorted(latest.values(), key=lambda r: (r["position"], r["slug"]))]
     return areas, items
@@ -115,13 +118,14 @@ def rebuild_sync(conn, user_id: int) -> dict[str, int]:
         elif any(row[f] != a[f] for f in _AREA_FIELDS):
             conn.execute(update(AREAS).where(AREAS.c.id == row["id"]).values(**{f: a[f] for f in _AREA_FIELDS}))
             stats["updated"] += 1
-    if have_a:
-        conn.execute(delete(AREAS).where(AREAS.c.id.in_([r["id"] for r in have_a.values()])))
-        stats["deleted"] += len(have_a)
+    stale = [r["id"] for r in have_a.values() if (r["legacy_ref"] or "").startswith("area:")]  # hand-made areas are never deleted
+    if stale:
+        conn.execute(delete(AREAS).where(AREAS.c.id.in_(stale)))
+        stats["deleted"] += len(stale)
 
     have = {r["legacy_ref"]: r for r in _tree_rows(conn, user_id)}
     ids: dict[str, int] = {}
-    today = dt.date.today()
+    today = datetime.now(ZoneInfo(settings.app_timezone)).date()
     for it in items:
         values = {**{f: it[f] for f in _ITEM_FIELDS if f != "parent_id"}, "parent_id": ids.get(it["parent_ref"]) if it["parent_ref"] else None}
         row = have.pop(it["ref"], None)
@@ -249,12 +253,17 @@ def touch(db: AsyncSession, user_id: int) -> None:
 
 
 def _safe_rebuild(session: Session, user_ids: set[int]) -> None:
-    """Shadow trouble must never break a legacy write: the rebuild runs in a SAVEPOINT and any error is logged and dropped."""
-    conn = session.connection()
+    """Shadow trouble must never break a legacy write: the rebuild runs in a SAVEPOINT and any error is logged and dropped.
+    A unique violation means another writer rebuilt the same user at the same moment: the user is marked again, so the next
+    flush or commit retries."""
     for uid in sorted(user_ids):
         try:
+            conn = session.connection()
             with conn.begin_nested():
                 rebuild_sync(conn, uid)
+        except IntegrityError:
+            log.warning("tree shadow rebuild for user %s hit a unique conflict; retrying at the next flush or commit", uid)
+            session.info.setdefault(_TOUCHED, set()).add(uid)
         except Exception:  # noqa: BLE001 - see docstring; tree-check reports the drift
             log.exception("tree shadow rebuild failed for user %s", uid)
 
@@ -274,6 +283,10 @@ def _after_flush(session: Session, _ctx) -> None:
 
 @event.listens_for(Session, "before_commit")
 def _before_commit(session: Session) -> None:
+    if not enabled():
+        session.info.pop(_TOUCHED, None)
+        return
+    session.flush()  # before_commit runs before the final flush: rebuild from the state that is about to be committed
     users = session.info.pop(_TOUCHED, set())
-    if users and enabled():
+    if users:
         _safe_rebuild(session, users)

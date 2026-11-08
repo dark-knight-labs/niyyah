@@ -54,6 +54,9 @@ compares a period or horizon.
 - A session hook collects the users whose `Quarter` or `QuarterStream` rows were touched in a flush and rebuilds them, with Core
   statements on the flush's own connection, inside a SAVEPOINT. A shadow failure is logged and never breaks the legacy write.
   `NIYYAH_TREE_SHADOW=off` disables the hook. A bulk delete is invisible to the hook, so the importer marks the user explicitly.
+- A rebuild is cheap single-threaded. Same-user concurrent writes are serialized by the unique index on (user, legacy_ref); the loser
+  hits a unique violation inside its SAVEPOINT, logs a warning and is retried at the next flush or commit. Areas carry `legacy_ref`
+  `area:<slug>` too; a hand-made area (NULL) is never deleted by a rebuild.
 - `python -m app.cli tree-rebuild --user N|--all` backfills; `tree-check --user N|--all` is read-only and exits 1 on any difference.
 
 The Alembic revision is DDL only. Backfill is an explicit `tree-rebuild` step, so the revision never depends on application code.

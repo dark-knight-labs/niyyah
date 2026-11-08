@@ -33,7 +33,9 @@ def upgrade() -> None:
         sa.Column("in_note", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("position", sa.Integer(), nullable=False),
         sa.Column("archived", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("legacy_ref", sa.String(80), nullable=True),
         sa.UniqueConstraint("user_id", "slug", name="uq_planner_area_slug"),
+        sa.UniqueConstraint("user_id", "legacy_ref", name="uq_planner_area_legacy_ref"),
     )
     op.create_index("ix_planner_areas_user_id", "planner_areas", ["user_id"])
     op.create_table(

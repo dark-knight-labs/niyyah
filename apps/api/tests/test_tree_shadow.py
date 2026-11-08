@@ -263,3 +263,79 @@ def test_kind_rules():
     assert item_rules.is_week_focus(item_rules.WORK, "2026-W46", "now") and not item_rules.is_week_focus(item_rules.WORK, "2026-W46", "next")
     assert item_rules.month_period("2026-Q4", "oct") == "2026-10" and item_rules.month_period("2026-Q4", "xyz") is None
     assert item_rules.month_key("2026-10") == "oct"
+
+
+# ---- review fixes: races, flush order, hand-made areas ----------------------------------------------------------------
+
+async def test_a_unique_conflict_is_logged_and_retried_at_the_next_flush(seeded, monkeypatch, caplog):
+    real = tree_shadow._tree_rows
+    monkeypatch.setattr(tree_shadow, "_tree_rows", lambda conn, uid: [])  # this rebuild believes the tree is empty: its INSERT hits the existing rows
+    async with TestSession() as db:
+        await planner_work.set_super_objective(db, 1, Q4, "Written during a race", None)
+        await db.flush()  # the legacy write survives; the shadow conflict is a warning, not an error
+        assert 1 in db.sync_session.info[tree_shadow._TOUCHED]
+        assert any("unique conflict" in r.message for r in caplog.records if r.levelname == "WARNING")
+        monkeypatch.setattr(tree_shadow, "_tree_rows", real)
+        await db.commit()  # the retry
+    async with TestSession() as db:
+        assert (await db.execute(select(Quarter.objective).where(Quarter.label == Q4))).scalar_one() == "Written during a race"
+    assert await check() == []
+
+
+async def test_other_errors_are_dropped_without_a_retry(seeded, monkeypatch):
+    def boom(conn, uid):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(tree_shadow, "rebuild_sync", boom)
+    async with TestSession() as db:
+        await planner_work.set_super_objective(db, 1, Q4, "Still saved", None)
+        await db.flush()
+        assert not db.sync_session.info.get(tree_shadow._TOUCHED)
+        await db.commit()
+
+
+async def test_a_connection_error_cannot_fail_the_legacy_flush(seeded, monkeypatch):
+    import sys
+
+    from sqlalchemy.orm import Session
+    real = Session.connection
+
+    def flaky(self, *a, **kw):
+        if sys._getframe(1).f_code.co_name == "_safe_rebuild":  # only the hook's own request fails
+            raise RuntimeError("no connection")
+        return real(self, *a, **kw)
+    monkeypatch.setattr(Session, "connection", flaky)
+    await run(lambda db: planner_work.set_super_objective(db, 1, Q4, "Saved anyway", None))
+    monkeypatch.undo()
+    async with TestSession() as db:
+        assert (await db.execute(select(Quarter.objective).where(Quarter.label == Q4))).scalar_one() == "Saved anyway"
+
+
+async def test_commit_rebuilds_from_flushed_state(seeded, monkeypatch):
+    seen = []
+    real = tree_shadow.rebuild_sync
+
+    async def go():
+        async with TestSession() as db:
+            def spy(conn, uid):
+                seen.append(conn.execute(select(func.count()).select_from(Quarter).where(Quarter.label == '2027-Q2')).scalar())  # visible to the rebuild?
+                return real(conn, uid)
+            monkeypatch.setattr(tree_shadow, "rebuild_sync", spy)
+            db.add(Quarter(user_id=1, label="2027-Q2", objective="Pending", objective_ar=""))
+            tree_shadow.touch(db, 1)
+            await db.commit()
+    await go()
+    assert seen and all(n == 1 for n in seen)  # every rebuild saw the pending quarter
+    monkeypatch.setattr(tree_shadow, "rebuild_sync", real)
+    assert await check() == [] and "q:2027-Q2" in await items()
+
+
+async def test_a_hand_made_area_survives_a_rebuild(seeded):
+    async with TestSession() as db:
+        db.add(PlannerArea(user_id=1, slug="mine", name="Mine", color="teal", icon="book", position=9))
+        await db.commit()
+    await run(lambda db: db.execute(delete(QuarterStream).where(QuarterStream.slug == "delta")))
+    await run(lambda db: tree_shadow.rebuild(db, 1))
+    async with TestSession() as db:
+        areas = {a.slug: a for a in (await db.execute(select(PlannerArea))).scalars()}
+    assert "mine" in areas and areas["mine"].legacy_ref is None
+    assert "delta" not in areas and areas["alpha"].legacy_ref == "area:alpha"  # a shadow-owned area is still removed with its stream
