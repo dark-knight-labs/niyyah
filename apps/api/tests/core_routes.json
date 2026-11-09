@@ -412,6 +412,10 @@
   "PUT"
  ],
  [
+  "/api/v1/vault/pipeline/products",
+  "PUT"
+ ],
+ [
   "/api/v1/vault/pipeline/remove",
   "POST"
  ],
@@ -424,12 +428,40 @@
   "PUT"
  ],
  [
+  "/api/v1/vault/pipeline/to-habit",
+  "POST"
+ ],
+ [
   "/api/v1/vault/pipeline/{stream}/items",
   "POST"
  ],
  [
   "/api/v1/vault/pipelines",
   "GET"
+ ],
+ [
+  "/api/v1/vault/plan/goals",
+  "PUT"
+ ],
+ [
+  "/api/v1/vault/products",
+  "GET"
+ ],
+ [
+  "/api/v1/vault/products",
+  "POST"
+ ],
+ [
+  "/api/v1/vault/products/reorder",
+  "PUT"
+ ],
+ [
+  "/api/v1/vault/products/{product_id}",
+  "DELETE"
+ ],
+ [
+  "/api/v1/vault/products/{product_id}",
+  "PUT"
  ],
  [
   "/api/v1/vault/quarter",

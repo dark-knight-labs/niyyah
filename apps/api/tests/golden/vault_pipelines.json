@@ -1,5 +1,9 @@
 {
   "now_limit": 3,
+  "quarters": [
+    "2026-Q4",
+    "2027-Q1"
+  ],
   "stale_days": 14,
   "streams": [
     {
@@ -49,6 +53,24 @@
         }
       ],
       "name": "Alpha",
+      "products": [],
+      "quarter_goals": [
+        {
+          "goals": [
+            {
+              "done": true,
+              "id": "g1a2b3c4",
+              "text": "Draft the outline"
+            },
+            {
+              "done": false,
+              "id": "g5d6e7f8",
+              "text": "Review with a friend"
+            }
+          ],
+          "quarter": "2026-Q4"
+        }
+      ],
       "slot": "Mon 09:00-11:00",
       "status": "active",
       "stream": "alpha",
@@ -81,6 +103,13 @@
         }
       ],
       "name": "Beta",
+      "products": [],
+      "quarter_goals": [
+        {
+          "goals": [],
+          "quarter": "2026-Q4"
+        }
+      ],
       "slot": "",
       "status": "committed",
       "stream": "beta",
@@ -92,6 +121,8 @@
       "icon": "server",
       "items": [],
       "name": "Extra",
+      "products": [],
+      "quarter_goals": [],
       "slot": "",
       "status": "committed",
       "stream": "extra",

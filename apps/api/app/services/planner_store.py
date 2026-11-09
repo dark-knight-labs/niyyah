@@ -8,7 +8,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    Goal, LogEntry, NotebookEntry, PlannerCalendarFeed, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
+    Goal, LogEntry, NotebookEntry, PlannerCalendarFeed, PlannerHabit, Quarter, QuarterStream, PlannerScheduleBlock, PlannerScheduleSetting, Task,
 )
 from app.services.rules import (
     MAX_GOALS, STALE_DAYS, URL, Stream, checklist_from_text, checklist_progress, line_hash, quarter_for, weekly_streams,
@@ -98,9 +98,12 @@ async def pipeline_items(db: AsyncSession, user_id: int, today: date) -> dict[st
 
 
 async def ended_goals(db: AsyncSession, user_id: int, today: date, items_by_stream: dict[str, list[dict]]) -> dict[str, list[dict]]:
-    """Per stream, the goal lines of earlier quarters that its items are nested under (the current quarter's are in the quarter)."""
+    """Per stream, the goal lines of earlier quarters that its items or habits are nested under (the current quarter's are in the quarter)."""
     label = quarter_for(today)
     wanted = {s: {i["goal_ref"] for i in items if i["goal_ref"]} for s, items in items_by_stream.items()}
+    for stream, ref in (await db.execute(select(PlannerHabit.stream, PlannerHabit.goal_ref).where(
+            PlannerHabit.user_id == user_id, PlannerHabit.goal_ref.is_not(None), PlannerHabit.stream.is_not(None)))).all():
+        wanted.setdefault(stream, set()).add(ref)
     wanted = {s: refs for s, refs in wanted.items() if refs}
     if not wanted:
         return {}

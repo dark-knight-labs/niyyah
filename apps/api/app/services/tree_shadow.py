@@ -35,7 +35,7 @@ ITEMS = PlannerItem.__table__
 AREAS = PlannerArea.__table__
 _TOUCHED = "tree_shadow_touched"
 _DUP = re.compile(r":dup\d+$")
-_ITEM_FIELDS = ("area", "title", "subtitle", "period", "horizon", "status", "commitment", "position", "parent_id")
+_ITEM_FIELDS = ("area", "title", "subtitle", "period", "horizon", "status", "commitment", "position", "parent_id", "tags")
 _AREA_FIELDS = ("legacy_ref", "name", "color", "icon", "slot", "weekly", "has_pipeline", "in_note", "position", "archived")
 
 
@@ -56,7 +56,8 @@ def _line_items(lines: list[dict], prefix: str, parent: str, area: str, seen: di
     out = []
     for n, line in enumerate(lines or []):
         out.append({"ref": _uniq(seen, f"{prefix}{line.get('id') or ''}"), "parent_ref": parent, "area": area, "title": line.get("text", ""),
-                    "subtitle": None, "horizon": None, "period": None, "commitment": None, "status": "done" if line.get("done") else "open", "position": n})
+                    "subtitle": None, "horizon": None, "period": None, "commitment": None, "status": "done" if line.get("done") else "open", "position": n,
+                    "tags": [line["product"]] if line.get("product") else []})  # Plan v3: a goal line's product is the tree item's tag
     return out
 
 
@@ -81,6 +82,8 @@ def desired(quarters: list[dict], streams: list[dict]) -> tuple[list[dict], list
                 items.append({"ref": ref, "parent_ref": goal, "area": s["slug"], "title": c.get("text", ""), "subtitle": None, "horizon": None, "period": period,
                               "commitment": None, "status": "open", "position": n})
                 items += _line_items(c.get("checklist") or [], f"{ref}:", ref, s["slug"], seen)
+    for it in items:
+        it.setdefault("tags", [])
     latest: dict[str, dict] = {}
     for s in sorted(streams, key=lambda r: r["quarter"]):
         latest[s["slug"]] = s
@@ -155,7 +158,8 @@ def _line_id(ref: str, prefix: str) -> str:
 
 
 def _lines(children: list[dict], prefix: str) -> list[dict]:
-    return [{"id": _line_id(c["legacy_ref"], prefix), "text": c["title"], "done": c["status"] == "done"} for c in children]
+    return [{"id": _line_id(c["legacy_ref"], prefix), "text": c["title"], "done": c["status"] == "done",
+             **({"product": c["tags"][0]} if c.get("tags") else {})} for c in children]
 
 
 async def project(db: AsyncSession, user_id: int, label: str) -> dict | None:

@@ -2,7 +2,7 @@ from datetime import date
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_serializer, model_validator
 
 
 class VaultDayResponse(BaseModel):
@@ -168,12 +168,21 @@ class ChecklistItem(BaseModel):
     id: str
     text: str
     done: bool
+    product: str | None = None  # goal lines only (Plan v3): the slug of one of the block's products; left out when empty
+
+    @model_serializer(mode="wrap")
+    def _without_empty_product(self, handler):
+        data = handler(self)
+        if data.get("product") is None:
+            data.pop("product", None)
+        return data
 
 
 class ChecklistItemIn(BaseModel):
     id: str | None = None  # a new line has none; the server gives it one
     text: str
     done: bool = False
+    product: str | None = None  # goal lines only: a product slug of the block; anything else is dropped (422 on PUT /plan/goals)
 
 
 class StreamInfo(BaseModel):
@@ -333,9 +342,27 @@ class EndedGoal(BaseModel):
     quarter: str  # "2026-Q3"
 
 
+class ProductOut(BaseModel):
+    id: int
+    block: str
+    slug: str
+    name: str
+    position: int
+    tasks: int = 0  # tasks of the block carrying it (filled by GET /products, 0 on the pipelines read)
+    goals: int = 0  # goal lines carrying it
+
+
+class QuarterGoals(BaseModel):
+    """The goal lines of one block in one quarter (this one or a later one)."""
+    quarter: str  # "2027-Q1"
+    goals: list[ChecklistItem]
+
+
 class PipelineStreamData(StreamInfo):
     items: list[PipelineItem]
     ended_goals: list[EndedGoal] = []
+    products: list[ProductOut] = []
+    quarter_goals: list[QuarterGoals] = []  # current and later quarters that have a row for this block
 
 
 class PipelinesResponse(BaseModel):
@@ -343,6 +370,37 @@ class PipelinesResponse(BaseModel):
     now_limit: int
     stale_days: int
     streams: list[PipelineStreamData]
+    quarters: list[str] = []  # the quarter tabs: this one, the next, and any later one with goals
+
+
+class ProductsResponse(BaseModel):
+    products: list[ProductOut]
+
+
+class ProductDeleteResponse(ProductsResponse):
+    tasks: int  # tasks that lost the tag
+    goals: int  # goal lines that lost it
+
+
+class ProductIn(BaseModel):
+    block: str
+    name: str
+
+
+class ProductRenameIn(BaseModel):
+    name: str
+
+
+class ProductReorderIn(BaseModel):
+    block: str
+    ids: list[int]
+
+
+class PlanGoalsIn(BaseModel):
+    """Replace the goal lines of a block in one quarter (this or a later one; a missing quarter row is created)."""
+    stream: str
+    quarter: str
+    goals: list[ChecklistItemIn]
 
 
 class PipelineAddIn(BaseModel):
@@ -377,6 +435,10 @@ class PipelineLabelIn(PipelineRefIn):
 
 class PipelineReorderIn(PipelineRefIn):
     direction: Literal["up", "down"]
+
+
+class PipelineProductsIn(PipelineRefIn):
+    products: list[str]  # product slugs of the task's block; replaces the task's product tags, other tags stay
 
 
 class PipelineTextIn(PipelineRefIn):
@@ -556,6 +618,7 @@ class HabitResponse(BaseModel):
     minimum: str
     stage: str
     stream: str | None = None
+    goal_ref: str | None = None  # a goal line of `stream` (this quarter or later)
     gate_pct: int
     gate_weeks: int
     trip_pct: int | None = None
@@ -576,6 +639,10 @@ class HabitsResponse(BaseModel):
     habits: list[HabitResponse]
 
 
+class HabitFromTaskResponse(HabitsResponse):
+    habit_id: int
+
+
 class HabitIn(BaseModel):
     name: str
     block: str
@@ -583,6 +650,7 @@ class HabitIn(BaseModel):
     per_week: int = 7
     minimum: str = ""
     stream: str | None = None
+    goal_ref: str | None = None
 
 
 class HabitFieldsIn(BaseModel):
@@ -597,7 +665,9 @@ class HabitFieldsIn(BaseModel):
     gate_weeks: int | None = None
     trip_pct: int | None = None
     trip_weeks: int | None = None
+    goal_ref: str | None = None
     clear_stream: bool = False
+    clear_goal: bool = False
     force: bool = False
 
 
