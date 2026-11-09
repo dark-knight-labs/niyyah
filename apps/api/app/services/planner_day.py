@@ -3,7 +3,7 @@
 Each function makes one change and flushes; the caller commits (see `_db_run` in the vault router).
 A `ValueError` carries the same message the vault path gives for the same bad input.
 """
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
@@ -13,8 +13,14 @@ from app.models.vault import VaultBlockVote, VaultDay
 from app.services import planner_blocks, planner_work
 from app.services.rules import MODE_META, clean_status, line_hash, one_line_note, possible_for_count, split_tags, MAX_DESCRIPTION_CHARS
 
+EDIT_WINDOW_DAYS = 7  # the log and the votes only cover days that have happened, the last week at most
 TASK_GONE = "this task no longer exists; reload and try again"
 LOG_GONE = "this log entry changed; reload and try again"
+
+
+def check_edit_day(day: date, today: date) -> None:
+    if not today - timedelta(days=EDIT_WINDOW_DAYS) <= day <= today:
+        raise ValueError(f"Only the last {EDIT_WINDOW_DAYS} days can be edited")
 
 
 async def _find_day(db, user_id: int, day: date) -> VaultDay | None:

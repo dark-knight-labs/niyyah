@@ -6,6 +6,7 @@ Pipeline items and week objectives are planner_tasks rows (see planner_mapping):
 objective sits on the row that is that week's small domino (`focus_week`, `objective_*`), or alone on a row with no lane when
 no item carries it. Every function here keeps the outcome the two old tables gave.
 """
+import re
 from datetime import date
 
 from sqlalchemy import func, select, update
@@ -278,16 +279,18 @@ async def set_focus(db, user_id: int, stream: str, item_id: int, week: str, toda
     await _move_row(db, row, "now", today)
 
 
-async def update_objective(db, user_id: int, today: date, stream: str, text: str | None, done: bool | None,
-                           checkpoint: str | None, streams) -> None:
-    """Set the text, done flag and/or checkpoint of one stream's objective for today's week ('' clears the checkpoint)."""
+async def set_week_objective(db, user_id: int, week: str, stream: str, text: str | None, done: bool | None,
+                             checkpoint: str | None, streams) -> None:
+    """Set the text, done flag and/or checkpoint of one stream's objective for `week` ('' clears the checkpoint).
+
+    `streams` are the streams of that week's quarter. Only the objective is written; `week_objective_set` adds what the
+    screen does around it for the current week (the small-domino item follows)."""
     if stream not in {s.id for s in weekly_streams(streams)}:
         raise ValueError(f"unknown stream '{stream}'")
     if text is None and done is None and checkpoint is None:
         raise ValueError("nothing to change")
     if checkpoint and checkpoint not in MONTHS:
         raise ValueError(f"unknown month '{checkpoint}'")
-    week = week_for(today)[2]
     holder = await _week_row(db, user_id, stream, week)
     existing = holder is not None and holder.objective_text is not None
     now_text = holder.objective_text if existing else ""
@@ -315,6 +318,74 @@ async def update_objective(db, user_id: int, today: date, stream: str, text: str
         else:
             _drop_objective(holder)
     await db.flush()
+
+
+async def update_objective(db, user_id: int, today: date, stream: str, text: str | None, done: bool | None,
+                           checkpoint: str | None, streams) -> None:
+    """Set the text, done flag and/or checkpoint of one stream's objective for today's week ('' clears the checkpoint)."""
+    await set_week_objective(db, user_id, week_for(today)[2], stream, text, done, checkpoint, streams)
+
+
+WEEK = re.compile(r"^(\d{4})-W(\d{2})$")
+WEEKS_BACK, WEEKS_AHEAD = 4, 13  # a week objective can be set from last month to next quarter
+
+
+def week_anchor(week: str) -> date:
+    """A day inside the week ('YYYY-Www', numbered as `week_for` does: by the ISO week of its Tuesday): the Tuesday."""
+    found = WEEK.match(week or "")
+    if not found:
+        raise ValueError("week must look like 2026-W45")
+    try:
+        return date.fromisocalendar(int(found.group(1)), int(found.group(2)), 2)
+    except ValueError:
+        raise ValueError(f"'{week}' is not a week") from None
+
+
+async def week_objective_set(db, user_id: int, today: date, stream: str, text: str | None, done: bool | None,
+                             checkpoint: str | None, week: str | None = None) -> list:
+    """What `PUT /objectives` does, for this week or another (current week -4 .. +13). Returns the week's streams.
+
+    For this week the stream's small-domino item follows the objective (`sync_focus`). Another week is text only: its
+    item is linked the first time the objective is edited in its own week."""
+    current = week_for(today)[2]
+    week = week or current
+    if week == current:
+        anchor = today
+    else:
+        anchor = week_anchor(week)
+        weeks = (anchor - week_for(today)[0]).days // 7
+        if not -WEEKS_BACK <= weeks <= WEEKS_AHEAD:
+            raise ValueError(f"week must be within {WEEKS_BACK} weeks back and {WEEKS_AHEAD} ahead of this week")
+    streams = await planner_store.streams_for(db, user_id, anchor)
+    block = next((s for s in streams if s.id == stream), None)
+    await set_week_objective(db, user_id, week, stream, text, done, checkpoint, streams)
+    if week == current and block and block.goal and not block.archived and (text is not None or done is not None):
+        await sync_focus(db, user_id, stream, week, today, text=text, done=done)
+    return streams
+
+
+async def pipeline_move(db, user_id: int, stream: str, item_id: int, lane: str, today: date) -> None:
+    """What `PUT /pipeline/move` does: finishing (or reopening) this week's small domino ticks (or unticks) its objective."""
+    streams = await planner_store.streams_for(db, user_id, today)
+    await move_and_tick(db, user_id, await item_row(db, user_id, stream, item_id), lane, today, streams)
+
+
+async def pipeline_focus(db, user_id: int, stream: str, item_id: int, today: date) -> None:
+    """What `PUT /pipeline/focus` does: the item becomes this week's small domino and the objective line follows."""
+    week = week_for(today)[2]
+    streams = await planner_store.streams_for(db, user_id, today)
+    item = await item_row(db, user_id, stream, item_id)
+    await update_objective(db, user_id, today, stream, item.text, False, item.checkpoint or "", streams)
+    await set_focus(db, user_id, stream, item_id, week, today)
+
+
+async def pipeline_remove(db, user_id: int, stream: str, item_id: int, today: date) -> None:
+    """What `POST /pipeline/remove` does: removing this week's small domino empties the objective first."""
+    streams = await planner_store.streams_for(db, user_id, today)
+    item = await item_row(db, user_id, stream, item_id)
+    if item.focus_week == week_for(today)[2]:
+        await update_objective(db, user_id, today, stream, "", None, "", streams)
+    await remove_item(db, user_id, stream, item_id)
 
 
 async def sync_focus(db, user_id: int, stream: str, week: str, today: date, *, text: str | None = None,

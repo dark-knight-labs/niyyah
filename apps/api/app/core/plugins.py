@@ -1,6 +1,7 @@
 """Plugin seam: an external package can mount API routers under /api/v1 without core knowing about it.
 
 A plugin is a class with a no-argument constructor, a `name`, an `api_version` and a `routers()` method.
+It may also define `suggestion_check(text) -> str | None` (see docs/plugins.md).
 It is enabled by an entry point in the group `niyyah.plugins` or by listing `module:Class` in the PLUGINS setting.
 See docs/plugins.md.
 """
@@ -30,6 +31,12 @@ class Plugin(Protocol):
     def routers(self) -> Sequence[APIRouter]:
         """Routers to mount under /api/v1."""
         ...
+
+
+def suggestion_checks(plugins: Iterable) -> list[Callable[[str], str | None]]:
+    """The optional `suggestion_check(text) -> str | None` of each loaded plugin. A plugin without one is simply not asked;
+    a message back refuses the suggestion that holds the text. Optional hooks are additive: PLUGIN_API_VERSION stays 1."""
+    return [check for plugin in plugins if callable(check := getattr(plugin, "suggestion_check", None))]
 
 
 def discover_entry_points() -> list:

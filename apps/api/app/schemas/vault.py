@@ -234,6 +234,7 @@ class GoalsIn(BaseModel):
 
 class ObjectiveIn(BaseModel):
     stream: str
+    week: str | None = Field(default=None, pattern=r"^\d{4}-W\d{2}$")  # "2026-W45"; this week when left out
     text: str | None = None
     done: bool | None = None
     checkpoint: Month | Literal[""] | None = None  # "" clears it
@@ -615,6 +616,7 @@ class ItemPatchIn(ItemFieldsIn):
     text: str | None = Field(default=None, min_length=1, max_length=300)
     day: date | None = None  # reschedules: sets the scheduled date, leaves due and start dates alone (an undated item takes the day)
     parent_id: int | None = None  # a piece of another item; send null to unlink
+    unschedule: bool | None = None  # true clears the scheduled day and the time (not with `day`)
     start_min: int | None = Field(default=None, ge=0, le=1440)  # send both null to make it all day
     end_min: int | None = Field(default=None, ge=0, le=1440)
 

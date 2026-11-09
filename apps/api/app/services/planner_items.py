@@ -4,7 +4,7 @@ An own item is a planner_tasks row. A time (start_min/end_min) belongs to its `s
 has a due or start date shows on those days too, all day. A calendar event's title and time always come from its feed;
 the user's additions live in planner_event_overlays, matched by event key. Writes flush; the caller commits.
 """
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from app.services.rules import (
 )
 
 MAX_RANGE_DAYS = 14
+TASK_DAYS_BACK, TASK_DAYS_AHEAD = 7, 366  # how far from today a task can be planned
 MAX_KEY_CHARS = 400
 MAX_ORPHAN_LOOKUPS = 10  # Calendar API lookups per read for overlays the range did not show
 
@@ -75,6 +76,12 @@ def event_item(event: dict, overlay: EventOverlay | None) -> dict:
         "color": event["color"], "location": event["location"], "meeting_url": event["meeting_url"],
         "all_day": event["all_day"], "start_min": event["start_min"], "end_min": event["end_min"], **overlay_fields(overlay),
     }
+
+
+def check_task_day(day: date, today: date) -> None:
+    """Tasks can be planned ahead (up to a year), unlike the log and votes, which only cover days that have happened."""
+    if not today - timedelta(days=TASK_DAYS_BACK) <= day <= today + timedelta(days=TASK_DAYS_AHEAD):
+        raise ValueError("That day is out of range for a task")
 
 
 def check_range(first: date, last: date) -> None:
@@ -224,7 +231,8 @@ async def _create_planning(db: AsyncSession, user_id: int, lane: str, fields: di
 
 
 async def update_item(db: AsyncSession, user_id: int, task_id: int, fields: dict, today: date) -> Task:
-    """Change the fields sent. `day` reschedules (scheduled_on; due and start dates stay); a time needs a scheduled day.
+    """Change the fields sent. `day` reschedules (scheduled_on; due and start dates stay), `unschedule` clears the scheduled
+    day and the time; a time needs a scheduled day.
 
     A pipeline item (an item with a lane) keeps the pipeline's rules: done goes to the Done lane and back to Now (a small
     domino's objective follows), a stream must have a pipeline this quarter, a rename keeps its tags and checkpoint."""
@@ -238,6 +246,10 @@ async def update_item(db: AsyncSession, user_id: int, task_id: int, fields: dict
             planner_work.set_text_row(task, fields["text"])
         else:
             task.text, text_tags = _task_fields(fields["text"])
+    if fields.get("unschedule"):
+        if fields.get("day") is not None:
+            raise ValueError("send `day` or `unschedule`, not both")
+        task.scheduled_on = task.start_min = task.end_min = None
     if fields.get("day") is not None:
         task.scheduled_on = fields["day"]
         await slot_on_day(db, task, fields["day"])

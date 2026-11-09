@@ -57,3 +57,14 @@ class ParamOverlapPlugin(FakePlugin):
 
     def routers(self):
         return [_router("/auth/{item_id}")]
+
+
+class CheckingPlugin(FakePlugin):
+    """Has the optional hook: refuses any text with the word 'forbidden'."""
+    name = "checking"
+
+    def routers(self):
+        return []
+
+    def suggestion_check(self, text: str) -> str | None:
+        return "that wording is not allowed" if "forbidden" in text.lower() else None

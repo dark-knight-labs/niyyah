@@ -55,6 +55,12 @@ RUN pip install --no-cache-dir --no-deps /src/niyyah-<plugin>
 
 For development and CI of a plugin, check out core at a pinned commit and set `PYTHONPATH=<core>/apps/api`.
 
+## Optional hooks
+
+A plugin may add methods core calls when present; a plugin without them loads and runs as before, and `api_version` stays 1.
+
+- `suggestion_check(self, text: str) -> str | None`: called on the title, the reason and every free-text field of a suggestion that code (not the signed-in user) created, when it is created and again when it is applied. Return a message to refuse it, or `None`. See [suggestions](suggestions.md).
+
 ## Checking it
 
 `scripts/check-plugin-attach.sh` is a **manual** check (it needs network access for pip). It builds a throwaway plugin, installs it into a temporary virtualenv with core's `requirements.txt`, and confirms that discovery mounts its route and that uninstalling removes it. It does not test the image layer above; a plugin's own CI should.
