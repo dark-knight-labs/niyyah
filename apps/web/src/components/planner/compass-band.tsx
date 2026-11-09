@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CompassChange, CompassData, RoleData, ValueData, compassApi } from "@/lib/compass-api";
+import { firstSentence } from "@/lib/plan-v3";
 import { StreamMeta } from "@/lib/streams";
 
 const FIELD = "w-full rounded-lg border border-[var(--accent)] bg-[var(--background)] px-3 py-2 text-sm";
@@ -13,6 +14,9 @@ interface Loaded {
   roles: RoleData[];
 }
 
+const OPEN_KEY = "niyyah.compass.open";
+
+/** Compass, one line: the first sentence of the mission; "Mission & vision" opens both texts side by side. Open or closed is remembered. */
 /** Compass: why this plan exists. Mission, vision and its horizon are edited here; values (principles) are read-only; a role points at a block. */
 export function CompassBand({ streams }: { streams: StreamMeta[] }) {
   const [data, setData] = useState<Loaded | null>(null);
@@ -22,6 +26,8 @@ export function CompassBand({ streams }: { streams: StreamMeta[] }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [openRole, setOpenRole] = useState<number | null>(null);
+  // Read once, when the band is first drawn: the page shows a spinner until the plan has loaded, so this never runs on the server.
+  const [open, setOpen] = useState(() => (typeof window === "undefined" ? false : window.localStorage.getItem(OPEN_KEY) === "1"));
 
   const load = useCallback(async () => {
     try {
@@ -39,7 +45,8 @@ export function CompassBand({ streams }: { streams: StreamMeta[] }) {
   }, [load]);
 
   if (failed) return <p role="status" className="mb-4 text-xs text-[var(--muted-foreground)]">Compass could not be loaded.</p>;
-  if (!data) return null;
+  // A line-high placeholder keeps the page from jumping when the compass arrives.
+  if (!data) return <section aria-label="Compass" aria-busy="true" className="mb-3 h-9 border-y border-[var(--border)]" />;
   const { compass, values, roles } = data;
   const empty = !compass.mission && !compass.vision;
 
@@ -82,14 +89,23 @@ export function CompassBand({ streams }: { streams: StreamMeta[] }) {
   }
 
   const label = "mono pt-1.5 text-[var(--muted-foreground)] sm:w-20 sm:flex-none";
+  const toggle = () => setOpen((v) => { window.localStorage.setItem(OPEN_KEY, v ? "0" : "1"); return !v; });
+  const showTexts = open && !editing;
+  const hasBody = editing || !!error || (open && (!empty || values.length > 0 || roles.length > 0));
 
   return (
-    <section aria-label="Compass" className="mb-4 border border-[var(--border)] bg-[var(--surface)]">
-      <h2 className="mono flex h-11 items-center justify-between gap-4 border-b border-[var(--border)] px-4 text-[var(--muted-foreground)]">
-        <span>Compass</span>
-        {!editing && <button type="button" onClick={start} className={BUTTON}>Edit</button>}
-      </h2>
-      <div className="grid gap-3 px-4 py-3">
+    <section aria-label="Compass" className="mb-3 border-y border-[var(--border)]">
+      <div className="flex min-h-9 flex-wrap items-baseline gap-x-3 gap-y-1 px-1 py-1.5">
+        <span className="mono shrink-0 text-[var(--muted-foreground)]">Compass</span>
+        <span className="min-w-0 flex-1 truncate text-small font-medium" title={compass.mission}>{empty ? "Write why this plan exists." : firstSentence(compass.mission)}</span>
+        {!editing && (
+          <>
+            {!empty && <button type="button" aria-expanded={open} onClick={toggle} className="mono text-[var(--accent)] hover:underline">{open ? "Hide" : "Mission & vision"}</button>}
+            <button type="button" onClick={start} className="mono text-[var(--accent)] hover:underline">Edit</button>
+          </>
+        )}
+      </div>
+      <div className={`grid gap-3 ${hasBody ? "px-1 pb-3" : ""}`}>
         {error && <p role="alert" className="border border-[var(--destructive)] px-3 py-2 text-xs text-[var(--destructive)]">{error}</p>}
 
         {editing ? (
@@ -105,22 +121,14 @@ export function CompassBand({ streams }: { streams: StreamMeta[] }) {
               <button type="button" onClick={cancel} className={BUTTON}>Cancel</button>
             </div>
           </form>
-        ) : empty ? (
-          <p className="text-sm text-[var(--muted-foreground)]">Write why this plan exists. <button type="button" onClick={start} className="font-semibold text-[var(--accent)] underline">Edit</button></p>
-        ) : (
-          <>
-            <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
-              <span className={label}>Mission</span>
-              <p className="heading-elegant max-w-[62ch] text-lg leading-snug">{compass.mission}</p>
-            </div>
-            <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
-              <span className={label}>Vision</span>
-              <p className="max-w-[70ch] text-sm">{compass.vision}{compass.vision_horizon && <span className="mono ml-2 text-[var(--muted-foreground)]">by {compass.vision_horizon}</span>}</p>
-            </div>
-          </>
-        )}
+        ) : showTexts && !empty ? (
+          <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2" data-testid="compass-texts">
+            <div><span className="mono text-[var(--muted-foreground)]">Mission</span><p className="mt-1 max-w-[62ch] text-xs leading-relaxed">{compass.mission}</p></div>
+            <div><span className="mono text-[var(--muted-foreground)]">Vision{compass.vision_horizon ? ` · by ${compass.vision_horizon}` : ""}</span><p className="mt-1 max-w-[62ch] text-xs leading-relaxed">{compass.vision}</p></div>
+          </div>
+        ) : null}
 
-        {values.length > 0 && (
+        {open && !editing && values.length > 0 && (
           <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
             <span className={label}>Values</span>
             <ul className="flex flex-wrap gap-1.5">
@@ -129,7 +137,7 @@ export function CompassBand({ streams }: { streams: StreamMeta[] }) {
           </div>
         )}
 
-        {roles.length > 0 && (
+        {open && !editing && roles.length > 0 && (
           <div className="flex flex-col gap-1 sm:flex-row sm:gap-3">
             <span className={label}>Roles</span>
             <div className="grid gap-2">

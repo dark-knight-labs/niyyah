@@ -2,17 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
-import { Checklist } from "@/components/planner/checklist";
 import { Checkbox } from "@/components/routine/checkbox";
+import { BlockCell } from "@/components/planner/block-cell";
+import { PlanHabitCard, RunHabits, WeekTicks } from "@/components/planner/plan-habits";
 import { ItemCard, NoteCard } from "@/components/planner/work-card";
 import { isOpenBlocker, waitingOn } from "@/lib/plan-model";
 import {
   CAPS, GoalRef, GoalGroup, LabelFilter, capped, columnOf, goalIndex, groupByGoal, isLate, labelOf, matchesLabel, monthText, monthsOfQuarter,
-  nestedCount, quarterText, sinceWeek, weekText,
+  quarterText, sinceWeek, weekText,
 } from "@/lib/plan-v2";
+import { planHabits, quarterTabs, tabLabel } from "@/lib/plan-v3";
 import { StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
-import { NotebookEntryData, NotebooksData, PipelineItemData, PipelinesData, QuarterData } from "@/lib/vault-types";
+import { HabitsData, NotebookEntryData, NotebooksData, PipelineItemData, PipelinesData, ProductData, QuarterData } from "@/lib/vault-types";
 
 type Run = (action: () => Promise<unknown>) => Promise<boolean>;
 type Column = "now" | "next" | "someday";
@@ -43,29 +45,49 @@ interface Props {
   busy: boolean;
   run: Run;
   message: string;
+  /** Habits (Plan v3): shown under their goals and as this week's ticks in Now. Null until loaded. */
+  habits: HabitsData | null;
+  runHabits: RunHabits;
+  /** Turn a task into a habit (the task is deleted); answers with the new habit's id, or null when it failed. */
+  makeHabit: (stream: string, item: PipelineItemData) => Promise<number | null>;
 }
 
 /** What is selected: a task (by its line) or a notebook entry (by its key). */
-type Sel = { kind: "item"; stream: string; line: number } | { kind: "note"; stream: string; key: string } | null;
+type Sel = { kind: "item"; stream: string; line: number } | { kind: "note"; stream: string; key: string } | { kind: "habit"; id: number } | null;
 
 /** The Plan: one table, a row per block (with its quarter goals) against Now, Next and Someday; Done is its own view. */
-export function PlanTable({ streams, quarter, pipelines, notebooks, today, block, onBlock, editor, onEdit, onAddBlock, busy, run, message }: Props) {
+export function PlanTable({ streams, quarter, pipelines, notebooks, today, block, onBlock, editor, onEdit, onAddBlock, busy, run, message, habits, runHabits, makeHabit }: Props) {
   const [view, setView] = useState<"plan" | "done">("plan");
   const [label, setLabel] = useState<LabelFilter>("all");
   const [focus, setFocus] = useState<string | null>(null);
   const [sel, setSel] = useState<Sel>(null);
   const [opened, setOpened] = useState<Record<string, boolean>>({});
-  const [adding, setAdding] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
-  const [editingGoals, setEditingGoals] = useState<string | null>(null);
+  // The quarter tab that is open (null = the current quarter) and quarters opened with "+" that have no goal yet.
+  const [openQ, setOpenQ] = useState<string | null>(null);
+  const [extraQ, setExtraQ] = useState<string[]>([]);
 
   const months = monthsOfQuarter(quarter.quarter);
   const thisMonth = today.slice(0, 7);
   const week = pipelines.week;
   const itemsOf = (id: string): PipelineItemData[] => pipelines.streams.find((s) => s.stream === id)?.items ?? [];
   const notesOf = (id: string): NotebookEntryData[] => notebooks?.streams.find((n) => n.stream === id)?.entries ?? [];
-  const goalsOf = (id: string): GoalRef[] =>
-    goalIndex(quarter.streams.find((s) => s.stream === id)?.goal_checklist ?? [], quarter.quarter, pipelines.streams.find((s) => s.stream === id)?.ended_goals);
+  const current = quarter.quarter;
+  const tabs = quarterTabs(current, pipelines.quarters, extraQ);
+  const shownQ = openQ && tabs.tabs.includes(openQ) ? openQ : current;
+  const productsOf = (id: string): ProductData[] => pipelines.streams.find((s) => s.stream === id)?.products ?? [];
+  /** The goal lines of a block in one quarter (the current quarter's come from the quarter, later ones from the pipelines read). */
+  const linesOf = (id: string, q: string) =>
+    q === current ? quarter.streams.find((s) => s.stream === id)?.goal_checklist ?? [] : pipelines.streams.find((s) => s.stream === id)?.quarter_goals?.find((x) => x.quarter === q)?.goals ?? [];
+  /** Every goal a task of the block can be nested under: this quarter's, later quarters', then the ended ones. */
+  const goalsOf = (id: string): GoalRef[] => {
+    const base = goalIndex(linesOf(id, current), current, pipelines.streams.find((s) => s.stream === id)?.ended_goals);
+    const later = (pipelines.streams.find((s) => s.stream === id)?.quarter_goals ?? []).filter((x) => x.quarter > current)
+      .flatMap((x) => x.goals.map((g) => ({ id: g.id, text: g.text, quarter: x.quarter, ended: false })))
+      .filter((g) => !base.some((b) => b.id === g.id));
+    return [...base.filter((g) => !g.ended), ...later, ...base.filter((g) => g.ended)];
+  };
+  const liveHabits = planHabits(habits?.habits ?? [], streams.map((s) => s.id));
+  const habitsOf = (id: string) => liveHabits.filter((h) => h.stream === id);
   const visible = streams.filter((s) => !block || s.id === block);
   const all = pipelines.streams.flatMap((s) => (!block || s.stream === block ? s.items : []));
   const doneItems = all.filter((i) => columnOf(i) === null);
@@ -148,7 +170,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
           <div key={g.removed ? "removed" : g.goal?.id ?? "none"}>
             {(groups.length > 1 || g.goal || g.removed) && (
               <p className={`mono mt-1.5 truncate first:mt-0 ${g.goal?.ended || g.removed ? "text-[var(--warn)]" : "text-[var(--muted-foreground)]"} ${focus && g.goal?.id !== focus ? "opacity-30" : ""}`}>
-                {g.removed ? "↳ (removed goal)" : g.goal ? `↳ ${g.goal.text}${g.goal.ended ? ` · ${quarterText(g.goal.quarter)} ended` : ""}` : "not nested"}
+                {g.removed ? "↳ (removed goal)" : g.goal ? `↳ ${g.goal.text}${g.goal.ended ? ` · ${quarterText(g.goal.quarter)} ended` : g.goal.quarter !== current ? ` · ${quarterText(g.goal.quarter)}` : ""}` : "not nested"}
               </p>
             )}
             {g.items.map((i, at) => {
@@ -166,68 +188,16 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     );
   }
 
-  function addGoal(stream: StreamMeta) {
-    const text = draft.trim();
-    if (!text) return;
-    const lines = (quarter.streams.find((s) => s.stream === stream.id)?.goal_checklist ?? []).map((l) => ({ id: l.id, text: l.text, done: l.done }));
-    void run(() => vaultApi.updateStream(stream.id, { goal_checklist: [...lines, { text }] })).then((ok) => { if (ok) { setDraft(""); setAdding(null); } });
-  }
-
   function blockCell(stream: StreamMeta) {
-    const goals = goalsOf(stream.id).filter((g) => !g.ended);
-    const lines = quarter.streams.find((s) => s.stream === stream.id)?.goal_checklist ?? [];
-    const nowN = itemsOf(stream.id).filter((i) => columnOf(i) === "now").length;
     const stuck = notesOf(stream.id).filter(isOpenBlocker);
-    const items = itemsOf(stream.id);
     return (
-      <td className="bg-[var(--surface)] px-3 py-3 align-top">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="h-2 w-2 shrink-0" style={{ background: stream.color }} aria-hidden="true" />
-          <b className="text-small font-semibold">{stream.label}</b>
-          {nowN > pipelines.now_limit && <span className="mono text-[var(--warn)]">Now {nowN}/{pipelines.now_limit}</span>}
-          {stuck.length > 0 && (
-            <button type="button" onClick={() => setSel({ kind: "note", stream: stream.id, key: stuck[0].id ?? `${stuck[0].line}:${stuck[0].hash}` })} aria-label={`${stuck.length} blocked in ${stream.label}`}
-              className="mono text-[var(--destructive)] hover:underline">blocked {stuck.length}</button>
-          )}
-          <button type="button" onClick={() => onEdit(stream.id)} aria-label={`Edit ${stream.label}`} className={`${link} ml-auto`}>Edit</button>
-        </div>
-        {editingGoals === stream.id ? (
-          <div className="mt-1.5">
-            <Checklist label={`${stream.label} ${quarterText(quarter.quarter)} goals`} items={lines} busy={busy} placeholder={`Add a ${quarterText(quarter.quarter)} goal`}
-              onToggle={(item, done) => run(() => vaultApi.tickStreamItem(stream.id, "goal", item.id, done))}
-              onChange={(next) => run(() => vaultApi.updateStream(stream.id, { goal_checklist: next }))} />
-            <button type="button" className={`${link} mt-1`} onClick={() => setEditingGoals(null)}>Done editing goals</button>
-          </div>
-        ) : (<>
-        <div className="mt-1.5" role="list" aria-label={`${stream.label} goals`}>
-          {goals.map((g) => {
-            const line = lines.find((l) => l.id === g.id);
-            const n = nestedCount(items, g.id);
-            return (
-              <div key={g.id} role="listitem" data-goal={g.id} className={`flex items-center gap-1.5 border-t border-[var(--border)] py-0.5 first:border-t-0 ${focus === g.id ? "bg-[var(--muted)] shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
-                <Checkbox checked={!!line?.done} disabled={busy} label={`Goal reached: ${g.text}`} onChange={() => void run(() => vaultApi.tickStreamItem(stream.id, "goal", g.id, !line?.done))} />
-                <button type="button" aria-pressed={focus === g.id} title="Show only the tasks nested under this goal" onClick={() => setFocus(focus === g.id ? null : g.id)}
-                  className={`min-w-0 flex-1 text-left text-small font-medium leading-snug hover:text-[var(--accent)] ${line?.done ? "text-[var(--muted-foreground)] line-through" : ""}`}>{g.text}</button>
-                {n.total > 0 && <span className="mono shrink-0 text-[var(--muted-foreground)]" title="tasks done / nested">{n.done}/{n.total}</span>}
-              </div>
-            );
-          })}
-          {goals.length === 0 && <p className="text-xs text-[var(--muted-foreground)]">No {quarterText(quarter.quarter)} goal yet.</p>}
-        </div>
-        {adding === stream.id ? (
-          <form className="mt-1 flex gap-1" onSubmit={(e) => { e.preventDefault(); addGoal(stream); }}>
-            <input autoFocus value={draft} maxLength={300} aria-label={`New ${quarterText(quarter.quarter)} goal for ${stream.label}`} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setAdding(null)}
-              className="min-w-0 flex-1 border border-[var(--rule)] bg-[var(--background)] px-1.5 py-1 text-small outline-none focus:border-[var(--accent)]" />
-            <button type="submit" disabled={busy || !draft.trim()} className={`${chip} disabled:opacity-40`}>Add</button>
-          </form>
-        ) : (
-          <span className="mt-1 flex gap-3">
-            <button type="button" className={link} onClick={() => { setAdding(stream.id); setDraft(""); }}>+ {quarterText(quarter.quarter)} goal</button>
-            {lines.length > 0 && <button type="button" className={link} aria-label={`Edit goals of ${stream.label}`} onClick={() => setEditingGoals(stream.id)}>Edit goals</button>}
-          </span>
-        )}
-        </>)}
-      </td>
+      <BlockCell stream={stream} quarter={shownQ} currentQuarter={current} lines={linesOf(stream.id, shownQ)} goalRefs={goalsOf(stream.id)}
+        products={productsOf(stream.id)} items={itemsOf(stream.id)} habits={habitsOf(stream.id)} focus={focus} onFocus={setFocus}
+        nowN={itemsOf(stream.id).filter((i) => columnOf(i) === "now").length} nowLimit={pipelines.now_limit}
+        stuck={stuck.map((e) => ({ id: e.id ?? `${e.line}:${e.hash}`, title: e.title }))}
+        onStuck={() => setSel({ kind: "note", stream: stream.id, key: stuck[0].id ?? `${stuck[0].line}:${stuck[0].hash}` })}
+        onEdit={() => onEdit(stream.id)} pickedHabit={sel?.kind === "habit" ? sel.id : null} onPickHabit={(id) => setSel({ kind: "habit", id })}
+        busy={busy} run={run} runHabits={runHabits} />
     );
   }
 
@@ -254,8 +224,9 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     return () => document.removeEventListener("keydown", onKey);
   });
 
+  const selectedHabit = sel?.kind === "habit" ? liveHabits.find((h) => h.id === sel.id) ?? habits?.habits.find((h) => h.id === sel.id) ?? null : null;
   const selected = (() => {
-    if (!sel) return null;
+    if (!sel || sel.kind === "habit") return null;
     const meta = streams.find((s) => s.id === sel.stream);
     if (!meta) return null;
     if (sel.kind === "item") {
@@ -296,14 +267,19 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
       </div>
       {editor && <div className="border-b border-[var(--border)] p-4">{editor}</div>}
 
-      <div className={`grid ${selected ? "lg:grid-cols-[minmax(0,1fr)_23rem]" : ""}`}>
+      <div className={`grid ${selected || selectedHabit ? "lg:grid-cols-[minmax(0,1fr)_23rem]" : ""}`}>
         <div className="min-w-0 overflow-x-auto" data-testid="plan-scroll">
           {view === "plan" ? (
             <table aria-label="Plan" className="w-full min-w-[60rem] table-fixed border-collapse text-small">
               <colgroup><col className="w-[25%]" /><col /><col /><col className="w-[22%]" /></colgroup>
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="mono px-3 py-2 text-left align-bottom font-medium text-[var(--muted-foreground)]">Block<span className="block font-normal">{quarterText(quarter.quarter)} goals</span></th>
+                  <th scope="col" className="mono px-3 py-2 text-left align-bottom font-medium text-[var(--muted-foreground)]">Block
+                    <span role="group" aria-label="Quarter" className="mt-1 flex flex-wrap gap-1 font-normal">
+                      {tabs.tabs.map((q) => <button key={q} type="button" aria-pressed={shownQ === q} onClick={() => setOpenQ(q)} className={chip}>{tabLabel(q, current)}</button>)}
+                      <button type="button" aria-label={`Add quarter ${quarterText(tabs.plus)}`} title={`Open ${quarterText(tabs.plus)}`} onClick={() => { setExtraQ([...extraQ, tabs.plus]); setOpenQ(tabs.plus); }} className={chip}>+</button>
+                    </span>
+                    <span className="mt-1 block font-normal">{quarterText(shownQ)} goals</span></th>
                   {COLUMNS.map((c) => (
                     <th key={c.id} scope="col" className="mono border-l border-[var(--border)] px-3 py-2 text-left align-bottom font-medium text-[var(--muted-foreground)]">
                       {c.label} <span className="tabular-nums text-[var(--foreground)]">{visible.reduce((n, s) => n + itemsOf(s.id).filter((i) => columnOf(i) === c.id && matchesLabel(i, label, today)).length, 0)}</span>
@@ -316,7 +292,12 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
                 {visible.map((s) => (
                   <tr key={s.id} data-block={s.id} className="border-b border-[var(--border)] align-top last:border-b-0">
                     {blockCell(s)}
-                    {COLUMNS.map((c) => <td key={c.id} data-col={c.id} className={`border-l border-[var(--border)] px-3 py-3 align-top ${c.id === "now" ? "bg-[var(--accent-light)]" : ""}`}>{cell(s, c.id)}</td>)}
+                    {COLUMNS.map((c) => (
+                      <td key={c.id} data-col={c.id} className={`border-l border-[var(--border)] px-3 py-3 align-top ${c.id === "now" ? "bg-[var(--accent-light)]" : ""}`}>
+                        {c.id === "now" && <WeekTicks habits={habitsOf(s.id)} today={today} busy={busy} runHabits={runHabits} dim={(h) => !!focus && h.goal_ref !== focus} onPick={(id) => setSel({ kind: "habit", id })} />}
+                        {cell(s, c.id)}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -356,13 +337,20 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
           </p>
         </div>
 
+        {selectedHabit && (
+          <aside aria-label="Habit" aria-live="polite" className="grid content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:border-l lg:border-t-0">
+            <PlanHabitCard key={selectedHabit.id} habit={selectedHabit} busy={busy} runHabits={runHabits} onClose={() => setSel(null)}
+              goals={(selectedHabit.stream ? goalsOf(selectedHabit.stream) : []).filter((g) => !g.ended || g.id === selectedHabit.goal_ref)} />
+          </aside>
+        )}
         {selected && (
           <aside aria-label="Item" aria-live="polite" className="grid content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:border-l lg:border-t-0">
             <button type="button" onClick={() => setSel(null)} className={`${link} justify-self-end`}>Close</button>
             {selected.item ? (
               <ItemCard key={`${selected.item.line}:${selected.item.hash}`} row={{ type: "item", key: String(selected.item.line), stream: selected.meta.id, item: selected.item }} meta={selected.meta}
                 months={months} goals={goalsOf(selected.meta.id).filter((g) => !g.ended || g.id === selected.item.goal_ref)}
-                blockers={notesOf(selected.meta.id).filter((e) => e.kind === "blocker")} week={week} busy={busy} run={run} />
+                blockers={notesOf(selected.meta.id).filter((e) => e.kind === "blocker")} week={week} busy={busy} run={run}
+                products={productsOf(selected.meta.id)} onMakeHabit={async (item) => { const id = await makeHabit(selected.meta.id, item); if (id !== null) setSel({ kind: "habit", id }); }} />
             ) : selected.entry && (
               <NoteCard key={selected.entry.id ?? selected.entry.line} row={{ type: "note", key: String(selected.entry.line), stream: selected.meta.id, entry: selected.entry }} meta={selected.meta} busy={busy} run={run} />
             )}

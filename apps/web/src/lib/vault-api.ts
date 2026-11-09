@@ -4,6 +4,7 @@ import {
   BlockConfig,
   BlocksConfigData,
   FeedData,
+  ChecklistLine,
   GoalIn,
   HabitFields,
   HabitLevel,
@@ -32,6 +33,7 @@ import {
   NotebooksData,
   PipelineItemData,
   PipelinesData,
+  ProductData,
   QuarterData,
   StreamChange,
   VaultMonthData,
@@ -122,6 +124,19 @@ export const vaultApi = {
   feeds: () => api.get<FeedData[]>("/vault/config/feeds"),
   addFeed: (name: string, url: string) => api.post<FeedData>("/vault/config/feeds", { name, url }),
   removeFeed: (id: number) => api.delete(`/vault/config/feeds/${id}`),
+  /** Plan v3: replace a block's goal lines in a quarter (this or a later one; the quarter row is created when missing). */
+  setPlanGoals: (stream: string, quarter: string, goals: ChecklistLine[]) => api.put<VaultEditData>("/vault/plan/goals", { stream, quarter, goals }),
+  products: (block?: string) => api.get<{ products: ProductData[] }>(`/vault/products${block ? `?block=${block}` : ""}`),
+  addProduct: (block: string, name: string) => api.post<{ products: ProductData[] }>("/vault/products", { block, name }),
+  renameProduct: (id: number, name: string) => api.put<{ products: ProductData[] }>(`/vault/products/${id}`, { name }),
+  deleteProduct: (id: number) => api.delete<{ products: ProductData[]; tasks: number; goals: number }>(`/vault/products/${id}`),
+  reorderProducts: (block: string, ids: number[]) => api.put<{ products: ProductData[] }>("/vault/products/reorder", { block, ids }),
+  /** Set which of the block's products a task has (its other tags stay). */
+  setPipelineProducts: (stream: string, item: PipelineItemData, products: string[]) =>
+    api.put<VaultEditData>("/vault/pipeline/products", { stream, line: item.line, hash: item.hash, products }),
+  /** Make a task a habit; the task is deleted in the same transaction. Answers with the habits and the new one's id. */
+  taskToHabit: (stream: string, item: PipelineItemData) =>
+    api.post<HabitsData & { habit_id: number }>("/vault/pipeline/to-habit", { stream, line: item.line, hash: item.hash }),
   habits: () => api.get<HabitsData>("/vault/habits"),
   addHabit: (body: { name: string; block: string; anchor?: string; per_week?: number; minimum?: string; stream?: string }) =>
     api.post<HabitsData>("/vault/habits", body),

@@ -6,9 +6,10 @@ import { OctagonAlert } from "lucide-react";
 import { Checkbox } from "@/components/routine/checkbox";
 import { ItemRow, NoteRow, TABS, LANE_FOR, isOpenBlocker, tabOf, waitingOn } from "@/lib/plan-model";
 import { GoalRef, monthText, quarterText } from "@/lib/plan-v2";
+import { plainTags, taskProducts } from "@/lib/plan-v3";
 import { StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
-import { Lane, NotebookEntryData } from "@/lib/vault-types";
+import { Lane, NotebookEntryData, ProductData } from "@/lib/vault-types";
 
 type Run = (action: () => Promise<unknown>) => Promise<boolean>;
 
@@ -60,10 +61,14 @@ interface ItemProps {
   week: string;
   busy: boolean;
   run: Run;
+  /** The block's products (Plan v3): chips on the card toggle the matching tags. */
+  products?: ProductData[];
+  /** Turn the task into a habit (it is deleted); the Plan then opens the habit. Leave out where there is no habit board. */
+  onMakeHabit?: (item: ItemRow["item"]) => Promise<void>;
 }
 
 /** The detail card of one pipeline item: rename, details, status, goal, label, what it waits on, tags, and the actions. */
-export function ItemCard({ row, meta, months, goals, blockers, week, busy, run }: ItemProps) {
+export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, products = [], onMakeHabit }: ItemProps) {
   const { item } = row;
   const stream = row.stream;
   const [newTag, setNewTag] = useState("");
@@ -73,7 +78,10 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run }
   const tab = tabOf(row);
   const order: Lane[] = ["now", "next", "backlog"];
   const at = order.indexOf(item.lane);
+  const [habitAsk, setHabitAsk] = useState(false);
   const tags = item.products ?? [];
+  const mine = taskProducts(tags, products);
+  const plain = plainTags(tags, products);
   const rewrite = (list: string[]) => run(() => vaultApi.renamePipelineItem(stream, item, [item.text, ...list.map((p) => (/\s/.test(p) ? `[product:: ${p}]` : `#${p}`))].join(" ")));
 
   return (
@@ -142,10 +150,22 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run }
           </div>
         </details>
       )}
+      {products.length > 0 && (
+        <div>
+          <span className={label}>Product</span>
+          <div role="group" aria-label="Product" className="flex flex-wrap gap-1.5">
+            {products.map((p) => (
+              <button key={p.id} type="button" disabled={busy} aria-pressed={mine.includes(p.slug)} data-product-chip={p.slug}
+                onClick={() => void run(() => vaultApi.setPipelineProducts(stream, item, mine.includes(p.slug) ? mine.filter((x) => x !== p.slug) : [...mine, p.slug]))}
+                className={chipBtn}>{p.name}</button>
+            ))}
+          </div>
+        </div>
+      )}
       <div>
         <span className={label}>Tags</span>
         <div className="flex flex-wrap items-center gap-1.5">
-          {tags.map((t) => (
+          {plain.map((t) => (
             <span key={t} className="mono inline-flex items-center border border-[var(--rule)] text-[var(--muted-foreground)]">
               <span className="px-1.5 py-0.5">#{t}</span>
               <button type="button" disabled={busy} aria-label={`Remove tag ${t}`} onClick={() => void rewrite(tags.filter((x) => x !== t))} className="px-1.5 py-0.5 hover:text-[var(--destructive)]">×</button>
@@ -171,6 +191,13 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run }
         {at >= 0 && at < 2 && <button type="button" disabled={busy} className={ghost} onClick={() => void run(() => vaultApi.movePipelineItem(stream, item, order[at + 1]))}>↓ Demote</button>}
         {meta.weekly && item.lane !== "done" && !isOne && <button type="button" disabled={busy} className={ghost} onClick={() => void run(() => vaultApi.focusPipelineItem(stream, item))}>Make small domino</button>}
         <Link href={`/map?board=life&node=task:${item.line}`} className={ghost}>Show on map</Link>
+        {onMakeHabit && item.lane !== "done" && (habitAsk ? (
+          <span role="alertdialog" aria-label="Make it a habit?" className="flex flex-wrap items-center gap-2 border border-[var(--rule)] px-2.5 py-1 text-xs">
+            This becomes a habit, 3 a week, and the task is deleted.
+            <button type="button" disabled={busy} className="mono text-[var(--accent)] hover:underline" onClick={() => void onMakeHabit(item)}>Make habit</button>
+            <button type="button" className="mono text-[var(--muted-foreground)] hover:underline" onClick={() => setHabitAsk(false)}>Cancel</button>
+          </span>
+        ) : <button type="button" disabled={busy} className={ghost} onClick={() => setHabitAsk(true)}>↻ Make it a habit</button>)}
         <DeleteButton busy={busy} onDelete={() => void run(() => vaultApi.removePipelineItem(stream, item))} />
       </div>
     </>

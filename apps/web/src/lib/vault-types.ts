@@ -86,9 +86,9 @@ export interface DaysStatusData {
 }
 
 /** One line of a checklist under a goal or a month. */
-export interface ChecklistItemData { id: string; text: string; done: boolean }
+export interface ChecklistItemData { id: string; text: string; done: boolean; /** Goal lines only (Plan v3): the slug of one of the block's products. */ product?: string | null }
 /** A line being sent: a new one has no id yet. */
-export interface ChecklistLine { id?: string; text: string; done?: boolean }
+export interface ChecklistLine { id?: string; text: string; done?: boolean; product?: string | null }
 
 export interface VaultGoal {
   title: string;
@@ -211,9 +211,17 @@ export interface PipelineItemData {
 /** A goal line of an earlier quarter that some item of the block is still nested under. */
 export interface EndedGoalData { id: string; text: string; quarter: string }
 
+/** Plan v3: a named part of a block. Tasks carry its slug as a tag, goal lines as `product`. */
+export interface ProductData { id: number; block: string; slug: string; name: string; position: number; tasks: number; goals: number }
+
+/** The goal lines of one block in one quarter (the current one or a later one). */
+export interface QuarterGoalsData { quarter: string; goals: ChecklistItemData[] }
+
 export interface PipelineStreamData extends StreamInfo {
   items: PipelineItemData[];
   ended_goals?: EndedGoalData[];
+  products?: ProductData[];
+  quarter_goals?: QuarterGoalsData[];
 }
 
 export interface PipelinesData {
@@ -222,6 +230,8 @@ export interface PipelinesData {
   now_limit: number;
   stale_days: number;
   streams: PipelineStreamData[];
+  /** The quarter tabs: this quarter, the next, and any later one with goals. */
+  quarters?: string[];
 }
 
 export type NotebookKind = "idea" | "meeting" | "blocker";
@@ -287,6 +297,8 @@ export interface HabitData {
   minimum: string;
   stage: HabitStage;
   stream: string | null;
+  /** Plan v3: a goal line of `stream` (this quarter or later; it stays when its quarter ends). */
+  goal_ref?: string | null;
   gate_pct: number;
   gate_weeks: number;
   trip_pct: number | null;
@@ -314,6 +326,8 @@ export interface HabitFields {
   stage?: HabitStage;
   stream?: string;
   clear_stream?: boolean;
+  goal_ref?: string;
+  clear_goal?: boolean;
   gate_pct?: number;
   gate_weeks?: number;
   trip_pct?: number;
