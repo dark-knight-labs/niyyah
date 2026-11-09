@@ -18,6 +18,7 @@ from datetime import date, datetime
 
 from sqlalchemy import select
 
+from app.models.board import Board, BoardNode
 from app.models.planner import Quarter, QuarterStream, Task
 from app.services import planner_work
 from app.services.plan_v2 import month_label
@@ -25,6 +26,7 @@ from app.services.rules import MONTHS, checklist_from_text, quarter_for, quarter
 
 ORIGIN = "cpl"  # cpl:<quarter label>:<mon>:<line id>
 NON_ALNUM = re.compile(r"[^a-z0-9]+")
+IGNORED_ON_REVERT = {"lane_position", "position"}  # reordering is not an edit
 MIN_CONTAINED = 6  # a text contained in another must be longer than this to count as the same item
 
 
@@ -289,22 +291,27 @@ async def revert(db, journal: dict, do_apply: bool) -> tuple[list[str], int]:
         changed += 1
         if do_apply:
             setattr(t, u["column"], u["old"])
+    # Loaded once for the whole loop. Position columns are left out of the comparison: reordering a task must not block the revert.
+    mine = {t.id: t for t in (await db.execute(select(Task).where(Task.user_id == user_id))).scalars()}
+    parents = {t.parent_id for t in mine.values() if t.parent_id is not None}
+    on_boards = set((await db.execute(select(BoardNode.ref_key).join(Board, Board.id == BoardNode.board_id)
+                                      .where(Board.user_id == user_id, BoardNode.ref_key.like("task:%")))).scalars().all())
     for c in reversed(journal["created"]):
-        t = (await db.execute(select(Task).where(Task.user_id == user_id, Task.id == c["id"]))).scalar_one_or_none()
+        t = mine.get(c["id"])
         if t is None:
             lines.append(f"id={c['id']} delete skipped: already gone")
             continue
-        diff = sorted(k for k, v in c["snapshot"].items() if snapshot(t).get(k) != v)
+        now = snapshot(t)
+        diff = sorted(k for k, v in c["snapshot"].items() if k not in IGNORED_ON_REVERT and now.get(k) != v)
         if diff:
             lines.append(f"id={c['id']} delete skipped: changed since ({', '.join(diff)}) in {_quote(t.text)}; left alone")
-            continue
-        used = [o.id for o in (await db.execute(select(Task).where(Task.user_id == user_id, Task.id != t.id))).scalars()
-                if o.parent_id == t.id or str(t.id) in {str(b) for b in (o.blocked_by or [])}]
-        if used:
-            lines.append(f"id={c['id']} delete skipped: items {used} refer to it ({_quote(t.text)}); left alone")
-            continue
-        lines.append(f"id={c['id']} delete: {_quote(t.text)} (lane {t.lane})")
-        changed += 1
-        if do_apply:
-            await planner_work._delete_row(db, t)
+        elif t.id in parents:
+            lines.append(f"id={c['id']} delete skipped: other tasks have it as their parent ({_quote(t.text)}); left alone")
+        elif f"task:{t.id}" in on_boards:
+            lines.append(f"id={c['id']} delete skipped: a board node holds it ({_quote(t.text)}); left alone")
+        else:
+            lines.append(f"id={c['id']} delete: {_quote(t.text)} (lane {t.lane})")
+            changed += 1
+            if do_apply:
+                await planner_work._delete_row(db, t)
     return lines, changed

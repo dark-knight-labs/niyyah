@@ -132,16 +132,25 @@ async def run_plan_v2_migrate(user: int | None, all_users: bool, do_apply: bool,
                 wrote = False
                 try:
                     entries = await plan_v2_migrate.apply(db, p)
-                    with open(path, "x", encoding="utf-8") as fh:  # written before the commit; removed if the commit fails
+                    with open(path, "x", encoding="utf-8") as fh:  # written before the commit
                         wrote = True
                         json.dump(entries, fh, indent=2, ensure_ascii=False, default=str)
-                    await db.commit()
-                except Exception as exc:
+                except Exception as exc:  # before the commit: nothing landed, so the half-written journal is worthless
                     await db.rollback()
-                    if wrote:  # the commit may or may not have landed: keep the journal, marked, rather than lose the way back
+                    if wrote:
+                        Path(path).unlink(missing_ok=True)
+                    print(f"user {uid}: failed before the commit, nothing written: {exc}", file=sys.stderr)
+                    return 1
+                try:
+                    await db.commit()
+                except Exception as exc:  # the commit may or may not have landed: keep the journal, marked, rather than lose the way back
+                    await db.rollback()
+                    try:
                         Path(path).rename(f"{path}.uncertain")
                         print(f"journal kept as {path}.uncertain: check the data, then revert with it if the run did land", file=sys.stderr)
-                    print(f"user {uid}: failed, nothing written: {exc}", file=sys.stderr)
+                    except OSError as rename_error:  # never let this hide the commit error below
+                        print(f"could not rename the journal {path}: {rename_error}", file=sys.stderr)
+                    print(f"user {uid}: commit failed: {exc}", file=sys.stderr)
                     return 1
                 print(f"  journal: {path}")
             else:

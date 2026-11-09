@@ -7,6 +7,7 @@ import pytest_asyncio
 from sqlalchemy import select
 
 from app.cli import main, run_plan_v2_migrate
+from app.models.board import Board, BoardNode
 from app.models.planner import PlannerItem, Quarter, QuarterStream, Task
 from app.models.user import User
 from tests.conftest import TestSession
@@ -268,7 +269,7 @@ async def test_revert_skips_a_created_task_changed_in_any_column_or_referenced(a
         await db.commit()
     assert await _run(uid, capsys, apply=True, revert=journal) == 0
     out = capsys.readouterr().out
-    assert "delete skipped: changed since (description)" in out and "refer to it" in out
+    assert "delete skipped: changed since (description)" in out and "have it as their parent" in out
     left = sorted(r.text for r in await _rows(uid) if r.origin)
     assert left == ["Review year", "Write docs"]  # everything else the run created is gone
 
@@ -342,3 +343,72 @@ async def test_a_failed_commit_keeps_the_journal_as_uncertain(account, capsys, t
     assert await run_plan_v2_migrate(uid, False, True, path, None, None, session_factory=factory, today=TODAY) == 1
     assert not path.exists() and (tmp_path / "j.json.uncertain").exists()
     assert "connection lost" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_reordering_a_migrated_task_does_not_block_its_revert(account, capsys, tmp_path):
+    uid, _ = account
+    journal = await _apply_with_journal(uid, capsys, tmp_path)
+    async with TestSession() as db:
+        t = (await db.execute(select(Task).where(Task.text == "Write docs"))).scalar_one()
+        t.lane_position = 99
+        t.position = 7
+        await db.commit()
+    await _run(uid, capsys, apply=True, revert=journal)
+    assert "Write docs" in capsys.readouterr().out
+    assert not [r for r in await _rows(uid) if r.origin]
+
+
+@pytest.mark.asyncio
+async def test_revert_keeps_a_task_a_board_node_holds(account, capsys, tmp_path):
+    uid, _ = account
+    journal = await _apply_with_journal(uid, capsys, tmp_path)
+    async with TestSession() as db:
+        t = (await db.execute(select(Task).where(Task.text == "Write docs"))).scalar_one()
+        board = Board(user_id=uid, title="Scratch")
+        db.add(board)
+        await db.flush()
+        db.add(BoardNode(board_id=board.id, id="n-1", kind="ref", ref_key=f"task:{t.id}"))
+        await db.commit()
+    await _run(uid, capsys, apply=True, revert=journal)
+    assert "a board node holds it" in capsys.readouterr().out
+    assert [r.text for r in await _rows(uid) if r.origin] == ["Write docs"]
+
+
+@pytest.mark.asyncio
+async def test_a_failure_before_the_commit_deletes_the_partial_journal(account, capsys, tmp_path, monkeypatch):
+    uid, _ = account
+    import app.cli as cli
+
+    def broken(*a, **k):
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(cli.json, "dump", broken)
+    path = tmp_path / "j.json"
+    assert await _run(uid, capsys, apply=True, journal=path) == 1
+    err = capsys.readouterr().err
+    assert "failed before the commit, nothing written: disk full" in err
+    assert not path.exists() and not (tmp_path / "j.json.uncertain").exists()
+    assert not [r for r in await _rows(uid) if r.origin]  # rolled back
+
+
+@pytest.mark.asyncio
+async def test_a_rename_error_does_not_mask_the_commit_error(account, capsys, tmp_path, monkeypatch):
+    uid, _ = account
+    from pathlib import Path as P
+
+    class Boom(TestSession.class_):
+        async def commit(self):
+            raise RuntimeError("connection lost")
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from tests.conftest import engine
+
+    def no_rename(self, target):
+        raise PermissionError("read-only")
+
+    monkeypatch.setattr(P, "rename", no_rename)
+    factory = async_sessionmaker(engine, class_=Boom, expire_on_commit=False)
+    assert await run_plan_v2_migrate(uid, False, True, tmp_path / "j.json", None, None, session_factory=factory, today=TODAY) == 1
+    err = capsys.readouterr().err
+    assert "could not rename the journal" in err and "commit failed: connection lost" in err
