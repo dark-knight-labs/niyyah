@@ -14,7 +14,7 @@ import { StreamEditor } from "@/components/planner/stream-editor";
 import { dateInTz } from "@/lib/routine";
 import { PLANNER_TZ } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
-import { HabitsData, StreamChange } from "@/lib/vault-types";
+import { HabitsData, PipelineItemData, StreamChange } from "@/lib/vault-types";
 
 /** A numbered mono strip that titles a section of the sheet. */
 function Strip({ n, title, aside }: { n: string; title: string; aside?: string }) {
@@ -75,6 +75,25 @@ export default function PlanPage() {
     }
   }
 
+  /** Task -> habit: one request creates the habit and deletes the task; then the plan reloads and the habit card opens. */
+  async function makeHabit(stream: string, item: PipelineItemData): Promise<number | null> {
+    setProblem(null);
+    setMessage("");
+    setBusy(true);
+    try {
+      const made = await vaultApi.taskToHabit(stream, item);
+      setHabits(made);
+      await reload();
+      setMessage("Habit made");
+      return made.habit_id;
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "Could not save");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function pick(id: string | null) {
     setPicked(id);
     setEditing(null);
@@ -129,7 +148,7 @@ export default function PlanPage() {
             <Strip n="01" title="Plan" aside={`${quarter.quarter.slice(5)} · every block against Now, Next and Someday`} />
             <PlanTable streams={streams} quarter={quarter} pipelines={pipelines} notebooks={notebooks} today={dateInTz(now, PLANNER_TZ)}
               block={stream} onBlock={pick} editor={editor} onEdit={setEditing} onAddBlock={() => setEditing("new")}
-              busy={busy} run={run} message={message} />
+              busy={busy} run={run} message={message} habits={habits} runHabits={runHabits} makeHabit={makeHabit} />
           </section>
         </>
       )}

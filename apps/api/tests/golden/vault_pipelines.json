@@ -1,5 +1,9 @@
 {
   "now_limit": 3,
+  "quarters": [
+    "2026-Q4",
+    "2027-Q1"
+  ],
   "stale_days": 14,
   "streams": [
     {
@@ -25,6 +29,7 @@
           "product": null,
           "products": [],
           "stale": false,
+          "subtasks": 0,
           "text": "Write the first page"
         },
         {
@@ -45,10 +50,29 @@
           "product": null,
           "products": [],
           "stale": true,
+          "subtasks": 0,
           "text": "Collect sources"
         }
       ],
       "name": "Alpha",
+      "products": [],
+      "quarter_goals": [
+        {
+          "goals": [
+            {
+              "done": true,
+              "id": "g1a2b3c4",
+              "text": "Draft the outline"
+            },
+            {
+              "done": false,
+              "id": "g5d6e7f8",
+              "text": "Review with a friend"
+            }
+          ],
+          "quarter": "2026-Q4"
+        }
+      ],
       "slot": "Mon 09:00-11:00",
       "status": "active",
       "stream": "alpha",
@@ -77,10 +101,18 @@
           "product": null,
           "products": [],
           "stale": false,
+          "subtasks": 0,
           "text": "Name the project"
         }
       ],
       "name": "Beta",
+      "products": [],
+      "quarter_goals": [
+        {
+          "goals": [],
+          "quarter": "2026-Q4"
+        }
+      ],
       "slot": "",
       "status": "committed",
       "stream": "beta",
@@ -92,6 +124,8 @@
       "icon": "server",
       "items": [],
       "name": "Extra",
+      "products": [],
+      "quarter_goals": [],
       "slot": "",
       "status": "committed",
       "stream": "extra",

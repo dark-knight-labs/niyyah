@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.planner import (
-    EventOverlay, Goal, LogEntry, NotebookEntry, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
+    EventOverlay, Goal, LogEntry, NotebookEntry, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerProduct, PlannerScheduleBlock, PlannerScheduleSetting,
     Quarter, QuarterStream, Task,
 )
 from app.models.compass import Compass
@@ -77,7 +77,7 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
     for c in await rows(PlannerHabitCheck, PlannerHabitCheck.day):
         habit_checks.setdefault(c.habit_id, {})[c.day.isoformat()] = c.level
     habits = [{"name": h.name, "block": h.block, "anchor": h.anchor, "per_week": h.per_week, "minimum": h.minimum, "stage": h.stage,
-               "stream": h.stream, "gate_pct": h.gate_pct, "gate_weeks": h.gate_weeks, "trip_pct": h.trip_pct, "trip_weeks": h.trip_weeks,
+               "stream": h.stream, "goal_ref": h.goal_ref, "gate_pct": h.gate_pct, "gate_weeks": h.gate_weeks, "trip_pct": h.trip_pct, "trip_weeks": h.trip_weeks,
                "started_on": _iso(h.started_on), "checks": habit_checks.get(h.id, {})}
               for h in await rows(PlannerHabit, PlannerHabit.position, PlannerHabit.id)]
 
@@ -122,6 +122,8 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
                            "goal_ref": t.goal_ref, "label_month": t.label_month, "label_date": _iso(t.label_date)}
                           for t in planning],
         "habits": habits,
+        "products": [{"block": p.block, "slug": p.slug, "name": p.name, "position": p.position}
+                     for p in await rows(PlannerProduct, PlannerProduct.block, PlannerProduct.position, PlannerProduct.id)],
         "item_overlays": [{"key": o.event_key, "calendar": o.source_calendar, "title": o.title, "day": _iso(o.day), "status": o.status,
                            "weight": o.weight, "stream": o.stream, "products": list(o.products or []), "description": o.description or "",
                            "checklist": list(o.checklist or [])}

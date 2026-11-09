@@ -65,6 +65,14 @@ class SnapLine(_Loose):
     id: str | None = Field(default=None, max_length=12)
     text: str = Field(max_length=400)
     done: bool = False
+    product: str | None = Field(default=None, max_length=32)  # goal lines only: a slug from `products` for the same block
+
+
+class SnapProduct(_Loose):
+    block: Slug
+    slug: str = Field(pattern=r"^[a-z][a-z0-9-]{0,31}$")
+    name: str = Field(min_length=1, max_length=60)
+    position: int = 0
 
 
 class SnapGoal(_Loose):
@@ -238,6 +246,7 @@ class SnapHabit(_Loose):
     trip_pct: int | None = Field(default=None, ge=1, le=100)
     trip_weeks: int | None = Field(default=None, ge=1, le=26)
     started_on: dt.date
+    goal_ref: str | None = Field(default=None, max_length=16)  # Plan v3: a goal line of `stream`; optional on import
     checks: dict[dt.date, str] = {}
 
     @field_validator("checks")
@@ -295,6 +304,7 @@ class Snapshot(_Loose):
     tasks: list[SnapTask] = _cap(50000)
     planning_rows: list[SnapPlanningRow] | None = Field(default=None, max_length=50000)  # absent in older exports: then pipeline_items/week_objectives are read
     habits: list[SnapHabit] = _cap(500)
+    products: list[SnapProduct] | None = Field(default=None, max_length=2000)  # Plan v3; absent in older exports: the account's products stay
     item_overlays: list[SnapOverlay] = _cap(20000)
     compass: SnapCompass | None = None  # absent or null in older exports: the account's Compass stays as it is
     persona_streams: list[SnapPersonaStream] = _cap(100)

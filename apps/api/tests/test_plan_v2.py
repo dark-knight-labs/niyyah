@@ -230,9 +230,11 @@ async def test_plan_reads_on_the_first_day_of_a_new_quarter(auth_client, monkeyp
     assert (await auth_client.get(f"{V}/quarter")).json()["streams"] == quarter["streams"]  # a second read adds no duplicates
     async with TestSession() as db:
         assert len((await db.execute(select(QuarterStream).where(QuarterStream.quarter == "2027-Q1"))).scalars().all()) == 2
-    # a goal of the ended quarter cannot be picked now, a new one can be added through the existing endpoint
+    # the item keeps its ref to the ended goal (Plan v3: re-sending it is accepted), another ended ref is refused,
+    # and a new goal can be added through the existing endpoint
     item = studio["items"][0]
-    assert (await auth_client.put(f"{V}/pipeline/goal", json=_ref("studio", item["line"], goal_ref="g0000000"))).status_code == 422
+    assert (await auth_client.put(f"{V}/pipeline/goal", json=_ref("studio", item["line"], goal_ref="g0000000"))).status_code == 200
+    assert (await auth_client.put(f"{V}/pipeline/goal", json=_ref("studio", item["line"], goal_ref="gone0000"))).status_code == 422
     assert (await auth_client.put(f"{V}/quarter/stream", json={"stream": "studio", "goal_checklist": [{"text": "Q1 goal"}]})).status_code == 200
 
 

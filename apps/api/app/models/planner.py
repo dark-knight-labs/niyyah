@@ -1,7 +1,7 @@
 """Per-user planner data: what the vault notes hold, as rows. Every table is scoped by user_id."""
 import datetime as dt
 
-from sqlalchemy import JSON, Boolean, Date, ForeignKey, Index, Integer, SmallInteger, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Index, func, Integer, SmallInteger, String, Text, UniqueConstraint
 from sqlalchemy import false as sa_false, text as sql_text, true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -272,6 +272,8 @@ class PlannerHabit(Base):
     trip_weeks: Mapped[int | None] = mapped_column(Integer, nullable=True)
     started_on: Mapped[dt.date] = mapped_column(Date, nullable=False)
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Plan v3: the id of a goal line of `stream`'s quarter goals (current or later quarter). NULL = serves no goal in particular.
+    goal_ref: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class PlannerHabitCheck(Base):
@@ -284,6 +286,20 @@ class PlannerHabitCheck(Base):
     habit_id: Mapped[int] = mapped_column(Integer, ForeignKey("planner_habits.id", ondelete="CASCADE"), nullable=False, index=True)
     day: Mapped[dt.date] = mapped_column(Date, nullable=False)
     level: Mapped[str] = mapped_column(String(4), nullable=False)  # done | min
+
+
+class PlannerProduct(Base):
+    """A product of a block: a named part of it (a tag). `slug` is what tasks carry in `products` and goal lines in `product`."""
+    __tablename__ = "planner_products"
+    __table_args__ = (UniqueConstraint("user_id", "block", "slug", name="uq_planner_product_block_slug"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = _owner()
+    block: Mapped[str] = mapped_column(String(24), nullable=False)  # the stream slug
+    slug: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default=sql_text("0"), nullable=False)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow, server_default=func.now(), nullable=False)
 
 
 class PlannerArea(Base):

@@ -116,6 +116,9 @@
        "gate_weeks": {
         "type": "integer"
        },
+       "goal_ref": {
+        "type": "string"
+       },
        "id": {
         "type": "integer"
        },
@@ -127,6 +130,9 @@
        },
        "per_week": {
         "type": "integer"
+       },
+       "plan_block": {
+        "type": "string"
        },
        "stage": {
         "type": "string"
@@ -221,6 +227,64 @@
   ],
   "request": null,
   "response": null
+ },
+ "DELETE /api/v1/vault/products/{product_id}": {
+  "params": [
+   "path:product_id*"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "goals": {
+     "type": "integer"
+    },
+    "products": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "goals": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "name": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "slug": {
+        "type": "string"
+       },
+       "tasks": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "block",
+       "id",
+       "name",
+       "position",
+       "slug"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "tasks": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "goals",
+    "products",
+    "tasks"
+   ],
+   "type": "object"
+  }
  },
  "GET /api/v1/auth/me": {
   "params": [],
@@ -1371,6 +1435,9 @@
           "id": {
            "type": "string"
           },
+          "product": {
+           "type": "string"
+          },
           "text": {
            "type": "string"
           }
@@ -1440,6 +1507,9 @@
        "gate_weeks": {
         "type": "integer"
        },
+       "goal_ref": {
+        "type": "string"
+       },
        "id": {
         "type": "integer"
        },
@@ -1451,6 +1521,9 @@
        },
        "per_week": {
         "type": "integer"
+       },
+       "plan_block": {
+        "type": "string"
        },
        "stage": {
         "type": "string"
@@ -1572,6 +1645,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {
@@ -1709,6 +1785,9 @@
           "id": {
            "type": "string"
           },
+          "product": {
+           "type": "string"
+          },
           "text": {
            "type": "string"
           }
@@ -1804,6 +1883,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {
@@ -2180,6 +2262,12 @@
     "now_limit": {
      "type": "integer"
     },
+    "quarters": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
     "stale_days": {
      "type": "integer"
     },
@@ -2274,6 +2362,9 @@
           "stale": {
            "type": "boolean"
           },
+          "subtasks": {
+           "type": "integer"
+          },
           "text": {
            "type": "string"
           }
@@ -2297,6 +2388,63 @@
        },
        "name": {
         "type": "string"
+       },
+       "products": {
+        "items": {
+         "properties": {
+          "block": {
+           "type": "string"
+          },
+          "goals": {
+           "type": "integer"
+          },
+          "id": {
+           "type": "integer"
+          },
+          "name": {
+           "type": "string"
+          },
+          "position": {
+           "type": "integer"
+          },
+          "slug": {
+           "type": "string"
+          },
+          "tasks": {
+           "type": "integer"
+          }
+         },
+         "required": [
+          "block",
+          "id",
+          "name",
+          "position",
+          "slug"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "quarter_goals": {
+        "items": {
+         "properties": {
+          "goals": {
+           "items": {
+            "ref": "ChecklistItem"
+           },
+           "type": "array"
+          },
+          "quarter": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "goals",
+          "quarter"
+         ],
+         "type": "object"
+        },
+        "type": "array"
        },
        "slot": {
         "type": "string"
@@ -2334,6 +2482,56 @@
     "stale_days",
     "streams",
     "week"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/products": {
+  "params": [
+   "query:block"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "products": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "goals": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "name": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "slug": {
+        "type": "string"
+       },
+       "tasks": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "block",
+       "id",
+       "name",
+       "position",
+       "slug"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "products"
    ],
    "type": "object"
   }
@@ -2419,6 +2617,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {
@@ -3225,6 +3426,9 @@
        "id": {
         "type": "string"
        },
+       "product": {
+        "type": "string"
+       },
        "text": {
         "type": "string"
        }
@@ -3291,6 +3495,9 @@
         "type": "boolean"
        },
        "id": {
+        "type": "string"
+       },
+       "product": {
         "type": "string"
        },
        "text": {
@@ -4015,6 +4222,9 @@
           "id": {
            "type": "string"
           },
+          "product": {
+           "type": "string"
+          },
           "text": {
            "type": "string"
           }
@@ -4061,6 +4271,9 @@
        },
        "gate_weeks": {
         "type": "integer"
+       },
+       "goal_ref": {
+        "type": "string"
        },
        "minimum": {
         "type": "string"
@@ -4109,6 +4322,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {
@@ -4379,6 +4595,31 @@
      },
      "type": "array"
     },
+    "products": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "slug": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "block",
+       "name",
+       "slug"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
     "quarters": {
      "items": {
       "properties": {
@@ -4483,6 +4724,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {
@@ -5424,6 +5668,9 @@
     "block": {
      "type": "string"
     },
+    "goal_ref": {
+     "type": "string"
+    },
     "minimum": {
      "type": "string"
     },
@@ -5469,6 +5716,9 @@
        "gate_weeks": {
         "type": "integer"
        },
+       "goal_ref": {
+        "type": "string"
+       },
        "id": {
         "type": "integer"
        },
@@ -5480,6 +5730,9 @@
        },
        "per_week": {
         "type": "integer"
+       },
+       "plan_block": {
+        "type": "string"
        },
        "stage": {
         "type": "string"
@@ -5581,6 +5834,9 @@
        "id": {
         "type": "string"
        },
+       "product": {
+        "type": "string"
+       },
        "text": {
         "type": "string"
        }
@@ -5652,6 +5908,9 @@
         "type": "boolean"
        },
        "id": {
+        "type": "string"
+       },
+       "product": {
         "type": "string"
        },
        "text": {
@@ -5987,6 +6246,161 @@
    "type": "object"
   }
  },
+ "POST /api/v1/vault/pipeline/to-habit": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "habit_id": {
+     "type": "integer"
+    },
+    "habits": {
+     "items": {
+      "properties": {
+       "anchor": {
+        "type": "string"
+       },
+       "block": {
+        "type": "string"
+       },
+       "days": {
+        "type": "object"
+       },
+       "gate_met": {
+        "type": "boolean"
+       },
+       "gate_pct": {
+        "type": "integer"
+       },
+       "gate_run": {
+        "type": "integer"
+       },
+       "gate_weeks": {
+        "type": "integer"
+       },
+       "goal_ref": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "minimum": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "per_week": {
+        "type": "integer"
+       },
+       "plan_block": {
+        "type": "string"
+       },
+       "stage": {
+        "type": "string"
+       },
+       "started_on": {
+        "type": "string"
+       },
+       "streak": {
+        "type": "integer"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "today": {
+        "type": "string"
+       },
+       "trip_pct": {
+        "type": "integer"
+       },
+       "trip_weeks": {
+        "type": "integer"
+       },
+       "tripwire": {
+        "type": "string"
+       },
+       "weeks": {
+        "items": {
+         "properties": {
+          "count": {
+           "type": "integer"
+          },
+          "current": {
+           "type": "boolean"
+          },
+          "pct": {
+           "type": "integer"
+          },
+          "start": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "count",
+          "current",
+          "pct",
+          "start"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "anchor",
+       "block",
+       "days",
+       "gate_met",
+       "gate_pct",
+       "gate_run",
+       "gate_weeks",
+       "id",
+       "minimum",
+       "name",
+       "per_week",
+       "stage",
+       "started_on",
+       "streak",
+       "weeks"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "installing_limit": {
+     "type": "integer"
+    },
+    "today": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "habit_id",
+    "habits",
+    "installing_limit",
+    "today"
+   ],
+   "type": "object"
+  }
+ },
  "POST /api/v1/vault/pipeline/{stream}/items": {
   "params": [
    "path:stream*"
@@ -6066,6 +6480,68 @@
    "type": "object"
   }
  },
+ "POST /api/v1/vault/products": {
+  "params": [],
+  "request": {
+   "properties": {
+    "block": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "block",
+    "name"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "products": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "goals": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "name": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "slug": {
+        "type": "string"
+       },
+       "tasks": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "block",
+       "id",
+       "name",
+       "position",
+       "slug"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "products"
+   ],
+   "type": "object"
+  }
+ },
  "POST /api/v1/vault/quarter/stream": {
   "params": [],
   "request": {
@@ -6086,6 +6562,9 @@
         "type": "boolean"
        },
        "id": {
+        "type": "string"
+       },
+       "product": {
         "type": "string"
        },
        "text": {
@@ -6205,6 +6684,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {
@@ -6496,6 +6978,9 @@
           "id": {
            "type": "string"
           },
+          "product": {
+           "type": "string"
+          },
           "text": {
            "type": "string"
           }
@@ -6546,6 +7031,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {
@@ -6991,6 +7479,9 @@
           "id": {
            "type": "string"
           },
+          "product": {
+           "type": "string"
+          },
           "text": {
            "type": "string"
           }
@@ -7043,6 +7534,9 @@
     "block": {
      "type": "string"
     },
+    "clear_goal": {
+     "type": "boolean"
+    },
     "clear_stream": {
      "type": "boolean"
     },
@@ -7054,6 +7548,9 @@
     },
     "gate_weeks": {
      "type": "integer"
+    },
+    "goal_ref": {
+     "type": "string"
     },
     "minimum": {
      "type": "string"
@@ -7106,6 +7603,9 @@
        "gate_weeks": {
         "type": "integer"
        },
+       "goal_ref": {
+        "type": "string"
+       },
        "id": {
         "type": "integer"
        },
@@ -7117,6 +7617,9 @@
        },
        "per_week": {
         "type": "integer"
+       },
+       "plan_block": {
+        "type": "string"
        },
        "stage": {
         "type": "string"
@@ -7249,6 +7752,9 @@
        "gate_weeks": {
         "type": "integer"
        },
+       "goal_ref": {
+        "type": "string"
+       },
        "id": {
         "type": "integer"
        },
@@ -7260,6 +7766,9 @@
        },
        "per_week": {
         "type": "integer"
+       },
+       "plan_block": {
+        "type": "string"
        },
        "stage": {
         "type": "string"
@@ -7364,6 +7873,9 @@
        "id": {
         "type": "string"
        },
+       "product": {
+        "type": "string"
+       },
        "text": {
         "type": "string"
        }
@@ -7423,6 +7935,9 @@
         "type": "boolean"
        },
        "id": {
+        "type": "string"
+       },
+       "product": {
         "type": "string"
        },
        "text": {
@@ -8288,6 +8803,85 @@
    "type": "object"
   }
  },
+ "PUT /api/v1/vault/pipeline/products": {
+  "params": [],
+  "request": {
+   "properties": {
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "products": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "products",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
  "PUT /api/v1/vault/pipeline/reorder": {
   "params": [],
   "request": {
@@ -8440,6 +9034,224 @@
    "type": "object"
   }
  },
+ "PUT /api/v1/vault/plan/goals": {
+  "params": [],
+  "request": {
+   "properties": {
+    "goals": {
+     "items": {
+      "properties": {
+       "done": {
+        "type": "boolean"
+       },
+       "id": {
+        "type": "string"
+       },
+       "product": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "quarter": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "goals",
+    "quarter",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/products/reorder": {
+  "params": [],
+  "request": {
+   "properties": {
+    "block": {
+     "type": "string"
+    },
+    "ids": {
+     "items": {
+      "type": "integer"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "block",
+    "ids"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "products": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "goals": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "name": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "slug": {
+        "type": "string"
+       },
+       "tasks": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "block",
+       "id",
+       "name",
+       "position",
+       "slug"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "products"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/products/{product_id}": {
+  "params": [
+   "path:product_id*"
+  ],
+  "request": {
+   "properties": {
+    "name": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "products": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "goals": {
+        "type": "integer"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "name": {
+        "type": "string"
+       },
+       "position": {
+        "type": "integer"
+       },
+       "slug": {
+        "type": "string"
+       },
+       "tasks": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "block",
+       "id",
+       "name",
+       "position",
+       "slug"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "products"
+   ],
+   "type": "object"
+  }
+ },
  "PUT /api/v1/vault/quarter": {
   "params": [],
   "request": {
@@ -8536,6 +9348,9 @@
           "id": {
            "type": "string"
           },
+          "product": {
+           "type": "string"
+          },
           "text": {
            "type": "string"
           }
@@ -8627,6 +9442,9 @@
         "type": "boolean"
        },
        "id": {
+        "type": "string"
+       },
+       "product": {
         "type": "string"
        },
        "text": {
@@ -8745,6 +9563,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {
@@ -8921,6 +9742,9 @@
            "type": "boolean"
           },
           "id": {
+           "type": "string"
+          },
+          "product": {
            "type": "string"
           },
           "text": {

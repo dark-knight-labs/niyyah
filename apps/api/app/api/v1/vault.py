@@ -46,6 +46,7 @@ from app.schemas.vault import (
     OverlayResponse,
     HabitCheckIn,
     HabitFieldsIn,
+    HabitFromTaskResponse,
     HabitIn,
     HabitsResponse,
     LogEntryIn,
@@ -67,6 +68,13 @@ from app.schemas.vault import (
     PipelineGoalIn,
     PipelineLabelIn,
     PipelineMoveIn,
+    PipelineProductsIn,
+    PlanGoalsIn,
+    ProductDeleteResponse,
+    ProductIn,
+    ProductRenameIn,
+    ProductReorderIn,
+    ProductsResponse,
     PipelineRefIn,
     PipelineReorderIn,
     PipelineTextIn,
@@ -95,7 +103,7 @@ from app.schemas.vault import (
     VaultWeekResponse,
     VoteIn,
 )
-from app.services import google_calendar, plan_v2, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_store, planner_work
+from app.services import google_calendar, plan_v2, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_products, planner_store, planner_work
 from app.services.calendar_events import events_for_day, events_for_range, fixture_feeds
 from app.services.google_calendar import GoogleCalendarError
 from app.services.planner_views import notebooks_response, objectives_response, pipelines_response, quarter_response
@@ -153,7 +161,7 @@ async def _db_run(db: AsyncSession, work):
         return result
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(status_code=409 if isinstance(exc, planner_products.Conflict) else 422, detail=str(exc))
 
 
 async def _day_write(db: AsyncSession, work) -> EditResponse:
@@ -810,8 +818,9 @@ async def get_pipelines(user: User = Depends(get_current_user), db: AsyncSession
     today = _local_now().date()
     await _db_run(db, lambda: plan_v2.carry_streams(db, user.id, today))
     streams = await planner_store.streams_for(db, user.id, today)
-    items = await planner_store.pipeline_items(db, user.id, today)
-    return pipelines_response(streams, items, today, await planner_store.ended_goals(db, user.id, today, items))
+    items = await planner_store.with_subtasks(db, user.id, await planner_store.pipeline_items(db, user.id, today))
+    return pipelines_response(streams, items, today, await planner_store.ended_goals(db, user.id, today, items),
+                              await planner_products.grouped(db, user.id), await plan_v2.quarter_goals(db, user.id, today))
 
 
 async def _known_stream(db: AsyncSession, user: User, stream: str, today: date) -> None:
@@ -872,6 +881,87 @@ async def put_pipeline_goal(data: PipelineGoalIn, user: User = Depends(get_curre
     today = _local_now().date()
     await _known_stream(db, user, data.stream, today)
     return await _day_write(db, lambda: plan_v2.set_goal(db, user.id, data.stream, data.line, data.goal_ref, today))
+
+
+@router.put("/pipeline/products", response_model=EditResponse)
+async def put_pipeline_products(data: PipelineProductsIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Set which of the block's products a task has (its other tags stay)."""
+    await _known_stream(db, user, data.stream, _local_now().date())
+
+    async def work():
+        row = await planner_work.item_row(db, user.id, data.stream, data.line)
+        await planner_products.set_task_products(db, user.id, data.stream, row, data.products)
+
+    return await _day_write(db, work)
+
+
+@router.post("/pipeline/to-habit", response_model=HabitFromTaskResponse)
+async def post_pipeline_to_habit(data: PipelineRefIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Make a task a habit and delete the task, in one transaction (name, block, 3 a week, installing, from today, same goal)."""
+    today = _local_now().date()
+    await _known_stream(db, user, data.stream, today)
+    week = week_for(today)[2]
+    streams = await planner_store.streams_for(db, user.id, today)
+
+    async def work():
+        item = await planner_work.item_row(db, user.id, data.stream, data.line)
+        habit = await planner_habits.from_task(db, user.id, today, item)
+        if item.focus_week == week:
+            await planner_work.update_objective(db, user.id, today, data.stream, "", None, "", streams)
+        await planner_work.remove_item(db, user.id, data.stream, data.line)
+        return habit.id
+
+    habit_id = await _db_run(db, work)
+    return HabitFromTaskResponse(**(await _habits(db, user)).model_dump(), habit_id=habit_id)
+
+
+@router.put("/plan/goals", response_model=EditResponse)
+async def put_plan_goals(data: PlanGoalsIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Replace a block's goal lines in a quarter: the current one or a later one (an absent quarter row is created, carrying the
+    blocks of the latest earlier quarter with empty goals). A line's `product` must be a product of the block, else 422."""
+    today = _local_now().date()
+    await _known_stream(db, user, data.stream, today)
+    await _db_run(db, lambda: plan_v2.set_quarter_goals(db, user.id, data.stream, data.quarter, [g.model_dump() for g in data.goals], today))
+    return EditResponse(commit="db", day=None)
+
+
+# --- Products of a block ------------------------------------------------------------------------------------------
+
+@router.get("/products", response_model=ProductsResponse)
+async def get_products(block: str | None = None, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """The owner's products, optionally of one block, with how many tasks and goal lines carry each."""
+    return ProductsResponse(products=await planner_products.listing(db, user.id, block))
+
+
+@router.post("/products", response_model=ProductsResponse, status_code=201)
+async def post_product(data: ProductIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Add a product to a block; the slug comes from the name. A slug the block already has is a 409."""
+    await _db_run(db, lambda: planner_products.create(db, user.id, data.block, data.name))
+    return ProductsResponse(products=await planner_products.listing(db, user.id, data.block))
+
+
+@router.put("/products/reorder", response_model=ProductsResponse)
+async def put_products_reorder(data: ProductReorderIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    await _db_run(db, lambda: planner_products.reorder(db, user.id, data.block, data.ids))
+    return ProductsResponse(products=await planner_products.listing(db, user.id, data.block))
+
+
+@router.put("/products/{product_id}", response_model=ProductsResponse)
+async def put_product(product_id: int, data: ProductRenameIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Rename (name and slug). The new slug replaces the old one on the block's tasks and goal lines, all in one transaction."""
+    row = await _db_run(db, lambda: planner_products.rename(db, user.id, product_id, data.name))
+    return ProductsResponse(products=await planner_products.listing(db, user.id, row.block))
+
+
+@router.delete("/products/{product_id}", response_model=ProductDeleteResponse)
+async def delete_product(product_id: int, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Delete a product and its tag on the block's tasks and goal lines; the tasks and goals stay."""
+    async def work():
+        row = await planner_products._find(db, user.id, product_id)
+        return row.block, await planner_products.delete(db, user.id, product_id)
+
+    block, counts = await _db_run(db, work)
+    return ProductDeleteResponse(products=await planner_products.listing(db, user.id, block), **counts)
 
 
 @router.put("/pipeline/label", response_model=EditResponse)
@@ -980,9 +1070,11 @@ async def post_habit(data: HabitIn, user: User = Depends(get_current_user), db: 
 @router.put("/habits/{habit_id}", response_model=HabitsResponse)
 async def put_habit(habit_id: int, data: HabitFieldsIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
-    fields = data.model_dump(exclude_none=True, exclude={"clear_stream", "force"})
+    fields = data.model_dump(exclude_none=True, exclude={"clear_stream", "clear_goal", "force"})
     if data.clear_stream:
         fields["stream"] = None
+    if data.clear_goal or data.clear_stream:
+        fields["goal_ref"] = None
     await _db_run(db, lambda: planner_habits.update_habit(db, user.id, today, habit_id, fields, data.force))
     return await _habits(db, user)
 

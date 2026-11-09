@@ -301,8 +301,13 @@ MAX_LINE_CHARS = 400
 _LINE_ID = re.compile(r"^[a-z0-9]{4,12}$")
 
 
-def clean_checklist(raw: list[dict] | None, max_lines: int = MAX_CHECKLIST, max_chars: int = MAX_LINE_CHARS) -> list[dict]:
-    """Validated lines as [{id, text, done}]. A new line (no id) gets one, an id is never reused within a list, empty lines are dropped."""
+def clean_checklist(raw: list[dict] | None, max_lines: int = MAX_CHECKLIST, max_chars: int = MAX_LINE_CHARS,
+                    products: set[str] | None = None, strict: bool = False, stored: dict[str, str] | None = None) -> list[dict]:
+    """Validated lines as [{id, text, done}]. A new line (no id) gets one, an id is never reused within a list, empty lines are dropped.
+
+    Goal lines may carry a `product` (Plan v3): `products` is the set of product slugs the block has. A line's product is kept
+    when it is in the set; otherwise it is dropped, or (`strict`) refused with a ValueError. `products=None` is a list that
+    has no products (month checklists): a `product` there is always dropped."""
     out: list[dict] = []
     seen: set[str] = set()
     for item in raw or []:
@@ -315,7 +320,14 @@ def clean_checklist(raw: list[dict] | None, max_lines: int = MAX_CHECKLIST, max_
         if not isinstance(line_id, str) or not _LINE_ID.match(line_id) or line_id in seen:
             line_id = new_id()
         seen.add(line_id)
-        out.append({"id": line_id, "text": text, "done": bool(item.get("done", False))})
+        line = {"id": line_id, "text": text, "done": bool(item.get("done", False))}
+        product = item.get("product")
+        if product:
+            if products is not None and product in products:
+                line["product"] = product
+            elif strict and (stored or {}).get(line_id) != product:  # a stale slug the line already had is just dropped
+                raise ValueError(f"'{product}' is not a product of this block")
+        out.append(line)
     if len(out) > max_lines:
         raise ValueError(f"at most {max_lines} lines in a list")
     return out
@@ -336,3 +348,22 @@ def checklist_from_text(text: str) -> list[dict]:
 def checklist_progress(items: list[dict]) -> int | None:
     """Percent of lines done (0-100), or None for an empty list."""
     return round(100 * sum(1 for i in items if i.get("done")) / len(items)) if items else None
+
+
+# --- Products (Plan v3) -------------------------------------------------------
+
+PRODUCT_SLUG = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+MAX_PRODUCT_NAME = 60
+
+
+def tag_slug(tag: str) -> str:
+    """The product slug a tag stands for: lowercase, runs of anything but letters and digits become one dash ('Home Lab' -> 'home-lab')."""
+    return re.sub(r"[^a-z0-9]+", "-", str(tag).lower()).strip("-")[:32].strip("-")
+
+
+def product_slug_of(name: str) -> str:
+    """The slug of a product name, or a ValueError when the name leaves nothing tag-safe (it must start with a letter)."""
+    slug = tag_slug(name)
+    if not PRODUCT_SLUG.match(slug):
+        raise ValueError("a product name needs letters or digits and must start with a letter")
+    return slug

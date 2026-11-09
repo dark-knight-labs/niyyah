@@ -2,7 +2,8 @@
 from datetime import date, timedelta
 
 from app.schemas.vault import NotebooksResponse, ObjectivesResponse, PipelinesResponse, QuarterResponse
-from app.services.rules import COLORS, ICONS, MONTHS, NOW_LIMIT, STALE_DAYS, quarter_months, week_for
+from app.services import plan_v2
+from app.services.rules import COLORS, ICONS, MONTHS, NOW_LIMIT, STALE_DAYS, quarter_for, quarter_months, week_for
 
 
 def stream_info(s) -> dict:
@@ -35,11 +36,21 @@ def objectives_response(parsed: list[dict], streams, today: date) -> ObjectivesR
     return ObjectivesResponse(week=label, period=f"{start.isoformat()}/{end.isoformat()}", items=items)
 
 
+def tab_quarters(today: date, goals: dict[str, list[dict]]) -> list[str]:
+    """The quarter tabs: this quarter, the next, and any later quarter in which some block has a goal."""
+    this = quarter_for(today)
+    have = {q["quarter"] for rows in goals.values() for q in rows if q["goals"] and q["quarter"] > this}
+    return sorted({this, plan_v2.next_quarter(this), *have})
+
+
 def pipelines_response(streams, items_by_stream: dict[str, list[dict]], today: date,
-                       ended: dict[str, list[dict]] | None = None) -> PipelinesResponse:
-    out = [{**stream_info(s), "items": items_by_stream.get(s.id, []), "ended_goals": (ended or {}).get(s.id, [])}
+                       ended: dict[str, list[dict]] | None = None, products: dict[str, list[dict]] | None = None,
+                       goals: dict[str, list[dict]] | None = None) -> PipelinesResponse:
+    out = [{**stream_info(s), "items": items_by_stream.get(s.id, []), "ended_goals": (ended or {}).get(s.id, []),
+            "products": (products or {}).get(s.id, []), "quarter_goals": (goals or {}).get(s.id, [])}
            for s in streams if s.goal and not s.archived]
-    return PipelinesResponse(week=week_for(today)[2], now_limit=NOW_LIMIT, stale_days=STALE_DAYS, streams=out)
+    return PipelinesResponse(week=week_for(today)[2], now_limit=NOW_LIMIT, stale_days=STALE_DAYS, streams=out,
+                             quarters=tab_quarters(today, goals or {}))
 
 
 def notebooks_response(streams, entries_by_stream: dict[str, list[dict]]) -> NotebooksResponse:

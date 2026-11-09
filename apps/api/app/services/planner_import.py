@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import (
-    EventOverlay, Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerScheduleBlock, PlannerScheduleSetting,
+    EventOverlay, Goal, LogEntry, NotebookEntry, PipelineItem, PlannerBlock, PlannerCalendarFeed, PlannerHabit, PlannerHabitCheck, PlannerProduct, PlannerScheduleBlock, PlannerScheduleSetting,
     Quarter, QuarterStream, Task, WeekObjective,
 )
 from app.models.compass import Compass
@@ -57,6 +57,16 @@ def _check(snap: Snapshot) -> None:
                 raise ValueError("a planning row with a time needs a scheduled_on date")
             if r.lane is None and not (r.focus_week and r.objective_text is not None):
                 raise ValueError("a planning row without a lane must be a week objective (focus_week and objective_text)")
+    if snap.products is not None:
+        keys = [(p.block, p.slug) for p in snap.products]
+        if len(keys) != len(set(keys)):
+            raise ValueError("a product appears twice in one block")
+    have = {(p.block, p.slug) for p in snap.products or []}
+    for q in snap.quarters:
+        for s in q.streams:
+            for line in s.goal_checklist:
+                if line.product and (s.slug, line.product) not in have:
+                    raise ValueError(f"goal line '{line.text[:40]}' of {s.slug} in {q.label} names product '{line.product}', which is not in products")
     if len({b.key for b in snap.blocks}) != len(snap.blocks):
         raise ValueError("a block key appears twice")
     if len({o.key for o in snap.item_overlays}) != len(snap.item_overlays):
@@ -67,13 +77,13 @@ def _check(snap: Snapshot) -> None:
             raise ValueError("a task with a time needs a scheduled_on date")
 
 
-def _lines(checklist, text: str) -> list[dict]:
-    """The snapshot's lines, or one line made from older plain text when it carries none."""
-    return clean_checklist([i.model_dump() for i in checklist]) if checklist else checklist_from_text(text)
+def _lines(checklist, text: str, products: set[str] | None = None) -> list[dict]:
+    """The snapshot's lines, or one line made from older plain text when it carries none. `products`: the slugs a goal line may carry."""
+    return clean_checklist([i.model_dump() for i in checklist], products=products) if checklist else checklist_from_text(text)
 
 
-def _stream_row(user_id: int, label: str, s, position: int) -> QuarterStream:
-    goal_lines = _lines(s.goal_checklist, s.goal)
+def _stream_row(user_id: int, label: str, s, position: int, products: set[str]) -> QuarterStream:
+    goal_lines = _lines(s.goal_checklist, s.goal, products)
     checkpoints = []
     for c in s.checkpoints:
         lines = _lines(c.checklist, c.text)
@@ -152,7 +162,7 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
     quarters, streams = [], []
     for q in snap.quarters:
         quarters.append(Quarter(user_id=user_id, label=q.label, starts=q.starts, ends=q.ends, objective=q.objective, objective_ar=q.objective_ar))
-        streams += [_stream_row(user_id, q.label, s, n) for n, s in enumerate(q.streams)]
+        streams += [_stream_row(user_id, q.label, s, n, {p.slug for p in snap.products or [] if p.block == s.slug}) for n, s in enumerate(q.streams)]
 
     notebook = [NotebookEntry(user_id=user_id, stream=e.stream, ext_id=e.id, kind=e.kind, title=e.title, body=e.body, entry_date=e.date,
                               is_open=e.open, position=n) for n, e in enumerate(snap.notebook_entries)]
@@ -188,7 +198,7 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
                        + [(t, o.id, o.parent_ref) for t, o in zip(planning, snap.planning_rows or [])])
 
     habits = [PlannerHabit(user_id=user_id, name=h.name, block=h.block, anchor=h.anchor, per_week=h.per_week, minimum=h.minimum, stage=h.stage,
-                           stream=h.stream, gate_pct=h.gate_pct, gate_weeks=h.gate_weeks, trip_pct=h.trip_pct, trip_weeks=h.trip_weeks,
+                           stream=h.stream, goal_ref=h.goal_ref, gate_pct=h.gate_pct, gate_weeks=h.gate_weeks, trip_pct=h.trip_pct, trip_weeks=h.trip_weeks,
                            started_on=h.started_on, position=n) for n, h in enumerate(snap.habits)]
     db.add_all(habits)
     await db.flush()  # the habits get their ids, which the checks need
@@ -197,6 +207,12 @@ async def import_snapshot(db: AsyncSession, user_id: int, snap: Snapshot) -> dic
     db.add_all(checks)
     await db.flush()
     groups["habits"], groups["habit_checks"] = habits, checks
+    if snap.products is not None:  # absent in an older file: the account's products stay
+        await db.execute(delete(PlannerProduct).where(PlannerProduct.user_id == user_id))
+        products = [PlannerProduct(user_id=user_id, block=p.block, slug=p.slug, name=p.name, position=p.position) for p in snap.products]
+        db.add_all(products)
+        await db.flush()
+        groups["products"] = products
     await _boards(db, user_id, snap, before, tasks + planning)
     await _compass(db, user_id, snap)  # not in USER_TABLES and not in the counts: an older file must not erase it
     return {name: len(rows) for name, rows in groups.items()}

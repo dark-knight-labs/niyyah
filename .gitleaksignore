@@ -1,0 +1,2 @@
+# false positive: prose line in the Plan v3 design note read as a generic API key (rewritten in a later commit)
+d875eddcbe686458adec866c3d7c9f7b36c53f8c:docs/superpowers/specs/2026-11-09-plan-v3.md:generic-api-key:126

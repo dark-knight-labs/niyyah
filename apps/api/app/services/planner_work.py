@@ -12,7 +12,7 @@ from sqlalchemy import func, select, update
 
 from app.services import tree_shadow  # noqa: F401  (importing it installs the session hook that keeps the shadow item tree current)
 from app.models.planner import NotebookEntry, Quarter, QuarterStream, Task
-from app.services import planner_store
+from app.services import planner_products, planner_store
 from app.services.rules import (
     BLOCKER_ID, FIELD_KEYS, LANES, checklist_from_text, checklist_text, clean_checklist, MAX_DESCRIPTION_CHARS, MAX_OBJECTIVE_CHARS, HASHTAG, MONTHS, PRODUCT, SLUG, clean_entry, clean_products, clean_item, split_tags,
     make_stream, new_id, one_line_field, quarter_months, validate_field, week_for, weekly_streams,
@@ -416,9 +416,10 @@ def _set_goal_checklist(row: QuarterStream, items: list[dict]) -> None:
     row.goal_checklist, row.goal = items, checklist_text(items)
 
 
-def _apply_lists(row: QuarterStream, months: list[str], goal_checklist, month_checklists) -> None:
+def _apply_lists(row: QuarterStream, months: list[str], goal_checklist, month_checklists, products: set[str] | None = None) -> None:
+    """Goal lines keep a `product` that is one of the block's `products` (anything else is dropped); month lines never carry one."""
     if goal_checklist is not None:
-        _set_goal_checklist(row, clean_checklist(goal_checklist))
+        _set_goal_checklist(row, clean_checklist(goal_checklist, products=products or set()))
     for month, items in (month_checklists or {}).items():
         if month not in months:
             raise ValueError(f"'{month}' is not a month of this quarter")
@@ -451,7 +452,7 @@ async def update_stream(db, user_id: int, label: str, stream: str, fields: dict[
             row.goal = clean
         else:
             setattr(row, key, clean)
-    _apply_lists(row, months, goal_checklist, month_checklists)
+    _apply_lists(row, months, goal_checklist, month_checklists, await planner_products.slugs_of(db, user_id, stream))
 
 
 async def add_stream(db, user_id: int, label: str, stream: str, fields: dict[str, str],

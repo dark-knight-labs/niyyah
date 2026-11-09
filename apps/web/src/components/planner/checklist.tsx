@@ -20,10 +20,12 @@ interface Props {
   progress?: boolean;
   /** Text shown when the list is empty and not editable. */
   empty?: string;
+  /** Something after each line's text (Plan v3: a product picker). `change` replaces fields of that line and saves. */
+  extra?: (item: ChecklistItemData, change: (patch: Partial<ChecklistLine>) => void) => React.ReactNode;
 }
 
 /** A short list of lines with small checkboxes: tick, edit in place (Enter saves), remove on hover, add at the foot. The tick shows at once. */
-export function Checklist({ items, label, title, busy, onToggle, onChange, placeholder = "Add a line", progress = true, empty }: Props) {
+export function Checklist({ items, label, title, busy, onToggle, onChange, placeholder = "Add a line", progress = true, empty, extra }: Props) {
   // Show the tick immediately; whatever the server then sends replaces it (state adjusted during render, not in an effect).
   const [shown, setShown] = useState(items);
   const [seen, setSeen] = useState(items);
@@ -32,7 +34,7 @@ export function Checklist({ items, label, title, busy, onToggle, onChange, place
   const count = useRef<HTMLSpanElement>(null);
 
   const done = shown.filter((i) => i.done).length;
-  const lines = (list: ChecklistItemData[]): ChecklistLine[] => list.map((i) => ({ id: i.id, text: i.text, done: i.done }));
+  const lines = (list: ChecklistItemData[]): ChecklistLine[] => list.map((i) => ({ id: i.id, text: i.text, done: i.done, ...(i.product ? { product: i.product } : {}) }));
 
   function tick(item: ChecklistItemData) {
     const next = !item.done;
@@ -46,6 +48,12 @@ export function Checklist({ items, label, title, busy, onToggle, onChange, place
     const clean = text.replace(/\s+/g, " ").trim();
     if (clean === item.text) return;
     const next = clean ? shown.map((i) => (i.id === item.id ? { ...i, text: clean } : i)) : shown.filter((i) => i.id !== item.id);
+    setShown(next);
+    void onChange?.(lines(next));
+  }
+
+  function change(item: ChecklistItemData, patch: Partial<ChecklistLine>) {
+    const next = shown.map((i) => (i.id === item.id ? { ...i, ...patch, product: patch.product === undefined ? i.product : patch.product } : i));
     setShown(next);
     void onChange?.(lines(next));
   }
@@ -86,6 +94,7 @@ export function Checklist({ items, label, title, busy, onToggle, onChange, place
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); } }}
             className={`min-w-0 flex-1 break-words text-sm leading-snug outline-none transition-colors [text-decoration-line:line-through] [text-decoration-thickness:1px] focus:shadow-[0_1px_0_var(--accent)] ${item.done ? "text-[var(--muted-foreground)] [text-decoration-color:var(--muted-foreground)]" : "[text-decoration-color:transparent]"} [transition-property:color,text-decoration-color] duration-300`}
           >{item.text}</span>
+          {onChange && extra?.(item, (patch) => change(item, patch))}
           {onChange && (
             <button type="button" aria-label={`Remove: ${item.text}`} onClick={() => remove(item)}
               className="rounded px-1.5 text-sm leading-none text-[var(--muted-foreground)] opacity-0 hover:text-[var(--destructive)] focus-visible:opacity-100 group-hover:opacity-100">×</button>

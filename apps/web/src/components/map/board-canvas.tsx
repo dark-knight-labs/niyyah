@@ -189,8 +189,9 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
       const el = document.querySelector(".niyyah-map .react-flow") as HTMLElement | null;
       void rf.setViewport({ x: (el?.clientWidth ?? 800) / 2, y: (el?.clientHeight ?? 600) / 2, zoom: 1 });
     } else if (initialized) {
-      fitted.current = true;
-      const t = setTimeout(() => void rf.fitView({ padding: 0.12, maxZoom: 1, duration: 0 }), 60);
+      // Mark the fit done only when it runs: a dependency that changes within the 60 ms clears this timer, and the effect must then
+      // schedule it again (it used to mark first, so a re-render in that window left the board unfitted, far from the screen).
+      const t = setTimeout(() => { fitted.current = true; void rf.fitView({ padding: 0.12, maxZoom: 1, duration: 0 }); }, 60);
       return () => clearTimeout(t);
     }
   }, [b.loading, b.board, data.nodes.size, initialized, rf, isLife, plan.loading]);
@@ -210,7 +211,9 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     const r = derived.rects.get(focusNode);
     if (!r) return;
     focused.current = focusNode;
+    fitted.current = true;                                           // the deep link places the view: no fit may follow it
     setTimeout(() => {
+      fitted.current = true;
       select([focusNode]);
       setFlash(focusNode);
       centerIn(r, 1.2, true);
