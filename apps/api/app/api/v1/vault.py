@@ -64,8 +64,11 @@ from app.schemas.vault import (
     PipelineBlockedByIn,
     PipelineCheckpointIn,
     PipelineDescriptionIn,
+    PipelineGoalIn,
+    PipelineLabelIn,
     PipelineMoveIn,
     PipelineRefIn,
+    PipelineReorderIn,
     PipelineTextIn,
     PipelinesResponse,
     QuarterResponse,
@@ -92,7 +95,7 @@ from app.schemas.vault import (
     VaultWeekResponse,
     VoteIn,
 )
-from app.services import google_calendar, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_store, planner_work
+from app.services import google_calendar, plan_v2, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_store, planner_work
 from app.services.calendar_events import events_for_day, events_for_range, fixture_feeds
 from app.services.google_calendar import GoogleCalendarError
 from app.services.planner_views import notebooks_response, objectives_response, pipelines_response, quarter_response
@@ -406,7 +409,7 @@ async def put_task(data: TaskToggleIn, user: User = Depends(get_current_user), d
 
 @router.put("/tasks/text", response_model=EditResponse)
 async def put_task_text(data: TaskTextIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    return await _day_write(db, lambda: planner_day.set_task_text(db, user.id, data.line, data.text))
+    return await _day_write(db, lambda: planner_day.set_task_text(db, user.id, data.line, data.text, _local_now().date()))
 
 
 @router.put("/tasks/description", response_model=EditResponse)
@@ -709,6 +712,7 @@ async def put_item_overlay(data: OverlayIn, user: User = Depends(get_current_use
 @router.get("/objectives", response_model=ObjectivesResponse)
 async def get_objectives(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
+    await _db_run(db, lambda: plan_v2.carry_streams(db, user.id, today))
     streams = await planner_store.streams_for(db, user.id, today)
     parsed = await planner_store.week_objectives(db, user.id, week_for(today)[2], streams)
     return objectives_response(parsed, streams, today)
@@ -735,6 +739,7 @@ async def put_objective(data: ObjectiveIn, user: User = Depends(get_current_user
 
 async def _quarter(db: AsyncSession, user: User, today: date) -> QuarterResponse:
     label = quarter_for(today)
+    await _db_run(db, lambda: plan_v2.carry_streams(db, user.id, today))  # a new quarter starts with last quarter's blocks
     data = await planner_store.quarter_data(db, user.id, label)
     if data is None:  # a new account has no plan yet: start this quarter with the placeholder objective
         await _db_run(db, lambda: planner_work.ensure_quarter(db, user.id, label))
@@ -803,8 +808,10 @@ async def post_stream(data: StreamAddIn, user: User = Depends(get_current_user),
 @router.get("/pipelines", response_model=PipelinesResponse)
 async def get_pipelines(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     today = _local_now().date()
+    await _db_run(db, lambda: plan_v2.carry_streams(db, user.id, today))
     streams = await planner_store.streams_for(db, user.id, today)
-    return pipelines_response(streams, await planner_store.pipeline_items(db, user.id, today), today)
+    items = await planner_store.pipeline_items(db, user.id, today)
+    return pipelines_response(streams, items, today, await planner_store.ended_goals(db, user.id, today, items))
 
 
 async def _known_stream(db: AsyncSession, user: User, stream: str, today: date) -> None:
@@ -854,14 +861,39 @@ async def put_pipeline_focus(data: PipelineRefIn, user: User = Depends(get_curre
 
 @router.put("/pipeline/checkpoint", response_model=EditResponse)
 async def put_pipeline_checkpoint(data: PipelineCheckpointIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    today = _local_now().date()
+    await _known_stream(db, user, data.stream, today)
+    return await _day_write(db, lambda: planner_work.set_checkpoint(db, user.id, data.stream, data.line, data.checkpoint or None, today))
+
+
+@router.put("/pipeline/goal", response_model=EditResponse)
+async def put_pipeline_goal(data: PipelineGoalIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Nest an item under one of its block's quarter goals, or un-nest it (goal_ref null)."""
+    today = _local_now().date()
+    await _known_stream(db, user, data.stream, today)
+    return await _day_write(db, lambda: plan_v2.set_goal(db, user.id, data.stream, data.line, data.goal_ref, today))
+
+
+@router.put("/pipeline/label", response_model=EditResponse)
+async def put_pipeline_label(data: PipelineLabelIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Label an item with a month ('YYYY-MM') or a day; neither clears it. The legacy month checkpoint follows."""
+    today = _local_now().date()
+    await _known_stream(db, user, data.stream, today)
+    return await _day_write(db, lambda: plan_v2.set_label(db, user.id, data.stream, data.line, data.month, data.day, today))
+
+
+@router.put("/pipeline/reorder", response_model=EditResponse)
+async def put_pipeline_reorder(data: PipelineReorderIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Move an item one place up or down among its block's items in the same lane."""
     await _known_stream(db, user, data.stream, _local_now().date())
-    return await _day_write(db, lambda: planner_work.set_checkpoint(db, user.id, data.stream, data.line, data.checkpoint or None))
+    return await _day_write(db, lambda: plan_v2.reorder(db, user.id, data.stream, data.line, data.direction))
 
 
 @router.put("/pipeline/text", response_model=EditResponse)
 async def put_pipeline_text(data: PipelineTextIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await _known_stream(db, user, data.stream, _local_now().date())
-    return await _day_write(db, lambda: planner_work.set_text(db, user.id, data.stream, data.line, data.text))
+    today = _local_now().date()
+    await _known_stream(db, user, data.stream, today)
+    return await _day_write(db, lambda: planner_work.set_text(db, user.id, data.stream, data.line, data.text, today))
 
 
 @router.put("/pipeline/description", response_model=EditResponse)

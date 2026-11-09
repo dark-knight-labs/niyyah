@@ -200,10 +200,20 @@ export interface PipelineItemData {
   done: boolean;
   age_days: number;
   stale: boolean;
+  /** Plan v2: the id of the quarter goal line this item is nested under, or null. */
+  goal_ref?: string | null;
+  /** "2026-11"; an item has a month label or a date label, never both. */
+  label_month?: string | null;
+  /** ISO day. */
+  label_date?: string | null;
 }
+
+/** A goal line of an earlier quarter that some item of the block is still nested under. */
+export interface EndedGoalData { id: string; text: string; quarter: string }
 
 export interface PipelineStreamData extends StreamInfo {
   items: PipelineItemData[];
+  ended_goals?: EndedGoalData[];
 }
 
 export interface PipelinesData {

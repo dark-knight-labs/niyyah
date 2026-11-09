@@ -4,6 +4,7 @@
   "streams": [
     {
       "color": "violet",
+      "ended_goals": [],
       "icon": "server",
       "items": [
         {
@@ -15,7 +16,10 @@
           "done": false,
           "done_on": null,
           "focus": null,
+          "goal_ref": null,
           "hash": "",
+          "label_date": null,
+          "label_month": null,
           "lane": "now",
           "line": 1,
           "product": null,
@@ -32,7 +36,10 @@
           "done": false,
           "done_on": null,
           "focus": null,
+          "goal_ref": null,
           "hash": "",
+          "label_date": null,
+          "label_month": null,
           "lane": "next",
           "line": 2,
           "product": null,
@@ -49,6 +56,7 @@
     },
     {
       "color": "teal",
+      "ended_goals": [],
       "icon": "book",
       "items": [
         {
@@ -60,7 +68,10 @@
           "done": true,
           "done_on": "2026-10-25",
           "focus": null,
+          "goal_ref": null,
           "hash": "",
+          "label_date": null,
+          "label_month": null,
           "lane": "done",
           "line": 3,
           "product": null,
@@ -77,6 +88,7 @@
     },
     {
       "color": "violet",
+      "ended_goals": [],
       "icon": "server",
       "items": [],
       "name": "Extra",

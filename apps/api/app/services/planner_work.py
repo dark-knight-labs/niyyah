@@ -97,8 +97,11 @@ async def add_rows(db, user_id: int, stream: str, texts: list[str], lane: str, t
     position = await _next_position(db, user_id, stream)
     created = []
     for title, products, month, note in cleaned:
-        created.append(Task(user_id=user_id, stream=stream, lane=lane, lane_position=position, text=title, description=note, products=products,
-                            checkpoint=month, added_on=today, done=False, status="open", blocked_by=[]))
+        task = Task(user_id=user_id, stream=stream, lane=lane, lane_position=position, text=title, description=note, products=products,
+                    checkpoint=month, added_on=today, done=False, status="open", blocked_by=[])
+        if month:  # a #month typed in the text is the checkpoint of the current quarter: the label follows it
+            task.label_month = f"{today.year}-{MONTHS.index(month) + 1:02d}"
+        created.append(task)
         position += 1
     db.add_all(created)
     await db.flush()
@@ -144,9 +147,21 @@ async def set_row_done(db, user_id: int, row: Task, done: bool, today: date) -> 
     await move_and_tick(db, user_id, row, "done" if done else "now", today, streams)
 
 
-async def set_checkpoint(db, user_id: int, stream: str, item_id: int, checkpoint: str | None) -> None:
+def _sync_label(row: Task, today: date | None) -> None:
+    """The month checkpoint is the current quarter's, so the item's month label follows it (None: the caller has no date)."""
+    if today is None:
+        return
+    if row.checkpoint:
+        row.label_month = f"{today.year}-{MONTHS.index(row.checkpoint) + 1:02d}"
+        row.label_date = None
+    else:
+        row.label_month = None
+
+
+async def set_checkpoint(db, user_id: int, stream: str, item_id: int, checkpoint: str | None, today: date | None = None) -> None:
     row = await item_row(db, user_id, stream, item_id)
     row.checkpoint = clean_item(f"x #{checkpoint}")[1] if checkpoint else None
+    _sync_label(row, today)
 
 
 async def _delete_row(db, row: Task) -> None:
@@ -189,18 +204,20 @@ async def set_blocked_by(db, user_id: int, stream: str, item_id: int, ids: list[
     row.blocked_by = clean
 
 
-def set_text_row(row: Task, text: str) -> None:
+def set_text_row(row: Task, text: str, today: date | None = None) -> None:
     """Rename in place, keeping lane, dates and products; a #month typed in the text replaces the checkpoint."""
     bare, typed_products = split_tags(text)
     title, typed_month = clean_item(bare)
     row.text = title
-    row.checkpoint = typed_month or row.checkpoint
+    if typed_month:
+        row.checkpoint = typed_month
+        _sync_label(row, today)
     if typed_products:
         row.products = typed_products
 
 
-async def set_text(db, user_id: int, stream: str, item_id: int, text: str) -> None:
-    set_text_row(await item_row(db, user_id, stream, item_id), text)
+async def set_text(db, user_id: int, stream: str, item_id: int, text: str, today: date | None = None) -> None:
+    set_text_row(await item_row(db, user_id, stream, item_id), text, today)
 
 
 async def pipeline_streams(db, user_id: int, today: date) -> set[str]:
@@ -327,7 +344,7 @@ async def sync_focus(db, user_id: int, stream: str, week: str, today: date, *, t
                 await _clear_focus(db, item)
             return
         if item:
-            set_text_row(item, text)
+            set_text_row(item, text, today)
             return
         wanted = clean_item(split_tags(text)[0])[0].lower()
         same = (await db.execute(select(Task).where(

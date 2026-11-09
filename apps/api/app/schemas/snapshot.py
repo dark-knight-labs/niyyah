@@ -202,6 +202,9 @@ class SnapPlanningRow(_Loose):
     end_min: int | None = Field(default=None, ge=0, le=1440)
     weight: int = Field(default=0, ge=0, le=3)
     checklist: list[SnapLine] = Field(default=[], max_length=50)
+    goal_ref: str | None = Field(default=None, max_length=16)  # Plan v2; absent in older exports
+    label_month: str | None = Field(default=None, pattern=r"^[0-9]{4}-(0[1-9]|1[0-2])$")
+    label_date: dt.date | None = None
 
 
 class SnapOverlay(_Loose):

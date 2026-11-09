@@ -320,11 +320,22 @@ class PipelineItem(BaseModel):
     products: list[str] = []  # the parts of the block it belongs to, from a [product:: X, Y] field
     done: bool
     age_days: int
+    goal_ref: str | None = None  # id of the quarter goal line this item is nested under
+    label_month: str | None = None  # "2026-11"
+    label_date: str | None = None  # a day, ISO; never together with label_month
     stale: bool
+
+
+class EndedGoal(BaseModel):
+    """A goal line of an earlier quarter that some item of the stream is still nested under."""
+    id: str
+    text: str
+    quarter: str  # "2026-Q3"
 
 
 class PipelineStreamData(StreamInfo):
     items: list[PipelineItem]
+    ended_goals: list[EndedGoal] = []
 
 
 class PipelinesResponse(BaseModel):
@@ -352,6 +363,20 @@ class PipelineMoveIn(PipelineRefIn):
 
 class PipelineCheckpointIn(PipelineRefIn):
     checkpoint: Month | Literal[""]
+
+
+class PipelineGoalIn(PipelineRefIn):
+    goal_ref: str | None = None  # a goal line id of the stream this quarter; None = not nested
+
+
+class PipelineLabelIn(PipelineRefIn):
+    """Exactly one label, or none to clear it: a month 'YYYY-MM' or a day."""
+    month: str | None = Field(default=None, pattern=r"^[0-9]{4}-(0[1-9]|1[0-2])$")
+    day: date | None = None
+
+
+class PipelineReorderIn(PipelineRefIn):
+    direction: Literal["up", "down"]
 
 
 class PipelineTextIn(PipelineRefIn):

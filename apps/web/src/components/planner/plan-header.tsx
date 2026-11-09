@@ -5,12 +5,15 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { PageTitle } from "@/components/planner/page-title";
 import { VaultScheduleData, noonInTz, slotOwnerFor } from "@/lib/routine";
-import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
+import { monthText, quarterText, weekText } from "@/lib/plan-v2";
+import { StreamMeta } from "@/lib/streams";
 import { fmtDay, weekDays } from "@/lib/week";
 import { QuarterData, VaultObjectivesData } from "@/lib/vault-types";
 
 interface Props {
   quarter: QuarterData;
+  /** The current week, "2026-W46". */
+  week: string;
   objectives: VaultObjectivesData | null;
   streams: StreamMeta[];
   /** Decides which stream owns the slot on each day; without it the week strip is left out. */
@@ -22,18 +25,15 @@ interface Props {
 }
 
 /** The quarter's Super Objective with its ring, and the week's seven days showing which block owns OT. */
-export function PlanHeader({ quarter, objectives, streams, schedule, today, busy, onSaveObjective }: Props) {
+export function PlanHeader({ quarter, week, objectives, streams, schedule, today, busy, onSaveObjective }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
-  const year = quarter.quarter.slice(0, 4);
-  const q = quarter.quarter.slice(5);
-  const months = quarter.months.map((m) => MONTH_LABEL[m]);
   const days = objectives ? weekDays(objectives.period) : [];
 
   return (
     <>
       <PageTitle
-        eyebrow={`${q} ${year} · ${months[0]} – ${months[months.length - 1]}`}
+        eyebrow={`Plan · ${quarterText(quarter.quarter)}`}
         title={
           editing ? (
             <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) void onSaveObjective(draft.trim()).then((ok) => ok && setEditing(false)); }}>
@@ -54,7 +54,7 @@ export function PlanHeader({ quarter, objectives, streams, schedule, today, busy
         visual={
           <div className="grid gap-1.5 justify-items-end">
             <Link href="/map?board=life" className="mono inline-flex min-h-8 items-center border border-[var(--rule)] px-3 text-[var(--accent)] hover:bg-[var(--muted)]">Map</Link>
-            <p className="mono text-[var(--muted-foreground)]">Week <b className="font-medium tabular-nums text-[var(--foreground)]">{quarter.week_of_quarter}</b> of {quarter.weeks_in_quarter}</p>
+            <p className="mono text-[var(--muted-foreground)]">{weekText(week)} · {monthText(today.slice(0, 7))} · Week <b className="font-medium tabular-nums text-[var(--foreground)]">{quarter.week_of_quarter}</b> of {quarter.weeks_in_quarter}</p>
             <div className="flex h-[22px] w-full min-w-[14rem] items-end gap-[3px] text-[var(--accent)] sm:w-[14.5rem]" role="img" aria-label={`Week ${quarter.week_of_quarter} of ${quarter.weeks_in_quarter}`}>
               {Array.from({ length: quarter.weeks_in_quarter }, (_, i) => (
                 <span key={i} className="flex-1 bg-current" style={{ height: i + 1 === quarter.week_of_quarter ? 18 : 7, opacity: i + 1 === quarter.week_of_quarter ? 1 : i + 1 < quarter.week_of_quarter ? 0.55 : 0.16 }} />

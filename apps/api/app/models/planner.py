@@ -53,6 +53,11 @@ class Task(Base):
     added_on: Mapped[dt.date | None] = mapped_column(Date, nullable=True)
     parent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("planner_tasks.id", ondelete="SET NULL"), nullable=True, index=True)
     origin: Mapped[str | None] = mapped_column(String(48), nullable=True)  # 'pipeline:7', 'objective:3': the old row this came from
+    # Plan v2 (docs/superpowers/specs/2026-11-09-plan-v2.md). Nullable, so an older image can still insert a task.
+    # The Postgres CHECK on label_month lives in the migration only (a regex check does not exist in SQLite).
+    goal_ref: Mapped[str | None] = mapped_column(String(16), nullable=True)  # id of a goal line of the stream's quarter goals
+    label_month: Mapped[str | None] = mapped_column(String(7), nullable=True)  # "2026-11": the item's month label
+    label_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)  # a day label, instead of a month; never both
 
 
 class EventOverlay(Base):

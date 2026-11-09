@@ -2189,6 +2189,28 @@
        "color": {
         "type": "string"
        },
+       "ended_goals": {
+        "items": {
+         "properties": {
+          "id": {
+           "type": "string"
+          },
+          "quarter": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "quarter",
+          "text"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
        "icon": {
         "type": "string"
        },
@@ -2222,7 +2244,16 @@
           "focus": {
            "type": "string"
           },
+          "goal_ref": {
+           "type": "string"
+          },
           "hash": {
+           "type": "string"
+          },
+          "label_date": {
+           "type": "string"
+          },
+          "label_month": {
            "type": "string"
           },
           "lane": {
@@ -4279,8 +4310,17 @@
        "focus_week": {
         "type": "string"
        },
+       "goal_ref": {
+        "type": "string"
+       },
        "id": {
         "type": "integer"
+       },
+       "label_date": {
+        "type": "string"
+       },
+       "label_month": {
+        "type": "string"
        },
        "lane": {
         "type": "string"
@@ -8019,6 +8059,159 @@
    "type": "object"
   }
  },
+ "PUT /api/v1/vault/pipeline/goal": {
+  "params": [],
+  "request": {
+   "properties": {
+    "goal_ref": {
+     "type": "string"
+    },
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pipeline/label": {
+  "params": [],
+  "request": {
+   "properties": {
+    "day": {
+     "type": "string"
+    },
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "month": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
  "PUT /api/v1/vault/pipeline/move": {
   "params": [],
   "request": {
@@ -8038,6 +8231,82 @@
    },
    "required": [
     "lane",
+    "line",
+    "stream"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "commit": {
+     "type": "string"
+    },
+    "day": {
+     "properties": {
+      "blocks": {
+       "type": "object"
+      },
+      "date": {
+       "type": "string"
+      },
+      "focus": {
+       "type": "string"
+      },
+      "log": {
+       "type": "string"
+      },
+      "mode": {
+       "type": "string"
+      },
+      "pct": {
+       "type": "integer"
+      },
+      "possible": {
+       "type": "integer"
+      },
+      "total": {
+       "type": "integer"
+      }
+     },
+     "required": [
+      "blocks",
+      "date",
+      "focus",
+      "log",
+      "mode",
+      "pct",
+      "possible",
+      "total"
+     ],
+     "type": "object"
+    }
+   },
+   "required": [
+    "commit",
+    "day"
+   ],
+   "type": "object"
+  }
+ },
+ "PUT /api/v1/vault/pipeline/reorder": {
+  "params": [],
+  "request": {
+   "properties": {
+    "direction": {
+     "type": "string"
+    },
+    "hash": {
+     "type": "string"
+    },
+    "line": {
+     "type": "integer"
+    },
+    "stream": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "direction",
     "line",
     "stream"
    ],

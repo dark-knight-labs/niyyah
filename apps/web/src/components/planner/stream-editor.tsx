@@ -22,7 +22,7 @@ const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 const field = "min-h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm placeholder:text-[var(--muted-foreground)]";
 const label = "mb-1.5 block text-micro font-extrabold uppercase tracking-[0.1em] text-[var(--muted-foreground)]";
 
-/** Add a stream (Finance, Errands…) or edit one: name, colour, icon. Its goal and month lines are edited on the stream's own page. */
+/** Add a stream (Finance, Errands…) or edit one: name, colour, icon. Its quarter goals are edited in the block's cell on the Plan table. */
 export function StreamEditor({ quarter, stream, busy, onSave, onCancel }: Props) {
   const [name, setName] = useState(stream?.name ?? "");
   const [slot, setSlot] = useState(stream?.slot ?? "");

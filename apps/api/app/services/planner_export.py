@@ -118,7 +118,8 @@ async def build_snapshot(db: AsyncSession, user: User) -> dict:
                            "focus_week": t.focus_week, "objective_text": t.objective_text, "objective_done": t.objective_done,
                            "focus_checkpoint": t.focus_checkpoint, "blocked_by": list(t.blocked_by or []), "due_on": _iso(t.due_on),
                            "scheduled_on": _iso(t.scheduled_on), "start_on": _iso(t.start_on), "source_path": t.source_path,
-                           "start_min": t.start_min, "end_min": t.end_min, "weight": t.weight, "checklist": list(t.checklist or [])}
+                           "start_min": t.start_min, "end_min": t.end_min, "weight": t.weight, "checklist": list(t.checklist or []),
+                           "goal_ref": t.goal_ref, "label_month": t.label_month, "label_date": _iso(t.label_date)}
                           for t in planning],
         "habits": habits,
         "item_overlays": [{"key": o.event_key, "calendar": o.source_calendar, "title": o.title, "day": _iso(o.day), "status": o.status,

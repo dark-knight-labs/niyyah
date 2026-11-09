@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { OctagonAlert } from "lucide-react";
-import { Pick } from "@/components/planner/pick";
 import { Checkbox } from "@/components/routine/checkbox";
 import { ItemRow, NoteRow, TABS, LANE_FOR, isOpenBlocker, tabOf, waitingOn } from "@/lib/plan-model";
-import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
+import { GoalRef, monthText, quarterText } from "@/lib/plan-v2";
+import { StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
-import { Lane, MonthKey, NotebookEntryData, QuarterStreamData } from "@/lib/vault-types";
+import { Lane, NotebookEntryData } from "@/lib/vault-types";
 
 type Run = (action: () => Promise<unknown>) => Promise<boolean>;
 
@@ -17,6 +17,7 @@ const field = "w-full border border-[var(--rule)] bg-[var(--background)] px-2.5 
 const btn = "mono inline-flex min-h-9 items-center px-3.5 disabled:opacity-40";
 const solid = `${btn} bg-[var(--foreground)] text-[var(--background)] hover:opacity-90`;
 const ghost = `${btn} border border-[var(--rule)] hover:bg-[var(--muted)]`;
+const chipBtn = "mono min-h-8 border border-[var(--rule)] px-2.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)] disabled:opacity-40";
 const danger = `${btn} border border-[var(--destructive)] text-[var(--destructive)] hover:bg-[var(--warn-light)]`;
 
 /** A title that saves when you leave it or press Enter. The key resets the draft when the row changes. */
@@ -51,17 +52,18 @@ function DeleteButton({ busy, onDelete }: { busy: boolean; onDelete: () => void 
 interface ItemProps {
   row: ItemRow;
   meta: StreamMeta;
-  goal: QuarterStreamData | undefined;
-  months: MonthKey[];
+  /** The "YYYY-MM" months of the current quarter, for the Label picker. */
+  months: string[];
+  /** The goals the item can be nested under: this quarter's, plus the ended one it is nested under now. */
+  goals: GoalRef[];
   blockers: NotebookEntryData[];
   week: string;
-  staleDays: number;
   busy: boolean;
   run: Run;
 }
 
-/** The detail card of one pipeline item: rename, details, horizon, checkpoint, what it waits on, tags, and the actions. */
-export function ItemCard({ row, meta, goal, months, blockers, week, staleDays, busy, run }: ItemProps) {
+/** The detail card of one pipeline item: rename, details, status, goal, label, what it waits on, tags, and the actions. */
+export function ItemCard({ row, meta, months, goals, blockers, week, busy, run }: ItemProps) {
   const { item } = row;
   const stream = row.stream;
   const [newTag, setNewTag] = useState("");
@@ -71,10 +73,6 @@ export function ItemCard({ row, meta, goal, months, blockers, week, staleDays, b
   const tab = tabOf(row);
   const order: Lane[] = ["now", "next", "backlog"];
   const at = order.indexOf(item.lane);
-  const cpOptions: { value: string; label: string }[] = [
-    { value: "none", label: item.stale ? `No checkpoint · ${item.age_days}d` : "No checkpoint" },
-    ...[...new Set<MonthKey>([...months, ...(item.checkpoint ? [item.checkpoint] : [])])].map((m) => ({ value: m, label: MONTH_LABEL[m] })),
-  ];
   const tags = item.products ?? [];
   const rewrite = (list: string[]) => run(() => vaultApi.renamePipelineItem(stream, item, [item.text, ...list.map((p) => (/\s/.test(p) ? `[product:: ${p}]` : `#${p}`))].join(" ")));
 
@@ -95,8 +93,8 @@ export function ItemCard({ row, meta, goal, months, blockers, week, staleDays, b
         <NotesField key={`${item.hash}-d`} value={item.description} busy={busy} rows={3} placeholder="Details, context, links…" onSave={(t) => void run(() => vaultApi.describePipelineItem(stream, item, t))} />
       </label>
       <div>
-        <span className={label}>Horizon</span>
-        <div role="group" aria-label="Horizon" className="flex w-max max-w-full border border-[var(--rule)]">
+        <span className={label}>Status</span>
+        <div role="group" aria-label="Status" className="flex w-max max-w-full border border-[var(--rule)]">
           {TABS.filter((t) => t.id !== "notes").map((t) => (
             <button key={t.id} type="button" disabled={busy} aria-pressed={tab === t.id} onClick={() => void run(() => vaultApi.movePipelineItem(stream, item, LANE_FOR[t.id as Exclude<typeof t.id, "notes">]))}
               className="mono min-h-8 border-r border-[var(--rule)] px-3 text-[var(--muted-foreground)] last:border-r-0 hover:bg-[var(--muted)] aria-pressed:bg-[var(--muted)] aria-pressed:text-[var(--foreground)] aria-pressed:shadow-[inset_0_-2px_0_var(--accent)]">{t.label}</button>
@@ -104,10 +102,30 @@ export function ItemCard({ row, meta, goal, months, blockers, week, staleDays, b
         </div>
       </div>
       <div>
-        <span className={label}>Checkpoint</span>
-        <Pick value={item.checkpoint ?? "none"} options={cpOptions} label="Checkpoint month" disabled={busy} warn={item.stale && !item.checkpoint}
-          onChange={(v) => void run(() => vaultApi.tagPipelineItem(stream, item, v === "none" ? "" : (v as MonthKey)))} />
-        {item.checkpoint && item.age_days >= staleDays && <span className="mono ml-2 text-[var(--muted-foreground)]">{item.age_days}d old</span>}
+        <span className={label}>Goal</span>
+        <div role="group" aria-label="Goal" className="flex flex-wrap gap-1.5">
+          {goals.map((g) => (
+            <button key={g.id} type="button" disabled={busy} aria-pressed={item.goal_ref === g.id} title={g.text} onClick={() => void run(() => vaultApi.setPipelineGoal(stream, item, g.id))}
+              className={`${chipBtn} max-w-full truncate ${g.ended ? "text-[var(--warn)]" : ""}`}>{quarterText(g.quarter)} · {g.text}{g.ended ? " · ended" : ""}</button>
+          ))}
+          <button type="button" disabled={busy} aria-pressed={!item.goal_ref || !goals.some((g) => g.id === item.goal_ref)} onClick={() => void run(() => vaultApi.setPipelineGoal(stream, item, null))} className={chipBtn}>Not nested</button>
+        </div>
+        {goals.every((g) => g.ended) && <p className="mt-1 text-xs text-[var(--muted-foreground)]">No goal for this quarter yet. Add one in the block column.</p>}
+      </div>
+      <div>
+        <span className={label}>Label</span>
+        <div role="group" aria-label="Label" className="flex flex-wrap items-center gap-1.5">
+          {[...new Set([...months, ...(item.label_month ? [item.label_month] : [])])].map((m) => (
+            <button key={m} type="button" disabled={busy} aria-pressed={item.label_month === m} onClick={() => void run(() => vaultApi.setPipelineLabel(stream, item, { month: m }))} className={chipBtn}>{monthText(m)}</button>
+          ))}
+          <button type="button" disabled={busy} aria-pressed={!item.label_month && !item.label_date} onClick={() => void run(() => vaultApi.setPipelineLabel(stream, item, {}))} className={chipBtn}>None</button>
+          <label className="mono flex items-center gap-1.5 text-[var(--muted-foreground)]">or date
+            <input type="date" aria-label="Label date" disabled={busy} defaultValue={item.label_date ?? ""} key={item.label_date ?? "no-date"}
+              onBlur={(e) => { if (e.target.value !== (item.label_date ?? "")) void run(() => vaultApi.setPipelineLabel(stream, item, e.target.value ? { day: e.target.value } : {})); }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              className="h-8 border border-[var(--rule)] bg-[var(--background)] px-1.5 text-small" />
+          </label>
+        </div>
       </div>
       {item.lane !== "done" && (
         <details open={linking} onToggle={(e) => setLinking(e.currentTarget.open)} className="border border-[var(--border)] px-2.5 py-2">
@@ -143,7 +161,6 @@ export function ItemCard({ row, meta, goal, months, blockers, week, staleDays, b
         </div>
       </div>
       <dl className="grid grid-cols-[6rem_1fr] border-t border-[var(--border)] text-small [&>*]:border-b [&>*]:border-[var(--border)] [&>*]:py-1.5">
-        {goal?.goal && <><dt className="mono text-[var(--muted-foreground)]">Goal</dt><dd className="break-words">{goal.goal}</dd></>}
         <dt className="mono text-[var(--muted-foreground)]">Age</dt><dd className="tabular-nums">{item.age_days}d</dd>
         {item.added && <><dt className="mono text-[var(--muted-foreground)]">Added</dt><dd className="tabular-nums">{item.added}</dd></>}
         {item.done_on && <><dt className="mono text-[var(--muted-foreground)]">Done</dt><dd className="tabular-nums">{item.done_on}</dd></>}

@@ -35,8 +35,9 @@ def objectives_response(parsed: list[dict], streams, today: date) -> ObjectivesR
     return ObjectivesResponse(week=label, period=f"{start.isoformat()}/{end.isoformat()}", items=items)
 
 
-def pipelines_response(streams, items_by_stream: dict[str, list[dict]], today: date) -> PipelinesResponse:
-    out = [{**stream_info(s), "items": items_by_stream.get(s.id, [])}
+def pipelines_response(streams, items_by_stream: dict[str, list[dict]], today: date,
+                       ended: dict[str, list[dict]] | None = None) -> PipelinesResponse:
+    out = [{**stream_info(s), "items": items_by_stream.get(s.id, []), "ended_goals": (ended or {}).get(s.id, [])}
            for s in streams if s.goal and not s.archived]
     return PipelinesResponse(week=week_for(today)[2], now_limit=NOW_LIMIT, stale_days=STALE_DAYS, streams=out)
 

@@ -98,6 +98,13 @@ export const vaultApi = {
     api.put<VaultEditData>("/vault/pipeline/move", { stream, line: item.line, hash: item.hash, lane }),
   tagPipelineItem: (stream: string, item: PipelineItemData, checkpoint: MonthKey | "") =>
     api.put<VaultEditData>("/vault/pipeline/checkpoint", { stream, line: item.line, hash: item.hash, checkpoint }),
+  setPipelineGoal: (stream: string, item: PipelineItemData, goalRef: string | null) =>
+    api.put<VaultEditData>("/vault/pipeline/goal", { stream, line: item.line, hash: item.hash, goal_ref: goalRef }),
+  /** One label, or none to clear it: a month ("2026-11") or a day (ISO). */
+  setPipelineLabel: (stream: string, item: PipelineItemData, label: { month?: string; day?: string }) =>
+    api.put<VaultEditData>("/vault/pipeline/label", { stream, line: item.line, hash: item.hash, month: label.month ?? null, day: label.day ?? null }),
+  reorderPipelineItem: (stream: string, item: PipelineItemData, direction: "up" | "down") =>
+    api.put<VaultEditData>("/vault/pipeline/reorder", { stream, line: item.line, hash: item.hash, direction }),
   removePipelineItem: (stream: string, item: PipelineItemData) =>
     api.post<VaultEditData>("/vault/pipeline/remove", { stream, line: item.line, hash: item.hash }),
   notebooks: () => api.get<NotebooksData>("/vault/notebooks"),

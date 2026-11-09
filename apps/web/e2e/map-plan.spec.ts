@@ -120,8 +120,7 @@ test("collapsing a derived node stores one state row; Make item turns a thought 
   expect(made.item.lane).toBe("backlog");
   // visible on /plan in that lane
   await page.goto("/plan");
-  await page.getByRole("tab", { name: /^Someday/ }).click();
-  await expect(page.getByText("Draft the FAQ page").first()).toBeVisible();
+  await expect(page.locator('[data-block="shop"] [data-col="someday"]')).toContainText("Draft the FAQ page");
   // and there is exactly one node for it on the board after a reload
   await openLife(page);
   await expect(page.locator(".nm-mind", { hasText: "Draft the FAQ page" })).toHaveCount(1);
@@ -151,8 +150,7 @@ test("Make item under a checkpoint: one node, under that checkpoint, children ke
 
 test("Show on map from /plan opens the Life board with that item selected", async ({ page }) => {
   await page.goto("/plan");
-  await page.getByRole("tab", { name: /^Next/ }).click();
-  await page.getByText("Plan the DNS cutover").first().click();
+  await page.locator("[data-task]").filter({ hasText: "Plan the DNS cutover" }).getByRole("button", { name: "Plan the DNS cutover", exact: true }).click();
   await page.getByRole("link", { name: "Show on map" }).click();
   await expect(page).toHaveURL(/\/map\?board=life&node=task:\d+/);
   await expect(page.locator(".nm-mind.sel-ring")).toContainText("Plan the DNS cutover", { timeout: 15_000 });
