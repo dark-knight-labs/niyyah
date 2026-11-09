@@ -400,12 +400,24 @@
   "PUT"
  ],
  [
+  "/api/v1/vault/pipeline/goal",
+  "PUT"
+ ],
+ [
+  "/api/v1/vault/pipeline/label",
+  "PUT"
+ ],
+ [
   "/api/v1/vault/pipeline/move",
   "PUT"
  ],
  [
   "/api/v1/vault/pipeline/remove",
   "POST"
+ ],
+ [
+  "/api/v1/vault/pipeline/reorder",
+  "PUT"
  ],
  [
   "/api/v1/vault/pipeline/text",

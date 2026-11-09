@@ -130,6 +130,7 @@ async def _old_views(db: AsyncSession, user_id: int) -> dict:
             "checkpoint": r.checkpoint, "added": r.added_on.isoformat() if r.added_on else None,
             "done_on": r.done_on.isoformat() if r.done_on else None, "focus": r.focus_week, "done": r.done, "age_days": age,
             "description": r.description, "blocked_by": list(r.blocked_by or []),
+            "goal_ref": None, "label_month": None, "label_date": None,  # Plan v2 fields: nothing sets them on a migrated row
             "stale": r.lane in ("next", "backlog") and r.checkpoint is None and age >= STALE_DAYS})
     weeks = sorted({o.week for o in (await db.execute(sa.select(WeekObjective).where(WeekObjective.user_id == user_id))).scalars()})
     objectives = {}

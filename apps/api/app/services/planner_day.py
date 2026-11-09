@@ -170,10 +170,10 @@ async def set_task_done(db, user_id: int, task_id: int, done: bool, today: date)
     set_status(task, "done" if done else "open", today)
 
 
-async def set_task_text(db, user_id: int, task_id: int, text: str) -> None:
+async def set_task_text(db, user_id: int, task_id: int, text: str, today: date | None = None) -> None:
     task = await _task(db, user_id, task_id)
     if planner_work.is_planning(task):  # renamed as a pipeline item is: tags move to products only when typed
-        planner_work.set_text_row(task, text)
+        planner_work.set_text_row(task, text, today)
         return
     label, tags = _task_fields(text)
     task.text = label

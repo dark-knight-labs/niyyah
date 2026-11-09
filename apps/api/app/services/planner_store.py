@@ -92,7 +92,28 @@ async def pipeline_items(db: AsyncSession, user_id: int, today: date) -> dict[st
             "added": _iso(r.added_on), "done_on": _iso(r.done_on), "focus": r.focus_week, "done": r.done, "age_days": age,
             "description": r.description or "", "blocked_by": list(r.blocked_by or []),
             "stale": r.lane in ("next", "backlog") and r.checkpoint is None and age >= STALE_DAYS,
+            "goal_ref": r.goal_ref, "label_month": r.label_month, "label_date": _iso(r.label_date),
         })
+    return out
+
+
+async def ended_goals(db: AsyncSession, user_id: int, today: date, items_by_stream: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    """Per stream, the goal lines of earlier quarters that its items are nested under (the current quarter's are in the quarter)."""
+    label = quarter_for(today)
+    wanted = {s: {i["goal_ref"] for i in items if i["goal_ref"]} for s, items in items_by_stream.items()}
+    wanted = {s: refs for s, refs in wanted.items() if refs}
+    if not wanted:
+        return {}
+    rows = await _all(db, select(QuarterStream).where(
+        QuarterStream.user_id == user_id, QuarterStream.slug.in_(list(wanted))).order_by(QuarterStream.quarter.desc()))
+    now = {(r.slug, g["id"]) for r in rows if r.quarter == label for g in r.goal_checklist or checklist_from_text(r.goal)}
+    out: dict[str, list[dict]] = {}
+    for r in rows:
+        if r.quarter >= label:
+            continue
+        for g in r.goal_checklist or checklist_from_text(r.goal):
+            if g["id"] in wanted[r.slug] and (r.slug, g["id"]) not in now and all(e["id"] != g["id"] for e in out.get(r.slug, [])):
+                out.setdefault(r.slug, []).append({"id": g["id"], "text": g["text"], "quarter": r.quarter})
     return out
 
 

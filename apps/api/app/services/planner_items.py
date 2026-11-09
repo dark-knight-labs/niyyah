@@ -235,7 +235,7 @@ async def update_item(db: AsyncSession, user_id: int, task_id: int, fields: dict
     text_tags = None
     if "text" in fields:
         if planning:
-            planner_work.set_text_row(task, fields["text"])
+            planner_work.set_text_row(task, fields["text"], today)
         else:
             task.text, text_tags = _task_fields(fields["text"])
     if fields.get("day") is not None:

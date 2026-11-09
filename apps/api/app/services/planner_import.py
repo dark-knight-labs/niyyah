@@ -107,7 +107,8 @@ def _planning_rows(snap: Snapshot, user_id: int) -> list[Task]:
             status=item_status(r.done, r.status), focus_week=r.focus_week, objective_text=r.objective_text, objective_done=r.objective_done,
             focus_checkpoint=r.focus_checkpoint, blocked_by=r.blocked_by, due_on=r.due_on, scheduled_on=r.scheduled_on, start_on=r.start_on,
             source_path=r.source_path, start_min=r.start_min, end_min=r.end_min, weight=r.weight,
-            checklist=clean_subtasks([i.model_dump() for i in r.checklist]), origin=r.origin, position=0) for r in snap.planning_rows]
+            checklist=clean_subtasks([i.model_dump() for i in r.checklist]), origin=r.origin, position=0,
+            goal_ref=r.goal_ref, label_month=r.label_month, label_date=None if r.label_month else r.label_date) for r in snap.planning_rows]
     pipeline = [{"id": i.id, "user_id": user_id, "stream": i.stream, "lane": i.lane, "text": i.text, "description": i.description,
                  "products": clean_products(i.products or ([i.product] if i.product else [])), "checkpoint": i.checkpoint,
                  "added_on": i.added_on, "done_on": i.done_on, "focus_week": i.focus_week, "done": i.done, "blocked_by": i.blocked_by,

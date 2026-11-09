@@ -9,10 +9,8 @@ import { AdvisorPanel } from "@/components/planner/advisor-panel";
 import { CompassBand } from "@/components/planner/compass-band";
 import { Notice, Spinner } from "@/components/planner/page-title";
 import { PlanHeader } from "@/components/planner/plan-header";
-import { PlanMap } from "@/components/planner/plan-map";
+import { PlanTable } from "@/components/planner/plan-table";
 import { StreamEditor } from "@/components/planner/stream-editor";
-import { WorkSection } from "@/components/planner/work-section";
-import { Row, Tab, View, buildRows, tabOf } from "@/lib/plan-model";
 import { dateInTz } from "@/lib/routine";
 import { PLANNER_TZ } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
@@ -28,13 +26,11 @@ function Strip({ n, title, aside }: { n: string; title: string; aside?: string }
   );
 }
 
-/** Plan: the Super Objective and the week, a map of every block against every horizon, and one work list with a side card. */
+/** Plan: the Super Objective and the week, then one table of every block's quarter goals against Now, Next and Someday. */
 export default function PlanPage() {
   const { loading, owner, quarter, quarterError, pipelines, objectives, notebooks, schedule, streams, error, reload } = usePlanner();
   // The page renders a spinner until the plan loads, so reading the browser here cannot cause a hydration mismatch.
   const [picked, setPicked] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("stream")));
-  const [view, setViewState] = useState<Omit<View, "stream">>({ tab: "now", tag: null, kind: "all" });
-  const [sel, setSel] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null); // a stream id, "new", or null
   const [problem, setProblem] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -82,7 +78,6 @@ export default function PlanPage() {
   function pick(id: string | null) {
     setPicked(id);
     setEditing(null);
-    setViewState((v) => ({ ...v, tag: null }));
     window.history.replaceState(null, "", id ? `?stream=${id}` : window.location.pathname);
   }
 
@@ -91,21 +86,11 @@ export default function PlanPage() {
   if (!quarter || !pipelines) return <Notice>{quarterError ?? error ?? "Loading the plan."}</Notice>;
 
   const stream = streams.find((s) => s.id === picked) ? picked : null;
-  const rows = buildRows(pipelines, notebooks);
-  const merged: View = { ...view, stream };
   const goal = stream ? quarter.streams.find((s) => s.stream === stream) : undefined;
 
   async function save(id: string, change: StreamChange & { name: string }, isNew: boolean) {
     const ok = await run(() => (isNew ? vaultApi.addStream(id, change) : vaultApi.updateStream(id, change)));
     if (ok) { setEditing(null); if (isNew) pick(id); }
-  }
-
-  function open(row: Row, tab: Tab) {
-    setPicked(null);
-    setViewState({ tab, tag: null, kind: "all" });
-    setSel(row.key);
-    window.history.replaceState(null, "", window.location.pathname);
-    document.getElementById("plan-work")?.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
   const editor = editing === "new"
@@ -118,7 +103,7 @@ export default function PlanPage() {
     <div className="w-full">
       <CompassBand streams={streams} />
       <AdvisorPanel onApplied={reload} />
-      <PlanHeader quarter={quarter} objectives={objectives} streams={streams} schedule={schedule} today={dateInTz(now, PLANNER_TZ)} busy={busy}
+      <PlanHeader quarter={quarter} week={pipelines.week} objectives={objectives} streams={streams} schedule={schedule} today={dateInTz(now, PLANNER_TZ)} busy={busy}
         onSaveObjective={(text) => run(() => vaultApi.setSuperObjective(text, quarter.objective_ar))} />
       {(problem || error) && <p role="alert" className="mb-4 border border-[var(--destructive)] px-4 py-2 text-xs text-[var(--destructive)]">{problem ?? error}</p>}
 
@@ -129,7 +114,7 @@ export default function PlanPage() {
           if (ok) { setMessage("Habit added"); setHabitPick(null); document.getElementById("plan-habits")?.scrollIntoView({ block: "start", behavior: "smooth" }); }
           return ok && added > 0;
         }}
-        onAdded={(tab, count) => { setViewState((v) => ({ ...v, tab, tag: null, kind: "all" })); setMessage(count > 1 ? `${count} items added` : "Added"); }} />
+        onAdded={(_tab, count) => setMessage(count > 1 ? `${count} items added` : "Added")} />
 
       {streams.length === 0 ? (
         <>
@@ -140,18 +125,10 @@ export default function PlanPage() {
         </>
       ) : (
         <>
-          <section aria-label="Map" className="mb-4 border border-[var(--border)] bg-[var(--surface)]">
-            <Strip n="01" title="Horizons" aside="Every block against every horizon. Click an item to open it below." />
-            <PlanMap streams={streams} quarter={quarter} notebooks={notebooks} rows={rows} picked={stream} selected={sel} week={pipelines.week}
-              onOpen={(r, tab) => open(r, tab)} onPickStream={pick}
-              onTag={(s, t) => { setPicked(s); setEditing(null); setViewState((v) => ({ ...v, tab: "now", tag: t })); window.history.replaceState(null, "", `?stream=${s}`); document.getElementById("plan-work")?.scrollIntoView({ block: "start", behavior: "smooth" }); }} />
-          </section>
-
-          <section id="plan-work" aria-label="Work" className="border border-[var(--border)] bg-[var(--surface)]">
-            <Strip n="02" title="Work" aside={`${rows.filter((r) => r.type === "item" && tabOf(r) !== "done").length} open items${rows.some((r) => r.type === "note" && r.entry.open) ? ` · ${rows.filter((r) => r.type === "note" && r.entry.open).length} blocked` : ""}`} />
-            <WorkSection streams={streams} quarter={quarter} pipelines={pipelines} notebooks={notebooks} objectives={objectives} rows={rows}
-              view={merged} setView={(patch) => setViewState((v) => ({ ...v, ...patch }))} sel={sel} setSel={setSel}
-              picked={stream} onPickStream={pick} editor={editor} onEdit={setEditing} onAddStream={() => setEditing("new")}
+          <section id="plan-work" aria-label="Plan" className="border border-[var(--border)] bg-[var(--surface)]">
+            <Strip n="01" title="Plan" aside={`${quarter.quarter.slice(5)} · every block against Now, Next and Someday`} />
+            <PlanTable streams={streams} quarter={quarter} pipelines={pipelines} notebooks={notebooks} today={dateInTz(now, PLANNER_TZ)}
+              block={stream} onBlock={pick} editor={editor} onEdit={setEditing} onAddBlock={() => setEditing("new")}
               busy={busy} run={run} message={message} />
           </section>
         </>
@@ -159,7 +136,7 @@ export default function PlanPage() {
 
       {habits && (
         <section id="plan-habits" aria-label="Habits" className="mt-4 border border-[var(--border)] bg-[var(--surface)]">
-          <Strip n="03" title="Habits" aside={`${habits.habits.filter((h) => h.stage === "installing").length} installing · ${habits.habits.filter((h) => h.stage === "rails").length} on rails`} />
+          <Strip n="02" title="Habits" aside={`${habits.habits.filter((h) => h.stage === "installing").length} installing · ${habits.habits.filter((h) => h.stage === "rails").length} on rails`} />
           <HabitBoard data={habits} streams={streams} busy={busy} runHabits={runHabits} picked={habitPick} onPick={setHabitPick} />
         </section>
       )}
