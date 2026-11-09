@@ -68,7 +68,7 @@ export function PlanHabitCard({ habit: h, goals, busy, runHabits, onClose }: {
   const linked = goals.find((g) => g.id === h.goal_ref);
   return (
     <>
-      <p className="mono text-[var(--muted-foreground)]">Habit · {h.stream ?? "no block"}</p>
+      <p className="mono text-[var(--muted-foreground)]">Habit · {h.plan_block ?? h.stream ?? "no block"}</p>
       <h3 className="heading-elegant text-lg leading-tight">↻ {h.name}</h3>
       <div>
         <span className={label}>Cadence</span>

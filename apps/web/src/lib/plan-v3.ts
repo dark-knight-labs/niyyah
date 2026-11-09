@@ -17,9 +17,9 @@ export const quarterOf = (day: string): string => `${day.slice(0, 4)}-Q${Math.fl
 
 const qText = (q: string): string => `${q.slice(5)}'${q.slice(2, 4)}`;
 
-/** "Q4'26" for the current or an earlier quarter, "Q1'27 · next" for a later one. */
+/** "Q4'26" for the current quarter (or an earlier one), "Q1'27 · next" for the quarter right after the current one, a bare label for the rest. */
 export function tabLabel(q: string, current: string): string {
-  return q > current ? `${qText(q)} · next` : qText(q);
+  return q === nextQuarter(current) ? `${qText(q)} · next` : qText(q);
 }
 
 /**
@@ -80,9 +80,25 @@ export function weekChecks(h: Pick<HabitData, "days">, today: string): number {
   return Object.keys(h.days ?? {}).filter((d) => d >= start && d <= today).length;
 }
 
-/** Habits shown in the Plan: live ones whose Plan block (`stream`) is one of `blocks`. */
+/** A habit's Plan block: the API's `plan_block`; older answers fall back to `stream`. */
+export const planBlockOf = (h: Pick<HabitData, "stream" | "plan_block">): string | null => (h.plan_block !== undefined ? h.plan_block : h.stream) ?? null;
+
+/** Habits shown in the Plan: live ones whose Plan block is one of `blocks`. */
 export function planHabits(habits: HabitData[], blocks: string[]): HabitData[] {
-  return habits.filter((h) => h.stage !== "retired" && h.stream !== null && blocks.includes(h.stream));
+  return habits.filter((h) => {
+    const b = planBlockOf(h);
+    return h.stage !== "retired" && b !== null && blocks.includes(b);
+  });
+}
+
+/** What a Make it a habit loses, in words, for the confirmation (the habit keeps its name, block, goal; short details become its minimum). */
+export function habitLoss(item: { description?: string; products?: string[]; subtasks?: number }): string[] {
+  const note = (item.description ?? "").replace(/\s+/g, " ").trim();
+  const out: string[] = [];
+  if (note.length > 120) out.push("its details");
+  if ((item.subtasks ?? 0) > 0) out.push(`${item.subtasks} sub-task${item.subtasks === 1 ? "" : "s"}`);
+  if ((item.products ?? []).length > 0) out.push(`its tag${(item.products ?? []).length === 1 ? "" : "s"} (${(item.products ?? []).map((t) => `#${t}`).join(" ")})`);
+  return out;
 }
 
 export interface HabitsByGoal {
@@ -90,7 +106,9 @@ export interface HabitsByGoal {
   byGoal: Map<string, HabitData[]>;
   /** Linked to a goal of an earlier quarter, or one that was removed. */
   ended: HabitData[];
-  /** Linked to no goal, or to a goal of another tab's quarter (shown with the goals they belong to there). */
+  /** Linked to a goal that no longer exists (removed): shown with a hint to re-link. */
+  removed: HabitData[];
+  /** Linked to no goal (a goal of another tab's quarter is not listed here: it shows with its goal there). */
   loose: HabitData[];
 }
 
@@ -101,14 +119,16 @@ export interface HabitsByGoal {
 export function habitsByGoal(habits: HabitData[], shown: string[], endedIds: string[], otherIds: string[] = []): HabitsByGoal {
   const byGoal = new Map<string, HabitData[]>();
   const ended: HabitData[] = [];
+  const removed: HabitData[] = [];
   const loose: HabitData[] = [];
   for (const h of habits) {
     const ref = h.goal_ref ?? null;
     if (ref && shown.includes(ref)) byGoal.set(ref, [...(byGoal.get(ref) ?? []), h]);
     else if (ref && endedIds.includes(ref)) ended.push(h);
-    else if (!ref || !otherIds.includes(ref)) loose.push(h);
+    else if (!ref) loose.push(h);
+    else if (!otherIds.includes(ref)) removed.push(h);
   }
-  return { byGoal, ended, loose };
+  return { byGoal, ended, removed, loose };
 }
 
 /** Gate progress for the mini bar: weeks at the gate over the weeks it takes, 0-100. */

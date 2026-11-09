@@ -275,6 +275,25 @@ async def test_quarter_tabs_and_creating_a_future_quarter_on_write_only(acct, mo
 
 
 @pytest.mark.asyncio
+async def test_a_block_added_in_the_earlier_quarter_after_the_future_quarter_was_written_is_there_on_day_one(acct, monkeypatch):
+    client, uid, ids = acct
+    await client.put(f"{V}/plan/goals", json={"stream": "studio", "quarter": "2027-Q1", "goals": [{"text": "Ship v2"}]})  # written 2026-11-09
+    monkeypatch.setattr(vault, "_local_now", lambda: datetime(2026, 12, 20, 9, 0))
+    r = await client.post(f"{V}/quarter/stream", json={"stream": "reading", "name": "Reading", "goal_checklist": [{"text": "Ten books"}]})
+    assert r.status_code == 200
+    assert await _row(uid, "2027-Q1", "reading") is None
+    monkeypatch.setattr(vault, "_local_now", lambda: datetime(2027, 1, 1, 0, 5))
+    pipelines = (await client.get(f"{V}/pipelines")).json()
+    assert [s["stream"] for s in pipelines["streams"]] == ["studio", "fitness", "reading"]  # carried on the read, goals empty
+    reading = await _row(uid, "2027-Q1", "reading")
+    assert reading.goal_checklist == [] and reading.name == "Reading"
+    assert [l["text"] for l in (await _row(uid, "2027-Q1", "studio")).goal_checklist] == ["Ship v2"]  # the written rows are untouched
+    assert (await client.put(f"{V}/plan/goals", json={"stream": "reading", "quarter": "2027-Q1", "goals": [{"text": "Twelve"}]})).status_code == 200
+    async with TestSession() as db:
+        assert len((await db.execute(select(QuarterStream).where(QuarterStream.quarter == "2027-Q1"))).scalars().all()) == 3
+
+
+@pytest.mark.asyncio
 async def test_a_tab_appears_for_a_later_quarter_with_goals(acct):
     client, uid, _ = acct
     await client.put(f"{V}/plan/goals", json={"stream": "fitness", "quarter": "2027-Q3", "goals": [{"text": "Marathon"}]})
@@ -382,6 +401,76 @@ async def test_habit_keeps_its_goal_when_the_quarter_ends_and_can_be_relinked(ac
     assert (await client.put(f"{V}/habits/{h['id']}", json={"goal_ref": "g2000000"})).status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_a_habit_with_only_a_day_block_that_is_a_plan_block_belongs_to_it(acct):
+    client, uid, _ = acct
+    async with TestSession() as db:
+        db.add(_stream(uid, "2026-Q4", "body", "Body", [_line("b1000000", "Lift")], 2))
+        db.add_all([PlannerHabit(user_id=uid, name="Gym", block="body", started_on=date(2026, 11, 1)),
+                    PlannerHabit(user_id=uid, name="Focus", block="onething", started_on=date(2026, 11, 1))])
+        await db.commit()
+    habits = {h["name"]: h for h in (await client.get(f"{V}/habits")).json()["habits"]}
+    assert (habits["Gym"]["stream"], habits["Gym"]["plan_block"]) == (None, "body")
+    assert habits["Focus"]["plan_block"] is None  # 'onething' is a day block, not a Plan block: it stays on the Habits board only
+    r = await client.put(f"{V}/habits/{habits['Gym']['id']}", json={"goal_ref": "b1000000"})
+    assert r.status_code == 200
+    gym = next(h for h in r.json()["habits"] if h["name"] == "Gym")
+    assert (gym["goal_ref"], gym["stream"], gym["plan_block"]) == ("b1000000", "body", "body")  # linking names the Plan block
+    assert (await client.put(f"{V}/habits/{gym['id']}", json={"goal_ref": "g1000000"})).status_code == 422  # another block's goal
+    refused = await client.put(f"{V}/habits/{habits['Focus']['id']}", json={"goal_ref": "b1000000"})
+    assert refused.status_code == 422 and "not in a Plan block" in refused.json()["detail"]
+    assert next(h for h in (await client.get(f"{V}/habits")).json()["habits"] if h["name"] == "Focus")["stream"] is None
+    # the ended goal shows for it after the quarter turns
+    assert (await _studio(client))["ended_goals"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_habit_cannot_keep_a_goal_into_another_plan_block(acct):
+    client, uid, _ = acct
+    h = await _habit(client, goal_ref="g1000000")
+    # the same ref sent while the Plan block changes in the same request is checked against the new block
+    r = await client.put(f"{V}/habits/{h['id']}", json={"stream": "fitness", "goal_ref": "g1000000"})
+    assert r.status_code == 422
+    assert next(x for x in (await client.get(f"{V}/habits")).json()["habits"] if x["id"] == h["id"])["stream"] == "studio"
+    ok = await client.put(f"{V}/habits/{h['id']}", json={"stream": "fitness", "goal_ref": "f1000000"})
+    assert ok.status_code == 200 and ok.json()["habits"][0]["goal_ref"] == "f1000000"
+
+
+@pytest.mark.asyncio
+async def test_a_stale_product_on_a_goal_line_is_dropped_not_refused_but_a_new_unknown_one_is(acct):
+    client, uid, _ = acct
+    await _add(client, "studio", "Router")
+    await client.put(f"{V}/plan/goals", json={"stream": "studio", "quarter": "2026-Q4", "goals": [{"id": "g1000000", "text": "Ship DNS", "product": "router"}]})
+    async with TestSession() as db:  # the product row disappears (e.g. a revert) while the line still carries it
+        row = (await db.execute(select(PlannerProduct))).scalar_one()
+        await db.delete(row)
+        await db.commit()
+    ok = await client.put(f"{V}/plan/goals", json={"stream": "studio", "quarter": "2026-Q4", "goals": [{"id": "g1000000", "text": "Ship DNS", "product": "router"}, {"text": "More"}]})
+    assert ok.status_code == 200
+    assert all("product" not in l for l in (await _row(uid, "2026-Q4", "studio")).goal_checklist)
+    bad = await client.put(f"{V}/plan/goals", json={"stream": "studio", "quarter": "2026-Q4", "goals": [{"text": "New", "product": "router"}]})
+    assert bad.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_product_counts_include_event_annotations_and_task_tags_are_capped(acct):
+    client, uid, ids = acct
+    router = await _add(client, "studio", "Router")
+    async with TestSession() as db:
+        db.add(EventOverlay(user_id=uid, event_key="e1", stream="studio", products=["router"]))
+        await db.commit()
+    assert (await _products(client, "studio"))[0]["tasks"] == 3  # two tasks and one event
+    assert (await client.delete(f"{V}/products/{router['id']}")).json()["tasks"] == 3
+    await _add(client, "studio", "Alpha")
+    async with TestSession() as db:
+        t = await db.get(Task, ids["c"])
+        t.products = [f"t{n}" for n in range(12)]
+        await db.commit()
+    r = await client.put(f"{V}/pipeline/products", json={"stream": "studio", "line": ids["c"], "hash": "", "products": ["alpha"]})
+    assert r.status_code == 422 and "at most 12 tags" in r.json()["detail"]
+    assert len((await _tags(uid))["Replace the switch"]) == 12
+
+
 # --- task -> habit ---------------------------------------------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -396,6 +485,14 @@ async def test_make_a_habit_from_a_task_creates_and_deletes_in_one_transaction(a
         ("Plan the cutover", "studio", 3, "installing", "g2000000", "soul")
     assert habit["started_on"] == "2026-11-09"
     assert "Plan the cutover" not in await _tags(uid)
+    # short details become the habit's minimum
+    async with TestSession() as db:
+        db.add(_task(uid, "studio", "With notes", "next", 6, description="Five minutes of stretching"))
+        await db.commit()
+    line = next(i for i in (await _studio(client))["items"] if i["text"] == "With notes")
+    assert line["subtasks"] == 0
+    body = (await client.post(f"{V}/pipeline/to-habit", json={"stream": "studio", "line": line["line"], "hash": ""})).json()
+    assert next(h for h in body["habits"] if h["id"] == body["habit_id"])["minimum"] == "Five minutes of stretching"
     # a task nested under an ended goal gives a habit with no goal
     async with TestSession() as db:
         db.add(_task(uid, "studio", "Old nest", "next", 5, goal_ref="old00000"))

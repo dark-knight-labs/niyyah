@@ -206,6 +206,8 @@ export interface PipelineItemData {
   label_month?: string | null;
   /** ISO day. */
   label_date?: string | null;
+  /** How many sub-tasks it has. */
+  subtasks?: number;
 }
 
 /** A goal line of an earlier quarter that some item of the block is still nested under. */
@@ -297,6 +299,8 @@ export interface HabitData {
   minimum: string;
   stage: HabitStage;
   stream: string | null;
+  /** Plan v3: the Plan block: `stream`, else `block` when that is a Plan block slug of this quarter; null = Habits board only. */
+  plan_block?: string | null;
   /** Plan v3: a goal line of `stream` (this quarter or later; it stays when its quarter ends). */
   goal_ref?: string | null;
   gate_pct: number;

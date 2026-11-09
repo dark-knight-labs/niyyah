@@ -37,6 +37,11 @@ function ProductsEditor({ stream, products, busy, run }: { stream: StreamMeta; p
           <span key={p.id} data-product={p.slug} className="mono inline-flex items-center border border-[var(--rule)]">
             {renaming?.id === p.id ? (
               <input autoFocus value={renaming.name} maxLength={60} aria-label={`New name for ${p.name}`} onChange={(e) => setRenaming({ id: p.id, name: e.target.value })}
+                onBlur={() => {
+                  const next = renaming.name.trim();
+                  if (next && next !== p.name) void run(() => vaultApi.renameProduct(p.id, next)).then((ok) => ok && setRenaming(null));
+                  else setRenaming(null);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") setRenaming(null);
                   if (e.key === "Enter" && renaming.name.trim()) void run(() => vaultApi.renameProduct(p.id, renaming.name)).then((ok) => ok && setRenaming(null));
@@ -176,6 +181,12 @@ export function BlockCell({ stream, quarter, currentQuarter, lines, goalRefs, pr
                 </div>
               );
             })}
+            {isCurrent && split.removed.length > 0 && (
+              <div data-habits-removed>
+                <p className="mono mt-1.5 truncate text-[var(--warn)]">↳ (removed goal) · re-link</p>
+                {split.removed.map((h) => <HabitLine key={h.id} habit={h} picked={pickedHabit === h.id} dim={dimHabit(h)} warn onPick={() => onPickHabit(h.id)} onRelink={() => onPickHabit(h.id)} />)}
+              </div>
+            )}
             {isCurrent && split.loose.length > 0 && (
               <div data-habits-loose>
                 <p className="mono mt-1.5 truncate text-[var(--muted-foreground)]">habits · no goal</p>

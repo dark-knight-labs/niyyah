@@ -117,13 +117,13 @@ test("quarter tabs: this and next quarter, a goal added to the next one, + opens
   await expect(cell(page, "now").getByText(`↳ ${future} · ${nextQ}`)).toBeVisible();
   // "+" opens the quarter after the last tab, with no goal and nothing created until one is added
   await tabs.getByRole("button", { name: `Add quarter ${afterQ}` }).click();
-  await expect(tabs.getByRole("button", { name: `${afterQ} · next` })).toHaveAttribute("aria-pressed", "true");
+  await expect(tabs.getByRole("button", { name: afterQ, exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(block(page).getByRole("button", { name: `+ ${afterQ} goal` })).toBeVisible();
   // the next quarter keeps its tab after a reload because it has a goal; the empty one does not
   await page.reload();
   await expect(page.getByRole("table", { name: "Plan" })).toBeVisible();
   await expect(tabs.getByRole("button", { name: `${nextQ} · next` })).toBeVisible();
-  await expect(tabs.getByRole("button", { name: `${afterQ} · next` })).toHaveCount(0);
+  await expect(tabs.getByRole("button", { name: afterQ, exact: true })).toHaveCount(0);
 });
 
 test("products: add, tag a goal and a task, rename, delete with a warning", async ({ page, request }) => {

@@ -211,7 +211,9 @@ export function BoardCanvas({ boardId, boards, startNew, onOpen, onNew, onRetitl
     const r = derived.rects.get(focusNode);
     if (!r) return;
     focused.current = focusNode;
+    fitted.current = true;                                           // the deep link places the view: no fit may follow it
     setTimeout(() => {
+      fitted.current = true;
       select([focusNode]);
       setFlash(focusNode);
       centerIn(r, 1.2, true);

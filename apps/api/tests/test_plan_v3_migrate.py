@@ -88,7 +88,7 @@ async def test_dry_run_prints_every_change_and_writes_nothing(account, capsys, t
     assert 'block=fitness product: slug=dns' in out
     assert "block=studio products after: home-lab, dns, two-words, router, calendar" in out
     assert 'skipped tag "2fa": not usable' in out and 'block=ghost skipped tag "lost": no quarter defines the block' in out
-    assert f"id={h['a']} habit \"Walk\" stream=studio goal_ref: None -> g1000000" in out
+    assert f"id={h['a']} habit \"Walk\" block=studio goal_ref: None -> g1000000" in out
     assert await _products(uid) == [] and await _goal(h["a"]) is None
 
 
@@ -138,13 +138,45 @@ async def test_existing_products_are_skipped_and_positions_continue(account, cap
 async def test_a_bad_habit_goal_mapping_refuses_before_any_write(account, capsys, tmp_path):
     uid, h = account
     for mapping, why in (({str(h["a"]): "nope0000"}, "not a goal of studio"), ({"99999": "g1000000"}, "does not exist"),
-                         ({str(h["c"]): "g1000000"}, "no Plan block"), ({str(h["a"]): "f1000000"}, "not a goal of studio")):
+                         ({str(h["c"]): "g1000000"}, "not in a Plan block"), ({str(h["a"]): "f1000000"}, "not a goal of studio")):
         assert await _run(uid, apply=True, habit_goals=_goals_file(tmp_path, mapping)) == 1
         assert why in capsys.readouterr().err
     assert await _products(uid) == [] and await _goal(h["a"]) is None
     bad = tmp_path / "bad.json"
     bad.write_text("[1]")
     assert await _run(uid, habit_goals=bad) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_habit_with_only_a_day_block_links_through_it_and_the_revert_restores_null(account, capsys, tmp_path):
+    uid, h = account
+    async with TestSession() as db:  # a Plan block slug that is also the habit's day block; no stream on the habit
+        db.add(QuarterStream(user_id=uid, quarter="2026-Q4", slug="body", name="Body", color="amber", icon="heart", slot="", weekly=True,
+                             has_pipeline=True, in_note=True, goal="Lift", goal_checklist=[_line("b1000000", "Lift")], status="committed",
+                             checkpoints=[], position=2))
+        body = PlannerHabit(user_id=uid, name="Gym", block="body", started_on=TODAY)
+        one = PlannerHabit(user_id=uid, name="Focus", block="onething", started_on=TODAY)  # not a Plan block
+        db.add_all([body, one])
+        await db.commit()
+        body_id, one_id = body.id, one.id
+    # a habit that is not in a Plan block is refused, before any write
+    assert await _run(uid, apply=True, habit_goals=_goals_file(tmp_path, {str(one_id): "g1000000"})) == 1
+    assert "not in a Plan block" in capsys.readouterr().err and await _products(uid) == []
+    # a goal of another block is refused too
+    assert await _run(uid, habit_goals=_goals_file(tmp_path, {str(body_id): "g1000000"})) == 1
+    capsys.readouterr()
+    journal = tmp_path / "j.json"
+    assert await _run(uid, apply=True, journal=journal, habit_goals=_goals_file(tmp_path, {str(body_id): "b1000000"})) == 0
+    out = capsys.readouterr().out
+    assert "block=body goal_ref: None -> b1000000, stream: None -> body" in out
+    async with TestSession() as db:
+        row = await db.get(PlannerHabit, body_id)
+        assert (row.goal_ref, row.stream) == ("b1000000", "body")
+    assert {"id": body_id, "column": "stream", "old": None, "new": "body"} in json.loads(journal.read_text())["updates"]
+    assert await _run(uid, apply=True, revert=journal) == 0
+    async with TestSession() as db:
+        row = await db.get(PlannerHabit, body_id)
+        assert (row.goal_ref, row.stream) == (None, None)
 
 
 @pytest.mark.asyncio
@@ -176,6 +208,23 @@ async def test_revert_restores_and_skips_what_changed_since(account, capsys, tmp
     capsys.readouterr()
     await _run(uid, apply=True, revert=tmp_path / "k.json")
     assert "goal_ref skipped" in capsys.readouterr().out and await _goal(h["a"]) == "other000"
+
+
+@pytest.mark.asyncio
+async def test_revert_keeps_a_product_a_goal_line_carries(account, capsys, tmp_path):
+    uid, _ = account
+    journal = tmp_path / "j.json"
+    await _run(uid, apply=True, journal=journal)
+    async with TestSession() as db:  # the owner put a seeded product on a goal line
+        row = await db.get(QuarterStream, (await db.execute(select(QuarterStream.id).where(QuarterStream.slug == "studio"))).scalar_one())
+        row.goal_checklist = [{**row.goal_checklist[0], "product": "router"}]
+        await db.commit()
+    capsys.readouterr()
+    await _run(uid, apply=True, revert=journal)
+    out = capsys.readouterr().out
+    assert "a goal line of studio carries router now" in out
+    assert ("studio", "router") in [(b, s) for b, s, _, _ in await _products(uid)]
+    assert len(await _products(uid)) == 1
 
 
 @pytest.mark.asyncio

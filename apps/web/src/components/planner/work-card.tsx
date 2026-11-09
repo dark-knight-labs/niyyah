@@ -6,7 +6,8 @@ import { OctagonAlert } from "lucide-react";
 import { Checkbox } from "@/components/routine/checkbox";
 import { ItemRow, NoteRow, TABS, LANE_FOR, isOpenBlocker, tabOf, waitingOn } from "@/lib/plan-model";
 import { GoalRef, monthText, quarterText } from "@/lib/plan-v2";
-import { plainTags, taskProducts } from "@/lib/plan-v3";
+import { habitLoss, plainTags, taskProducts } from "@/lib/plan-v3";
+import { useBlocks } from "@/lib/blocks";
 import { StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { Lane, NotebookEntryData, ProductData } from "@/lib/vault-types";
@@ -79,6 +80,9 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
   const order: Lane[] = ["now", "next", "backlog"];
   const at = order.indexOf(item.lane);
   const [habitAsk, setHabitAsk] = useState(false);
+  const dayBlocks = useBlocks();
+  const landing = dayBlocks.list.find((b) => !b.archived)?.label;
+  const lost = habitLoss(item);
   const tags = item.products ?? [];
   const mine = taskProducts(tags, products);
   const plain = plainTags(tags, products);
@@ -193,7 +197,7 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
         <Link href={`/map?board=life&node=task:${item.line}`} className={ghost}>Show on map</Link>
         {onMakeHabit && item.lane !== "done" && (habitAsk ? (
           <span role="alertdialog" aria-label="Make it a habit?" className="flex flex-wrap items-center gap-2 border border-[var(--rule)] px-2.5 py-1 text-xs">
-            This becomes a habit, 3 a week, and the task is deleted.
+            This becomes a habit, 3 a week{landing ? ` in ${landing} on the Habits board` : ""}, and the task is deleted.{lost.length > 0 ? ` Not kept: ${lost.join(", ")}.` : ""}
             <button type="button" disabled={busy} className="mono text-[var(--accent)] hover:underline" onClick={() => void onMakeHabit(item)}>Make habit</button>
             <button type="button" className="mono text-[var(--muted-foreground)] hover:underline" onClick={() => setHabitAsk(false)}>Cancel</button>
           </span>

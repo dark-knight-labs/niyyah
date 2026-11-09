@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  deleteWarning, firstSentence, gateShare, groupGoals, habitsByGoal, nextQuarter, planHabits, plainTags, quarterOf, quarterTabs, tabLabel, tagSlug,
+  deleteWarning, firstSentence, habitLoss, gateShare, groupGoals, habitsByGoal, nextQuarter, planHabits, plainTags, quarterOf, quarterTabs, tabLabel, tagSlug,
   taskProducts, weekChecks, weekLabel, weekStart,
 } from "@/lib/plan-v3";
 import type { HabitData, ProductData } from "@/lib/vault-types";
@@ -24,7 +24,8 @@ describe("quarters", () => {
   it("labels future quarters with next", () => {
     expect(tabLabel("2026-Q4", "2026-Q4")).toBe("Q4'26");
     expect(tabLabel("2027-Q1", "2026-Q4")).toBe("Q1'27 · next");
-    expect(tabLabel("2027-Q3", "2026-Q4")).toBe("Q3'27 · next");
+    expect(tabLabel("2027-Q3", "2026-Q4")).toBe("Q3'27");   // only the quarter right after the current one is "next"
+    expect(tabLabel("2027-Q2", "2027-Q1")).toBe("Q2'27 · next");
   });
   it("tabs: current, next, quarters with goals; + opens the one after the last", () => {
     expect(quarterTabs("2026-Q4", undefined)).toEqual({ tabs: ["2026-Q4", "2027-Q1"], plus: "2027-Q2" });
@@ -97,11 +98,25 @@ describe("habits in the block cell", () => {
     const r = habitsByGoal(hs, ["g1", "g2"], ["old"], ["n1"]);
     expect([...r.byGoal].map(([k, v]) => [k, v.map((h) => h.id)])).toEqual([["g1", [1, 5]]]);
     expect(r.ended.map((h) => h.id)).toEqual([3]);
-    expect(r.loose.map((h) => h.id)).toEqual([2, 6]); // 4 belongs to another tab's quarter; an unknown goal falls back to loose
+    expect(r.loose.map((h) => h.id)).toEqual([2]);
+    expect(r.removed.map((h) => h.id)).toEqual([6]); // 4 belongs to another tab's quarter and is listed nowhere here
+  });
+  it("a habit with no stream belongs to its day block when that is a Plan block (the API says so in plan_block)", () => {
+    const all = [habit({ id: 1, stream: null, plan_block: "studio" }), habit({ id: 2, stream: null, plan_block: null }), habit({ id: 3, stream: "studio", plan_block: "studio" })];
+    expect(planHabits(all, ["studio"]).map((h) => h.id)).toEqual([1, 3]);
   });
   it("shows only live habits of Plan blocks", () => {
     const all = [habit({ id: 1 }), habit({ id: 2, stage: "retired" }), habit({ id: 3, stream: null }), habit({ id: 4, stream: "elsewhere" })];
     expect(planHabits(all, ["studio"]).map((h) => h.id)).toEqual([1]);
+  });
+});
+
+describe("what Make it a habit loses", () => {
+  it("names details past the short limit, sub-tasks and tags; nothing when there are none", () => {
+    expect(habitLoss({})).toEqual([]);
+    expect(habitLoss({ description: "Five minutes of stretching" })).toEqual([]);   // short details become the minimum
+    expect(habitLoss({ description: "x".repeat(121), subtasks: 2, products: ["dns", "lab"] })).toEqual(["its details", "2 sub-tasks", "its tags (#dns #lab)"]);
+    expect(habitLoss({ subtasks: 1, products: ["dns"] })).toEqual(["1 sub-task", "its tag (#dns)"]);
   });
 });
 

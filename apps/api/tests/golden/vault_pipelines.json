@@ -29,6 +29,7 @@
           "product": null,
           "products": [],
           "stale": false,
+          "subtasks": 0,
           "text": "Write the first page"
         },
         {
@@ -49,6 +50,7 @@
           "product": null,
           "products": [],
           "stale": true,
+          "subtasks": 0,
           "text": "Collect sources"
         }
       ],
@@ -99,6 +101,7 @@
           "product": null,
           "products": [],
           "stale": false,
+          "subtasks": 0,
           "text": "Name the project"
         }
       ],

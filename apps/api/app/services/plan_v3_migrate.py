@@ -6,8 +6,9 @@ and returns a journal; `revert` undoes a journal. Steps:
   a. products: for each block, each distinct tag on that user's tasks (every planner_tasks row with a stream, lane or not) and event
      overlays becomes a product (slug = the tag made tag-safe, name = the tag with dashes as spaces, Title Case, position by first
      appearance), unless the block already has that slug;
-  b. habit goals, from --habit-goals {"<habit id>": "<goal line id>"}: the habit must have a Plan block (`stream`) and the line must be
-     a goal of that block this quarter; goal_ref is set only where it is NULL.
+  b. habit goals, from --habit-goals {"<habit id>": "<goal line id>"}: the habit must have a Plan block (`stream`, or its day `block` when
+     stream is NULL and the block is a Plan block slug) and the line must be a goal of that block this quarter; goal_ref is set only
+     where it is NULL, and a habit with NULL stream gets stream = its Plan block (both in the journal).
 
 Nothing here deletes or edits a task, a tag, a goal line or an existing product.
 """
@@ -39,7 +40,7 @@ class Plan:
     today: date
     lines: list[str] = field(default_factory=list)
     products: list[dict] = field(default_factory=list)  # PlannerProduct kwargs
-    habit_goals: list[tuple[PlannerHabit, str]] = field(default_factory=list)
+    habit_goals: list[tuple[PlannerHabit, str, str]] = field(default_factory=list)  # (habit, goal line id, Plan block)
     skipped: Counter = field(default_factory=Counter)
 
     @property
@@ -78,18 +79,18 @@ async def plan(db, user_id: int, today: date, habit_goals: dict[int, str] | None
     habits = {h.id: h for h in (await db.execute(select(PlannerHabit).where(PlannerHabit.user_id == user_id).with_for_update())).scalars()}
     current = quarter_for(today)
     rows = {r.slug: r for r in (await db.execute(select(QuarterStream).where(
-        QuarterStream.user_id == user_id, QuarterStream.quarter == current))).scalars()}
-    chosen: list[tuple[PlannerHabit, str]] = []
+        QuarterStream.user_id == user_id, QuarterStream.quarter == current, QuarterStream.in_note.is_(True)))).scalars()}
+    chosen: list[tuple[PlannerHabit, str, str]] = []
     for habit_id, line_id in habit_goals.items():
         habit = habits.get(habit_id)
         if habit is None:
             raise ValueError(f"habit {habit_id} does not exist for this user")
-        if habit.stream is None:
-            raise ValueError(f"habit {habit_id} has no Plan block, so it has no goal to link to")
-        row = rows.get(habit.stream)
-        if row is None or line_id not in {g["id"] for g in plan_v2.goal_lines(row)}:
-            raise ValueError(f"habit {habit_id}: '{line_id}' is not a goal of {habit.stream} in {current}")
-        chosen.append((habit, line_id))
+        block = plan_v2.plan_block(habit.stream, habit.block, set(rows))
+        if block is None:
+            raise ValueError(f"habit {habit_id} is not in a Plan block (stream is empty and its day block '{habit.block}' is not one), so it has no goal to link to")
+        if line_id not in {g["id"] for g in plan_v2.goal_lines(rows[block])}:
+            raise ValueError(f"habit {habit_id}: '{line_id}' is not a goal of {block} in {current}")
+        chosen.append((habit, line_id, block))
 
     # a. products from the tags in use
     blocks = {slug for (slug,) in (await db.execute(select(QuarterStream.slug).where(
@@ -128,12 +129,13 @@ async def plan(db, user_id: int, today: date, habit_goals: dict[int, str] | None
         out.lines.append(f"block={stream} products after: " + ", ".join(slug for _, slug in sorted(after)))
 
     # b. continued: only where goal_ref is NULL
-    for habit, line_id in chosen:
+    for habit, line_id, block in chosen:
         if habit.goal_ref is not None:
             out.lines.append(f"id={habit.id} habit goal_ref skipped: already {habit.goal_ref!r}; left alone")
             continue
-        out.habit_goals.append((habit, line_id))
-        out.lines.append(f"id={habit.id} habit {_quote(habit.name)} stream={habit.stream} goal_ref: None -> {line_id}")
+        out.habit_goals.append((habit, line_id, block))
+        extra = f", stream: None -> {block}" if habit.stream is None else ""
+        out.lines.append(f"id={habit.id} habit {_quote(habit.name)} block={block} goal_ref: None -> {line_id}{extra}")
     return out
 
 
@@ -146,9 +148,12 @@ def snapshot(row: PlannerProduct) -> dict:
 async def apply(db, p: Plan) -> dict:
     """Write the plan through the session (flush only: the caller commits) and return the journal."""
     updates = []
-    for habit, new in p.habit_goals:
+    for habit, new, block in p.habit_goals:
         updates.append({"id": habit.id, "column": "goal_ref", "old": habit.goal_ref, "new": new})
         habit.goal_ref = new
+        if habit.stream is None:  # the habit only had a day block: name its Plan block, and record it so a revert restores NULL
+            updates.append({"id": habit.id, "column": "stream", "old": None, "new": block})
+            habit.stream = block
     rows = [PlannerProduct(**spec) for spec in p.products]
     db.add_all(rows)
     await db.flush()
@@ -175,6 +180,9 @@ async def revert(db, journal: dict, do_apply: bool) -> tuple[list[str], int]:
         changed += 1
         if do_apply:
             setattr(h, u["column"], u["old"])
+    lines_of = {}  # block -> product slugs that some goal line of the block carries now
+    for q in (await db.execute(select(QuarterStream).where(QuarterStream.user_id == user_id))).scalars():
+        lines_of.setdefault(q.slug, set()).update(l["product"] for l in q.goal_checklist or [] if l.get("product"))
     for c in reversed(journal["created"]):
         p = (await db.execute(select(PlannerProduct).where(PlannerProduct.user_id == user_id, PlannerProduct.id == c["id"]))).scalar_one_or_none()
         if p is None:
@@ -184,6 +192,9 @@ async def revert(db, journal: dict, do_apply: bool) -> tuple[list[str], int]:
         diff = sorted(k for k, v in c["snapshot"].items() if now.get(k) != v)
         if diff:
             lines.append(f"id={c['id']} product delete skipped: changed since ({', '.join(diff)}) in {_quote(p.name)}; left alone")
+            continue
+        if p.slug in lines_of.get(p.block, set()):  # deleting it would leave a stale slug on a goal line
+            lines.append(f"id={c['id']} product delete skipped: a goal line of {p.block} carries {p.slug} now ({_quote(p.name)}); left alone")
             continue
         lines.append(f"id={c['id']} product delete: {p.block}/{p.slug} {_quote(p.name)}")
         changed += 1

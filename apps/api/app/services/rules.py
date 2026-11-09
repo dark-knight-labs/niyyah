@@ -302,7 +302,7 @@ _LINE_ID = re.compile(r"^[a-z0-9]{4,12}$")
 
 
 def clean_checklist(raw: list[dict] | None, max_lines: int = MAX_CHECKLIST, max_chars: int = MAX_LINE_CHARS,
-                    products: set[str] | None = None, strict: bool = False) -> list[dict]:
+                    products: set[str] | None = None, strict: bool = False, stored: dict[str, str] | None = None) -> list[dict]:
     """Validated lines as [{id, text, done}]. A new line (no id) gets one, an id is never reused within a list, empty lines are dropped.
 
     Goal lines may carry a `product` (Plan v3): `products` is the set of product slugs the block has. A line's product is kept
@@ -325,7 +325,7 @@ def clean_checklist(raw: list[dict] | None, max_lines: int = MAX_CHECKLIST, max_
         if product:
             if products is not None and product in products:
                 line["product"] = product
-            elif strict:
+            elif strict and (stored or {}).get(line_id) != product:  # a stale slug the line already had is just dropped
                 raise ValueError(f"'{product}' is not a product of this block")
         out.append(line)
     if len(out) > max_lines:

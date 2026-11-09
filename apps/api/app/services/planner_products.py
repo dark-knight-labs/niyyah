@@ -7,6 +7,7 @@ deleting one removes the tag but keeps the tasks and goals. Same contract as pla
 422, a `Conflict` a 409.
 """
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from app.models.planner import EventOverlay, PlannerProduct, QuarterStream, Task
 from app.services.rules import MAX_ITEM_TAGS, MAX_PRODUCT_NAME, clean_products, product_slug_of, tag_slug
@@ -77,7 +78,7 @@ async def usage(db, user_id: int, block: str) -> dict[str, dict[str, int]]:
     """{slug: {tasks, goals}}: how many tasks and goal lines of the block carry each product."""
     tasks, overlays, quarters = await _tagged(db, user_id, block)
     out: dict[str, dict[str, int]] = {}
-    for t in tasks:
+    for t in [*tasks, *overlays]:  # a calendar event's annotation counts with the tasks
         for slug in {tag_slug(x) for x in t.products or []}:
             out.setdefault(slug, {"tasks": 0, "goals": 0})["tasks"] += 1
     for q in quarters:
@@ -99,7 +100,12 @@ async def create(db, user_id: int, block: str, name: str) -> PlannerProduct:
         raise ValueError(f"at most {MAX_PRODUCTS_PER_BLOCK} products in a block")
     row = PlannerProduct(user_id=user_id, block=block, slug=slug, name=name, position=max((p.position for p in existing), default=-1) + 1)
     db.add(row)
-    await db.flush()
+    try:
+        async with db.begin_nested():
+            await db.flush()
+    except IntegrityError:  # another request added the same slug between the check and the insert
+        db.expunge(row)
+        raise Conflict(f"'{slug}' is already a product of this block")
     return row
 
 
@@ -124,7 +130,11 @@ async def rename(db, user_id: int, product_id: int, name: str) -> PlannerProduct
                 q.goal_checklist = [{**l, "product": slug} if l.get("product") == old else l for l in q.goal_checklist]
         row.slug = slug
     row.name = name
-    await db.flush()
+    try:
+        async with db.begin_nested():
+            await db.flush()
+    except IntegrityError:
+        raise Conflict(f"'{slug}' is already a product of this block")
     return row
 
 
@@ -140,6 +150,7 @@ async def delete(db, user_id: int, product_id: int) -> dict[str, int]:
     for o in overlays:
         if _has(o.products, row.slug):
             o.products = _swap(o.products, row.slug, None)
+            counts["tasks"] += 1
     for q in quarters:
         if any(l.get("product") == row.slug for l in q.goal_checklist or []):
             counts["goals"] += sum(1 for l in q.goal_checklist if l.get("product") == row.slug)
@@ -167,7 +178,10 @@ async def set_task_products(db, user_id: int, block: str, task: Task, slugs: lis
     if bad:
         raise ValueError(f"'{bad[0]}' is not a product of this block")
     plain = [t for t in task.products or [] if tag_slug(t) not in known]
-    task.products = clean_products([*plain, *slugs], MAX_ITEM_TAGS)
+    merged = clean_products([*plain, *slugs], 10_000)
+    if len(merged) > MAX_ITEM_TAGS:
+        raise ValueError(f"a task holds at most {MAX_ITEM_TAGS} tags; remove a tag first")
+    task.products = merged
 
 
 def out(row: PlannerProduct, counts: dict | None = None) -> dict:

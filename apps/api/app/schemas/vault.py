@@ -332,6 +332,7 @@ class PipelineItem(BaseModel):
     goal_ref: str | None = None  # id of the quarter goal line this item is nested under
     label_month: str | None = None  # "2026-11"
     label_date: str | None = None  # a day, ISO; never together with label_month
+    subtasks: int = 0  # how many sub-tasks (checklist lines) it has
     stale: bool
 
 
@@ -618,7 +619,8 @@ class HabitResponse(BaseModel):
     minimum: str
     stage: str
     stream: str | None = None
-    goal_ref: str | None = None  # a goal line of `stream` (this quarter or later)
+    plan_block: str | None = None  # the Plan block: `stream`, else `block` when that is a Plan block slug of this quarter
+    goal_ref: str | None = None  # a goal line of the Plan block (this quarter or later)
     gate_pct: int
     gate_weeks: int
     trip_pct: int | None = None

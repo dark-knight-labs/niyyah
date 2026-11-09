@@ -818,7 +818,7 @@ async def get_pipelines(user: User = Depends(get_current_user), db: AsyncSession
     today = _local_now().date()
     await _db_run(db, lambda: plan_v2.carry_streams(db, user.id, today))
     streams = await planner_store.streams_for(db, user.id, today)
-    items = await planner_store.pipeline_items(db, user.id, today)
+    items = await planner_store.with_subtasks(db, user.id, await planner_store.pipeline_items(db, user.id, today))
     return pipelines_response(streams, items, today, await planner_store.ended_goals(db, user.id, today, items),
                               await planner_products.grouped(db, user.id), await plan_v2.quarter_goals(db, user.id, today))
 

@@ -97,6 +97,16 @@ async def pipeline_items(db: AsyncSession, user_id: int, today: date) -> dict[st
     return out
 
 
+async def with_subtasks(db: AsyncSession, user_id: int, items_by_stream: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    """Each lane item dict gains `subtasks` (its checklist length), for the Make it a habit confirmation. Kept out of
+    pipeline_items so the item dicts the older views compare against stay as they were."""
+    counts = {i: n for i, n in ((r.id, len(r.checklist or [])) for r in await _all(db, select(Task).where(Task.user_id == user_id, Task.lane.is_not(None))))}
+    for items in items_by_stream.values():
+        for it in items:
+            it["subtasks"] = counts.get(it["line"], 0)
+    return items_by_stream
+
+
 async def ended_goals(db: AsyncSession, user_id: int, today: date, items_by_stream: dict[str, list[dict]]) -> dict[str, list[dict]]:
     """Per stream, the goal lines of earlier quarters that its items or habits are nested under (the current quarter's are in the quarter)."""
     label = quarter_for(today)

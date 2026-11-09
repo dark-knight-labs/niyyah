@@ -131,6 +131,9 @@
        "per_week": {
         "type": "integer"
        },
+       "plan_block": {
+        "type": "string"
+       },
        "stage": {
         "type": "string"
        },
@@ -1519,6 +1522,9 @@
        "per_week": {
         "type": "integer"
        },
+       "plan_block": {
+        "type": "string"
+       },
        "stage": {
         "type": "string"
        },
@@ -2355,6 +2361,9 @@
           },
           "stale": {
            "type": "boolean"
+          },
+          "subtasks": {
+           "type": "integer"
           },
           "text": {
            "type": "string"
@@ -5722,6 +5731,9 @@
        "per_week": {
         "type": "integer"
        },
+       "plan_block": {
+        "type": "string"
+       },
        "stage": {
         "type": "string"
        },
@@ -6297,6 +6309,9 @@
        },
        "per_week": {
         "type": "integer"
+       },
+       "plan_block": {
+        "type": "string"
        },
        "stage": {
         "type": "string"
@@ -7603,6 +7618,9 @@
        "per_week": {
         "type": "integer"
        },
+       "plan_block": {
+        "type": "string"
+       },
        "stage": {
         "type": "string"
        },
@@ -7748,6 +7766,9 @@
        },
        "per_week": {
         "type": "integer"
+       },
+       "plan_block": {
+        "type": "string"
        },
        "stage": {
         "type": "string"

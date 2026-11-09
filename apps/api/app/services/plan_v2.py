@@ -36,7 +36,8 @@ def goal_lines(row: QuarterStream) -> list[dict]:
 async def goal_ids(db, user_id: int, stream: str, today: date) -> set[str]:
     """The goal line ids of `stream` in the current quarter and every later one: what a task or a habit may be nested under."""
     rows = (await db.execute(select(QuarterStream).where(
-        QuarterStream.user_id == user_id, QuarterStream.slug == stream, QuarterStream.quarter >= quarter_for(today)))).scalars().all()
+        QuarterStream.user_id == user_id, QuarterStream.slug == stream, QuarterStream.quarter >= quarter_for(today),
+        QuarterStream.in_note.is_(True)))).scalars().all()
     return {g["id"] for r in rows for g in goal_lines(r)}
 
 
@@ -89,29 +90,36 @@ def next_quarter(label: str) -> str:
 
 
 async def carry_streams(db, user_id: int, today: date, label: str | None = None) -> int:
-    """A quarter with no blocks starts from the latest earlier quarter's: same blocks, empty goals and checkpoints.
+    """Quarter `label` (default: today's) carries the latest earlier quarter's blocks: every block of that quarter the target has no
+    row for is copied (same name, colour, icon, slot, weekly, pipeline, status; empty goals and checkpoints), so a block added in the earlier
+    quarter after the target was created is there on the day the quarter starts. Rows the target already has are never touched (the
+    owner may have edited them; a rename in the earlier quarter after the target exists does not propagate).
 
-    `label` defaults to today's quarter (the Plan reads); a future quarter is created only by a write (ensure_block_in_quarter).
-    Idempotent: nothing happens when the quarter has blocks. Two requests racing to do it hit the unique (user, quarter,
-    slug) index; the loser's insert is rolled back to a savepoint and it reads what the winner wrote. Returns blocks added."""
+    `label` is today's quarter for the Plan reads; a future quarter is created only by a write (ensure_block_in_quarter).
+    Idempotent. Two requests racing to do it hit the unique (user, quarter, slug) index; the loser's insert is rolled back to a
+    savepoint and it reads what the winner wrote. Returns the number of blocks added."""
     label = label or quarter_for(today)
-    mine = (await db.execute(select(QuarterStream.id).where(
-        QuarterStream.user_id == user_id, QuarterStream.quarter == label).limit(1))).first()
-    if mine is not None:
-        return 0
     earlier = (await db.execute(select(QuarterStream.quarter).where(
         QuarterStream.user_id == user_id, QuarterStream.quarter < label).order_by(QuarterStream.quarter.desc()).limit(1))).scalar()
     if earlier is None:
         return 0
-    source = await planner_work._stream_rows(db, user_id, earlier)
+    source = [r for r in await planner_work._stream_rows(db, user_id, earlier) if r.in_note]
+    mine = {r.slug: r for r in await planner_work._stream_rows(db, user_id, label)}
+    missing = [r for r in source if r.slug not in mine]
+    if not missing:
+        return 0
     try:
         async with db.begin_nested():
             await planner_work.ensure_quarter(db, user_id, label)
-            db.add_all([_copy(r, user_id, label) for r in source])
+            last = max((t.position for t in mine.values()), default=-1)
+            for n, r in enumerate(missing, start=1):
+                copy = _copy(r, user_id, label)
+                copy.position = last + n if mine else r.position
+                db.add(copy)
             await db.flush()
     except IntegrityError:
         return 0
-    return len(source)
+    return len(missing)
 
 
 def _copy(r: QuarterStream, user_id: int, label: str) -> QuarterStream:
@@ -170,7 +178,8 @@ async def set_quarter_goals(db, user_id: int, stream: str, label: str, lines: li
     if not re.fullmatch(r"[0-9]{4}-Q[1-4]", label):
         raise ValueError("quarter must look like 2027-Q1")
     row = await ensure_block_in_quarter(db, user_id, stream, label, today)
-    planner_work._set_goal_checklist(row, clean_checklist(lines, products=await planner_products.slugs_of(db, user_id, stream), strict=True))
+    planner_work._set_goal_checklist(row, clean_checklist(lines, products=await planner_products.slugs_of(db, user_id, stream), strict=True,
+                        stored={l["id"]: l["product"] for l in row.goal_checklist or [] if l.get("product")}))
     await db.flush()
     return row
 
@@ -184,3 +193,16 @@ async def quarter_goals(db, user_id: int, today: date) -> dict[str, list[dict]]:
     for r in rows:
         out.setdefault(r.slug, []).append({"quarter": r.quarter, "goals": goal_lines(r)})
     return out
+
+
+async def plan_slugs(db, user_id: int, today: date) -> set[str]:
+    """The Plan block slugs of the current quarter (the streams its note defines)."""
+    return set((await db.execute(select(QuarterStream.slug).where(
+        QuarterStream.user_id == user_id, QuarterStream.quarter == quarter_for(today), QuarterStream.in_note.is_(True)))).scalars().all())
+
+
+def plan_block(stream: str | None, block: str | None, slugs: set[str]) -> str | None:
+    """A habit's Plan block: its `stream`; when that is NULL, its day `block` if that key is also a Plan block slug; else None."""
+    if stream is not None:
+        return stream
+    return block if block in slugs else None

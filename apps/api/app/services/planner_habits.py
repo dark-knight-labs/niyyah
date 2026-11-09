@@ -52,14 +52,20 @@ def _clean(fields: dict) -> dict:
     return out
 
 
-async def _check_goal(db, user_id: int, stream: str | None, goal_ref: str | None, today: date, current: str | None = None) -> None:
-    """A habit's goal is a goal line of its Plan block (`stream`), this quarter's or a later one's; the one it already has stays valid."""
-    if goal_ref is None or goal_ref == current:
-        return
-    if stream is None:
-        raise ValueError("pick the habit's block before its goal")
-    if goal_ref not in await plan_v2.goal_ids(db, user_id, stream, today):
-        raise ValueError(f"'{goal_ref}' is not a goal of {stream} this quarter or later")
+async def _check_goal(db, user_id: int, stream: str | None, block: str | None, goal_ref: str | None, today: date,
+                      current: str | None = None, current_plan: str | None = None) -> str | None:
+    """A habit's goal is a goal line of its Plan block (`stream`, or its day `block` when that is a Plan block and stream is NULL),
+    this quarter's or a later one's; the one it already has stays valid. Returns the Plan block (None without a goal to check)."""
+    if goal_ref is None:
+        return None
+    plan = plan_v2.plan_block(stream, block, await plan_v2.plan_slugs(db, user_id, today))
+    if goal_ref == current and plan == current_plan:  # the ref it already has, in the Plan block it already has
+        return plan
+    if plan is None:
+        raise ValueError("this habit is not in a Plan block, so it has no goal to link to")
+    if goal_ref not in await plan_v2.goal_ids(db, user_id, plan, today):
+        raise ValueError(f"'{goal_ref}' is not a goal of {plan} this quarter or later")
+    return plan
 
 
 async def _block_keys(db, user_id: int) -> set[str]:
@@ -121,13 +127,13 @@ def _streak(checks: dict[date, str], today: date) -> int:
     return n
 
 
-def _out(row: PlannerHabit, checks: dict[date, str], today: date) -> dict:
+def _out(row: PlannerHabit, checks: dict[date, str], today: date, slugs: set[str] | None = None) -> dict:
     weeks = _weeks(row, checks, today)
     run = _gate_run(row, weeks)
     span = HISTORY_WEEKS * 7 + today.weekday()
     return {
         "id": row.id, "name": row.name, "block": row.block, "anchor": row.anchor, "per_week": row.per_week, "minimum": row.minimum,
-        "stage": row.stage, "stream": row.stream, "goal_ref": row.goal_ref, "gate_pct": row.gate_pct, "gate_weeks": row.gate_weeks,
+        "stage": row.stage, "stream": row.stream, "plan_block": plan_v2.plan_block(row.stream, row.block, slugs or set()), "goal_ref": row.goal_ref, "gate_pct": row.gate_pct, "gate_weeks": row.gate_weeks,
         "trip_pct": row.trip_pct, "trip_weeks": row.trip_weeks, "started_on": row.started_on.isoformat(),
         "today": checks.get(today), "streak": _streak(checks, today), "gate_run": run, "gate_met": run >= row.gate_weeks,
         "tripwire": _tripwire(row, weeks) if row.stage == "rails" else None, "weeks": weeks,
@@ -142,7 +148,8 @@ async def list_habits(db, user_id: int, today: date, include_retired: bool = Tru
     checks: dict[int, dict[date, str]] = {}
     for c in (await db.execute(select(PlannerHabitCheck).where(PlannerHabitCheck.user_id == user_id, PlannerHabitCheck.day >= since))).scalars():
         checks.setdefault(c.habit_id, {})[c.day] = c.level
-    return [_out(r, checks.get(r.id, {}), today) for r in rows if include_retired or r.stage != "retired"]
+    slugs = await plan_v2.plan_slugs(db, user_id, today)
+    return [_out(r, checks.get(r.id, {}), today, slugs) for r in rows if include_retired or r.stage != "retired"]
 
 
 async def add_habit(db, user_id: int, today: date, fields: dict) -> PlannerHabit:
@@ -151,7 +158,9 @@ async def add_habit(db, user_id: int, today: date, fields: dict) -> PlannerHabit
         raise ValueError("a habit needs a name")
     if fields.get("block") not in await _block_keys(db, user_id):
         raise ValueError(f"unknown block '{fields.get('block')}'")
-    await _check_goal(db, user_id, fields.get("stream"), fields.get("goal_ref"), today)
+    plan = await _check_goal(db, user_id, fields.get("stream"), fields.get("block"), fields.get("goal_ref"), today)
+    if plan is not None and fields.get("stream") is None:
+        fields["stream"] = plan  # linking a habit that only has a day block names its Plan block
     count = len((await db.execute(select(PlannerHabit.id).where(PlannerHabit.user_id == user_id))).scalars().all())
     row = PlannerHabit(user_id=user_id, started_on=today, position=count, **fields)
     db.add(row)
@@ -164,10 +173,15 @@ async def update_habit(db, user_id: int, today: date, habit_id: int, fields: dic
     fields = _clean(fields)
     if "block" in fields and fields["block"] not in await _block_keys(db, user_id):
         raise ValueError(f"unknown block '{fields['block']}'")
+    slugs = await plan_v2.plan_slugs(db, user_id, today)
     stream = fields["stream"] if "stream" in fields else row.stream
-    if "stream" in fields and fields["stream"] != row.stream and "goal_ref" not in fields:
-        fields["goal_ref"] = None  # the goal belonged to the old block
-    await _check_goal(db, user_id, stream, fields.get("goal_ref"), today, row.goal_ref)
+    block = fields.get("block", row.block)
+    old_plan, plan_now = plan_v2.plan_block(row.stream, row.block, slugs), plan_v2.plan_block(stream, block, slugs)
+    if plan_now != old_plan and "goal_ref" not in fields:
+        fields["goal_ref"] = None  # the goal belonged to the old Plan block
+    plan = await _check_goal(db, user_id, stream, block, fields.get("goal_ref"), today, row.goal_ref, old_plan)
+    if plan is not None and stream is None and fields.get("goal_ref") is not None:
+        fields["stream"] = plan  # linking a habit that only has a day block names its Plan block
     new_stage = fields.get("stage", row.stage)
     if new_stage == "rails" and row.stage == "installing":
         # Demoting needs a tripwire (written now, while you still care) and a met gate, unless you say why you are overriding.
@@ -220,4 +234,8 @@ async def from_task(db, user_id: int, today: date, task) -> PlannerHabit:
     if first is None:
         raise ValueError("add a day block in Settings before making a habit")
     goal = task.goal_ref if task.goal_ref in await plan_v2.goal_ids(db, user_id, task.stream, today) else None
-    return await add_habit(db, user_id, today, {"name": task.text[:200], "block": first, "per_week": 3, "stream": task.stream, "goal_ref": goal})
+    fields = {"name": task.text[:200], "block": first, "per_week": 3, "stream": task.stream, "goal_ref": goal}
+    note = " ".join((task.description or "").split())
+    if note and len(note) <= 120:  # short details become the two-minute version; longer ones (and sub-tasks, tags) are not kept
+        fields["minimum"] = note
+    return await add_habit(db, user_id, today, fields)

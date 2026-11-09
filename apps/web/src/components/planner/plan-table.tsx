@@ -11,7 +11,7 @@ import {
   CAPS, GoalRef, GoalGroup, LabelFilter, capped, columnOf, goalIndex, groupByGoal, isLate, labelOf, matchesLabel, monthText, monthsOfQuarter,
   quarterText, sinceWeek, weekText,
 } from "@/lib/plan-v2";
-import { planHabits, quarterTabs, tabLabel } from "@/lib/plan-v3";
+import { planBlockOf, planHabits, quarterTabs, tabLabel } from "@/lib/plan-v3";
 import { StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { HabitsData, NotebookEntryData, NotebooksData, PipelineItemData, PipelinesData, ProductData, QuarterData } from "@/lib/vault-types";
@@ -87,7 +87,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     return [...base.filter((g) => !g.ended), ...later, ...base.filter((g) => g.ended)];
   };
   const liveHabits = planHabits(habits?.habits ?? [], streams.map((s) => s.id));
-  const habitsOf = (id: string) => liveHabits.filter((h) => h.stream === id);
+  const habitsOf = (id: string) => liveHabits.filter((h) => planBlockOf(h) === id);
   const visible = streams.filter((s) => !block || s.id === block);
   const all = pipelines.streams.flatMap((s) => (!block || s.stream === block ? s.items : []));
   const doneItems = all.filter((i) => columnOf(i) === null);
@@ -340,7 +340,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
         {selectedHabit && (
           <aside aria-label="Habit" aria-live="polite" className="grid content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:border-l lg:border-t-0">
             <PlanHabitCard key={selectedHabit.id} habit={selectedHabit} busy={busy} runHabits={runHabits} onClose={() => setSel(null)}
-              goals={(selectedHabit.stream ? goalsOf(selectedHabit.stream) : []).filter((g) => !g.ended || g.id === selectedHabit.goal_ref)} />
+              goals={(planBlockOf(selectedHabit) ? goalsOf(planBlockOf(selectedHabit)!) : []).filter((g) => !g.ended || g.id === selectedHabit.goal_ref)} />
           </aside>
         )}
         {selected && (
