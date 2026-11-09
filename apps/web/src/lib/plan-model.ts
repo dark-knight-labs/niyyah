@@ -1,9 +1,13 @@
-import type { Lane, NotebookEntryData, NotebookKind, NotebooksData, PipelineItemData, PipelinesData } from "@/lib/vault-types";
+import { inMonth, type RuleItem } from "@/lib/plan-rules";
+import type { Lane, MonthKey, NotebookEntryData, NotebookKind, NotebooksData, PipelineItemData, PipelinesData } from "@/lib/vault-types";
 
 /** The horizons of the work list, plus the notebook and what is finished. */
-export type Tab = "now" | "next" | "someday" | "notes" | "done";
+export type Tab = "now" | "next" | "someday" | "month" | "notes" | "done";
 
-export const TABS: { id: Tab; label: string }[] = [
+/** A tab that is one pipeline lane (Month is derived, Notes is the notebook). */
+export type LaneTab = Exclude<Tab, "notes" | "month">;
+
+export const TABS: { id: Exclude<Tab, "month">; label: string }[] = [
   { id: "now", label: "Now" },
   { id: "next", label: "Next" },
   { id: "someday", label: "Someday" },
@@ -12,7 +16,7 @@ export const TABS: { id: Tab; label: string }[] = [
 ];
 
 /** The lane the API calls "backlog" is shown as Someday. */
-export const LANE_FOR: Record<Exclude<Tab, "notes">, Lane> = { now: "now", next: "next", someday: "backlog", done: "done" };
+export const LANE_FOR: Record<LaneTab, Lane> = { now: "now", next: "next", someday: "backlog", done: "done" };
 
 export interface ItemRow { type: "item"; key: string; stream: string; item: PipelineItemData }
 export interface NoteRow { type: "note"; key: string; stream: string; entry: NotebookEntryData }
@@ -38,6 +42,12 @@ export function buildRows(pipelines: PipelinesData | null, notebooks: NotebooksD
   return rows;
 }
 
+/** The item of a row as the plan rules read it. No `order`: ties fall back to the position in the list, i.e. display order. */
+export function rowItem(row: ItemRow): RuleItem {
+  const i = row.item;
+  return { lane: i.lane, done: i.done, checkpoint: i.checkpoint, focus: i.focus };
+}
+
 export function tabOf(row: ItemRow): Tab {
   const lane = row.item.lane;
   return lane === "backlog" ? "someday" : lane;
@@ -50,7 +60,8 @@ export function inScope(row: Row, view: Pick<View, "stream" | "tag">): boolean {
   return true;
 }
 
-export function inTab(row: Row, tab: Tab, kind: NotebookKind | "all" = "all"): boolean {
+export function inTab(row: Row, tab: Tab, kind: NotebookKind | "all" = "all", month?: { current: MonthKey; week: string }): boolean {
+  if (tab === "month") return !!month && row.type === "item" && inMonth(rowItem(row), month.current, month.week);
   if (tab === "notes") return row.type === "note" && (kind === "all" || row.entry.kind === kind);
   return row.type === "item" && tabOf(row) === tab;
 }

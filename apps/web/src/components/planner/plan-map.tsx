@@ -1,10 +1,10 @@
 "use client";
 
-import { Row, Tab, isOpenBlocker, tabOf, tagTally, waitingOn } from "@/lib/plan-model";
+import { LaneTab, Row, Tab, isOpenBlocker, tabOf, tagTally, waitingOn } from "@/lib/plan-model";
 import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { NotebooksData, QuarterData } from "@/lib/vault-types";
 
-const COLUMNS: { id: Exclude<Tab, "notes">; label: string }[] = [
+const COLUMNS: { id: LaneTab; label: string }[] = [
   { id: "now", label: "Now" },
   { id: "next", label: "Next" },
   { id: "someday", label: "Someday" },
