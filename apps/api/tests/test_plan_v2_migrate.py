@@ -95,7 +95,7 @@ async def test_dry_run_is_the_default_and_writes_nothing(account, capsys):
     assert "ambiguous: checkpoint jan fits no single stored quarter" in out
     assert "drift: label_month 2026-11 but checkpoint oct" in out
     # matched lines show both texts and both months
-    assert 'matched: line "Ship the DNS cutover plan" [2026-11] ~ item "Ship the DNS cutover plan now" [label_month=2026-11' in out
+    assert 'matched: line "Ship the DNS cutover plan" [2026-11] done=False ~ item "Ship the DNS cutover plan now" [label_month=2026-11' in out
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_apply_labels_creates_nests_and_never_touches_checkpoints(account,
         "cpl:2026-Q4:oct:o1", "cpl:2026-Q4:nov:n2", "cpl:2026-Q4:nov:b1", "cpl:2026-Q4:dec:b1", "cpl:2026-Q4:dec:d1", "cpl:2026-Q4:nov:f1"])
     by_origin = {r.origin: r for r in created}
     done = by_origin["cpl:2026-Q4:oct:o1"]
-    assert (done.lane, done.done, done.status, done.label_month, done.done_on, done.stream) == ("done", True, "done", "2026-10", TODAY, "studio")
+    assert (done.lane, done.done, done.status, done.label_month, done.done_on, done.stream) == ("done", True, "done", "2026-10", date(2026, 10, 31), "studio")
     nov, dec = by_origin["cpl:2026-Q4:nov:b1"], by_origin["cpl:2026-Q4:dec:b1"]
     assert (nov.text, nov.label_month, nov.lane) == ("Backup check", "2026-11", "next")
     assert (dec.text, dec.label_month, dec.lane) == ("Backup check", "2026-12", "next")  # same text, two months: two tasks
@@ -173,7 +173,7 @@ async def test_overrides_match_and_skip(account, capsys, tmp_path):
     assert (s["created"], s["matched"], s["overridden"]) == (4, 2, 2)
     assert (await _by_text(uid, "Misc")).label_month == "2026-11"  # an override match sets the label like a text match
     assert not any(r.text in ("Write docs", "Review year") for r in await _rows(uid))
-    assert json.loads((tmp_path / "j.json").read_text())["overrides"] == {"match": {"n2": ids["misc"]}, "skip": ["d1"]}
+    assert json.loads((tmp_path / "j.json").read_text())["overrides"] == {"match": {"n2": ids["misc"]}, "skip": ["d1"], "create": []}
 
 
 @pytest.mark.asyncio
@@ -218,7 +218,7 @@ async def test_revert_restores_what_it_can_and_skips_what_changed_since(account,
     assert await _run(uid, capsys, apply=True, revert=journal) == 0
     out = capsys.readouterr().out
     assert f"id={ids['router']} label_month skipped: it is '2026-09' now, not '2026-10'" in out
-    assert 'delete skipped: edited since ("Write the docs"' in out
+    assert 'delete skipped: changed since (text) in "Write the docs"' in out
     rows = {r.id: r for r in await _rows(uid)}
     assert rows[ids["router"]].label_month == "2026-09"  # the owner's value stays
     assert rows[ids["router"]].goal_ref is None  # the untouched column is restored
@@ -247,3 +247,98 @@ def test_the_command_is_registered(capsys):
     with pytest.raises(SystemExit):
         main(["plan-v2-migrate", "--help"])
     assert "--overrides" in capsys.readouterr().out
+
+
+async def _apply_with_journal(uid, capsys, tmp_path, name="j.json", **kw):
+    path = tmp_path / name
+    await _run(uid, capsys, apply=True, journal=path, **kw)
+    capsys.readouterr()
+    return path
+
+
+@pytest.mark.asyncio
+async def test_revert_skips_a_created_task_changed_in_any_column_or_referenced(account, capsys, tmp_path):
+    uid, _ = account
+    journal = await _apply_with_journal(uid, capsys, tmp_path)
+    async with TestSession() as db:
+        docs = (await db.execute(select(Task).where(Task.text == "Write docs"))).scalar_one()
+        docs.description = "notes the owner wrote"  # only the description changed
+        parent = (await db.execute(select(Task).where(Task.text == "Review year"))).scalar_one()
+        db.add(_task(uid, "studio", "Piece of it", "next", 20, parent_id=parent.id))  # a child refers to it
+        await db.commit()
+    assert await _run(uid, capsys, apply=True, revert=journal) == 0
+    out = capsys.readouterr().out
+    assert "delete skipped: changed since (description)" in out and "refer to it" in out
+    left = sorted(r.text for r in await _rows(uid) if r.origin)
+    assert left == ["Review year", "Write docs"]  # everything else the run created is gone
+
+
+@pytest.mark.asyncio
+async def test_a_done_line_is_dated_at_the_end_of_its_month_capped_at_today(account, capsys, tmp_path):
+    uid, _ = account
+    async with TestSession() as db:
+        q = (await db.execute(select(QuarterStream).where(QuarterStream.slug == "fitness"))).scalar_one()
+        q.checkpoints = [{"month": "dec", "text": "x", "checklist": [_line("d9", "Early finish", True)]},
+                         {"month": "oct", "text": "x", "checklist": [_line("o9", "Old finish", True)]}]
+        await db.commit()
+    await _run(uid, capsys, apply=True, journal=tmp_path / "j.json")
+    rows = {r.text: r for r in await _rows(uid)}
+    assert rows["Old finish"].done_on == date(2026, 10, 31) and rows["Early finish"].done_on == TODAY  # Dec is in the future: today
+    assert rows["Old finish"].status == "done" and rows["Old finish"].done
+
+
+@pytest.mark.asyncio
+async def test_a_tie_between_items_is_ambiguous_and_overrides_decide(account, capsys, tmp_path):
+    uid, ids = account
+    async with TestSession() as db:
+        db.add_all([_task(uid, "studio", "Write docs for DNS", "next", 30), _task(uid, "studio", "Write docs for mail", "next", 31)])
+        await db.commit()
+    await _run(uid, capsys)
+    out = capsys.readouterr().out
+    assert "ambiguous-match" in out and "Write docs" in out and _summary(out)["ambiguous"] == 2  # the jan checkpoint item, and the tie
+    assert not any("Write docs" in l and "create:" in l for l in out.splitlines())  # nothing created for the tied line
+    path = tmp_path / "o.json"
+    path.write_text(json.dumps({"create": ["n2"]}))
+    await _run(uid, capsys, overrides=path)
+    out = capsys.readouterr().out
+    assert 'create: lane=next text="Write docs"' in out and _summary(out)["overridden"] == 1 and _summary(out)["ambiguous"] == 1
+    path.write_text(json.dumps({"create": ["n2"], "skip": ["n2"]}))
+    assert await _run(uid, capsys, overrides=path) == 1
+    assert "both skip and create" in capsys.readouterr().err
+    path.write_text(json.dumps({"create": ["zzz"]}))
+    assert await _run(uid, capsys, overrides=path) == 1
+    path.write_text("[1]")
+    assert await _run(uid, capsys, overrides=path) == 1
+    assert "overrides must look like" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_create_override_forces_a_task_and_matched_lines_show_done_state(account, capsys, tmp_path):
+    uid, _ = account
+    async with TestSession() as db:
+        db.add(_task(uid, "studio", "Router live", "next", 40))  # an open item; the oct line "Router live" is done
+        await db.commit()
+    await _run(uid, capsys)
+    out = capsys.readouterr().out
+    assert "done=True ~ item \"Router live\"" in out and "WARNING: a done line matched an open item" in out
+    path = tmp_path / "o.json"
+    path.write_text(json.dumps({"create": ["o1"]}))
+    await _run(uid, capsys, overrides=path)
+    assert 'create: lane=done text="Router live"' in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_a_failed_commit_keeps_the_journal_as_uncertain(account, capsys, tmp_path, monkeypatch):
+    uid, _ = account
+
+    class Boom(TestSession.class_):
+        async def commit(self):
+            raise RuntimeError("connection lost")
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from tests.conftest import engine
+    factory = async_sessionmaker(engine, class_=Boom, expire_on_commit=False)
+    path = tmp_path / "j.json"
+    assert await run_plan_v2_migrate(uid, False, True, path, None, None, session_factory=factory, today=TODAY) == 1
+    assert not path.exists() and (tmp_path / "j.json.uncertain").exists()
+    assert "connection lost" in capsys.readouterr().err

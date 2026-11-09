@@ -9,11 +9,12 @@ checkpoint, a checklist, a goal line, a week objective or a focus_week. Steps, i
      this run says the same thing (text match or an override), when that item just gets the month label;
   c. goal_ref, for each block whose current-quarter goals are exactly one line, on every lane item of the block without one.
 """
+import calendar
 import json
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import select
 
@@ -76,23 +77,31 @@ def add_summaries(plans: list[Plan]) -> str:
     return "SUMMARY " + " ".join(f"{k}={total[k]}" for k in keys)
 
 
+EMPTY_OVERRIDES = {"match": {}, "skip": [], "create": []}
+SHAPE = ('overrides must look like {"match": {"<line id>": <item id>}, "skip": ["<line id>"], "create": ["<line id>"]}; '
+         "all three keys are optional")
+
+
 def read_overrides(path: str | None) -> dict:
     if not path:
-        return {"match": {}, "skip": []}
+        return {"match": {}, "skip": [], "create": []}
     try:
-        raw = json.loads(open(path, encoding="utf-8").read())
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh)
     except (OSError, ValueError) as exc:
         raise ValueError(f"cannot read overrides {path}: {exc}")
-    match, skip = raw.get("match", {}), raw.get("skip", [])
-    if not isinstance(match, dict) or not isinstance(skip, list) or set(raw) - {"match", "skip"}:
-        raise ValueError('overrides must look like {"match": {"<line id>": <item id>}, "skip": ["<line id>"]}')
+    if not isinstance(raw, dict):
+        raise ValueError(SHAPE)
+    match, skip, create = raw.get("match", {}), raw.get("skip", []), raw.get("create", [])
+    if not isinstance(match, dict) or not isinstance(skip, list) or not isinstance(create, list) or set(raw) - {"match", "skip", "create"}:
+        raise ValueError(SHAPE)
     if not all(isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool) for k, v in match.items()) \
-            or not all(isinstance(k, str) for k in skip):
-        raise ValueError("overrides: match maps line ids (text) to item ids (numbers), skip lists line ids (text)")
-    both = set(match) & set(skip)
-    if both:
-        raise ValueError(f"overrides: {sorted(both)} are in both match and skip")
-    return {"match": dict(match), "skip": list(skip)}
+            or not all(isinstance(k, str) for k in [*skip, *create]):
+        raise ValueError("overrides: match maps line ids (text) to item ids (numbers); skip and create list line ids (text)")
+    for a, b, names in ((set(match), set(skip), "match and skip"), (set(match), set(create), "match and create"), (set(skip), set(create), "skip and create")):
+        if a & b:
+            raise ValueError(f"overrides: {sorted(a & b)} are in both {names}")
+    return {"match": dict(match), "skip": list(skip), "create": list(create)}
 
 
 def _quote(text: str) -> str:
@@ -101,10 +110,10 @@ def _quote(text: str) -> str:
 
 async def plan(db, user_id: int, today: date, overrides: dict | None = None) -> Plan:
     """Decide every change for one user without writing. Raises ValueError for a bad override, before anything is written."""
-    overrides = overrides or {"match": {}, "skip": []}
+    overrides = {**EMPTY_OVERRIDES, **(overrides or {})}
     out = Plan(user_id=user_id, today=today, overrides=overrides)
     tasks = list((await db.execute(select(Task).where(Task.user_id == user_id, Task.lane.is_not(None))
-                                   .order_by(Task.lane_position, Task.id))).scalars().all())
+                                   .order_by(Task.lane_position, Task.id).with_for_update())).scalars().all())
     by_id = {t.id: t for t in tasks}
     qrows = list((await db.execute(select(QuarterStream).where(QuarterStream.user_id == user_id)
                                    .order_by(QuarterStream.quarter, QuarterStream.position))).scalars().all())
@@ -122,7 +131,7 @@ async def plan(db, user_id: int, today: date, overrides: dict | None = None) -> 
     for row in qrows:
         for _, line in checkpoint_lines(row):
             streams_of_line.setdefault(line["id"], set()).add(row.slug)
-    for line_id in [*overrides["match"], *overrides["skip"]]:
+    for line_id in [*overrides["match"], *overrides["skip"], *overrides["create"]]:
         if line_id not in streams_of_line:
             raise ValueError(f"override: no checkpoint line has the id '{line_id}'")
     for line_id, item_id in overrides["match"].items():
@@ -178,25 +187,34 @@ async def plan(db, user_id: int, today: date, overrides: dict | None = None) -> 
                 out.counts["overridden"] += 1
                 out.lines.append(f"stream={row.slug} skipped (override): {_quote(line['text'])} [{label}]")
                 continue
+            line_done = bool(line.get("done"))
             target, how = None, "matched"
             if line["id"] in overrides["match"]:
                 target, how = by_id[overrides["match"][line["id"]]], "matched (override)"
                 out.counts["overridden"] += 1
+            elif line["id"] in overrides["create"]:
+                out.counts["overridden"] += 1  # a new task is made even if an item says the same
             else:
-                best = 0
-                for t in tasks:  # only items that existed before this run: two equal monthly lines stay two tasks
-                    if t.stream == row.slug and (score := same_text(line["text"], t.text)) > best:
-                        target, best = t, score
+                scores = [(same_text(line["text"], t.text), t) for t in tasks if t.stream == row.slug]
+                best = max((sc for sc, _ in scores), default=0)
+                tied = [t for sc, t in scores if best > 0 and sc == best]
+                if len(tied) > 1:
+                    out.counts["ambiguous"] += 1
+                    out.lines.append(f"stream={row.slug} ambiguous-match: line {_quote(line['text'])} [{label}] fits items "
+                                     f"{[t.id for t in tied]}; nothing created or changed (decide with --overrides match/create/skip)")
+                    continue
+                target = tied[0] if tied else None
             if target is not None:
                 out.counts["matched"] += 1
                 set_it = label_of(target) is None and target.label_date is None
                 if set_it:
                     pending[target.id] = label
                     out.label_updates.append((target, label))
+                warn = "; WARNING: a done line matched an open item" if line_done and not target.done else ""
                 out.lines.append(
-                    f"id={target.id} stream={row.slug} {how}: line {_quote(line['text'])} [{label}] ~ item {_quote(target.text)} "
+                    f"id={target.id} stream={row.slug} {how}: line {_quote(line['text'])} [{label}] done={line_done} ~ item {_quote(target.text)} "
                     f"[label_month={label_of(target)} checkpoint={target.checkpoint} lane={target.lane}]"
-                    + (f"; label_month: None -> {label}" if set_it else ""))
+                    + (f"; label_month: None -> {label}" if set_it else "") + warn)
                 continue
             done = bool(line.get("done"))
             position[row.slug] = position.get(row.slug, -1) + 1
@@ -205,7 +223,8 @@ async def plan(db, user_id: int, today: date, overrides: dict | None = None) -> 
             out.creates.append({
                 "user_id": user_id, "stream": row.slug, "lane": lane, "lane_position": position[row.slug], "text": line["text"],
                 "description": "", "products": [], "blocked_by": [], "added_on": today, "done": done, "status": "done" if done else "open",
-                "done_on": today if done else None, "label_month": label, "origin": origin,
+                "done_on": min(today, date(int(label[:4]), int(label[5:]), calendar.monthrange(int(label[:4]), int(label[5:]))[1])) if done else None,
+                "label_month": label, "origin": origin,
             })
             out.lines.append(f"id=new stream={row.slug} create: lane={lane} text={_quote(line['text'])} label_month={label} origin={origin}")
 
@@ -239,12 +258,18 @@ async def apply(db, p: Plan) -> dict:
     rows = [Task(**spec) for spec in p.creates]
     db.add_all(rows)
     await db.flush()
+    for r in rows:
+        await db.refresh(r)  # database defaults, so the snapshot is the whole row as stored
     return {
         "user": p.user_id, "today": p.today.isoformat(), "overrides": p.overrides,
-        "created": [{"id": r.id, "stream": r.stream, "text": r.text, "lane": r.lane, "label_month": r.label_month,
-                     "goal_ref": r.goal_ref, "origin": r.origin} for r in rows],
+        "created": [{"id": r.id, "snapshot": snapshot(r)} for r in rows],
         "updates": updates, "summary": p.summary(),
     }
+
+
+def snapshot(row: Task) -> dict:
+    """Every mapped column of a task as plain JSON (dates as ISO text), to tell later whether anyone touched the row."""
+    return json.loads(json.dumps({c.key: getattr(row, c.key) for c in Task.__table__.columns}, default=lambda v: v.isoformat() if isinstance(v, (date, datetime)) else str(v)))
 
 
 async def revert(db, journal: dict, do_apply: bool) -> tuple[list[str], int]:
@@ -268,11 +293,18 @@ async def revert(db, journal: dict, do_apply: bool) -> tuple[list[str], int]:
         t = (await db.execute(select(Task).where(Task.user_id == user_id, Task.id == c["id"]))).scalar_one_or_none()
         if t is None:
             lines.append(f"id={c['id']} delete skipped: already gone")
-        elif any(getattr(t, k) != c[k] for k in ("stream", "text", "lane", "label_month", "goal_ref", "origin")):
-            lines.append(f"id={c['id']} delete skipped: edited since ({_quote(t.text)} in {t.lane}); left alone")
-        else:
-            lines.append(f"id={c['id']} delete: {_quote(t.text)} (lane {t.lane})")
-            changed += 1
-            if do_apply:
-                await planner_work._delete_row(db, t)
+            continue
+        diff = sorted(k for k, v in c["snapshot"].items() if snapshot(t).get(k) != v)
+        if diff:
+            lines.append(f"id={c['id']} delete skipped: changed since ({', '.join(diff)}) in {_quote(t.text)}; left alone")
+            continue
+        used = [o.id for o in (await db.execute(select(Task).where(Task.user_id == user_id, Task.id != t.id))).scalars()
+                if o.parent_id == t.id or str(t.id) in {str(b) for b in (o.blocked_by or [])}]
+        if used:
+            lines.append(f"id={c['id']} delete skipped: items {used} refer to it ({_quote(t.text)}); left alone")
+            continue
+        lines.append(f"id={c['id']} delete: {_quote(t.text)} (lane {t.lane})")
+        changed += 1
+        if do_apply:
+            await planner_work._delete_row(db, t)
     return lines, changed

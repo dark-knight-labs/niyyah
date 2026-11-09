@@ -121,7 +121,8 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run }
           <button type="button" disabled={busy} aria-pressed={!item.label_month && !item.label_date} onClick={() => void run(() => vaultApi.setPipelineLabel(stream, item, {}))} className={chipBtn}>None</button>
           <label className="mono flex items-center gap-1.5 text-[var(--muted-foreground)]">or date
             <input type="date" aria-label="Label date" disabled={busy} defaultValue={item.label_date ?? ""} key={item.label_date ?? "no-date"}
-              onChange={(e) => void run(() => vaultApi.setPipelineLabel(stream, item, e.target.value ? { day: e.target.value } : {}))}
+              onBlur={(e) => { if (e.target.value !== (item.label_date ?? "")) void run(() => vaultApi.setPipelineLabel(stream, item, e.target.value ? { day: e.target.value } : {})); }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
               className="h-8 border border-[var(--rule)] bg-[var(--background)] px-1.5 text-small" />
           </label>
         </div>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { Checklist } from "@/components/planner/checklist";
 import { Checkbox } from "@/components/routine/checkbox";
 import { ItemCard, NoteCard } from "@/components/planner/work-card";
 import { isOpenBlocker, waitingOn } from "@/lib/plan-model";
@@ -56,6 +57,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const [adding, setAdding] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [editingGoals, setEditingGoals] = useState<string | null>(null);
 
   const months = monthsOfQuarter(quarter.quarter);
   const thisMonth = today.slice(0, 7);
@@ -73,7 +75,13 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     return run(() => vaultApi.movePipelineItem(stream, item, columnOf(item) === null ? "next" : "done"));
   }
 
-  function itemLine(stream: StreamMeta, item: PipelineItemData, col: Column, rank: number | null) {
+  /** Swap with the neighbour shown above or below: the API swaps lane neighbours, so repeat it for the items between them. */
+  function moveTo(stream: StreamMeta, item: PipelineItemData, neighbour: PipelineItemData, direction: "up" | "down", ranked: Map<number, number>) {
+    const steps = Math.abs((ranked.get(item.line) ?? 0) - (ranked.get(neighbour.line) ?? 0));
+    return run(async () => { for (let i = 0; i < steps; i++) await vaultApi.reorderPipelineItem(stream.id, item, direction); });
+  }
+
+  function itemLine(stream: StreamMeta, item: PipelineItemData, col: Column, rank: number | null, nav?: { up: () => void; down: () => void; hasUp: boolean; hasDown: boolean }) {
     const lab = labelOf(item);
     const late = isLate(item, today);
     const since = sinceWeek(item, week);
@@ -81,7 +89,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     const dim = focus && item.goal_ref !== focus;
     const picked = sel?.kind === "item" && sel.stream === stream.id && sel.line === item.line;
     return (
-      <div key={item.line} data-task={item.line} data-check-row className={`flex min-h-7 items-center gap-1.5 border-t border-[var(--border)] first:border-t-0 ${dim ? "opacity-30" : ""} ${picked ? "bg-[var(--muted)] shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
+      <div key={item.line} data-task={item.line} data-stream={stream.id} data-check-row className={`flex min-h-7 items-center gap-1.5 border-t border-[var(--border)] first:border-t-0 ${dim ? "opacity-30" : ""} ${picked ? "bg-[var(--muted)] shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
         {rank !== null && <span className="mono w-3 shrink-0 text-right text-[var(--muted-foreground)]">{rank + 1}</span>}
         <Checkbox checked={false} disabled={busy} label={`Done: ${item.text}`} onChange={() => void setDone(stream.id, item)} />
         <button type="button" onClick={() => setSel({ kind: "item", stream: stream.id, line: item.line })} className={`min-w-0 flex-1 py-0.5 text-left text-small leading-snug hover:text-[var(--accent)] ${blocked ? "text-[var(--destructive)]" : ""}`}>
@@ -95,10 +103,10 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
             onClick={() => void run(() => vaultApi.setPipelineLabel(stream.id, item, { month: thisMonth }))}>→ {monthText(thisMonth)}</button>
         )}
         {col === "now" && since && <span className="mono shrink-0 text-[var(--muted-foreground)]">since {since}</span>}
-        {col === "next" && (
+        {col === "next" && nav && (
           <span className="shrink-0 whitespace-nowrap">
-            <button type="button" disabled={busy} aria-label={`Move up: ${item.text}`} onClick={() => void run(() => vaultApi.reorderPipelineItem(stream.id, item, "up"))} className="mono px-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">↑</button>
-            <button type="button" disabled={busy} aria-label={`Move down: ${item.text}`} onClick={() => void run(() => vaultApi.reorderPipelineItem(stream.id, item, "down"))} className="mono px-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">↓</button>
+            {nav.hasUp && <button type="button" disabled={busy} aria-label={`Move up: ${item.text}`} onClick={nav.up} className="mono px-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">↑</button>}
+            {nav.hasDown && <button type="button" disabled={busy} aria-label={`Move down: ${item.text}`} onClick={nav.down} className="mono px-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">↓</button>}
           </span>
         )}
       </div>
@@ -121,24 +129,34 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     const everything = itemsOf(stream.id).filter((i) => columnOf(i) === col);
     const ranked = new Map(everything.map((i, n) => [i.line, n]));
     const mine = everything.filter((i) => matchesLabel(i, label, today));
-    const notes = col === "someday" && label === "all" ? notesOf(stream.id) : [];
+    // Open blockers come first, outside the cap and the label filter: something is stuck and must not hide.
+    const blockers = col === "someday" ? notesOf(stream.id).filter(isOpenBlocker) : [];
+    const notes = col === "someday" && label === "all" ? notesOf(stream.id).filter((e) => !isOpenBlocker(e)) : [];
     const combined: (PipelineItemData | NotebookEntryData)[] = [...mine, ...notes];
     const cap = CAPS[col];
     const { shown, more } = capped(combined, cap, !!opened[key]);
     const shownItems = shown.filter((x): x is PipelineItemData => "lane" in x && "goal_ref" in x);
     const shownNotes = shown.filter((x): x is NotebookEntryData => "kind" in x);
     const groups: GoalGroup<PipelineItemData>[] = groupByGoal(shownItems, goalsOf(stream.id));
-    if (groups.length === 0 && shownNotes.length === 0) return <span className="text-[var(--muted-foreground)] opacity-60">·</span>;
+    if (groups.length === 0 && shownNotes.length === 0 && blockers.length === 0) return <span className="text-[var(--muted-foreground)] opacity-60">·</span>;
+    const plain = label === "all" && !focus; // a filter hides items, so the order the arrows act on is not the order shown
+    let shownRank = 0;
     return (
       <>
+        {blockers.map((e) => noteLine(stream, e))}
         {groups.map((g) => (
-          <div key={g.goal?.id ?? "none"}>
-            {(groups.length > 1 || g.goal) && (
-              <p className={`mono mt-1.5 truncate first:mt-0 ${g.goal?.ended ? "text-[var(--warn)]" : "text-[var(--muted-foreground)]"} ${focus && g.goal?.id !== focus ? "opacity-30" : ""}`}>
-                {g.goal ? `↳ ${g.goal.text}${g.goal.ended ? ` · ${quarterText(g.goal.quarter)} ended` : ""}` : "not nested"}
+          <div key={g.removed ? "removed" : g.goal?.id ?? "none"}>
+            {(groups.length > 1 || g.goal || g.removed) && (
+              <p className={`mono mt-1.5 truncate first:mt-0 ${g.goal?.ended || g.removed ? "text-[var(--warn)]" : "text-[var(--muted-foreground)]"} ${focus && g.goal?.id !== focus ? "opacity-30" : ""}`}>
+                {g.removed ? "↳ (removed goal)" : g.goal ? `↳ ${g.goal.text}${g.goal.ended ? ` · ${quarterText(g.goal.quarter)} ended` : ""}` : "not nested"}
               </p>
             )}
-            {g.items.map((i) => itemLine(stream, i, col, col === "next" ? ranked.get(i.line) ?? 0 : null))}
+            {g.items.map((i, at) => {
+              const up = g.items[at - 1], down = g.items[at + 1];
+              return itemLine(stream, i, col, col === "next" ? shownRank++ : null, col === "next" && plain
+                ? { hasUp: !!up, hasDown: !!down, up: () => void moveTo(stream, i, up, "up", ranked), down: () => void moveTo(stream, i, down, "down", ranked) }
+                : undefined);
+            })}
           </div>
         ))}
         {shownNotes.map((e) => noteLine(stream, e))}
@@ -159,6 +177,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     const goals = goalsOf(stream.id).filter((g) => !g.ended);
     const lines = quarter.streams.find((s) => s.stream === stream.id)?.goal_checklist ?? [];
     const nowN = itemsOf(stream.id).filter((i) => columnOf(i) === "now").length;
+    const stuck = notesOf(stream.id).filter(isOpenBlocker);
     const items = itemsOf(stream.id);
     return (
       <td className="bg-[var(--surface)] px-3 py-3 align-top">
@@ -166,8 +185,20 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
           <span className="h-2 w-2 shrink-0" style={{ background: stream.color }} aria-hidden="true" />
           <b className="text-small font-semibold">{stream.label}</b>
           {nowN > pipelines.now_limit && <span className="mono text-[var(--warn)]">Now {nowN}/{pipelines.now_limit}</span>}
+          {stuck.length > 0 && (
+            <button type="button" onClick={() => setSel({ kind: "note", stream: stream.id, key: stuck[0].id ?? `${stuck[0].line}:${stuck[0].hash}` })} aria-label={`${stuck.length} blocked in ${stream.label}`}
+              className="mono text-[var(--destructive)] hover:underline">blocked {stuck.length}</button>
+          )}
           <button type="button" onClick={() => onEdit(stream.id)} aria-label={`Edit ${stream.label}`} className={`${link} ml-auto`}>Edit</button>
         </div>
+        {editingGoals === stream.id ? (
+          <div className="mt-1.5">
+            <Checklist label={`${stream.label} ${quarterText(quarter.quarter)} goals`} items={lines} busy={busy} placeholder={`Add a ${quarterText(quarter.quarter)} goal`}
+              onToggle={(item, done) => run(() => vaultApi.tickStreamItem(stream.id, "goal", item.id, done))}
+              onChange={(next) => run(() => vaultApi.updateStream(stream.id, { goal_checklist: next }))} />
+            <button type="button" className={`${link} mt-1`} onClick={() => setEditingGoals(null)}>Done editing goals</button>
+          </div>
+        ) : (<>
         <div className="mt-1.5" role="list" aria-label={`${stream.label} goals`}>
           {goals.map((g) => {
             const line = lines.find((l) => l.id === g.id);
@@ -190,11 +221,38 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
             <button type="submit" disabled={busy || !draft.trim()} className={`${chip} disabled:opacity-40`}>Add</button>
           </form>
         ) : (
-          <button type="button" className={`${link} mt-1`} onClick={() => { setAdding(stream.id); setDraft(""); }}>+ {quarterText(quarter.quarter)} goal</button>
+          <span className="mt-1 flex gap-3">
+            <button type="button" className={link} onClick={() => { setAdding(stream.id); setDraft(""); }}>+ {quarterText(quarter.quarter)} goal</button>
+            {lines.length > 0 && <button type="button" className={link} aria-label={`Edit goals of ${stream.label}`} onClick={() => setEditingGoals(stream.id)}>Edit goals</button>}
+          </span>
         )}
+        </>)}
       </td>
     );
   }
+
+  // The old work list's keys: J and K move down and up the tasks on screen, X ticks, S makes the small domino, / goes to the capture bar.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (!t || e.metaKey || e.ctrlKey || e.altKey || view !== "plan") return;
+      if (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || t.closest("[role=menu]")) return;
+      if (e.key === "/") { e.preventDefault(); document.getElementById("plan-capture")?.focus(); return; }
+      const rows = [...document.querySelectorAll<HTMLElement>("[data-task]")].map((el) => ({ stream: el.dataset.stream ?? "", line: Number(el.dataset.task) }));
+      const at = sel?.kind === "item" ? rows.findIndex((r) => r.stream === sel.stream && r.line === sel.line) : -1;
+      const pick = (r?: { stream: string; line: number }) => r && setSel({ kind: "item", stream: r.stream, line: r.line });
+      if (e.key === "j") pick(rows[at + 1]);
+      else if (e.key === "k") pick(rows[at - 1]);
+      else if (sel?.kind === "item") {
+        const item = itemsOf(sel.stream).find((i) => i.line === sel.line);
+        if (!item) return;
+        if (e.key === "x") void setDone(sel.stream, item);
+        else if (e.key === "s" && streams.find((m) => m.id === sel.stream)?.weekly) void run(() => vaultApi.focusPipelineItem(sel.stream, item));
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
 
   const selected = (() => {
     if (!sel) return null;
@@ -292,7 +350,10 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
               </tbody>
             </table>
           )}
-          {message && <p role="status" className="mono px-4 py-2 text-[var(--accent)]">{message}</p>}
+          <p className="mono flex flex-wrap gap-x-5 gap-y-1 px-4 py-2.5 text-[var(--muted-foreground)]">
+            <span>J K move</span><span>X done</span><span>S small domino</span><span>/ capture</span>
+            {message && <span role="status" className="text-[var(--accent)]">{message}</span>}
+          </p>
         </div>
 
         {selected && (

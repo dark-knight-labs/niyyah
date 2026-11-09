@@ -106,6 +106,7 @@ test("labels: month, date, late with a quick move, and the filters", async ({ pa
   await expect(row(page, a).locator("[data-label]")).toHaveText(thisMonth);
   // a day label replaces the month
   await label.getByLabel("Label date").fill(`${year}-${String(month).padStart(2, "0")}-28`);
+  await label.getByLabel("Label date").press("Enter");  // saved on Enter or blur, not on every keystroke
   await expect(row(page, a).locator("[data-label]")).toHaveText(/^[A-Z][a-z]{2} 28 [A-Z][a-z]{2}$/);
   // the filter row: this month shows it, No label hides it
   await page.getByRole("group", { name: "Label" }).first().getByRole("button", { name: thisMonth }).click();
@@ -119,6 +120,7 @@ test("labels: month, date, late with a quick move, and the filters", async ({ pa
   // late: a past day label is red and offers a one-click move to this month
   const yesterday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka" }).format(new Date(Date.now() - 86_400_000 * 3));
   await label.getByLabel("Label date").fill(yesterday);
+  await label.getByLabel("Label date").press("Enter");
   await expect(row(page, a).locator("[data-label]")).toHaveClass(/destructive/);
   await expect(page.getByRole("button", { name: /^Late \d+$/ })).toBeVisible();
   await page.getByRole("button", { name: `Move to ${thisMonth}: ${a}` }).click();
@@ -154,7 +156,7 @@ test("Now over its limit warns on the block; Next and Someday show +n more", asy
   await expect(page.locator('[data-block="studio"]').getByText(/Now \d+\/3/)).toBeVisible();
   await expect(cell(page, "next").locator("[data-task]")).toHaveCount(6);
   await expect(cell(page, "next").getByRole("button", { name: /^\+\d+ more$/ })).toBeVisible();
-  await expect(cell(page, "someday").locator("[data-task]")).toHaveCount(3 - (await cell(page, "someday").locator("span", { hasText: /^(idea|meeting|blocker)$/ }).count()));
+  await expect(cell(page, "someday").locator("[data-task]")).toHaveCount(3);  // the cap counts tasks and plain notes; open blockers sit outside it
   await cell(page, "next").getByRole("button", { name: /^\+\d+ more$/ }).click();
   expect(await cell(page, "next").locator("[data-task]").count()).toBeGreaterThan(6);
 });
@@ -197,4 +199,66 @@ test("dark theme keeps the table readable", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
   await open(page);
   await expect(page.getByRole("table", { name: "Plan" })).toBeVisible();
+});
+
+test("an open blocker is flagged in the block cell and listed first in Someday, whatever the filters", async ({ page }) => {
+  await open(page);
+  const block = page.locator('[data-block="studio"]');
+  await expect(block.getByRole("button", { name: /blocked in Studio/ })).toBeVisible();
+  await page.getByRole("button", { name: "No label" }).click();                       // hides every labelled item and the plain notes
+  await expect(cell(page, "someday")).toContainText("Waiting on legal");
+  await block.getByRole("button", { name: /blocked in Studio/ }).click();
+  await expect(page.getByRole("complementary", { name: "Item" }).getByLabel("Title")).toHaveValue("Waiting on legal");
+});
+
+test("goal lines can be renamed and removed; a task under a removed goal says so", async ({ page, request }) => {
+  const t = uniq("Orphan task"), goal = uniq("Short lived");
+  await addTasks(request, [t]);
+  await open(page);
+  const block = page.locator('[data-block="studio"]');
+  await block.getByRole("button", { name: /^\+ Q\d'\d\d goal$/ }).click();
+  await block.getByRole("textbox", { name: /^New Q\d'\d\d goal/ }).fill(goal);
+  await block.getByRole("button", { name: "Add", exact: true }).click();
+  await row(page, t).getByRole("button", { name: t, exact: true }).click();
+  await page.getByRole("group", { name: "Goal" }).getByRole("button", { name: new RegExp(goal) }).click();
+  await expect(cell(page, "now").getByText(`↳ ${goal}`)).toBeVisible();
+  await block.getByRole("button", { name: "Edit goals of Studio" }).click();
+  const renamed = `${goal} renamed`;
+  const text = block.getByText(goal, { exact: true });
+  await text.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" renamed");
+  await page.keyboard.press("Enter");
+  await expect(block.getByText(renamed, { exact: true })).toBeVisible();
+  await block.getByRole("button", { name: `Remove: ${renamed}` }).click({ force: true });
+  await block.getByRole("button", { name: "Done editing goals" }).click();
+  await expect(cell(page, "now").getByText("↳ (removed goal)")).toBeVisible();
+  await expect(cell(page, "now").getByText("↳ (removed goal)")).toHaveClass(/warn/);
+});
+
+test("keyboard: j selects the next task, x ticks it, / goes to the capture bar", async ({ page, request }) => {
+  const t = uniq("Keyed");
+  await addTasks(request, [t]);
+  await open(page);
+  await page.keyboard.press("j");
+  await expect(page.getByRole("complementary", { name: "Item" })).toBeVisible();
+  const first = await page.locator("[data-task].shadow-\\[inset_2px_0_0_var\\(--accent\\)\\]").first().getAttribute("data-task");
+  expect(first).not.toBeNull();
+  await page.keyboard.press("/");
+  await expect(page.locator("#plan-capture")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await row(page, t).getByRole("button", { name: t, exact: true }).click();
+  await page.keyboard.press("x");
+  await expect(row(page, t)).toHaveCount(0);
+});
+
+test("Next arrows act on the order shown: numbered as displayed, hidden while a label filter is on", async ({ page, request }) => {
+  const a = uniq("Arrow A"), b = uniq("Arrow B");
+  await addTasks(request, [a, b], "next");
+  await open(page);
+  await expect(page.getByRole("button", { name: /^Move up: / }).first()).toBeVisible();
+  await page.getByRole("button", { name: "No label" }).click();
+  await expect(page.getByRole("button", { name: /^Move up: / })).toHaveCount(0);
+  const nums = (await cell(page, "next").locator("[data-task] > span.mono").first().innerText()).trim();
+  expect(nums).toBe("1");
 });

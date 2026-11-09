@@ -68,14 +68,25 @@ export function goalIndex(current: { id: string; text: string }[], quarter: stri
   ];
 }
 
-export interface GoalGroup<T> { goal: GoalRef | null; items: T[] }
+export interface GoalGroup<T> {
+  goal: GoalRef | null;
+  /** True for items whose goal_ref names a goal line that no longer exists. */
+  removed?: boolean;
+  items: T[];
+}
 
-/** Items grouped under their goals (this quarter's in order, then ended ones), then the not-nested rest. Empty groups are left out. */
+/**
+ * Items grouped under their goals (this quarter's in order, then ended ones), then those pointing at a goal that was removed,
+ * then the not-nested rest. Empty groups are left out.
+ */
 export function groupByGoal<T extends { goal_ref?: string | null }>(items: T[], goals: GoalRef[]): GoalGroup<T>[] {
-  const groups = goals.map((goal) => ({ goal: goal as GoalRef | null, items: items.filter((i) => i.goal_ref === goal.id) })).filter((g) => g.items.length > 0);
+  const groups: GoalGroup<T>[] = goals.map((goal) => ({ goal, items: items.filter((i) => i.goal_ref === goal.id) })).filter((g) => g.items.length > 0);
   const known = new Set(goals.map((g) => g.id));
-  const rest = items.filter((i) => !i.goal_ref || !known.has(i.goal_ref));
-  return rest.length ? [...groups, { goal: null, items: rest }] : groups;
+  const removed = items.filter((i) => i.goal_ref && !known.has(i.goal_ref));
+  const rest = items.filter((i) => !i.goal_ref);
+  if (removed.length) groups.push({ goal: null, removed: true, items: removed });
+  if (rest.length) groups.push({ goal: null, items: rest });
+  return groups;
 }
 
 /** Tasks done / nested under a goal, counting the block's items of every lane. */

@@ -53,11 +53,12 @@ describe("matchesLabel", () => {
 describe("grouping under goals", () => {
   const goals = goalIndex([{ id: "g1", text: "Ship" }, { id: "g2", text: "Rest" }], "2026-Q4", [{ id: "old", text: "Last quarter", quarter: "2026-Q3" }]);
   const a = item({ goal_ref: "g2" }), b = item({ goal_ref: "g1" }), c = item(), d = item({ goal_ref: "old" }), e = item({ goal_ref: "gone" });
-  it("orders groups by goal, ended goals after, not nested last; unknown refs count as not nested", () => {
+  it("orders groups by goal, ended goals after, not nested last; a ref to a removed goal gets its own group", () => {
     const groups = groupByGoal([a, b, c, d, e], goals);
-    expect(groups.map((g) => g.goal?.id ?? null)).toEqual(["g1", "g2", "old", null]);
+    expect(groups.map((g) => g.goal?.id ?? null)).toEqual(["g1", "g2", "old", null, null]);
     expect(groups[2].goal?.ended).toBe(true);
-    expect(groups[3].items).toEqual([c, e]);
+    expect(groups[3]).toEqual({ goal: null, removed: true, items: [e] }); // a ref to a goal that is gone is flagged, not hidden
+    expect(groups[4]).toEqual({ goal: null, items: [c] });
   });
   it("leaves out empty groups and returns one plain group when nothing is nested", () => {
     expect(groupByGoal([c], goals)).toEqual([{ goal: null, items: [c] }]);

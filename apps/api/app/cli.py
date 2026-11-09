@@ -85,6 +85,7 @@ async def run_plan_v2_migrate(user: int | None, all_users: bool, do_apply: bool,
         try:
             entries = json.loads(revert.read_text(encoding="utf-8"))
             entries["user"], entries["created"], entries["updates"]
+            [c["snapshot"] for c in entries["created"]]
         except (OSError, ValueError, KeyError, TypeError) as exc:
             print(f"cannot read journal {revert}: {exc}", file=sys.stderr)
             return 1
@@ -137,8 +138,9 @@ async def run_plan_v2_migrate(user: int | None, all_users: bool, do_apply: bool,
                     await db.commit()
                 except Exception as exc:
                     await db.rollback()
-                    if wrote:
-                        Path(path).unlink(missing_ok=True)
+                    if wrote:  # the commit may or may not have landed: keep the journal, marked, rather than lose the way back
+                        Path(path).rename(f"{path}.uncertain")
+                        print(f"journal kept as {path}.uncertain: check the data, then revert with it if the run did land", file=sys.stderr)
                     print(f"user {uid}: failed, nothing written: {exc}", file=sys.stderr)
                     return 1
                 print(f"  journal: {path}")
