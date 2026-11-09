@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { Checklist } from "@/components/planner/checklist";
 import { MonthTrack } from "@/components/planner/month-track";
-import { SmallDomino } from "@/components/planner/small-domino";
+import { SmallDomino, weekLabel } from "@/components/planner/small-domino";
 import { StatusPill } from "@/components/planner/stream-chip";
 import { ItemCard, NoteCard } from "@/components/planner/work-card";
-import { Row, TABS, View, inScope, inTab, isOpenBlocker, tagTally, waitingOn } from "@/lib/plan-model";
+import { Row, TABS, View, inScope, inTab, isOpenBlocker, rowItem, tagTally, waitingOn } from "@/lib/plan-model";
+import { carriedFrom, carriedPick, monthTab, overdue } from "@/lib/plan-rules";
 import { MONTH_LABEL, StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { NotebooksData, NotebookKind, PipelinesData, QuarterData, VaultObjectivesData } from "@/lib/vault-types";
@@ -52,7 +53,11 @@ interface Props {
 export function WorkSection({ streams, quarter, pipelines, notebooks, objectives, rows, view, setView, sel, setSel, picked, onPickStream, editor, onEdit, onAddStream, busy, run, message }: Props) {
   const [idx, setIdx] = useState(0);
   const scoped = rows.filter((r) => inScope(r, view));
-  const shown = scoped.filter((r) => inTab(r, view.tab, view.kind));
+  const mctx = { current: quarter.current_month, week: pipelines.week };
+  const inThisTab = (r: Row, tab: View["tab"]) => inTab(r, tab, view.kind, mctx);
+  const shown = view.tab === "month" ? orderedMonth(scoped) : scoped.filter((r) => inThisTab(r, view.tab));
+  const tabs = [...TABS.slice(0, 3), { id: "month" as const, label: "Month" }, ...TABS.slice(3)];
+  const carriedOf = (id: string) => carriedPick(rows.flatMap((r) => (r.type === "item" && r.stream === id ? [r.item] : [])), pipelines.week);
   const active = shown.find((r) => r.key === sel) ?? shown[Math.min(idx, shown.length - 1)] ?? null;
   const meta = (id: string) => streams.find((s) => s.id === id);
   const entriesOf = (id: string) => notebooks?.streams.find((n) => n.stream === id)?.entries ?? [];
@@ -67,6 +72,12 @@ export function WorkSection({ streams, quarter, pipelines, notebooks, objectives
   const stale = scoped.filter((r) => r.type === "item" && r.item.stale && r.item.lane !== "done").length;
   const links = scoped.filter((r) => r.type === "note" && r.entry.url) as Extract<Row, { type: "note" }>[];
   const weekly = streams.filter((s) => s.weekly && (!picked || s.id === picked));
+
+  /** Month tab order: overdue, this month's checkpoints, then Now > Next > Someday (see plan-rules). */
+  function orderedMonth(list: Row[]): Row[] {
+    const items = list.flatMap((r) => (r.type === "item" ? [{ ...rowItem(r), row: r }] : []));
+    return monthTab(items, mctx.current, mctx.week).map((x) => x.row);
+  }
 
   function toggle(r: Row) {
     if (r.type === "item") return run(() => vaultApi.movePipelineItem(r.stream, r.item, r.item.lane === "done" ? "next" : "done"));
@@ -90,15 +101,15 @@ export function WorkSection({ streams, quarter, pipelines, notebooks, objectives
     return () => document.removeEventListener("keydown", onKey);
   });
 
-  const count = (tab: View["tab"]) => scoped.filter((r) => inTab(r, tab, view.kind)).length;
+  const count = (tab: View["tab"]) => scoped.filter((r) => inThisTab(r, tab)).length;
   const nowLimit = pipelines.now_limit;
-  const nowOver = (picked ? [picked] : streams.map((s) => s.id)).some((id) => scoped.filter((r) => r.stream === id && inTab(r, "now")).length > nowLimit);
+  const nowOver = (picked ? [picked] : streams.map((s) => s.id)).some((id) => scoped.filter((r) => r.stream === id && inThisTab(r, "now")).length > nowLimit);
 
   return (
     <>
       <div className="flex flex-wrap justify-between border-b border-[var(--border)]">
         <div role="tablist" aria-label="Horizon" className="flex max-w-full overflow-x-auto">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const n = count(t.id);
             return (
               <button key={t.id} type="button" role="tab" aria-selected={view.tab === t.id} onClick={() => setView({ tab: t.id })}
@@ -166,7 +177,8 @@ export function WorkSection({ streams, quarter, pipelines, notebooks, objectives
             <div className="px-3 py-2">
               <SmallDomino meta={picks} objective={objectives?.items.find((o) => o.stream === picks.id) ?? null}
                 pool={rows.flatMap((r) => (r.type === "item" && r.stream === picks.id && r.item.lane !== "done" ? [r.item] : []))} run={run}
-                onPick={(item) => void run(() => vaultApi.focusPipelineItem(picks.id, item))} />
+                onPick={(item) => void run(() => vaultApi.focusPipelineItem(picks.id, item))}
+                carried={carriedOf(picks.id)} week={pipelines.week} />
             </div>
           </div>
         </section>
@@ -178,7 +190,8 @@ export function WorkSection({ streams, quarter, pipelines, notebooks, objectives
               <div className="min-w-0 flex-1 basis-64">
                 <SmallDomino meta={s} objective={objectives?.items.find((o) => o.stream === s.id) ?? null}
                   pool={rows.flatMap((r) => (r.type === "item" && r.stream === s.id && r.item.lane !== "done" ? [r.item] : []))} run={run}
-                  onPick={(item) => void run(() => vaultApi.focusPipelineItem(s.id, item))} />
+                  onPick={(item) => void run(() => vaultApi.focusPipelineItem(s.id, item))}
+                  carried={carriedOf(s.id)} week={pipelines.week} />
               </div>
             </div>
           ))}
@@ -220,7 +233,7 @@ export function WorkSection({ streams, quarter, pipelines, notebooks, objectives
           <div role="listbox" aria-label="Work items">
             {shown.length === 0 && (
               <p className="px-4 py-8 text-sm text-[var(--muted-foreground)]">
-                {view.tab === "notes" ? "No notes here. Write one in the box above." : view.tab === "now" ? "Nothing committed. Promote one from Next." : `Nothing in ${view.tab} for this filter.`}
+                {view.tab === "notes" ? "No notes here. Write one in the box above." : view.tab === "now" ? "Nothing committed. Promote one from Next." : view.tab === "month" ? "Nothing for this month. Set a checkpoint on an item to bring it here." : `Nothing in ${view.tab} for this filter.`}
               </p>
             )}
             {shown.map((r, i) => {
@@ -229,6 +242,8 @@ export function WorkSection({ streams, quarter, pipelines, notebooks, objectives
               const done = r.type === "item" && r.item.lane === "done";
               const blocked = r.type === "item" && waitingOn(r.item, entriesOf(r.stream)).some((w) => w.found);
               const one = r.type === "item" && r.item.focus === pipelines.week;
+              const carriedWeek = r.type === "item" ? carriedFrom(r.item, pipelines.week) : null;
+              const late = r.type === "item" && overdue(rowItem(r), quarter.current_month);
               const clearedBlocker = r.type === "note" && r.entry.kind === "blocker" && !r.entry.open;
               const title = r.type === "item" ? r.item.text : r.entry.title;
               const snippet = r.type === "item" ? r.item.description : r.entry.body;
@@ -256,7 +271,10 @@ export function WorkSection({ streams, quarter, pipelines, notebooks, objectives
                     {r.type === "note" && <span className={`mono border px-1.5 py-0.5 ${r.entry.kind === "blocker" && r.entry.open ? "border-[var(--destructive)] bg-[var(--warn-light)] text-[var(--destructive)]" : "border-[var(--rule)] text-[var(--muted-foreground)]"}`}>{r.entry.kind}</span>}
                     {blocked && <span className="mono border border-[var(--destructive)] bg-[var(--warn-light)] px-1.5 py-0.5 text-[var(--destructive)]">Blocked</span>}
                     {r.type === "item" && !done && !r.item.checkpoint && r.item.stale && <span className="mono border border-[var(--warn)] bg-[var(--warn-light)] px-1.5 py-0.5 text-[var(--warn)]">No checkpoint · {r.item.age_days}d</span>}
-                    {r.type === "item" && r.item.checkpoint && <span className="mono border border-[var(--rule)] px-1.5 py-0.5">{MONTH_LABEL[r.item.checkpoint]}</span>}
+                    {carriedWeek && <span className="mono border border-[var(--warn)] bg-[var(--warn-light)] px-1.5 py-0.5 text-[var(--warn)]">From {weekLabel(carriedWeek)}</span>}
+                    {r.type === "item" && r.item.checkpoint && (late
+                      ? <span className="mono border border-[var(--destructive)] bg-[var(--warn-light)] px-1.5 py-0.5 text-[var(--destructive)]">{MONTH_LABEL[r.item.checkpoint]} · overdue</span>
+                      : <span className="mono border border-[var(--rule)] px-1.5 py-0.5">{MONTH_LABEL[r.item.checkpoint]}</span>)}
                     {one && <span className="mono border border-[var(--accent)] px-1.5 py-0.5 text-[var(--accent)]">Small domino</span>}
                     {r.type === "item" && (r.item.products ?? []).map((t) => (
                       <button key={t} type="button" onClick={(e) => { e.stopPropagation(); setView({ tag: view.tag === t ? null : t }); }} className="mono text-[var(--muted-foreground)] hover:text-[var(--accent)]">#{t}</button>
