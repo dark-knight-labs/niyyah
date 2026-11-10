@@ -95,7 +95,7 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
       {waiting.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {waiting.map((w) => (
-            <span key={w.id} className={`mono inline-flex max-w-full items-center gap-1.5 px-2 py-1 ${w.found ? "bg-[var(--warn-light)] text-[var(--destructive)]" : "bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
+            <span key={w.id} className={`mono inline-flex min-w-0 max-w-full items-center gap-1.5 [overflow-wrap:anywhere] px-2 py-1 ${w.found ? "bg-[var(--warn-light)] text-[var(--destructive)]" : "bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
               <OctagonAlert size={11} aria-hidden="true" className="shrink-0" />{w.found ? w.found.title : "blocker deleted"}
             </span>
           ))}
@@ -118,7 +118,7 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
         <div role="group" aria-label="Goal" className="flex flex-wrap gap-1.5">
           {goals.map((g) => (
             <button key={g.id} type="button" disabled={busy} aria-pressed={item.goal_ref === g.id} title={g.text} onClick={() => void run(() => vaultApi.setPipelineGoal(stream, item, g.id))}
-              className={`${chipBtn} max-w-full truncate ${g.ended ? "text-[var(--warn)]" : ""}`}>{quarterText(g.quarter)} · {g.text}{g.ended ? " · ended" : ""}</button>
+              className={`${chipBtn} min-w-0 max-w-full truncate ${g.ended ? "text-[var(--warn)]" : ""}`}>{quarterText(g.quarter)} · {g.text}{g.ended ? " · ended" : ""}</button>
           ))}
           <button type="button" disabled={busy} aria-pressed={!item.goal_ref || !goals.some((g) => g.id === item.goal_ref)} onClick={() => void run(() => vaultApi.setPipelineGoal(stream, item, null))} className={chipBtn}>Not nested</button>
         </div>
@@ -131,11 +131,11 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
             <button key={m} type="button" disabled={busy} aria-pressed={item.label_month === m} onClick={() => void run(() => vaultApi.setPipelineLabel(stream, item, { month: m }))} className={chipBtn}>{monthText(m)}</button>
           ))}
           <button type="button" disabled={busy} aria-pressed={!item.label_month && !item.label_date} onClick={() => void run(() => vaultApi.setPipelineLabel(stream, item, {}))} className={chipBtn}>None</button>
-          <label className="mono flex items-center gap-1.5 text-[var(--muted-foreground)]">or date
+          <label className="mono flex min-w-0 max-w-full items-center gap-1.5 text-[var(--muted-foreground)]">or date
             <input type="date" aria-label="Label date" disabled={busy} defaultValue={item.label_date ?? ""} key={item.label_date ?? "no-date"}
               onBlur={(e) => { if (e.target.value !== (item.label_date ?? "")) void run(() => vaultApi.setPipelineLabel(stream, item, e.target.value ? { day: e.target.value } : {})); }}
               onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-              className="h-8 border border-[var(--rule)] bg-[var(--background)] px-1.5 text-small" />
+              className="h-8 min-w-0 border border-[var(--rule)] bg-[var(--background)] px-1.5 text-small" />
           </label>
         </div>
       </div>
@@ -161,7 +161,7 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
             {products.map((p) => (
               <button key={p.id} type="button" disabled={busy} aria-pressed={mine.includes(p.slug)} data-product-chip={p.slug}
                 onClick={() => void run(() => vaultApi.setPipelineProducts(stream, item, mine.includes(p.slug) ? mine.filter((x) => x !== p.slug) : [...mine, p.slug]))}
-                className={chipBtn}>{p.name}</button>
+                className={`${chipBtn} min-w-0 max-w-full [overflow-wrap:anywhere]`}>{p.name}</button>
             ))}
           </div>
         </div>
@@ -189,7 +189,7 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
         {item.added && <><dt className="mono text-[var(--muted-foreground)]">Added</dt><dd className="tabular-nums">{item.added}</dd></>}
         {item.done_on && <><dt className="mono text-[var(--muted-foreground)]">Done</dt><dd className="tabular-nums">{item.done_on}</dd></>}
       </dl>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex min-w-0 flex-wrap gap-2">
         <button type="button" disabled={busy} className={solid} onClick={() => void run(() => vaultApi.movePipelineItem(stream, item, item.lane === "done" ? "next" : "done"))}>{item.lane === "done" ? "Reopen" : "Mark done"}</button>
         {at > 0 && <button type="button" disabled={busy} className={ghost} onClick={() => void run(() => vaultApi.movePipelineItem(stream, item, order[at - 1]))}>↑ Promote</button>}
         {at >= 0 && at < 2 && <button type="button" disabled={busy} className={ghost} onClick={() => void run(() => vaultApi.movePipelineItem(stream, item, order[at + 1]))}>↓ Demote</button>}

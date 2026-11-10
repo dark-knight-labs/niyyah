@@ -237,3 +237,35 @@ test("habits sit under their goal, tick in Now with +1, and a task can become a 
   await card2.getByRole("group", { name: "Cadence" }).getByRole("button", { name: "5/wk" }).click();
   await expect(b.locator("[data-habit]").filter({ hasText: task })).toContainText("5/wk");
 });
+
+test("item and habit side cards stay inside their panel and the page, on a phone and on a desktop", async ({ page, request }) => {
+  const long = uniq("A very long goal that keeps going until the whole line runs far past the edge of a narrow phone panel");
+  const t = uniq("Overflow check"), habitName = uniq("Overflow habit");
+  const goalId = await addGoal(request, apiQuarter, long);
+  await addTasks(request, [t]);
+  const made = await request.post(`${V}/habits`, { headers: headers(), data: { name: habitName, block: "soul", stream: "studio", per_week: 3, goal_ref: goalId } });
+  expect(made.ok(), await made.text()).toBeTruthy();
+  // inside its own box, inside the viewport, and the page itself does not scroll sideways
+  const fits = async (name: "Item" | "Habit", width: number) => {
+    const m = await page.getByRole("complementary", { name }).evaluate((el) => ({
+      scroll: el.scrollWidth, client: el.clientWidth, right: el.getBoundingClientRect().right, vw: window.innerWidth, page: document.documentElement.scrollWidth,
+    }));
+    expect(m.scroll, `${name} card scrollWidth at ${width}px`).toBeLessThanOrEqual(m.client);
+    expect(m.right, `${name} card right edge at ${width}px`).toBeLessThanOrEqual(m.vw + 1);
+    expect(m.page, `page scrollWidth at ${width}px`).toBeLessThanOrEqual(m.vw);
+  };
+  for (const width of (process.env.OVERFLOW_WIDTHS ?? "390,1280").split(",").map(Number)) {
+    await page.setViewportSize({ width, height: 844 });
+    await open(page);
+    await row(page, t).getByRole("button", { name: t, exact: true }).click();
+    const card = page.getByRole("complementary", { name: "Item" });
+    await expect(card.getByRole("group", { name: "Goal" }).getByRole("button", { name: new RegExp(long.slice(0, 30)) })).toBeVisible();
+    await fits("Item", width);
+    await page.screenshot({ path: `e2e/out/item-card-${width}.png` });
+    await block(page).locator("[data-habit]").filter({ hasText: habitName }).getByRole("button", { name: habitName }).click();
+    const habit = page.getByRole("complementary", { name: "Habit" });
+    await expect(habit.getByRole("group", { name: "Habit goal" }).getByRole("button", { name: new RegExp(long.slice(0, 30)) })).toBeVisible();
+    await fits("Habit", width);
+    await page.screenshot({ path: `e2e/out/habit-card-${width}.png` });
+  }
+});

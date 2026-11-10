@@ -83,7 +83,7 @@ export function PlanHabitCard({ habit: h, goals, busy, runHabits, onClose }: {
         <div role="group" aria-label="Habit goal" className="flex flex-wrap gap-1.5">
           {goals.map((g) => (
             <button key={g.id} type="button" disabled={busy} aria-pressed={h.goal_ref === g.id} title={g.text}
-              onClick={() => void save({ goal_ref: g.id })} className={`${chipBtn} max-w-full truncate ${g.ended ? "text-[var(--warn)]" : ""}`}>
+              onClick={() => void save({ goal_ref: g.id })} className={`${chipBtn} min-w-0 max-w-full truncate ${g.ended ? "text-[var(--warn)]" : ""}`}>
               {quarterText(g.quarter)} · {g.text}{g.ended ? " · ended" : ""}
             </button>
           ))}
