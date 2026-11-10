@@ -95,7 +95,7 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
       {waiting.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {waiting.map((w) => (
-            <span key={w.id} className={`mono inline-flex max-w-full items-center gap-1.5 px-2 py-1 ${w.found ? "bg-[var(--warn-light)] text-[var(--destructive)]" : "bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
+            <span key={w.id} className={`mono inline-flex min-w-0 max-w-full items-center gap-1.5 [overflow-wrap:anywhere] px-2 py-1 ${w.found ? "bg-[var(--warn-light)] text-[var(--destructive)]" : "bg-[var(--muted)] text-[var(--muted-foreground)]"}`}>
               <OctagonAlert size={11} aria-hidden="true" className="shrink-0" />{w.found ? w.found.title : "blocker deleted"}
             </span>
           ))}
@@ -161,7 +161,7 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
             {products.map((p) => (
               <button key={p.id} type="button" disabled={busy} aria-pressed={mine.includes(p.slug)} data-product-chip={p.slug}
                 onClick={() => void run(() => vaultApi.setPipelineProducts(stream, item, mine.includes(p.slug) ? mine.filter((x) => x !== p.slug) : [...mine, p.slug]))}
-                className={chipBtn}>{p.name}</button>
+                className={`${chipBtn} min-w-0 max-w-full [overflow-wrap:anywhere]`}>{p.name}</button>
             ))}
           </div>
         </div>
