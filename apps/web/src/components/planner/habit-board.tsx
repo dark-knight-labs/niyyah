@@ -189,7 +189,7 @@ export function HabitBoard({ data, streams, busy, runHabits, picked, onPick }: P
         ))}
       </div>
       {data.habits.length === 0 && (
-        <p className="px-4 py-3 text-small text-[var(--muted-foreground)]">No habits yet. Pick Habit in the capture line above and write one: <span className="mono normal-case tracking-normal">Walk 20 min @after Asr, min: 5 min, 5/wk</span></p>
+        <p className="px-4 py-3 text-small text-[var(--muted-foreground)]">No habits yet. Pick Habit in the capture line on the Plan and write one: <span className="mono normal-case tracking-normal">Walk 20 min @after Asr, min: 5 min, 5/wk</span></p>
       )}
       {retired.length > 0 && (
         <div className="border-b border-[var(--border)]">

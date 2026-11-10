@@ -197,7 +197,7 @@ export function ItemCard({ row, meta, months, goals, blockers, week, busy, run, 
         <Link href={`/map?board=life&node=task:${item.line}`} className={ghost}>Show on map</Link>
         {onMakeHabit && item.lane !== "done" && (habitAsk ? (
           <span role="alertdialog" aria-label="Make it a habit?" className="flex flex-wrap items-center gap-2 border border-[var(--rule)] px-2.5 py-1 text-xs">
-            This becomes a habit, 3 a week{landing ? ` in ${landing} on the Habits board` : ""}, and the task is deleted.{lost.length > 0 ? ` Not kept: ${lost.join(", ")}.` : ""}
+            This becomes a habit, 3 a week{landing ? ` in ${landing}` : ""} (see <Link href="/habits" className="underline">Habits</Link>), and the task is deleted.{lost.length > 0 ? ` Not kept: ${lost.join(", ")}.` : ""}
             <button type="button" disabled={busy} className="mono text-[var(--accent)] hover:underline" onClick={() => void onMakeHabit(item)}>Make habit</button>
             <button type="button" className="mono text-[var(--muted-foreground)] hover:underline" onClick={() => setHabitAsk(false)}>Cancel</button>
           </span>

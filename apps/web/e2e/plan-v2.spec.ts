@@ -109,11 +109,11 @@ test("labels: month, date, late with a quick move, and the filters", async ({ pa
   await label.getByLabel("Label date").press("Enter");  // saved on Enter or blur, not on every keystroke
   await expect(row(page, a).locator("[data-label]")).toHaveText(/^[A-Z][a-z]{2} 28 [A-Z][a-z]{2}$/);
   // the filter row: this month shows it, No label hides it
-  await page.getByRole("group", { name: "Label" }).first().getByRole("button", { name: thisMonth }).click();
+  await page.locator('select[aria-label="Label"]').selectOption({ label: thisMonth });
   await expect(row(page, a)).toBeVisible();
-  await page.getByRole("button", { name: "No label" }).click();
+  await page.locator('select[aria-label="Label"]').selectOption("none");
   await expect(row(page, a)).toHaveCount(0);
-  await page.getByRole("button", { name: "All", exact: true }).click();
+  await page.locator('select[aria-label="Label"]').selectOption("all");
   await expect(row(page, a)).toBeVisible();
   await label.getByRole("button", { name: "None" }).click();
   await expect(row(page, a).locator("[data-label]")).toHaveCount(0);
@@ -122,7 +122,7 @@ test("labels: month, date, late with a quick move, and the filters", async ({ pa
   await label.getByLabel("Label date").fill(yesterday);
   await label.getByLabel("Label date").press("Enter");
   await expect(row(page, a).locator("[data-label]")).toHaveClass(/destructive/);
-  await expect(page.getByRole("button", { name: /^Late \d+$/ })).toBeVisible();
+  await expect(page.locator('select[aria-label="Label"] option').filter({ hasText: /^Late \d+$/ })).toHaveCount(1);
   await page.getByRole("button", { name: `Move to ${thisMonth}: ${a}` }).click();
   await expect(row(page, a).locator("[data-label]")).toHaveText(thisMonth);
   await expect(row(page, a).locator("[data-label]")).not.toHaveClass(/destructive/);
@@ -205,7 +205,7 @@ test("an open blocker is flagged in the block cell and listed first in Someday, 
   await open(page);
   const block = page.locator('[data-block="studio"]');
   await expect(block.getByRole("button", { name: /blocked in Studio/ })).toBeVisible();
-  await page.getByRole("button", { name: "No label" }).click();                       // hides every labelled item and the plain notes
+  await page.locator('select[aria-label="Label"]').selectOption("none");                       // hides every labelled item and the plain notes
   await expect(cell(page, "someday")).toContainText("Waiting on legal");
   await block.getByRole("button", { name: /blocked in Studio/ }).click();
   await expect(page.getByRole("complementary", { name: "Item" }).getByLabel("Title")).toHaveValue("Waiting on legal");
@@ -257,7 +257,7 @@ test("Next arrows act on the order shown: numbered as displayed, hidden while a 
   await addTasks(request, [a, b], "next");
   await open(page);
   await expect(page.getByRole("button", { name: /^Move up: / }).first()).toBeVisible();
-  await page.getByRole("button", { name: "No label" }).click();
+  await page.locator('select[aria-label="Label"]').selectOption("none");
   await expect(page.getByRole("button", { name: /^Move up: / })).toHaveCount(0);
   const nums = (await cell(page, "next").locator("[data-task] > span.mono").first().innerText()).trim();
   expect(nums).toBe("1");

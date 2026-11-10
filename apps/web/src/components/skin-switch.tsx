@@ -21,8 +21,8 @@ const IDS = SKINS.map((s) => s.id);
 /** Runs before first paint: ?skin=<id> wins and is remembered; otherwise the remembered skin. */
 export const SKIN_BOOT = `try{var ids=${JSON.stringify(IDS)},k="${KEY}",q=new URLSearchParams(location.search).get("skin");if(q&&ids.indexOf(q)>=0)localStorage.setItem(k,q);var s=localStorage.getItem(k);if(s&&s!=="paper"&&ids.indexOf(s)>=0)document.documentElement.setAttribute("data-skin",s)}catch(e){}`;
 
-/** Skin picker fixed to the bottom-right corner. Remove once a skin wins. */
-export function SkinSwitch() {
+/** Skin select for the account menu. The choice is remembered in localStorage and shown through the data-skin attribute. */
+export function SkinSelect({ className = "" }: { className?: string }) {
   const [skin, setSkin] = useState<SkinId>("paper");
   useEffect(() => { setSkin((document.documentElement.getAttribute("data-skin") as SkinId | null) ?? "paper"); }, []);
 
@@ -34,9 +34,9 @@ export function SkinSwitch() {
   }
 
   return (
-    <label className="fixed bottom-3 right-3 z-50 inline-flex items-center gap-1.5 border border-[var(--border)] bg-[var(--surface)] px-2 text-xs font-semibold text-[var(--muted-foreground)] shadow-sm">
+    <label className={`flex items-center justify-between gap-2 px-3 py-2 text-small ${className}`}>
       Skin
-      <select value={skin} onChange={(e) => pick(e.target.value as SkinId)} aria-label="Skin" className="min-h-8 bg-transparent text-[var(--foreground)]">
+      <select value={skin} onChange={(e) => pick(e.target.value as SkinId)} aria-label="Skin" className="min-h-8 min-w-0 max-w-[8.5rem] border border-[var(--border)] bg-[var(--background)] px-1 text-xs text-[var(--foreground)]">
         {SKINS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
       </select>
     </label>
