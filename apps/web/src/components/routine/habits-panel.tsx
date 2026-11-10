@@ -15,6 +15,8 @@ interface Props {
   today: VaultDayData | null;
   onData: (data: HabitsData) => void;
   onVoted: (day: VaultDayData | null) => void;
+  /** Where the habit list is: while it loads or failed, no "No habits yet" is shown (voting still works). */
+  habitsState?: "loading" | "error" | "ready";
 }
 
 /** How many days back the API lets a check or vote be edited (the week endpoint covers today and the six before). */
@@ -28,7 +30,7 @@ function shiftDay(day: string, back: number): string {
 }
 
 /** Habits under the day block they live in, and the one place to vote: each block that counts for stars has 1-3 star buttons in its header (tap the level you have to clear it), and ticking habits updates the count they suggest; one tap applies it. Counted blocks with no habit show as header-only rows. The arrows step back through the last week so a missed day can be filled in. */
-export function HabitsPanel({ day: todayKey, current, data, today: todayData, onData, onVoted }: Props) {
+export function HabitsPanel({ day: todayKey, current, data, today: todayData, onData, onVoted, habitsState = "ready" }: Props) {
   const blocks = useBlocks();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,21 +78,23 @@ export function HabitsPanel({ day: todayKey, current, data, today: todayData, on
           <button type="button" aria-label="Next day" disabled={isToday} onClick={() => setBack(back - 1)} className="px-1.5 hover:text-[var(--foreground)] disabled:opacity-30">›</button>
         </span>
       </h2>
-      {live.length === 0 && (
+      {habitsState === "loading" && <p className="px-4 py-3 text-small text-[var(--muted-foreground)]">Loading habits…</p>}
+      {habitsState === "error" && <p role="alert" className="px-4 py-3 text-small text-[var(--destructive)]">Could not load habits.</p>}
+      {habitsState === "ready" && live.length === 0 && (
         <p className="px-4 py-3 text-small text-[var(--muted-foreground)]">No habits yet. Add one from the capture line on <Link href="/plan" className="underline">Plan</Link>; see <Link href="/habits" className="underline">Habits</Link>.</p>
       )}
       {groups.map(({ key, habits }) => {
         const color = blocks.color(key);
         const suggested = suggestedStars(habits);
         const stars = today?.blocks[key] ?? 0;
-        const countsForStars = blocks.get(key)?.counts_for_stars ?? false;
+        const countsForStars = counted.includes(key) || (blocks.get(key)?.counts_for_stars ?? false);
         return (
-          <div key={key} className={`border-b border-[var(--border)] last:border-b-0 ${isToday && current && current !== key ? "opacity-60" : ""}`}>
+          <div key={key} className="border-b border-[var(--border)] last:border-b-0">
             <div className="flex min-h-10 flex-wrap items-center gap-x-2.5 bg-[var(--muted)] px-4">
               <span className="h-2 w-2 shrink-0" style={{ background: color }} aria-hidden="true" />
               <span className="mono text-[var(--foreground)]">{blocks.label(key)}</span>
               {countsForStars && (
-                <span role="group" aria-label={`${blocks.label(key)} vote`} className="mono ml-auto flex items-center gap-2 text-[var(--muted-foreground)]">
+                <span role="group" aria-label={`${blocks.label(key)} vote`} className={`mono ml-auto flex items-center gap-2 text-[var(--muted-foreground)] transition-opacity ${isToday && current && current !== key ? "opacity-60" : ""}`}>
                   <span className="tabular-nums">{stars} of 3 stars</span>
                   {suggested !== stars && habits.length > 0 && (
                     <button type="button" disabled={busy} onClick={() => void apply(key, suggested)}

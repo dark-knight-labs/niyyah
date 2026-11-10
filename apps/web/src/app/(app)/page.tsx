@@ -40,6 +40,7 @@ export default function OverviewPage() {
   const [quarter, setQuarter] = useState<QuarterData | null>(null);
   const [objectives, setObjectives] = useState<VaultObjectivesData | null>(null);
   const [habits, setHabits] = useState<HabitsData | null>(null);
+  const [habitsFailed, setHabitsFailed] = useState(false);
   const [calendarKey, setCalendarKey] = useState(0);
   /** The left sidebar (clock, now, this week); hidden, the calendar takes the full width. */
   const [sidebar, setSidebar] = useState(true);
@@ -98,7 +99,7 @@ export default function OverviewPage() {
     vaultApi.goals().then(setGoals).catch(() => setGoals(null));
     vaultApi.quarter().then(setQuarter).catch(() => setQuarter(null));
     vaultApi.objectives().then(setObjectives).catch(() => setObjectives(null));
-    vaultApi.habits().then(setHabits).catch(() => setHabits(null));
+    vaultApi.habits().then((h) => { setHabits(h); setHabitsFailed(false); }).catch(() => { setHabits(null); setHabitsFailed(true); });
     vaultApi.today().then(setToday).catch(() => setToday(null));
   }, [canEdit, dayKey]);
   const loadToday = useCallback(() => {
@@ -181,7 +182,7 @@ export default function OverviewPage() {
                     barExtra={sidebar ? undefined : <TopBar look="bar" dateLabel={dateLabel} city={schedule.meta.city} editDay={dayKey} today={today} onSaved={setToday} />} />
                 </section>
               </div>
-              <div className="mb-5"><HabitsPanel day={dayKey} current={block?.block} data={habits ?? { today: dayKey, installing_limit: 0, habits: [] }} today={today} onData={setHabits} onVoted={setToday} /></div>
+              <div className="mb-5"><HabitsPanel day={dayKey} current={block?.block} data={habits ?? { today: dayKey, installing_limit: 0, habits: [] }} today={today} onData={setHabits} onVoted={setToday} habitsState={habits ? "ready" : habitsFailed ? "error" : "loading"} /></div>
             </>
           ) : (
             <div className="mx-auto max-w-xl">

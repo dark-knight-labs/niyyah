@@ -239,19 +239,19 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
   })();
 
   const sel_ = "mono min-h-8 min-w-0 max-w-full border border-[var(--rule)] bg-[var(--background)] px-1.5 text-[var(--foreground)]";
-  const labelOptions: [string, string][] = [["all", "All"], ...months.map((m): [string, string] => [m, monthText(m)]), ["none", "No label"], ...(lateN ? [["late", `Late ${lateN}`] as [string, string]] : [])];
+  const labelOptions: [string, string][] = [["all", "All"], ...months.map((m): [string, string] => [m, monthText(m)]), ["none", "No label"], ...(lateN || label === "late" ? [["late", `Late ${lateN}`] as [string, string]] : [])];
   // Page-level controls: compact menus. From md up they sit in the top bar (PageSlot); on phones they are one row above the table.
   const controls = (
-    <div className="flex min-w-0 items-center gap-2 max-md:border-b max-md:border-[var(--border)] max-md:px-4 max-md:py-2" data-testid="plan-controls">
+    <div className="flex min-w-0 items-center gap-2 max-lg:border-b max-lg:border-[var(--border)] max-lg:px-4 max-lg:py-2" data-testid="plan-controls">
       {view === "plan" ? (
-        <label className="flex min-w-0 items-center gap-1 text-[var(--muted-foreground)] max-md:flex-1">
+        <label className="flex min-w-0 items-center gap-1 text-[var(--muted-foreground)] max-lg:flex-1">
           <span className="mono max-md:sr-only">Label</span>
           <select aria-label="Label" value={label} onChange={(e) => setLabel(e.target.value)} className={`${sel_} ${label === "late" ? "text-[var(--destructive)]" : ""}`}>
             {labelOptions.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
         </label>
       ) : <span className="mono text-[var(--muted-foreground)]">Done · {doneItems.length}</span>}
-      <label className="flex min-w-0 items-center gap-1 text-[var(--muted-foreground)] max-md:flex-1">
+      <label className="flex min-w-0 items-center gap-1 text-[var(--muted-foreground)] max-lg:flex-1">
         <span className="mono max-md:sr-only">Block</span>
         <select aria-label="Block" value={block ?? ""} onChange={(e) => onBlock(e.target.value || null)} className={sel_}>
           <option value="">All blocks</option>
@@ -268,7 +268,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
 
   return (
     <div>
-      <PageSlot>{controls}</PageSlot>
+      <PageSlot minPx={1024}>{controls}</PageSlot>
       {editor && <div className="border-b border-[var(--border)] p-4">{editor}</div>}
 
       <div className={`grid ${selected || selectedHabit ? "lg:grid-cols-[minmax(0,1fr)_23rem]" : ""}`}>

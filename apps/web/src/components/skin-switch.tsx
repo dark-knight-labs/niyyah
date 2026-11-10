@@ -34,7 +34,7 @@ export function SkinSelect({ className = "" }: { className?: string }) {
   }
 
   return (
-    <label className={`flex items-center justify-between gap-2 px-3 py-2 text-small ${className}`}>
+    <label role="none" className={`flex items-center justify-between gap-2 px-3 py-2 text-small ${className}`}>
       Skin
       <select value={skin} onChange={(e) => pick(e.target.value as SkinId)} aria-label="Skin" className="min-h-8 min-w-0 max-w-[8.5rem] border border-[var(--border)] bg-[var(--background)] px-1 text-xs text-[var(--foreground)]">
         {SKINS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}

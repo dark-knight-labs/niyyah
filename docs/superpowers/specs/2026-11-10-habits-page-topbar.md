@@ -13,18 +13,18 @@ Web only (apps/web). No API, database or stored-data change.
 ## Votes merged into the habit headers
 - The Overview `Votes` strip is removed (`votes-panel.tsx` deleted). Each counted block's header in the Habits panel has 1-3 star
   buttons (`<Block> N stars`, tap the current level to clear; group `<Block> vote`), plus the `Set N` suggestion. A counted block with
-  no habit today is a header-only row. The block you are in is bright, the others are dimmed (today only). Same `setVote` call, so
+  no habit today (or a vote on a block no longer configured) is a header-only row. Only the other blocks' vote buttons are dimmed (today only). Same `setVote` call, so
   Progress is unchanged.
 
 ## Top bar
 - One 44px row: Brand | nav (md+) | page slot | account. Phones: icon-only brand, the page title, the account cell (nav is at the bottom).
-- `#nav-cal` became `#page-slot`; `PageSlot` (components/page-slot.tsx) portals a page's compact controls into it from 768px, and
-  renders them in place on phones. The Overview's calendar bar uses it from 1280px as before.
-- Plan: Label and Block are compact selects (+ Block, One goal ×, Done) in the slot; on phones one row above the table. The table's
+- `#nav-cal` became `#page-slot`; `PageSlot` (components/page-slot.tsx) portals a page's compact controls into it from the `minPx` given (Plan: 1024px, so the selects stay readable; default 768px), and
+  renders them in place below that. The Overview's calendar bar uses it from 1280px as before.
+- Plan: Label and Block are compact selects (+ Block, One goal ×, Done) in the slot from 1024px; below that one row above the table. The table's
   own quarter tabs stay in the table. Plan header (Map link, week strip) is unchanged.
 - Overview bar: left = sidebar toggle, ‹ › and range, Today; centre = quick-add, which takes all free width (max 44rem); right =
   Day | Week, the view menu, calendar status. Arrow, scope and menu buttons carry tooltips with their hotkeys.
-- Skin picker moved from the fixed bottom-right corner into the account menu (a select). `?skin=` and localStorage behave as before.
+- Skin picker moved from the fixed bottom-right corner into the account menu (a select). `?skin=` and localStorage behave as before. Signed-out pages (and the login page) have no account menu, so they only get `?skin=`.
 
 ## Tests
 `apps/web/e2e/habits-topbar.spec.ts`: Habits page via nav and `g h`, Plan has no `#plan-habits`, votes through habit headers

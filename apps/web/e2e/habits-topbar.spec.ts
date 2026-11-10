@@ -8,6 +8,7 @@ const API = process.env.E2E_API_URL ?? "http://localhost:8017";
 const EMAIL = process.env.E2E_EMAIL ?? "e2e@niyyah.app";
 const PASSWORD = process.env.E2E_PASSWORD ?? "e2e-pass-123";
 const OUT = "e2e/out";
+const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka" }).format(new Date());
 const V = `${API}/api/v1/vault`;
 
 let tokens: { access_token: string; refresh_token: string } | null = null;
@@ -33,6 +34,8 @@ test("Habits page: reachable from the nav and by g h; the board works; Plan no l
   const name = uniq("Board habit");
   const made = await request.post(`${V}/habits`, { headers: headers(), data: { name, block: "soul", stream: "studio", per_week: 3 } });
   expect(made.ok(), await made.text()).toBeTruthy();
+  const madeId = ((await made.json()).habits as { id: number; name: string }[]).find((h) => h.name === name)!.id;
+  try {
 
   await page.goto("/plan");
   await expect(page.getByRole("table", { name: "Plan" })).toBeVisible();
@@ -58,43 +61,69 @@ test("Habits page: reachable from the nav and by g h; the board works; Plan no l
   await page.goto("/plan");
   await page.locator('[aria-label="Habits this week"]').first().getByRole("link", { name: /Habits/ }).click();
   await expect(page).toHaveURL(/\/habits$/);
+  } finally {
+    await request.delete(`${V}/habits/${madeId}`, { headers: headers() });
+  }
 });
 
-test("Overview votes through the habit group headers, including a counted block with no habit, and Progress reflects it", async ({ page, request }) => {
+test("Overview votes through the habit group headers, including a counted block with no habit and a stale vote key, and Progress reflects it", async ({ page, request }) => {
   const blocks = (await (await request.get(`${V}/config/blocks`, { headers: headers() })).json()).blocks as { key: string; label: string; counts_for_stars: boolean; archived?: boolean }[];
-  const habits = (await (await request.get(`${V}/habits`, { headers: headers() })).json()).habits as { block: string; stage: string }[];
   const counted = blocks.filter((b) => b.counts_for_stars && !b.archived);
-  const bare = counted.find((b) => !habits.some((h) => h.block === b.key && h.stage !== "retired"));
-  test.skip(!bare, "every counted block already has a habit");
-  const withHabit = counted.find((b) => habits.some((h) => h.block === b.key && h.stage !== "retired")) ?? null;
-
-  await page.goto("/");
-  await expect(page.getByRole("region", { name: "Votes" })).toHaveCount(0);   // the old strip is gone
-  const panel = page.getByRole("region", { name: "Habits" });
-  const group = panel.getByRole("group", { name: `${bare!.label} vote` });
-  await expect(group).toBeVisible();
-  const star = (g = group, k = 2) => g.getByRole("button", { name: `${bare!.label} ${k} stars` });
-  await star().click();
-  await expect(star()).toHaveAttribute("aria-pressed", "true");
-  await expect(group).toContainText("2 of 3 stars");
-  // Progress reads the same stored vote (its series endpoint ends with today)
-  // (the API's "today" is UTC and the app's is Dhaka, so look at the last two days)
-  const series = async () => ((await (await request.get(`${V}/blocks?days=7`, { headers: headers() })).json()).blocks[bare!.key] as (number | null)[]).slice(-2);
-  expect(await series()).toContain(2);
-  await page.goto("/progress");
-  await expect(page.getByRole("group", { name: "Range" })).toBeVisible();
-
-  await page.goto("/");
-  await expect(group).toContainText("2 of 3 stars");
-  await star().click();                                  // tapping the current level clears it
-  await expect(group).toContainText("0 of 3 stars");
-  expect(await series()).not.toContain(2);
+  expect(counted.length, "the seeded account has counted blocks").toBeGreaterThan(0);
+  // Fixture: the first counted block has no habit (the e2e database is disposable); another counted block gets one, if there is one.
+  const bare = counted[0];
+  const all = (await (await request.get(`${V}/habits`, { headers: headers() })).json()).habits as { id: number; block: string }[];
+  for (const h of all.filter((x) => x.block === bare.key)) expect((await request.delete(`${V}/habits/${h.id}`, { headers: headers() })).ok()).toBeTruthy();
+  const withHabit = counted[1] ?? null;
+  // The sample account arrives with votes for today; start both blocks at 0 so the taps below set, not clear.
+  for (const b of [bare, withHabit].filter((x) => !!x)) expect((await request.put(`${V}/day/${today}/vote`, { headers: headers(), data: { block: b.key, stars: 0 } })).ok()).toBeTruthy();
+  const made: number[] = [];
   if (withHabit) {
-    const g2 = panel.getByRole("group", { name: `${withHabit.label} vote` });
-    await g2.getByRole("button", { name: `${withHabit.label} 1 star` }).click();
-    await expect(g2).toContainText("1 of 3 stars");
-    await g2.getByRole("button", { name: `${withHabit.label} 1 star` }).click();
-    await expect(g2).toContainText("0 of 3 stars");
+    const r = await request.post(`${V}/habits`, { headers: headers(), data: { name: uniq("Vote habit"), block: withHabit.key, stream: "studio", per_week: 3 } });
+    expect(r.ok(), await r.text()).toBeTruthy();
+    made.push(...((await r.json()).habits as { id: number; block: string; name: string }[]).filter((h) => h.block === withHabit.key).map((h) => h.id));
+  }
+  try {
+    await page.goto("/");
+    await expect(page.getByRole("region", { name: "Votes" })).toHaveCount(0);   // the old strip is gone
+    const panel = page.getByRole("region", { name: "Habits" });
+    const group = panel.getByRole("group", { name: `${bare.label} vote` });
+    await expect(group).toBeVisible();
+    const star = group.getByRole("button", { name: `${bare.label} 2 stars` });
+    await star.click();
+    await expect(star).toHaveAttribute("aria-pressed", "true");
+    await expect(group).toContainText("2 of 3 stars");
+    // Progress reads the stored votes of the month
+    const stored = async () => ((await (await request.get(`${V}/month?month=${today.slice(0, 7)}`, { headers: headers() })).json()).days as { date: string; blocks: Record<string, number> }[]).find((d) => d.date === today)?.blocks[bare.key] ?? 0;
+    expect(await stored()).toBe(2);
+    await page.goto("/progress");
+    await expect(page.getByRole("group", { name: "Range" })).toBeVisible();
+    await page.goto("/");
+    await expect(group).toContainText("2 of 3 stars");
+    await star.click();                                  // tapping the current level clears it
+    await expect(group).toContainText("0 of 3 stars");
+    expect(await stored()).toBe(0);
+    if (withHabit) {
+      const g2 = panel.getByRole("group", { name: `${withHabit.label} vote` });
+      await g2.getByRole("button", { name: `${withHabit.label} 1 star` }).click();
+      await expect(g2).toContainText("1 of 3 stars");
+      await g2.getByRole("button", { name: `${withHabit.label} 1 star` }).click();
+      await expect(g2).toContainText("0 of 3 stars");
+    }
+    // A stored vote for a key that is no longer a configured block (the API refuses new ones, so the read is stubbed) still shows its stars.
+    const ghost = "oldblock";
+    await page.route("**/api/v1/vault/today", async (route) => {
+      const res = await route.fetch();
+      const day = await res.json();
+      await route.fulfill({ response: res, json: { ...day, blocks: { ...day.blocks, [ghost]: 1 } } });
+    });
+    await page.goto("/");
+    const gg = panel.getByRole("group", { name: `${ghost} vote` });
+    await expect(gg).toContainText("1 of 3 stars");
+    await expect(gg.getByRole("button", { name: `${ghost} 1 star` })).toHaveAttribute("aria-pressed", "true");
+    await expect(gg.getByRole("button", { name: `${ghost} 3 stars` })).toBeEnabled();
+  } finally {
+    for (const id of made) await request.delete(`${V}/habits/${id}`, { headers: headers() });
   }
 });
 
@@ -139,8 +168,10 @@ test("Plan: Label and Block menus filter; they sit in the bar on md+ and in one 
   await expect(row).toBeVisible();
   await block.selectOption("studio");
   await expect(row).toBeVisible();
+  await expect(page.locator("[data-block]:not([data-block=studio])")).toHaveCount(0);   // other blocks' rows hide
+  await expect(page.locator('[data-block="studio"]')).toHaveCount(1);
   await block.selectOption("");
-  await expect(page.locator("[data-block]").first()).toBeVisible();
+  await expect(page.locator("[data-block]:not([data-block=studio])").first()).toBeVisible();
   expect((await page.getByTestId("plan-controls").boundingBox())!.y).toBeLessThan(44);   // inside the 44px bar
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -152,6 +183,26 @@ test("Plan: Label and Block menus filter; they sit in the bar on md+ and in one 
   expect(await overflow(page)).toBeLessThanOrEqual(0);
 });
 
+for (const width of [768, 1024]) {
+  test(`Plan Label and Block selects show their value in full at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/plan");
+    await expect(page.getByRole("table", { name: "Plan" })).toBeVisible();
+    for (const name of ["Label", "Block"]) {
+      const sel = page.locator(`select[aria-label="${name}"]`);
+      await expect(sel).toBeVisible();
+      const { box, need } = await sel.evaluate((el: HTMLSelectElement) => {
+        const cs = getComputedStyle(el);
+        const c = document.createElement("canvas").getContext("2d")!;
+        c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const text = el.selectedOptions[0].textContent ?? "";
+        return { box: el.getBoundingClientRect().width, need: c.measureText(text).width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) };
+      });
+      expect(box, `${name} select is at least as wide as its value`).toBeGreaterThanOrEqual(need);
+    }
+  });
+}
+
 for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
   for (const path of ["/", "/plan", "/habits"]) {
     test(`top bar ${path} at ${width}px: no horizontal overflow, one 44px row`, async ({ page }) => {
@@ -160,7 +211,7 @@ for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
       if (path === "/") await expect(page.getByRole("region", { name: "Habits" })).toBeVisible({ timeout: 30_000 });
       else if (path === "/plan") await expect(page.getByRole("table", { name: "Plan" })).toBeVisible();
       else await expect(page.getByRole("region", { name: "Habits" })).toBeVisible();
-      await page.waitForTimeout(400);
+      await expect(page.getByRole("button", { name: /^Account/ })).toBeVisible();
       expect(await overflow(page)).toBeLessThanOrEqual(0);
       const box = (await headerBox(page))!;
       expect(box.height).toBeLessThanOrEqual(45);
