@@ -148,7 +148,7 @@ export function QuickAdd({ focus, today, days, connected, streams, onCreate, onA
 
   if (floating) {
     return (
-      <form onSubmit={submit} className="relative flex min-w-[10rem] max-w-[20rem] flex-1 items-center" aria-label="Add a task or event">
+      <form onSubmit={submit} className="relative flex w-full min-w-[8rem] max-w-[44rem] flex-1 items-center" aria-label="Add a task or event">
         <input id="quick-add-title" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }} maxLength={300}
           placeholder="Add: fri 14:00-15:00 call #work" aria-label="Add a task or event" aria-describedby="quick-add-preview"
           className="min-h-8 w-full border border-[var(--border)] bg-[var(--surface)] pl-2.5 pr-9 text-small placeholder:text-[var(--muted-foreground)]" />

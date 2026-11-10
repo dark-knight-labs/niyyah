@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { PageSlot } from "@/components/page-slot";
 import { Checkbox } from "@/components/routine/checkbox";
 import { BlockCell } from "@/components/planner/block-cell";
 import { PlanHabitCard, RunHabits, WeekTicks } from "@/components/planner/plan-habits";
@@ -237,34 +238,37 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     return entry ? { meta, item: null, entry } : null;
   })();
 
-  const filterGroup = (
-    <div role="group" aria-label="Block" className="flex flex-wrap items-center gap-1.5">
-      <span className="mono mr-1 text-[var(--muted-foreground)]">Block</span>
-      <button type="button" aria-pressed={!block} onClick={() => onBlock(null)} className={chip}>All blocks</button>
-      {streams.map((s) => <button key={s.id} type="button" aria-pressed={block === s.id} onClick={() => onBlock(block === s.id ? null : s.id)} className={chip}>{s.label}</button>)}
-      <button type="button" onClick={onAddBlock} aria-label="Add a block" className={`${chip} inline-flex items-center gap-1`}><Plus size={11} aria-hidden="true" />Block</button>
+  const sel_ = "mono min-h-8 min-w-0 max-w-full border border-[var(--rule)] bg-[var(--background)] px-1.5 text-[var(--foreground)]";
+  const labelOptions: [string, string][] = [["all", "All"], ...months.map((m): [string, string] => [m, monthText(m)]), ["none", "No label"], ...(lateN || label === "late" ? [["late", `Late ${lateN}`] as [string, string]] : [])];
+  // Page-level controls: compact menus. From md up they sit in the top bar (PageSlot); on phones they are one row above the table.
+  const controls = (
+    <div className="flex min-w-0 items-center gap-2 max-lg:border-b max-lg:border-[var(--border)] max-lg:px-4 max-lg:py-2" data-testid="plan-controls">
+      {view === "plan" ? (
+        <label className="flex min-w-0 items-center gap-1 text-[var(--muted-foreground)] max-lg:flex-1">
+          <span className="mono max-md:sr-only">Label</span>
+          <select aria-label="Label" value={label} onChange={(e) => setLabel(e.target.value)} className={`${sel_} ${label === "late" ? "text-[var(--destructive)]" : ""}`}>
+            {labelOptions.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </label>
+      ) : <span className="mono text-[var(--muted-foreground)]">Done · {doneItems.length}</span>}
+      <label className="flex min-w-0 items-center gap-1 text-[var(--muted-foreground)] max-lg:flex-1">
+        <span className="mono max-md:sr-only">Block</span>
+        <select aria-label="Block" value={block ?? ""} onChange={(e) => onBlock(e.target.value || null)} className={sel_}>
+          <option value="">All blocks</option>
+          {streams.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+      </label>
+      <button type="button" onClick={onAddBlock} aria-label="Add a block" title="Add a block" className={`${chip} inline-flex min-h-8 shrink-0 items-center gap-1`}><Plus size={11} aria-hidden="true" /><span className="max-lg:sr-only">Block</span></button>
+      {focus && view === "plan" && <button type="button" aria-pressed="true" onClick={() => setFocus(null)} className={`${chip} min-h-8 shrink-0`}>One goal ×</button>}
+      <button type="button" aria-pressed={view === "done"} onClick={() => { setView(view === "done" ? "plan" : "done"); setSel(null); }} className={`${chip} min-h-8 shrink-0`}>
+        {view === "done" ? "Back to Plan" : `Done ${doneItems.length}`}
+      </button>
     </div>
   );
 
   return (
     <div>
-      <div className="grid gap-2 border-b border-[var(--border)] px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {view === "plan" ? (
-            <div role="group" aria-label="Label" className="flex flex-wrap items-center gap-1.5">
-              <span className="mono mr-1 text-[var(--muted-foreground)]">Label</span>
-              {[["all", "All"], ...months.map((m) => [m, monthText(m)]), ["none", "No label"], ...(lateN ? [["late", `Late ${lateN}`]] : [])].map(([k, l]) => (
-                <button key={k} type="button" aria-pressed={label === k} onClick={() => setLabel(k)} className={`${chip} ${k === "late" ? "text-[var(--destructive)]" : ""}`}>{l}</button>
-              ))}
-              {focus && <button type="button" aria-pressed="true" onClick={() => setFocus(null)} className={chip}>One goal ×</button>}
-            </div>
-          ) : <span className="mono text-[var(--muted-foreground)]">Done · {doneItems.length}</span>}
-          <button type="button" aria-pressed={view === "done"} onClick={() => { setView(view === "done" ? "plan" : "done"); setSel(null); }} className={chip}>
-            {view === "done" ? "Back to Plan" : `Done ${doneItems.length}`}
-          </button>
-        </div>
-        {filterGroup}
-      </div>
+      <PageSlot minPx={1024}>{controls}</PageSlot>
       {editor && <div className="border-b border-[var(--border)] p-4">{editor}</div>}
 
       <div className={`grid ${selected || selectedHabit ? "lg:grid-cols-[minmax(0,1fr)_23rem]" : ""}`}>

@@ -22,8 +22,8 @@ export function rangeLabel(first: string, last: string): string {
 }
 
 /** A button that opens a small panel under it, kept inside the window (the bar wraps on a phone); a click outside or Escape closes it. */
-function Menu({ label, summary, name, children, align = "left", className = `${CHIP} gap-1`, chevron = true }: {
-  label: ReactNode; summary?: string; name: string; children: ReactNode | ((close: () => void) => ReactNode); align?: "left" | "right"; className?: string; chevron?: boolean;
+function Menu({ label, summary, name, hint, children, align = "left", className = `${CHIP} gap-1`, chevron = true }: {
+  label: ReactNode; summary?: string; name: string; hint?: string; children: ReactNode | ((close: () => void) => ReactNode); align?: "left" | "right"; className?: string; chevron?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [shift, setShift] = useState(0);
@@ -46,7 +46,7 @@ function Menu({ label, summary, name, children, align = "left", className = `${C
   }, [open]);
   return (
     <div ref={box} className="relative shrink-0">
-      <button type="button" onClick={() => { setShift(0); setOpen(!open); }} aria-expanded={open} aria-haspopup="true" aria-label={summary ? `${name}: ${summary}` : name} className={className}>
+      <button type="button" onClick={() => { setShift(0); setOpen(!open); }} aria-expanded={open} aria-haspopup="true" aria-label={summary ? `${name}: ${summary}` : name} title={hint ? `${name} (${hint})` : undefined} className={className}>
         {label}{chevron && <ChevronDown size={12} aria-hidden="true" />}
       </button>
       {open && (
@@ -143,29 +143,29 @@ export function CalendarBar(p: CalendarBarProps) {
   const header = p.placement === "header";
   const views = VIEWS.filter((v) => v.scope === p.scope);
   const hasTags = p.tags.length > 0 || !!p.tag;
-  return (
-    <div role="toolbar" aria-label="Calendar" data-cal-bar={p.placement}
-      className={header
-        ? "flex h-full min-w-0 flex-1 items-center gap-1.5 border-l border-[var(--border)] pl-1.5 pr-2"
-        : "relative mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-[var(--border)] pb-2"}>
-      <button type="button" onClick={p.onSidebar} aria-pressed={p.sidebar} aria-keyshortcuts="Control+B Meta+B" aria-label={p.sidebar ? "Hide the sidebar" : "Show the sidebar"} title={`${p.sidebar ? "Hide" : "Show"} the sidebar (⌘B)`} className={ICON}>
-        {p.sidebar ? <PanelLeftClose size={15} aria-hidden="true" /> : <PanelLeftOpen size={15} aria-hidden="true" />}
-      </button>
-      <span className="inline-flex shrink-0" role="group" aria-label="Move">
-        <button type="button" onClick={() => p.onStep(-1)} aria-label={p.scope === "day" ? "Previous day" : "Previous week"} aria-keyshortcuts="[" className={`${CHIP} px-1.5`}><ChevronLeft size={15} aria-hidden="true" /></button>
-        <button type="button" onClick={() => p.onStep(1)} aria-label={p.scope === "day" ? "Next day" : "Next week"} aria-keyshortcuts="]" className={`${CHIP} border-l-0 px-1.5`}><ChevronRight size={15} aria-hidden="true" /></button>
-      </span>
-      <h2 className="mono min-w-0 shrink truncate !text-[13px] !font-semibold text-[var(--foreground)]" aria-label={p.rangeLong} title={p.rangeLong} data-cal-range>{p.range}</h2>
-      {!p.atToday && <button type="button" onClick={p.onToday} aria-keyshortcuts="t" title="Back to today (t)" className={CHIP}>Today</button>}
-      {p.extra}
-      <span className={header ? "min-w-2 flex-1" : "hidden"} aria-hidden="true" />
-      {p.quickAdd}
-      <span className="inline-flex shrink-0" role="group" aria-label="Scope">
-        {(["day", "week"] as const).map((s) => (
-          <button key={s} type="button" aria-pressed={p.scope === s} onClick={() => p.scope !== s && p.onScope(s)} className={`${CHIP} ${s === "week" ? "border-l-0" : ""}`}>{s === "day" ? "Day" : "Week"}</button>
-        ))}
-      </span>
-      <Menu name="View options" summary={p.tag ? `${viewName(p.view)}, tag #${p.tag}` : viewName(p.view)} align="right" chevron={false}
+  const stepName = p.scope === "day" ? "day" : "week";
+  const toggle = (
+    <button type="button" onClick={p.onSidebar} aria-pressed={p.sidebar} aria-keyshortcuts="Control+B Meta+B" aria-label={p.sidebar ? "Hide the sidebar" : "Show the sidebar"} title={`${p.sidebar ? "Hide" : "Show"} the sidebar (⌘B)`} className={ICON}>
+      {p.sidebar ? <PanelLeftClose size={15} aria-hidden="true" /> : <PanelLeftOpen size={15} aria-hidden="true" />}
+    </button>
+  );
+  const move = (
+    <span className="inline-flex shrink-0" role="group" aria-label="Move">
+      <button type="button" onClick={() => p.onStep(-1)} aria-label={`Previous ${stepName}`} title={`Previous ${stepName} ([)`} aria-keyshortcuts="[" className={`${CHIP} px-1.5`}><ChevronLeft size={15} aria-hidden="true" /></button>
+      <button type="button" onClick={() => p.onStep(1)} aria-label={`Next ${stepName}`} title={`Next ${stepName} (])`} aria-keyshortcuts="]" className={`${CHIP} border-l-0 px-1.5`}><ChevronRight size={15} aria-hidden="true" /></button>
+    </span>
+  );
+  const range = <h2 className="mono min-w-0 shrink truncate !text-[13px] !font-semibold text-[var(--foreground)]" aria-label={p.rangeLong} title={p.rangeLong} data-cal-range>{p.range}</h2>;
+  const today = !p.atToday && <button type="button" onClick={p.onToday} aria-keyshortcuts="t" title="Back to today (t)" className={CHIP}>Today</button>;
+  const scope = (
+    <span className="inline-flex shrink-0" role="group" aria-label="Scope">
+      {(["day", "week"] as const).map((s) => (
+        <button key={s} type="button" aria-pressed={p.scope === s} onClick={() => p.scope !== s && p.onScope(s)} title={`${s === "day" ? "Day" : "Week"} view`} className={`${CHIP} ${s === "week" ? "border-l-0" : ""}`}>{s === "day" ? "Day" : "Week"}</button>
+      ))}
+    </span>
+  );
+  const menu = (
+      <Menu name="View options" hint="V" summary={p.tag ? `${viewName(p.view)}, tag #${p.tag}` : viewName(p.view)} align="right" chevron={false}
         className={`${CHIP} gap-1 px-1.5 ${p.tag ? "font-mono" : ""}`}
         label={<>{p.tag && <span className="max-w-[7rem] truncate">#{p.tag}</span>}<Ellipsis size={15} aria-hidden="true" /></>}>
         {(close) => <>
@@ -202,7 +202,28 @@ export function CalendarBar(p: CalendarBarProps) {
           )}
         </>}
       </Menu>
-      <CalendarStatus errors={p.errors} google={p.google} compact={header} />
+  );
+  const status = <CalendarStatus errors={p.errors} google={p.google} compact={header} />;
+
+  // In the app header: left = sidebar toggle and date navigation, centre = quick-add (takes the free width), right = Day | Week and the view menu.
+  if (header) {
+    return (
+      <div role="toolbar" aria-label="Calendar" data-cal-bar="header" className="flex h-full min-w-0 flex-1 items-center gap-2 border-l border-[var(--border)] pl-1.5 pr-2">
+        <div className="flex shrink-0 items-center gap-1.5">
+          {toggle}{move}{range}
+          {today || <span className="w-[3.6rem] shrink-0" aria-hidden="true" />}
+          {p.extra}
+        </div>
+        <div className="flex min-w-0 flex-1 justify-center">{p.quickAdd}</div>
+        <div className="flex shrink-0 items-center gap-1.5 border-l border-[var(--border)] pl-2">{scope}{menu}{status}</div>
+      </div>
+    );
+  }
+  return (
+    <div role="toolbar" aria-label="Calendar" data-cal-bar="page" className="relative mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-[var(--border)] pb-2">
+      {toggle}{move}{range}{today}{p.extra}
+      {p.quickAdd}
+      {scope}{menu}{status}
     </div>
   );
 }

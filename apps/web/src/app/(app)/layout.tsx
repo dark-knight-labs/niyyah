@@ -13,9 +13,11 @@ import {
   Clock,
   ListChecks,
   Network,
+  Repeat,
   Settings,
   LogOut,
 } from "lucide-react";
+import { SkinSelect } from "@/components/skin-switch";
 
 // Readable without signing in; every other page in this group requires a session.
 const PUBLIC_PATHS = ["/"];
@@ -23,10 +25,13 @@ const PUBLIC_PATHS = ["/"];
 const nav = [
   { href: "/", label: "Overview", icon: Clock, key: "o" },
   { href: "/plan", label: "Plan", icon: ListChecks, key: "p" },
+  { href: "/habits", label: "Habits", icon: Repeat, key: "h" },
   { href: "/map", label: "Map", icon: Network, key: "m" },
   { href: "/progress", label: "Progress", icon: Activity, key: "r" },
-  { href: "/settings", label: "Settings", icon: Settings, key: "s" },
 ];
+
+/** Settings is in the account menu, not the nav, but "g s" still goes there. */
+const HOTKEYS = [...nav, { href: "/settings", label: "Settings", key: "s" }];
 
 /** The ring-and-dot mark: the 24-hour ring with its gap, and the intention at the centre. */
 function NiyyahMark() {
@@ -65,6 +70,7 @@ function AccountMenu({ email }: { email: string }) {
         <div role="menu" className="absolute right-0 top-full z-30 w-52 border border-[var(--rule)] bg-[var(--surface)] shadow-xl">
           <p className="truncate border-b border-[var(--border)] px-3 py-2 text-xs text-[var(--muted-foreground)]">{email}</p>
           <Link href="/settings" role="menuitem" onClick={() => setOpen(false)} className={item}><Settings size={14} aria-hidden="true" />Settings</Link>
+          <SkinSelect className="border-b border-[var(--border)]" />
           <button type="button" role="menuitem" onClick={logout} className={item}><LogOut size={14} aria-hidden="true" />Sign out</button>
         </div>
       )}
@@ -72,11 +78,11 @@ function AccountMenu({ email }: { email: string }) {
   );
 }
 
-function Brand() {
+function Brand({ iconOnly = false }: { iconOnly?: boolean }) {
   return (
-    <Link href="/" aria-label="Niyyah" className="flex items-center gap-2.5 border-r border-[var(--border)] px-4 text-[var(--accent)]">
+    <Link href="/" aria-label="Niyyah" className="flex items-center gap-2.5 border-r border-[var(--border)] px-3 text-[var(--accent)] md:px-4">
       <NiyyahMark />
-      <span className="font-serif text-lg font-medium leading-none text-[var(--foreground)]">Niyyah</span>
+      <span className={`${iconOnly ? "hidden md:inline " : ""}font-serif text-lg font-medium leading-none text-[var(--foreground)]`}>Niyyah</span>
     </Link>
   );
 }
@@ -88,7 +94,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   useTheme();
   // "g" then a letter goes to a page, like the hint on each tab says.
-  useHotkeys(user ? Object.fromEntries(nav.map((item) => [`g ${item.key}`, () => router.push(item.href)])) : {});
+  useHotkeys(user ? Object.fromEntries(HOTKEYS.map((item) => [`g ${item.key}`, () => router.push(item.href)])) : {});
+
+  const title = [...nav, { href: "/settings", label: "Settings" }].find((item) => item.href === pathname)?.label ?? "Niyyah";
 
   if (loading) {
     return (
@@ -117,7 +125,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen">
       {/* z-30: above the calendar's sticky day head and all-day row (z-20), so menus opened from the bar in the header paint on top. */}
       <header className="sticky top-0 z-30 flex h-11 items-stretch border-b border-[var(--rule)] bg-[var(--background)]">
-        <Brand />
+        <Brand iconOnly />
+        {/* Phones: the page title in place of the nav, which is at the bottom there. */}
+        <p className="mono flex min-w-0 flex-1 items-center truncate px-3 text-[var(--foreground)] md:hidden" data-testid="page-title">{title}</p>
         <nav aria-label="Main" className="hidden shrink-0 md:flex">
           {nav.map((item) => {
             const active = pathname === item.href;
@@ -129,8 +139,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        {/* The Overview puts its calendar bar here on wide screens (see useHeaderSlot); elsewhere it is empty space. */}
-        <div id="nav-cal" className="flex min-w-0 flex-1 items-center" />
+        {/* Pages put their compact controls here from md up (see PageSlot); the Overview's calendar bar from 1280px. Empty otherwise. */}
+        <div id="page-slot" className="hidden min-w-0 flex-1 items-center justify-end md:flex" />
         <AccountMenu email={user.email} />
       </header>
 

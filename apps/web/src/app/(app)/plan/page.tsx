@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { usePlanner } from "@/hooks/use-planner";
 import { useNow } from "@/hooks/use-now";
-import { HabitBoard } from "@/components/planner/habit-board";
 import { CaptureBar } from "@/components/planner/capture-bar";
 import { AdvisorPanel } from "@/components/planner/advisor-panel";
 import { CompassBand } from "@/components/planner/compass-band";
@@ -36,7 +35,6 @@ export default function PlanPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [habits, setHabits] = useState<HabitsData | null>(null);
-  const [habitPick, setHabitPick] = useState<number | null>(null);
   const now = useNow(60_000);
 
   useEffect(() => {
@@ -130,7 +128,7 @@ export default function PlanPage() {
         onHabit={async (h) => {
           let added = 0;
           const ok = await runHabits(async () => { const d = await vaultApi.addHabit(h); added = d.habits.length; return d; });
-          if (ok) { setMessage("Habit added"); setHabitPick(null); document.getElementById("plan-habits")?.scrollIntoView({ block: "start", behavior: "smooth" }); }
+          if (ok) setMessage("Habit added");
           return ok && added > 0;
         }}
         onAdded={(_tab, count) => setMessage(count > 1 ? `${count} items added` : "Added")} />
@@ -153,12 +151,6 @@ export default function PlanPage() {
         </>
       )}
 
-      {habits && (
-        <section id="plan-habits" aria-label="Habits" className="mt-4 border border-[var(--border)] bg-[var(--surface)]">
-          <Strip n="02" title="Habits" aside={`${habits.habits.filter((h) => h.stage === "installing").length} installing · ${habits.habits.filter((h) => h.stage === "rails").length} on rails`} />
-          <HabitBoard data={habits} streams={streams} busy={busy} runHabits={runHabits} picked={habitPick} onPick={setHabitPick} />
-        </section>
-      )}
     </div>
   );
 }

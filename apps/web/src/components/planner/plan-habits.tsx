@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { gateShare, weekChecks, weekLabel } from "@/lib/plan-v3";
 import { GoalRef, quarterText } from "@/lib/plan-v2";
 import { vaultApi } from "@/lib/vault-api";
@@ -37,6 +38,7 @@ export function WeekTicks({ habits, today, dim, busy, runHabits, onPick }: {
   if (habits.length === 0) return null;
   return (
     <div className="mb-1.5 border-b border-[var(--border)] pb-1" aria-label="Habits this week">
+      <Link href="/habits" className={`${link} block text-right`}>Habits →</Link>
       {habits.map((h) => {
         const n = weekChecks(h, today);
         const checkedToday = h.today !== null;

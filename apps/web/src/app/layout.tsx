@@ -18,7 +18,7 @@ import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/archivo";
 import "./globals.css";
-import { SkinSwitch, SKIN_BOOT } from "@/components/skin-switch";
+import { SKIN_BOOT } from "@/components/skin-switch";
 
 export const metadata: Metadata = {
   title: "Niyyah - Muslim Productivity",
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: SKIN_BOOT }} /></head>
-      <body className="antialiased min-h-screen">{children}<SkinSwitch /></body>
+      <body className="antialiased min-h-screen">{children}</body>
     </html>
   );
 }
