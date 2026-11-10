@@ -237,3 +237,20 @@ test("habits sit under their goal, tick in Now with +1, and a task can become a 
   await card2.getByRole("group", { name: "Cadence" }).getByRole("button", { name: "5/wk" }).click();
   await expect(b.locator("[data-habit]").filter({ hasText: task })).toContainText("5/wk");
 });
+
+test("item side card never overflows its panel, on a phone and on a desktop", async ({ page, request }) => {
+  const long = uniq("A very long goal that keeps going until the whole line runs far past the edge of a narrow phone panel");
+  const t = uniq("Overflow check");
+  await addGoal(request, apiQuarter, long);
+  await addTasks(request, [t]);
+  for (const size of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+    await page.setViewportSize(size);
+    await open(page);
+    await row(page, t).getByRole("button", { name: t, exact: true }).click();
+    const card = page.getByRole("complementary", { name: "Item" });
+    await expect(card.getByRole("group", { name: "Goal" }).getByRole("button", { name: new RegExp(long.slice(0, 30)) })).toBeVisible();
+    const fit = await card.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(fit.scroll, `Item card at ${size.width}px`).toBeLessThanOrEqual(fit.client);
+    await page.screenshot({ path: `e2e/out/item-card-${size.width}.png` });
+  }
+});
