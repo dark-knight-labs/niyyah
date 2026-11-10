@@ -14,14 +14,13 @@ import { TopBar } from "@/components/routine/top-bar";
 import { DayPreview } from "@/components/routine/day-preview";
 import { ThisWeek } from "@/components/routine/this-week";
 import { HabitsPanel } from "@/components/routine/habits-panel";
-import { VotesPanel } from "@/components/routine/votes-panel";
 import { useWeek } from "@/components/routine/week-calendar";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { toMeta } from "@/lib/streams";
 
 const REFRESH_MS = 60_000;
 
-/** Overview, the home page: the day's clock, lists and votes, with Now / Next / Someday across every block at the end. */
+/** Overview, the home page: the day's clock, lists, habits and votes, with Now / Next / Someday across every block at the end. */
 export default function OverviewPage() {
   const blocks = useBlocks();
   const [schedule, setSchedule] = useState<VaultScheduleData | null>(null);
@@ -182,8 +181,7 @@ export default function OverviewPage() {
                     barExtra={sidebar ? undefined : <TopBar look="bar" dateLabel={dateLabel} city={schedule.meta.city} editDay={dayKey} today={today} onSaved={setToday} />} />
                 </section>
               </div>
-              {habits && <div className="mb-5"><HabitsPanel day={dayKey} data={habits} today={today} onData={setHabits} onVoted={setToday} /></div>}
-              <div className="mb-5"><VotesPanel day={dayKey} today={today} onSaved={setToday} current={block?.block} /></div>
+              <div className="mb-5"><HabitsPanel day={dayKey} current={block?.block} data={habits ?? { today: dayKey, installing_limit: 0, habits: [] }} today={today} onData={setHabits} onVoted={setToday} /></div>
             </>
           ) : (
             <div className="mx-auto max-w-xl">
