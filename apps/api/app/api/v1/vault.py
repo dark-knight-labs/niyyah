@@ -7,15 +7,16 @@ import asyncio
 from datetime import date, datetime, time as clock, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.deps import get_current_user, get_optional_user
+from app.core.deps import get_capture_user, get_current_user, get_optional_user
 from app.models.google import GoogleCredential
 from app.models.planner import PlannerPin
 from app.models.user import User
@@ -103,7 +104,7 @@ from app.schemas.vault import (
     VaultWeekResponse,
     VoteIn,
 )
-from app.services import google_calendar, plan_v2, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_products, planner_store, planner_work
+from app.services import device_tokens, google_calendar, plan_v2, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_products, planner_store, planner_work
 from app.services.calendar_events import events_for_day, events_for_range, fixture_feeds
 from app.services.google_calendar import GoogleCalendarError
 from app.services.planner_views import notebooks_response, objectives_response, pipelines_response, quarter_response
@@ -683,12 +684,47 @@ async def get_undated_items(user: User = Depends(get_current_user), db: AsyncSes
 
 
 @router.post("/items", response_model=ItemResponse, status_code=201)
-async def post_item(data: ItemCreateIn, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def post_item(data: ItemCreateIn, request: Request, response: Response, user: User = Depends(get_capture_user),
+                    db: AsyncSession = Depends(get_db)):
     """Add an own item on `day`, or an undated one in `lane` of the `stream`'s pipeline (exactly one of the two).
-    `#word`s in the text become tags; no start_min/end_min = all day."""
+    `#word`s in the text become tags; no start_min/end_min = all day.
+
+    A device token may send `client_id` (a UUID): a repeat with the same `client_id` from the same token returns the item the
+    first call made (200) instead of adding another, so a capture client can retry safely. The repeat's other fields are ignored."""
     if data.day is not None:
         _check_task_day(data.day)
-    task = await _item_run(db, lambda: planner_items.create_item(db, user.id, data.day, _item_fields(data), _local_now().date()))
+    fields = _item_fields(data)
+    fields.pop("client_id", None)
+    user_id = user.id  # read now: a rollback below expires the user object
+    token_id = getattr(request.state, "device_token_id", None)  # set only when a device token made the call
+    client_id = str(data.client_id) if data.client_id is not None and token_id is not None else None
+
+    async def repeat():
+        if client_id is None:
+            return None
+        return await device_tokens.captured_task(db, user_id, token_id, client_id)
+
+    def reply_with(task):
+        response.status_code = 200
+        return planner_items.written_task(task)
+
+    if (found := await repeat()) is not None:
+        return reply_with(found)
+
+    async def add():
+        task = await planner_items.create_item(db, user_id, data.day, fields, _local_now().date())
+        if client_id is not None:
+            device_tokens.remember_capture(db, token_id, client_id, task.id)
+            await db.flush()
+        return task
+
+    try:
+        task = await _item_run(db, add)
+    except IntegrityError:  # a concurrent retry with the same client_id won the unique key: return its item
+        await db.rollback()
+        if (found := await repeat()) is None:
+            raise
+        return reply_with(found)
     return planner_items.written_task(task)
 
 

@@ -13,6 +13,13 @@
   "request": null,
   "response": null
  },
+ "DELETE /api/v1/devices/tokens/{token_id}": {
+  "params": [
+   "path:token_id*"
+  ],
+  "request": null,
+  "response": null
+ },
  "DELETE /api/v1/personas/{persona_id}": {
   "params": [
    "path:persona_id*"
@@ -559,6 +566,93 @@
    "type": "object"
   }
  },
+ "GET /api/v1/capture/options": {
+  "params": [],
+  "request": null,
+  "response": {
+   "properties": {
+    "blocks": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "end": {
+        "type": "string"
+       },
+       "start": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "what": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "block",
+       "end",
+       "start",
+       "what"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "day": {
+     "type": "string"
+    },
+    "products": {
+     "items": {
+      "properties": {
+       "block": {
+        "type": "string"
+       },
+       "name": {
+        "type": "string"
+       },
+       "slug": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "block",
+       "name",
+       "slug"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "streams": {
+     "items": {
+      "properties": {
+       "name": {
+        "type": "string"
+       },
+       "slug": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "name",
+       "slug"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "blocks",
+    "day",
+    "products",
+    "streams"
+   ],
+   "type": "object"
+  }
+ },
  "GET /api/v1/compass": {
   "params": [],
   "request": null,
@@ -590,6 +684,43 @@
   "params": [],
   "request": null,
   "response": null
+ },
+ "GET /api/v1/devices/tokens": {
+  "params": [],
+  "request": null,
+  "response": {
+   "items": {
+    "properties": {
+     "created_at": {
+      "type": "string"
+     },
+     "id": {
+      "type": "integer"
+     },
+     "last_used_at": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "prefix": {
+      "type": "string"
+     },
+     "scope": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "created_at",
+     "id",
+     "name",
+     "prefix",
+     "scope"
+    ],
+    "type": "object"
+   },
+   "type": "array"
+  }
  },
  "GET /api/v1/export": {
   "params": [],
@@ -4063,6 +4194,54 @@
    "type": "object"
   }
  },
+ "POST /api/v1/devices/tokens": {
+  "params": [],
+  "request": {
+   "properties": {
+    "name": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "created_at": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "last_used_at": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "prefix": {
+     "type": "string"
+    },
+    "scope": {
+     "type": "string"
+    },
+    "token": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "created_at",
+    "id",
+    "name",
+    "prefix",
+    "scope",
+    "token"
+   ],
+   "type": "object"
+  }
+ },
  "POST /api/v1/import": {
   "params": [
    "query:replace"
@@ -5847,6 +6026,9 @@
       "type": "object"
      },
      "type": "array"
+    },
+    "client_id": {
+     "type": "string"
     },
     "day": {
      "type": "string"
