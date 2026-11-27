@@ -18,6 +18,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { SkinSelect } from "@/components/skin-switch";
+import { ShortcutHelp } from "@/components/shortcut-help";
 
 // Readable without signing in; every other page in this group requires a session.
 const PUBLIC_PATHS = ["/"];
@@ -94,7 +95,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   useTheme();
   // "g" then a letter goes to a page, like the hint on each tab says.
-  useHotkeys(user ? Object.fromEntries(HOTKEYS.map((item) => [`g ${item.key}`, () => router.push(item.href)])) : {});
+  const [help, setHelp] = useState(false);
+  // "?" lists the keys, except on the Map, which has its own sheet on the same key.
+  useHotkeys(user ? {
+    ...Object.fromEntries(HOTKEYS.map((item) => [`g ${item.key}`, () => router.push(item.href)])),
+    ...(pathname === "/map" ? {} : { "?": () => setHelp(true) }),
+  } : {});
 
   const title = [...nav, { href: "/settings", label: "Settings" }].find((item) => item.href === pathname)?.label ?? "Niyyah";
 
@@ -160,6 +166,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+      {pathname !== "/map" && <ShortcutHelp open={help} onOpenChange={setHelp} pathname={pathname} />}
     </div>
   );
 }

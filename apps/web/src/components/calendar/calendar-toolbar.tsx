@@ -160,7 +160,7 @@ export function CalendarBar(p: CalendarBarProps) {
   const scope = (
     <span className="inline-flex shrink-0" role="group" aria-label="Scope">
       {(["day", "week"] as const).map((s) => (
-        <button key={s} type="button" aria-pressed={p.scope === s} onClick={() => p.scope !== s && p.onScope(s)} title={`${s === "day" ? "Day" : "Week"} view`} className={`${CHIP} ${s === "week" ? "border-l-0" : ""}`}>{s === "day" ? "Day" : "Week"}</button>
+        <button key={s} type="button" aria-pressed={p.scope === s} onClick={() => p.scope !== s && p.onScope(s)} title={`${s === "day" ? "Day" : "Week"} view (${s === "day" ? "d" : "w"})`} aria-keyshortcuts={s === "day" ? "d" : "w"} className={`${CHIP} ${s === "week" ? "border-l-0" : ""}`}>{s === "day" ? "Day" : "Week"}</button>
       ))}
     </span>
   );
@@ -183,7 +183,7 @@ export function CalendarBar(p: CalendarBarProps) {
           )}
           {p.view === "week-grid" && (
             <Section title="Done tasks">
-              <button type="button" onClick={() => p.onShowDone(!p.showDone)} aria-pressed={p.showDone} aria-keyshortcuts="d" title={`${p.showDone ? "Hide" : "Show"} done tasks (d)`} className={`${SMALL} gap-1.5`}>
+              <button type="button" onClick={() => p.onShowDone(!p.showDone)} aria-pressed={p.showDone} aria-keyshortcuts="Shift+D" title={`${p.showDone ? "Hide" : "Show"} done tasks (Shift+D)`} className={`${SMALL} gap-1.5`}>
                 Show done <span className="font-mono tabular-nums">{p.doneCount}</span>
               </button>
             </Section>

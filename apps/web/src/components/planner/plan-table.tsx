@@ -82,6 +82,8 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
   const [colFocus, setColFocus] = useState<Column>("now");
   const [narrow, setNarrow] = useState(false);
   const area = useRef<HTMLDivElement>(null);
+  // The column the 1 2 3 keys and the "+" last pointed at: N adds there (Someday until then).
+  const [addCol, setAddCol] = useState<Column>("someday");
   const [seenReveal, setSeenReveal] = useState(0);
   if (reveal && reveal.seq !== seenReveal) {
     setSeenReveal(reveal.seq);
@@ -241,14 +243,36 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  /** The "+" of a column header and the N key: remember the column, then ask the page to point the capture line at it. */
+  function addTo(column: Column) {
+    setAddCol(column);
+    setColFocus(column);
+    onAdd(column);
+  }
 
   // The old work list's keys: J and K move down and up the tasks on screen, X ticks, S makes the small domino, / goes to the capture bar.
+  // 1 2 3 pick the first task of Now, Next, Someday; N writes a new task in the column last pointed at.
+  // This listener runs in the bubble phase on purpose: the layout's "g s" must see its second key first.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
       if (!t || e.metaKey || e.ctrlKey || e.altKey || view !== "plan") return;
-      if (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || t.closest("[role=menu]")) return;
+      if (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || t.closest("[role=menu]") || t.closest("[data-shortcut-help]")) return;
       if (e.key === "/") { e.preventDefault(); document.getElementById("plan-capture")?.focus(); return; }
+      if (e.key === "n") { e.preventDefault(); addTo(addCol); return; }
+      const col = ({ "1": "now", "2": "next", "3": "someday" } as Record<string, Column | undefined>)[e.key];
+      if (col) {
+        setAddCol(col);
+        setColFocus(col); // on a narrow table the other columns are rails with no tasks drawn, so open this one
+        const first = document.querySelector<HTMLElement>(`td[data-col="${col}"] [data-task]`);
+        if (first) setSel({ kind: "item", stream: first.dataset.stream ?? "", line: Number(first.dataset.task) });
+        else {
+          const s = visible.find((v) => itemsOf(v.id).some((i) => columnOf(i) === col && matchesLabel(i, label, today)));
+          const i = s && itemsOf(s.id).find((x) => columnOf(x) === col && matchesLabel(x, label, today));
+          if (s && i) setSel({ kind: "item", stream: s.id, line: i.line });
+        }
+        return;
+      }
       const rows = [...document.querySelectorAll<HTMLElement>("[data-task]")].map((el) => ({ stream: el.dataset.stream ?? "", line: Number(el.dataset.task) }));
       const at = sel?.kind === "item" ? rows.findIndex((r) => r.stream === sel.stream && r.line === sel.line) : -1;
       const pick = (r?: { stream: string; line: number }) => r && setSel({ kind: "item", stream: r.stream, line: r.line });
@@ -345,7 +369,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
                       <th key={c.id} scope="col" data-col={c.id} className="mono border-l border-[var(--border)] px-3 py-2 text-left align-bottom font-medium text-[var(--muted-foreground)]">
                         <span className="flex items-center justify-between gap-2">
                           <span>{c.label} <span className="tabular-nums text-[var(--foreground)]">{n}</span></span>
-                          <button type="button" disabled={busy} onClick={() => onAdd(c.id)} aria-label={`Add to ${c.label}`} title={`Add to ${c.label}`} className={`${chip} inline-flex min-h-6 items-center`}><Plus size={11} aria-hidden="true" /></button>
+                          <button type="button" disabled={busy} onClick={() => addTo(c.id)} aria-label={`Add to ${c.label}`} title={`Add to ${c.label}`} className={`${chip} inline-flex min-h-6 items-center`}><Plus size={11} aria-hidden="true" /></button>
                         </span>
                         <span className="block font-normal">{c.hint(week)}</span>
                       </th>
@@ -403,7 +427,7 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
             </table>
           )}
           <p className="mono flex flex-wrap gap-x-5 gap-y-1 px-4 py-2.5 text-[var(--muted-foreground)]">
-            <span>J K move</span><span>X done</span><span>S small domino</span><span>/ capture</span>
+            <span>J K move</span><span>X done</span><span>S small domino</span><span>/ capture</span><span>1 2 3 column</span><span>N new</span><span>? keys</span>
             {message && <span role="status" className="text-[var(--accent)]">{message}</span>}
           </p>
         </div>
