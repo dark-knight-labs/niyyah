@@ -137,6 +137,16 @@ test("account menu holds the skin select; it sets data-skin, remembers it, and n
   await page.goto("/plan");                              // no ?skin= now: the remembered choice applies
   await expect(page.locator("html")).toHaveAttribute("data-skin", "admin");
   await page.getByRole("button", { name: /^Account/ }).click();
+  await page.getByRole("menu").getByLabel("Skin").selectOption("nextup");   // the eighth skin: set, kept over a reload, and also reachable by ?skin=
+  await expect(page.locator("html")).toHaveAttribute("data-skin", "nextup");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-skin", "nextup");
+  await expect(page.locator("html")).toHaveCSS("--accent", /#224cc8/i);
+  await page.goto("/plan?skin=admin");
+  await expect(page.locator("html")).toHaveAttribute("data-skin", "admin");
+  await page.goto("/plan?skin=nextup");
+  await expect(page.locator("html")).toHaveAttribute("data-skin", "nextup");
+  await page.getByRole("button", { name: /^Account/ }).click();
   await page.getByRole("menu").getByLabel("Skin").selectOption("paper");
   await expect(page.locator("html")).not.toHaveAttribute("data-skin", /.+/);
   const fixedCorner = await page.evaluate(() => [...document.body.querySelectorAll("*")].filter((el) => {

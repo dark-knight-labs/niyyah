@@ -13,6 +13,7 @@ export const SKINS = [
   { id: "brutalist", label: "Brutalist (terminal, red)" },
   { id: "editorial", label: "Editorial (cream, serif)" },
   { id: "oled", label: "OLED (black, emerald)" },
+  { id: "nextup", label: "Next Up (blue, system font)" },
 ] as const;
 
 type SkinId = (typeof SKINS)[number]["id"];

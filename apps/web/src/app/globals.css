@@ -283,6 +283,42 @@
   --map-sticky-gray: #34322e;
 }
 
+/* Next Up: a blue, system-font look with opaque surfaces. Not the default (paper stays); pick it in the account menu or with ?skin=nextup. */
+:root[data-skin="nextup"] {
+  --background: #e2eafe;
+  --surface: #f8faff;
+  --foreground: #182238;
+  --muted: #eef2fb;
+  --muted-foreground: #546079;
+  --border: #dce2ef;
+  --rule: #b4c2e0;
+  --accent: #224cc8;
+  --accent-fg: #ffffff;
+  --accent-light: #e4edff;
+  --destructive: #613b23;
+  --warn: #80512a;
+  --warn-light: #fde4b9;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --r-xs: 6; --r-sm: 8; --r-md: 8; --r-lg: 10; --r-xl: 16; --r-2xl: 16; --r-3xl: 20;
+}
+
+:root[data-skin="nextup"][data-theme="dark"] {
+  --background: #111a30;
+  --surface: #182238;
+  --foreground: #f9faff;
+  --muted: #27396d;
+  --muted-foreground: #b8c4df;
+  --border: #3c4c70;
+  --rule: #4a5c85;
+  --accent: #8faaf0;
+  --accent-fg: #182238;
+  --accent-light: #27396d;
+  --destructive: #ffb347;
+  --warn: #ffea89;
+  --warn-light: #613b23;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
