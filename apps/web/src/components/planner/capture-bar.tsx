@@ -1,16 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pick } from "@/components/planner/pick";
 import { useBlocks } from "@/lib/blocks";
 import { parseHabit } from "@/lib/habit";
 import { parseDraft } from "@/lib/draft";
-import { Tab } from "@/lib/plan-model";
+import { LANE_FOR, Tab } from "@/lib/plan-model";
 import { StreamMeta } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
 import { NotebookKind } from "@/lib/vault-types";
 
 type Kind = NotebookKind | "task" | "habit";
+
+/** The columns a new task can be written into. */
+export type AddColumn = "now" | "next" | "someday";
+
+const COLUMNS: { value: AddColumn; label: string }[] = [
+  { value: "now", label: "Now" },
+  { value: "next", label: "Next" },
+  { value: "someday", label: "Someday" },
+];
+
+/** A request from the table: write a task into this column. `seq` makes the same request twice count as two. */
+export interface AddIntent { column: AddColumn; seq: number }
 
 const KINDS: { id: Kind; label: string }[] = [
   { id: "idea", label: "Idea" },
@@ -26,19 +38,32 @@ interface Props {
   stream: string | null;
   busy: boolean;
   run: (action: () => Promise<unknown>) => Promise<boolean>;
-  /** Called after a save, with the tab the new entry lives on. */
-  onAdded: (tab: Tab, count: number) => void;
+  /** Called after a save, with the tab the new entry lives on, how many were added and the block they went to. */
+  onAdded: (tab: Tab, count: number, stream: string) => void;
+  /** Set by a "+" in the Plan table: switches to Task, picks the column and focuses the line. */
+  intent?: AddIntent | null;
   /** Saves a habit; resolves true when it was saved. */
   onHabit: (habit: { name: string; block: string; anchor: string; minimum: string; per_week: number }) => Promise<boolean>;
 }
 
-/** One line to write something down: an idea, a meeting, a blocker (into the block's notebook) or tasks (into Someday). */
-export function CaptureBar({ streams, stream, busy, run, onAdded, onHabit }: Props) {
+/** One line to write something down: an idea, a meeting, a blocker (into the block's notebook) or tasks (into Someday, or the column you pick). */
+export function CaptureBar({ streams, stream, busy, run, onAdded, onHabit, intent = null }: Props) {
   const dayBlocks = useBlocks().list.filter((b) => !b.archived);
   const [kind, setKind] = useState<Kind>("idea");
   const [text, setText] = useState("");
   const [target, setTarget] = useState<string | null>(null);
   const [habitBlock, setHabitBlock] = useState<string | null>(null);
+  const [column, setColumn] = useState<AddColumn>("someday");
+  const [seenIntent, setSeenIntent] = useState(0);
+  // A new request from the table is applied once, while rendering (no effect needed); the line is focused after the paint.
+  if (intent && intent.seq !== seenIntent) {
+    setSeenIntent(intent.seq);
+    setKind("task");
+    setColumn(intent.column);
+  }
+  useEffect(() => {
+    if (seenIntent) document.getElementById("plan-capture")?.focus();
+  }, [seenIntent]);
   const habitTo = habitBlock ?? dayBlocks[0]?.key ?? "";
   const to = stream ?? target ?? streams[0]?.id ?? "";
   const items = kind === "task" ? parseDraft(text) : [];
@@ -53,12 +78,12 @@ export function CaptureBar({ streams, stream, busy, run, onAdded, onHabit }: Pro
       return;
     }
     const ok = await run(async () => {
-      if (kind === "task") await vaultApi.addPipelineItems(to, items.map((i) => i.text), "backlog", items.map((i) => i.description));
+      if (kind === "task") await vaultApi.addPipelineItems(to, items.map((i) => i.text), LANE_FOR[column], items.map((i) => i.description));
       else if (kind !== "habit") await vaultApi.addNotebookEntry(to, kind, lines[0].trim(), lines.slice(1).map((l) => l.trim()).join("\n"));
     });
     if (ok) {
       setText("");
-      onAdded(kind === "task" ? "someday" : "notes", kind === "task" ? items.length : 1);
+      onAdded(kind === "task" ? column : "notes", kind === "task" ? items.length : 1, to);
     }
   }
 
@@ -85,6 +110,11 @@ export function CaptureBar({ streams, stream, busy, run, onAdded, onHabit }: Pro
       {kind === "habit" && dayBlocks.length > 0 && (
         <div className="flex items-center border-l border-[var(--border)] px-2 max-md:border-l-0 max-md:border-t">
           <Pick value={habitTo} label="Day block" options={dayBlocks.map((b) => ({ value: b.key, label: b.label }))} onChange={setHabitBlock} />
+        </div>
+      )}
+      {kind === "task" && (
+        <div className="flex items-center border-l border-[var(--border)] px-2 max-md:border-l-0 max-md:border-t">
+          <Pick value={column} label="Add to column" options={COLUMNS} onChange={(v) => setColumn(v as AddColumn)} />
         </div>
       )}
       {kind !== "habit" && !stream && streams.length > 1 && (

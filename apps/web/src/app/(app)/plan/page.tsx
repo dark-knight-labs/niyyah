@@ -3,12 +3,12 @@
 import { useEffect, useState } from "react";
 import { usePlanner } from "@/hooks/use-planner";
 import { useNow } from "@/hooks/use-now";
-import { CaptureBar } from "@/components/planner/capture-bar";
+import { AddColumn, AddIntent, CaptureBar } from "@/components/planner/capture-bar";
 import { AdvisorPanel } from "@/components/planner/advisor-panel";
 import { CompassBand } from "@/components/planner/compass-band";
 import { Notice, Spinner } from "@/components/planner/page-title";
 import { PlanHeader } from "@/components/planner/plan-header";
-import { PlanTable } from "@/components/planner/plan-table";
+import { PlanTable, Reveal } from "@/components/planner/plan-table";
 import { StreamEditor } from "@/components/planner/stream-editor";
 import { dateInTz } from "@/lib/routine";
 import { PLANNER_TZ } from "@/lib/streams";
@@ -35,6 +35,8 @@ export default function PlanPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [habits, setHabits] = useState<HabitsData | null>(null);
+  const [intent, setIntent] = useState<AddIntent | null>(null);
+  const [reveal, setReveal] = useState<Reveal | null>(null);
   const now = useNow(60_000);
 
   useEffect(() => {
@@ -92,6 +94,11 @@ export default function PlanPage() {
     }
   }
 
+  /** The "+" in a column header: the capture line switches to Task, points at that column and takes focus. */
+  function addTo(column: AddColumn) {
+    setIntent({ column, seq: (intent?.seq ?? 0) + 1 });
+  }
+
   function pick(id: string | null) {
     setPicked(id);
     setEditing(null);
@@ -131,7 +138,11 @@ export default function PlanPage() {
           if (ok) setMessage("Habit added");
           return ok && added > 0;
         }}
-        onAdded={(_tab, count) => setMessage(count > 1 ? `${count} items added` : "Added")} />
+        intent={intent}
+        onAdded={(tab, count, to) => {
+          setMessage(count > 1 ? `${count} items added` : "Added");
+          if (tab === "now" || tab === "next" || tab === "someday") setReveal({ stream: to, column: tab, seq: (reveal?.seq ?? 0) + 1 });
+        }} />
 
       {streams.length === 0 ? (
         <>
@@ -146,7 +157,7 @@ export default function PlanPage() {
             <Strip n="01" title="Plan" aside={`${quarter.quarter.slice(5)} · every block against Now, Next and Someday`} />
             <PlanTable streams={streams} quarter={quarter} pipelines={pipelines} notebooks={notebooks} today={dateInTz(now, PLANNER_TZ)}
               block={stream} onBlock={pick} editor={editor} onEdit={setEditing} onAddBlock={() => setEditing("new")}
-              busy={busy} run={run} message={message} habits={habits} runHabits={runHabits} makeHabit={makeHabit} />
+              busy={busy} run={run} message={message} habits={habits} runHabits={runHabits} makeHabit={makeHabit} onAdd={addTo} reveal={reveal} />
           </section>
         </>
       )}

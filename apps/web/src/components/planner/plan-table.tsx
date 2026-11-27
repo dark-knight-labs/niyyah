@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { PageSlot } from "@/components/page-slot";
 import { Checkbox } from "@/components/routine/checkbox";
+import type { AddColumn } from "@/components/planner/capture-bar";
 import { BlockCell } from "@/components/planner/block-cell";
 import { PlanHabitCard, RunHabits, WeekTicks } from "@/components/planner/plan-habits";
 import { ItemCard, NoteCard } from "@/components/planner/work-card";
@@ -18,7 +19,10 @@ import { vaultApi } from "@/lib/vault-api";
 import { HabitsData, NotebookEntryData, NotebooksData, PipelineItemData, PipelinesData, ProductData, QuarterData } from "@/lib/vault-types";
 
 type Run = (action: () => Promise<unknown>) => Promise<boolean>;
-type Column = "now" | "next" | "someday";
+type Column = AddColumn;
+
+/** A task that was just added: its column opens in that block so the new row (it lands last) is not behind "+N more". */
+export interface Reveal { stream: string; column: Column; seq: number }
 
 const COLUMNS: { id: Column; label: string; hint: (week: string) => string }[] = [
   { id: "now", label: "Now", hint: (w) => `this week · ${weekText(w)}` },
@@ -56,6 +60,10 @@ interface Props {
   /** Habits (Plan v3): shown under their goals and as this week's ticks in Now. Null until loaded. */
   habits: HabitsData | null;
   runHabits: RunHabits;
+  /** The "+" in a column header: write a new task into that column (the page points the capture line there). */
+  onAdd: (column: Column) => void;
+  /** Opens a column after an add; a new `seq` applies it once. */
+  reveal?: Reveal | null;
   /** Turn a task into a habit (the task is deleted); answers with the new habit's id, or null when it failed. */
   makeHabit: (stream: string, item: PipelineItemData) => Promise<number | null>;
 }
@@ -64,7 +72,7 @@ interface Props {
 type Sel = { kind: "item"; stream: string; line: number } | { kind: "note"; stream: string; key: string } | { kind: "habit"; id: number } | null;
 
 /** The Plan: one table, a row per block (with its quarter goals) against Now, Next and Someday; Done is its own view. */
-export function PlanTable({ streams, quarter, pipelines, notebooks, today, block, onBlock, editor, onEdit, onAddBlock, busy, run, message, habits, runHabits, makeHabit }: Props) {
+export function PlanTable({ streams, quarter, pipelines, notebooks, today, block, onBlock, editor, onEdit, onAddBlock, busy, run, message, habits, runHabits, makeHabit, onAdd, reveal = null }: Props) {
   const [view, setView] = useState<"plan" | "done">("plan");
   const [label, setLabel] = useState<LabelFilter>("all");
   const [focus, setFocus] = useState<string | null>(null);
@@ -74,6 +82,12 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
   const [colFocus, setColFocus] = useState<Column>("now");
   const [narrow, setNarrow] = useState(false);
   const area = useRef<HTMLDivElement>(null);
+  const [seenReveal, setSeenReveal] = useState(0);
+  if (reveal && reveal.seq !== seenReveal) {
+    setSeenReveal(reveal.seq);
+    setOpened({ ...opened, [`${reveal.stream}:${reveal.column}`]: true });
+    setColFocus(reveal.column);
+  }
   // The quarter tab that is open (null = the current quarter) and quarters opened with "+" that have no goal yet.
   const [openQ, setOpenQ] = useState<string | null>(null);
   const [extraQ, setExtraQ] = useState<string[]>([]);
@@ -329,7 +343,10 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
                     }
                     return (
                       <th key={c.id} scope="col" data-col={c.id} className="mono border-l border-[var(--border)] px-3 py-2 text-left align-bottom font-medium text-[var(--muted-foreground)]">
-                        {c.label} <span className="tabular-nums text-[var(--foreground)]">{n}</span>
+                        <span className="flex items-center justify-between gap-2">
+                          <span>{c.label} <span className="tabular-nums text-[var(--foreground)]">{n}</span></span>
+                          <button type="button" disabled={busy} onClick={() => onAdd(c.id)} aria-label={`Add to ${c.label}`} title={`Add to ${c.label}`} className={`${chip} inline-flex min-h-6 items-center`}><Plus size={11} aria-hidden="true" /></button>
+                        </span>
                         <span className="block font-normal">{c.hint(week)}</span>
                       </th>
                     );
