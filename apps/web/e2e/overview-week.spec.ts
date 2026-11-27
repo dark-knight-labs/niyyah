@@ -78,7 +78,7 @@ test("set the schedule these tests read", async ({ request }) => {
 
 /* ---------- 1. the range label is set in the nav's type ---------- */
 
-for (const skin of ["paper", "admin"]) {
+for (const skin of ["paper", "admin", "nextup"]) {
   test(`range label uses the nav's type (${skin})`, async ({ page }) => {
     await openOverview(page, `/?skin=${skin}`);
     const style = (sel: string) => page.locator(sel).first().evaluate((el) => { const c = getComputedStyle(el); return { family: c.fontFamily, upper: c.textTransform, weight: c.fontWeight, spacing: parseFloat(c.letterSpacing) / parseFloat(c.fontSize), color: c.color, size: parseFloat(c.fontSize) }; });
