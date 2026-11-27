@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Niyyah Capture</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="capture-view">
+    <form id="capture-form" autocomplete="off">
+      <input id="text" type="text" maxlength="300" placeholder="What is on your mind?" aria-label="Capture" autofocus>
+      <div class="row">
+        <label>Block
+          <select id="block" aria-label="Block"></select>
+        </label>
+        <label>Product
+          <select id="product" aria-label="Product"></select>
+        </label>
+      </div>
+      <div class="row">
+        <div id="lanes" role="group" aria-label="Lane">
+          <button type="button" class="chip" data-lane="now" aria-pressed="false">Now</button>
+          <button type="button" class="chip" data-lane="next" aria-pressed="true">Next</button>
+          <button type="button" class="chip" data-lane="someday" aria-pressed="false">Someday</button>
+        </div>
+        <button id="save" type="submit">Save</button>
+      </div>
+    </form>
+    <p id="status" role="status"></p>
+    <ul id="queue"></ul>
+    <button id="open-settings" type="button" class="link">Settings</button>
+  </main>
+
+  <main id="settings-view" hidden>
+    <form id="settings-form" autocomplete="off">
+      <label>Server URL
+        <input id="server-url" type="url" placeholder="Your Niyyah address" spellcheck="false">
+      </label>
+      <label>Device token
+        <input id="token" type="password" placeholder="Paste a device token" spellcheck="false" autocomplete="off">
+      </label>
+      <p class="hint" id="token-state"></p>
+      <div class="row">
+        <button id="close-settings" type="button" class="link">Back</button>
+        <button id="save-settings" type="submit">Store</button>
+      </div>
+    </form>
+    <p id="settings-status" role="status"></p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
