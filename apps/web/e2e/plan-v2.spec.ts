@@ -265,3 +265,40 @@ test("Next arrows act on the order shown: numbered as displayed, hidden while a 
   const nums = (await cell(page, "next").locator("[data-task] > span.mono").first().innerText()).trim();
   expect(nums).toBe("1");
 });
+
+test("add to column: the header plus sends a new task to Now, Next or Someday", async ({ page }) => {
+  await open(page);
+  await page.locator('select[aria-label="Block"]').selectOption("studio");
+  const table = page.getByRole("table", { name: "Plan" });
+  for (const [col, name] of [["next", "Next"], ["now", "Now"], ["someday", "Someday"]] as const) {
+    const t = uniq(`Plus ${name}`);
+    await table.getByRole("button", { name: `Add to ${name}` }).click();
+    await expect(page.locator("#plan-capture")).toBeFocused();
+    await expect(page.getByRole("button", { name: "Add to column" })).toContainText(name);
+    await page.keyboard.type(t);
+    await page.keyboard.press("Enter");
+    await expect(cell(page, col).locator("[data-task]").filter({ hasText: t })).toBeVisible();
+  }
+  // Task + the "Add to column" pick also works without the plus, and an untouched Task add still lands in Someday.
+  await page.reload();
+  await expect(table).toBeVisible();
+  await page.locator('select[aria-label="Block"]').selectOption("studio");
+  const d = uniq("Default add");
+  await page.getByRole("button", { name: "Task", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Add to column" })).toContainText("Someday");
+  await page.locator("#plan-capture").fill(d);
+  await page.keyboard.press("Enter");
+  await expect(cell(page, "someday").locator("[data-task]").filter({ hasText: d })).toBeVisible();
+});
+
+test("add to column: a column over its cap opens so the new row is visible", async ({ page, request }) => {
+  await addTasks(request, [uniq("Cap 1"), uniq("Cap 2"), uniq("Cap 3"), uniq("Cap 4"), uniq("Cap 5"), uniq("Cap 6"), uniq("Cap 7")], "next");
+  await open(page);
+  await page.locator('select[aria-label="Block"]').selectOption("studio");
+  await expect(cell(page, "next").getByRole("button", { name: /^\+\d+ more$/ })).toBeVisible();
+  const t = uniq("Lands last");
+  await page.getByRole("table", { name: "Plan" }).getByRole("button", { name: "Add to Next" }).click();
+  await page.keyboard.type(t);
+  await page.keyboard.press("Enter");
+  await expect(cell(page, "next").locator("[data-task]").filter({ hasText: t })).toBeVisible();
+});
