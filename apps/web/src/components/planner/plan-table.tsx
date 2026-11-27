@@ -342,13 +342,13 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
         </div>
 
         {selectedHabit && (
-          <aside aria-label="Habit" aria-live="polite" className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:border-l lg:border-t-0">
+          <aside aria-label="Habit" aria-live="polite" className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:sticky lg:top-11 lg:max-h-[calc(100dvh-2.75rem)] lg:self-start lg:overflow-y-auto lg:border-l lg:border-t-0">
             <PlanHabitCard key={selectedHabit.id} habit={selectedHabit} busy={busy} runHabits={runHabits} onClose={() => setSel(null)}
               goals={(planBlockOf(selectedHabit) ? goalsOf(planBlockOf(selectedHabit)!) : []).filter((g) => !g.ended || g.id === selectedHabit.goal_ref)} />
           </aside>
         )}
         {selected && (
-          <aside aria-label="Item" aria-live="polite" className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:border-l lg:border-t-0">
+          <aside aria-label="Item" aria-live="polite" className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:sticky lg:top-11 lg:max-h-[calc(100dvh-2.75rem)] lg:self-start lg:overflow-y-auto lg:border-l lg:border-t-0">
             <button type="button" onClick={() => setSel(null)} className={`${link} justify-self-end`}>Close</button>
             {selected.item ? (
               <ItemCard key={`${selected.item.line}:${selected.item.hash}`} row={{ type: "item", key: String(selected.item.line), stream: selected.meta.id, item: selected.item }} meta={selected.meta}
