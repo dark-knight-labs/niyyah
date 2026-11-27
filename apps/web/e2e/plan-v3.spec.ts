@@ -262,6 +262,8 @@ test("item and habit side cards stay inside their panel and the page, on a phone
     await expect(card.getByRole("group", { name: "Goal" }).getByRole("button", { name: new RegExp(long.slice(0, 30)) })).toBeVisible();
     await fits("Item", width);
     await page.screenshot({ path: `e2e/out/item-card-${width}.png` });
+    // Below lg the Item card is a panel over the list: close it before reaching for the habit underneath.
+    await card.getByRole("button", { name: "Close" }).click();
     await block(page).locator("[data-habit]").filter({ hasText: habitName }).getByRole("button", { name: habitName }).click();
     const habit = page.getByRole("complementary", { name: "Habit" });
     await expect(habit.getByRole("group", { name: "Habit goal" }).getByRole("button", { name: new RegExp(long.slice(0, 30)) })).toBeVisible();

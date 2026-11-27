@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { PageSlot } from "@/components/page-slot";
 import { Checkbox } from "@/components/routine/checkbox";
@@ -26,7 +26,14 @@ const COLUMNS: { id: Column; label: string; hint: (week: string) => string }[] =
   { id: "someday", label: "Someday", hint: () => "ideas, notes, links" },
 ];
 
+/** Below this width (px) of the table area the three columns no longer fit side by side, so one is open and the others are rails. 60rem is the width the table was always built for (its old min-width). */
+const NARROW_BELOW = 960;
+
 const chip = "mono min-h-6 border border-[var(--rule)] px-2 text-[var(--muted-foreground)] hover:bg-[var(--muted)] aria-pressed:border-[var(--foreground)] aria-pressed:bg-[var(--foreground)] aria-pressed:text-[var(--background)]";
+/** The detail panel. From lg up it is sticky beside the table, under the 2.75rem header. Below lg it is fixed to the right edge (over the list), with its own scroll. */
+const PANEL = "grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 border-[var(--border)] bg-[var(--surface)] p-4 "
+  + "max-lg:fixed max-lg:bottom-0 max-lg:right-0 max-lg:top-11 max-lg:z-40 max-lg:w-[min(90vw,420px)] max-lg:overflow-y-auto max-lg:border-l max-lg:shadow-xl "
+  + "lg:sticky lg:top-11 lg:max-h-[calc(100dvh-2.75rem)] lg:self-start lg:overflow-y-auto lg:border-l";
 const link = "mono text-[var(--accent)] hover:underline";
 
 interface Props {
@@ -63,6 +70,10 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
   const [focus, setFocus] = useState<string | null>(null);
   const [sel, setSel] = useState<Sel>(null);
   const [opened, setOpened] = useState<Record<string, boolean>>({});
+  // Narrow table area: the one open column (the others are rails). Component state only.
+  const [colFocus, setColFocus] = useState<Column>("now");
+  const [narrow, setNarrow] = useState(false);
+  const area = useRef<HTMLDivElement>(null);
   // The quarter tab that is open (null = the current quarter) and quarters opened with "+" that have no goal yet.
   const [openQ, setOpenQ] = useState<string | null>(null);
   const [extraQ, setExtraQ] = useState<string[]>([]);
@@ -93,6 +104,10 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
   const all = pipelines.streams.flatMap((s) => (!block || s.stream === block ? s.items : []));
   const doneItems = all.filter((i) => columnOf(i) === null);
   const lateN = all.filter((i) => isLate(i, today)).length;
+
+  /** Items in a column across the visible blocks, after the label filter (the number a header or rail shows). */
+  const columnCount = (col: Column, only?: string) =>
+    visible.reduce((n, s) => n + (only && s.id !== only ? 0 : itemsOf(s.id).filter((i) => columnOf(i) === col && matchesLabel(i, label, today)).length), 0);
 
   function setDone(stream: string, item: PipelineItemData) {
     return run(() => vaultApi.movePipelineItem(stream, item, columnOf(item) === null ? "next" : "done"));
@@ -202,6 +217,17 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
     );
   }
 
+  // Is there room for all three columns? Measure the table area (not the window): the open detail panel takes width from it.
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const measure = () => setNarrow(el.clientWidth < NARROW_BELOW);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // The old work list's keys: J and K move down and up the tasks on screen, X ticks, S makes the small domino, / goes to the capture bar.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -272,10 +298,13 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
       {editor && <div className="border-b border-[var(--border)] p-4">{editor}</div>}
 
       <div className={`grid ${selected || selectedHabit ? "lg:grid-cols-[minmax(0,1fr)_23rem]" : ""}`}>
-        <div className="min-w-0 overflow-x-auto" data-testid="plan-scroll">
+        <div ref={area} className="min-w-0 overflow-x-auto" data-testid="plan-scroll" data-narrow={narrow}>
           {view === "plan" ? (
-            <table aria-label="Plan" className="w-full min-w-[60rem] table-fixed border-collapse text-small">
-              <colgroup><col className="w-[25%]" /><col /><col /><col className="w-[22%]" /></colgroup>
+            <table aria-label="Plan" className={`w-full table-fixed border-collapse text-small ${narrow ? "min-w-[32.5rem]" : "min-w-[60rem]"}`}>
+              <colgroup>
+                <col className={narrow ? "w-44" : "w-[25%]"} />
+                {COLUMNS.map((c) => <col key={c.id} className={narrow ? (c.id === colFocus ? "" : "w-11") : c.id === "someday" ? "w-[22%]" : ""} />)}
+              </colgroup>
               <thead>
                 <tr className="border-b border-[var(--border)]">
                   <th scope="col" className="mono px-3 py-2 text-left align-bottom font-medium text-[var(--muted-foreground)]">Block
@@ -284,19 +313,40 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
                       <button type="button" aria-label={`Add quarter ${quarterText(tabs.plus)}`} title={`Open ${quarterText(tabs.plus)}`} onClick={() => { setExtraQ([...extraQ, tabs.plus]); setOpenQ(tabs.plus); }} className={chip}>+</button>
                     </span>
                     <span className="mt-1 block font-normal">{quarterText(shownQ)} goals</span></th>
-                  {COLUMNS.map((c) => (
-                    <th key={c.id} scope="col" className="mono border-l border-[var(--border)] px-3 py-2 text-left align-bottom font-medium text-[var(--muted-foreground)]">
-                      {c.label} <span className="tabular-nums text-[var(--foreground)]">{visible.reduce((n, s) => n + itemsOf(s.id).filter((i) => columnOf(i) === c.id && matchesLabel(i, label, today)).length, 0)}</span>
-                      <span className="block font-normal">{c.hint(week)}</span>
-                    </th>
-                  ))}
+                  {COLUMNS.map((c) => {
+                    const n = columnCount(c.id);
+                    if (narrow && c.id !== colFocus) {
+                      // A rail: the column's name and count, written upright down the side; a click opens it and closes the open one.
+                      return (
+                        <th key={c.id} scope="col" data-col={c.id} data-rail className="mono border-l border-[var(--border)] p-0 align-top font-medium text-[var(--muted-foreground)]">
+                          <button type="button" aria-expanded="false" aria-label={`Open ${c.label}, ${n} ${n === 1 ? "item" : "items"}`} onClick={() => setColFocus(c.id)}
+                            className="flex w-full flex-col items-center gap-1 px-1 py-2 hover:bg-[var(--muted)] hover:text-[var(--foreground)]">
+                            <span className="tabular-nums text-[var(--foreground)]">{n}</span>
+                            <span className="[writing-mode:vertical-rl]">{c.label}</span>
+                          </button>
+                        </th>
+                      );
+                    }
+                    return (
+                      <th key={c.id} scope="col" data-col={c.id} className="mono border-l border-[var(--border)] px-3 py-2 text-left align-bottom font-medium text-[var(--muted-foreground)]">
+                        {c.label} <span className="tabular-nums text-[var(--foreground)]">{n}</span>
+                        <span className="block font-normal">{c.hint(week)}</span>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {visible.map((s) => (
                   <tr key={s.id} data-block={s.id} className="border-b border-[var(--border)] align-top last:border-b-0">
                     {blockCell(s)}
-                    {COLUMNS.map((c) => (
+                    {COLUMNS.map((c) => narrow && c.id !== colFocus ? (
+                      // A rail cell shows only how many tasks this block has in the column; its tasks are not rendered.
+                      <td key={c.id} data-col={c.id} data-rail onClick={() => setColFocus(c.id)} title={`Open ${c.label}`}
+                        className={`mono cursor-pointer border-l border-[var(--border)] px-1 py-3 text-center align-top tabular-nums text-[var(--muted-foreground)] hover:bg-[var(--muted)] ${c.id === "now" ? "bg-[var(--accent-light)]" : ""}`}>
+                        {columnCount(c.id, s.id) || "·"}
+                      </td>
+                    ) : (
                       <td key={c.id} data-col={c.id} className={`border-l border-[var(--border)] px-3 py-3 align-top ${c.id === "now" ? "bg-[var(--accent-light)]" : ""}`}>
                         {c.id === "now" && <WeekTicks habits={habitsOf(s.id)} today={today} busy={busy} runHabits={runHabits} dim={(h) => !!focus && h.goal_ref !== focus} onPick={(id) => setSel({ kind: "habit", id })} />}
                         {cell(s, c.id)}
@@ -342,14 +392,14 @@ export function PlanTable({ streams, quarter, pipelines, notebooks, today, block
         </div>
 
         {selectedHabit && (
-          <aside aria-label="Habit" aria-live="polite" className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:sticky lg:top-11 lg:max-h-[calc(100dvh-2.75rem)] lg:self-start lg:overflow-y-auto lg:border-l lg:border-t-0">
+          <aside aria-label="Habit" aria-live="polite" className={PANEL}>
             <PlanHabitCard key={selectedHabit.id} habit={selectedHabit} busy={busy} runHabits={runHabits} onClose={() => setSel(null)}
               goals={(planBlockOf(selectedHabit) ? goalsOf(planBlockOf(selectedHabit)!) : []).filter((g) => !g.ended || g.id === selectedHabit.goal_ref)} />
           </aside>
         )}
         {selected && (
-          <aside aria-label="Item" aria-live="polite" className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4 border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:sticky lg:top-11 lg:max-h-[calc(100dvh-2.75rem)] lg:self-start lg:overflow-y-auto lg:border-l lg:border-t-0">
-            <button type="button" onClick={() => setSel(null)} className={`${link} justify-self-end`}>Close</button>
+          <aside aria-label="Item" aria-live="polite" className={PANEL}>
+            <button type="button" onClick={() => setSel(null)} className={`${link} justify-self-end max-lg:sticky max-lg:top-0 max-lg:z-10 max-lg:bg-[var(--surface)] max-lg:py-1`}>Close</button>
             {selected.item ? (
               <ItemCard key={`${selected.item.line}:${selected.item.hash}`} row={{ type: "item", key: String(selected.item.line), stream: selected.meta.id, item: selected.item }} meta={selected.meta}
                 months={months} goals={goalsOf(selected.meta.id).filter((g) => !g.ended || g.id === selected.item.goal_ref)}

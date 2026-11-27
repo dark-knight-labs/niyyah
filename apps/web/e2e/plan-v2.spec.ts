@@ -63,10 +63,13 @@ test("one table: blocks against Now, Next and Someday, with the header and the q
   await expect(cell(page, "now")).toContainText("Wire the router");
   await expect(cell(page, "next")).toContainText("Plan the DNS cutover");
   await expect(cell(page, "someday")).toContainText("Replace the switch");
-  // narrow screens scroll the table inside its own container, not the page
+  // narrow screens: one column open (Now), the others rails, and no sideways scroll of the page
   await page.setViewportSize({ width: 600, height: 900 });
-  const box = await page.getByTestId("plan-scroll").evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth }));
-  expect(box.scroll).toBeGreaterThan(box.client);
+  await expect(page.locator("thead th[data-col]:not([data-rail])")).toHaveCount(1);
+  await expect(page.locator('thead th[data-col="now"]:not([data-rail])')).toHaveCount(1);
+  await page.locator('thead th[data-col="someday"][data-rail] button').click();
+  await expect(page.locator('thead th[data-col="someday"]:not([data-rail])')).toHaveCount(1);
+  await expect(page.locator("thead th[data-rail]")).toHaveCount(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
