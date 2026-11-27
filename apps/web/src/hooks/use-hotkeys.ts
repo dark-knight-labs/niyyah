@@ -7,9 +7,10 @@ export type Hotkeys = Record<string, () => void>;
 
 const CHORD_MS = 1000;
 
+/** True where a plain key must not act: a text field, a menu, or the "?" sheet (which keeps focus while it is open). */
 function typing(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
-  return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || !!el.closest("[role=menu]"));
+  return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || !!el.closest("[role=menu]") || !!el.closest("[data-shortcut-help]"));
 }
 
 /**

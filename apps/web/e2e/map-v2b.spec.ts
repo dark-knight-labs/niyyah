@@ -347,9 +347,21 @@ test('"?" opens the shortcut sheet listing every command that has a shortcut', a
   await page.keyboard.press("?");
   const sheet = page.getByTestId("help-sheet");
   await expect(sheet).toBeVisible();
+  await expect(page.getByTestId("shortcut-help")).toHaveCount(0); // the app-wide sheet stays out of the Map
   const kbds = new Set(COMMANDS.filter((c) => c.kbd).map((c) => c.kbd!));
   expect(kbds.size).toBeGreaterThan(15);
   for (const k of kbds) await expect(sheet.locator(`[data-kbd="${k}"]`).first(), k).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(sheet).toHaveCount(0);
+});
+
+test("hotkeys map: g p still navigates with the Map help sheet focused", async ({ page, request }) => {
+  const id = await board(request, "Help chord", [node("a", "sticky", { x: 100, y: 100, w: 170, h: 100 })]);
+  await open(page, id);
+  await page.mouse.click(1200, 700);
+  await page.keyboard.press("?");
+  await expect(page.getByTestId("help-sheet")).toBeVisible();
+  await page.keyboard.press("g");
+  await page.keyboard.press("p");
+  await expect(page).toHaveURL(/\/plan$/);
 });
