@@ -73,19 +73,19 @@
     return (single ? [text] : text.split(/\n+/)).map(line => line.trim()).filter(Boolean);
   }
 
-  // The Niyyah side of a new task: only what the server can store (text, stream, optional product).
+  // The Niyyah side of a new task: only what the server can store (text, stream, optional products).
   // No lane. Link, timer, deadline and the focus window stay local.
-  function captureFor(name, stream, product, clientId) {
-    return { text: name, stream, product: product || null, client_id: clientId || null };
+  function captureFor(name, stream, products, clientId) {
+    return { text: name, stream, products: [...new Set(products ?? [])], client_id: clientId || null };
   }
 
-  // Stream picker: choosing a stream shows that stream's products as an optional second pick. Nothing is
-  // preselected beyond the stream; a product survives a change of stream only if the new stream has it.
-  function pickStream(streams, value, product) {
+  // Stream picker: choosing a stream shows that stream's products as an optional multi-pick. Nothing is
+  // preselected beyond the stream; products survive a change of stream only if the new stream has them.
+  function pickStream(streams, value, products) {
     const stream = streams.find(item => item.value === value) ?? streams[0];
-    if (!stream) return { stream: null, product: null, products: [] };
-    const kept = stream.products.some(item => item.slug === product) ? product : null;
-    return { stream: stream.value, product: kept, products: stream.products };
+    if (!stream) return { stream: null, products: [], available: [] };
+    const keep = (products ?? []).filter(slug => stream.products.some(item => item.slug === slug));
+    return { stream: stream.value, products: keep, available: stream.products };
   }
 
   // ---- Focus session: ONE task, ONE primary window, optional allowed (secondary) windows. -------------

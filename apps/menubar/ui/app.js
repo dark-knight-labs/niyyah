@@ -59,7 +59,7 @@
     if (!text) return;
     try {
       await invoke("submit_capture", {
-        capture: { text, stream: picker.value.stream, product: picker.value.product, client_id: crypto.randomUUID() },
+        capture: { text, stream: picker.value.stream, products: picker.value.products, client_id: crypto.randomUUID() },
       });
       $("text").value = "";
       say($("status"), "Saved");

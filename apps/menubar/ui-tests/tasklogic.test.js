@@ -79,29 +79,29 @@ test('namesFrom: one name in single mode, one per line in bulk mode', () => {
   assert.deepEqual(T.namesFrom('   ', true), []);
 });
 
-test('captureFor sends only what Niyyah can store: text, stream, product, client id. No lane.', () => {
-  assert.deepEqual(T.captureFor('Call the bank', 'kahf', 'dns', 'u1'),
-    {text: 'Call the bank', stream: 'kahf', product: 'dns', client_id: 'u1'});
-  assert.deepEqual(T.captureFor('x', 'kahf', '', ''), {text: 'x', stream: 'kahf', product: null, client_id: null});
-  assert.deepEqual(Object.keys(T.captureFor('x', 'kahf', '')).sort(), ['client_id', 'product', 'stream', 'text']);
+test('captureFor sends only what Niyyah can store: text, stream, products, client id. No lane.', () => {
+  assert.deepEqual(T.captureFor('Call the bank', 'kahf', ['dns', 'cart', 'dns'], 'u1'),
+    {text: 'Call the bank', stream: 'kahf', products: ['dns', 'cart'], client_id: 'u1'});
+  assert.deepEqual(T.captureFor('x', 'kahf', [], ''), {text: 'x', stream: 'kahf', products: [], client_id: null});
+  assert.deepEqual(T.captureFor('x', 'kahf', undefined), {text: 'x', stream: 'kahf', products: [], client_id: null});
+  assert.deepEqual(Object.keys(T.captureFor('x', 'kahf', [])).sort(), ['client_id', 'products', 'stream', 'text']);
 });
 
 const streams = [
   {value: 'kahf', label: 'Kahf', products: [{slug: 'dns', name: 'DNS'}]},
-  {value: 'alisha', label: 'Alisha Noor', products: [{slug: 'dns', name: 'DNS'}, {slug: 'store', name: 'Store'}]},
+  {value: 'alisha', label: 'Alisha Noor', products: [{slug: 'dns', name: 'DNS'}, {slug: 'store', name: 'Store'}, {slug: 'cart', name: 'Cart'}]},
   {value: 'solo', label: 'Solo', products: []},
 ];
 
 test('pickStream: products are optional and follow the stream; nothing preselected', () => {
-  assert.equal(T.pickStream(streams, 'kahf', null).product, null);
-  assert.deepEqual(T.pickStream(streams, 'alisha', null).products.map(p => p.slug), ['dns', 'store']);
-  assert.equal(T.pickStream(streams, 'alisha', 'store').product, 'store');
-  assert.equal(T.pickStream(streams, 'kahf', 'store').product, null, 'store is not a Kahf product');
-  assert.equal(T.pickStream(streams, 'alisha', 'dns').product, 'dns');
-  assert.equal(T.pickStream(streams, 'kahf', 'dns').product, 'dns', 'kept when the new stream has it too');
-  assert.equal(T.pickStream(streams, 'solo', null).products.length, 0, 'a stream alone is enough');
-  assert.equal(T.pickStream(streams, 'missing', null).stream, 'kahf', 'unknown value falls back to the first stream');
-  assert.deepEqual(T.pickStream([], 'x', null), {stream: null, product: null, products: []});
+  assert.deepEqual(T.pickStream(streams, 'kahf', []).products, []);
+  assert.deepEqual(T.pickStream(streams, 'alisha', []).available.map(p => p.slug), ['dns', 'store', 'cart']);
+  assert.deepEqual(T.pickStream(streams, 'alisha', ['store', 'cart']).products, ['store', 'cart']);
+  assert.deepEqual(T.pickStream(streams, 'kahf', ['store', 'dns']).products, ['dns'], 'store is not a Kahf product');
+  assert.deepEqual(T.pickStream(streams, 'solo', ['dns']).products, []);
+  assert.equal(T.pickStream(streams, 'solo', []).available.length, 0, 'a stream alone is enough');
+  assert.equal(T.pickStream(streams, 'missing', []).stream, 'kahf', 'unknown value falls back to the first stream');
+  assert.deepEqual(T.pickStream([], 'x', []), {stream: null, products: [], available: []});
 });
 
 const task = {id: 't1', name: 'Write the report'};
@@ -208,7 +208,7 @@ test('record: countdown capped at its length; window names only in the local fie
 test('no window name leaves the Mac: syncable record and capture payload carry none', () => {
   let s = T.newSession(task, safari, [notes], 'up', 0, 0);
   s = T.focusTick(s, 5000);
-  const wire = JSON.stringify([T.syncable(T.focusRecord(s, 9)), T.captureFor(task.name, 'kahf', 'dns', task.id)]);
+  const wire = JSON.stringify([T.syncable(T.focusRecord(s, 9)), T.captureFor(task.name, 'kahf', ['dns'], task.id)]);
   for (const secret of ['Safari', 'Quarterly report', 'Notes', 'Outline', 'com.apple', 'window', '"app"', 'title', 'bundle']) {
     assert.equal(wire.includes(secret), false, secret + ' leaked: ' + wire);
   }

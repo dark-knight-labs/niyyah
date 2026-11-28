@@ -224,7 +224,7 @@ fn e2e_against_the_real_api() {
     let stream = opts.streams.first().expect("at least one stream");
     let mut cap = capture("menubar e2e capture (delete me)");
     cap.stream = stream.slug.clone();
-    cap.product = None; // optional
+    cap.products = vec![]; // optional
     c.submit(cap, niyyah_capture_core::now_secs()).unwrap();
     let r = c.flush(niyyah_capture_core::now_secs());
     assert_eq!(r.sent, 1, "{r:?}");

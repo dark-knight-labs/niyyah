@@ -10,11 +10,38 @@ pub struct Capture {
     pub text: String,
     /// The stream slug to file under. A capture always has one.
     pub stream: String,
-    /// A product slug, if one was picked.
-    #[serde(default)]
-    pub product: Option<String>,
+    /// Product slugs, if any were picked (optional, any number). An older queue file has a single `product`.
+    #[serde(default, alias = "product", deserialize_with = "one_or_many")]
+    pub products: Vec<String>,
     /// The panel task's UUID: the retry key. Sent as `client_id` when it is a valid UUID.
     pub client_id: Option<String>,
+}
+
+/// A product is a slug string; an old queue entry may hold one string (or null) instead of a list.
+fn one_or_many<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Wire {
+        One(String),
+        Many(Vec<String>),
+    }
+    Ok(match Option::<Wire>::deserialize(d)? {
+        None => Vec::new(),
+        Some(Wire::One(s)) => vec![s],
+        Some(Wire::Many(v)) => v,
+    })
+}
+
+/// Trim, drop blanks and repeats, keep the picker's order.
+fn clean_products(products: Vec<String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for p in products {
+        let p = p.trim().to_string();
+        if !p.is_empty() && !out.contains(&p) {
+            out.push(p);
+        }
+    }
+    out
 }
 
 impl Capture {
@@ -22,7 +49,7 @@ impl Capture {
     pub fn validated(mut self) -> Result<Self, Error> {
         self.text = self.text.trim().to_string();
         self.stream = self.stream.trim().to_string();
-        self.product = self.product.map(|p| p.trim().to_string()).filter(|p| !p.is_empty());
+        self.products = clean_products(std::mem::take(&mut self.products));
         if self.text.is_empty() {
             return Err(Error::EmptyText);
         }
@@ -42,7 +69,7 @@ impl Capture {
             client_id: self.client_id.clone().filter(|id| is_uuid(id)),
             text: self.text.clone(),
             stream: self.stream.clone(),
-            products: self.product.as_ref().map(|p| vec![p.clone()]),
+            products: (!self.products.is_empty()).then(|| self.products.clone()),
         }
     }
 }
@@ -73,7 +100,7 @@ mod tests {
     use serde_json::json;
 
     fn cap(product: Option<&str>) -> Capture {
-        Capture { text: "  Call the bank #errand ".into(), stream: "kahf".into(), product: product.map(String::from), client_id: None }
+        Capture { text: "  Call the bank #errand ".into(), stream: "kahf".into(), products: product.map(String::from).into_iter().collect(), client_id: None }
     }
 
     #[test]
@@ -123,6 +150,24 @@ mod tests {
     }
 
     #[test]
+    fn several_products_keep_their_order_and_lose_blanks_and_repeats() {
+        let mut c = cap(None);
+        c.products = vec!["dns".into(), " ".into(), "cart".into(), "dns".into(), " store ".into()];
+        let v = serde_json::to_value(c.validated().unwrap().to_item()).unwrap();
+        assert_eq!(v["products"], json!(["dns", "cart", "store"]));
+    }
+
+    #[test]
+    fn an_old_queue_entry_with_one_product_string_still_loads() {
+        let old: Capture = serde_json::from_value(json!({"text": "x", "stream": "OT", "product": "alisha"})).unwrap();
+        assert_eq!(old.products, ["alisha"]);
+        let none: Capture = serde_json::from_value(json!({"text": "x", "stream": "OT", "product": null})).unwrap();
+        assert!(none.products.is_empty());
+        let many: Capture = serde_json::from_value(json!({"text": "x", "stream": "OT", "products": ["a", "b"]})).unwrap();
+        assert_eq!(many.products, ["a", "b"]);
+    }
+
+    #[test]
     fn validation_rules() {
         let mut c = cap(None);
         c.text = "   ".into();
@@ -136,7 +181,7 @@ mod tests {
         let mut c = cap(None);
         c.stream = " ".into();
         assert!(matches!(c.validated(), Err(Error::NoBlock)));
-        assert!(cap(Some("  ")).validated().unwrap().product.is_none());
+        assert!(cap(Some("  ")).validated().unwrap().products.is_empty());
     }
 
     /// The focus panel sends the task's name, a stream and maybe a product. Link, timer, deadline and the
@@ -145,7 +190,7 @@ mod tests {
     #[test]
     fn local_only_fields_never_reach_the_wire() {
         let from_panel = json!({
-            "text": "Call the bank", "stream": "kahf", "product": "dns", "client_id": "3f2b8c1e-6a0d-4a5e-9d57-1c2f0b7a9e11",
+            "text": "Call the bank", "stream": "kahf", "products": ["dns"], "client_id": "3f2b8c1e-6a0d-4a5e-9d57-1c2f0b7a9e11",
             "lane": "now", "link": "https://example.com", "deadlineAt": 1, "window": "Quarterly report",
             "title": "Quarterly report", "app": "Safari", "bundle_id": "com.apple.Safari",
             "trackedMs": 5, "startedAt": 2, "done": false,

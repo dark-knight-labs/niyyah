@@ -641,13 +641,13 @@ async function loadNiyyahOptions(refresh = false) {
 
 async function fileInNiyyah(items) {
   const status = get('niyyah-status');
-  const {stream: block, product} = picker.value;
+  const {stream: block, products} = picker.value;
   if (!desktop || !block) return;
   let queued = 0;
   const problems = [];
   for (const {name, id} of items) {
     try {
-      await desktop.invoke('submit_capture', {capture: captureFor(name, block, product, id)});
+      await desktop.invoke('submit_capture', {capture: captureFor(name, block, products, id)});
       queued++;
     } catch (error) {
       problems.push(String(error));
@@ -1044,16 +1044,36 @@ get('voice-form').onsubmit = event => {
   get('announcement').textContent = names.length + ' priorities added.';
 };
 
-function sizeDesktop() {
-  if (!desktop) return;
-  const scale = appSizes[preferences.appSize];
+// How tall the window would like to be: the content's natural height, not the (possibly capped) current one.
+// Rust caps the real window to the screen's usable height; the dialogs and the task list scroll inside.
+function naturalHeight() {
   const widget = get('widget');
-  const dialog = settings.open ? settings : get('welcome').open ? get('welcome') : voice;
-  const height = dialog.open ? Math.max(widget.offsetHeight, Math.max(dialog.offsetHeight, dialog.scrollHeight) + 12) : widget.offsetHeight;
+  const body = widget.querySelector('.widget-body');
+  let height = widget.offsetHeight;
+  if (body && body.offsetParent) height = height - body.clientHeight + body.scrollHeight;
+  const dialog = [settings, get('welcome'), voice].find(item => item.open);
+  if (dialog) height = Math.max(height, dialog.scrollHeight + (dialog.offsetHeight - dialog.clientHeight) + 12);
+  return height;
+}
+
+// The usable window height, in the unzoomed px the zoomed boxes use: dialogs and the list cap themselves to it.
+function applyAvail() {
+  const scale = appSizes[preferences.appSize];
+  document.documentElement.style.setProperty('--avail', (window.innerHeight / scale) + 'px');
+}
+window.addEventListener('resize', applyAvail);
+
+let sizeLocked = false; // an open dropdown menu must not resize the window under it
+function sizeDesktop() {
+  if (!desktop || sizeLocked) return;
+  const scale = appSizes[preferences.appSize];
   return native('resize_widget', {
     width: Math.round(420 * scale),
-    height: Math.ceil((height + 24) * scale),
+    height: Math.ceil((naturalHeight() + 24) * scale),
   });
+}
+if (window.NiyyahDropdown) {
+  window.NiyyahDropdown.onOpenChange(open => { sizeLocked = open; if (!open) sizeDesktop(); });
 }
 
 if (desktop) {
@@ -1338,43 +1358,36 @@ window.addEventListener('focus-state', event => {
 // ---- The window choices (primary, allowed, timer), used by the composer and by a task row's inline picker.
 function makeFocusOptions() {
   const root = el('div', 'focus-options');
-  const primaryLabel = el('label', null, 'Main window ');
-  const primary = el('select');
-  primary.setAttribute('aria-label', 'Main window');
-  primaryLabel.append(primary);
-  const allowedSet = el('fieldset', 'settings-group');
-  allowedSet.append(el('legend', null, 'Also fine to use (optional)'));
-  const allowedHost = el('div', 'focus-allowed');
-  allowedSet.append(allowedHost);
-  const modeLabel = el('label', null, 'Timer ');
+  const windowItems = () => focusWindows.map((win, index) => ({value: String(index), label: winLabel(win)}));
+  const primary = window.NiyyahDropdown.create({
+    label: 'Main window', placeholder: 'Choose a window',
+    onChange: value => { allowed.setDisabled(value == null ? [] : [value]); },
+  });
+  const allowed = window.NiyyahDropdown.create({label: 'Also fine to use (optional)', placeholder: 'None', multi: true});
+  const row = (label, dd) => {
+    const wrap = el('div', 'pk-row');
+    wrap.append(el('span', 'pk-label', label), dd.el);
+    return wrap;
+  };
+  const primaryRow = row('Main window', primary);
+  const allowedRow = row('Also fine to use', allowed);
+  const modeRow = el('div', 'pk-row');
   const mode = el('select');
   mode.setAttribute('aria-label', 'Timer');
   mode.append(new Option('Count up', 'up'), new Option('Countdown', 'down'));
-  modeLabel.append(mode);
-  const minutesLabel = el('label', null, 'Minutes ');
+  modeRow.append(el('span', 'pk-label', 'Timer'), mode);
+  const minutesRow = el('div', 'pk-row');
   const minutes = el('input');
   minutes.type = 'number'; minutes.min = '1'; minutes.max = '240'; minutes.value = '25';
   minutes.setAttribute('aria-label', 'Minutes');
-  minutesLabel.append(minutes);
-  minutesLabel.hidden = true;
+  minutesRow.append(el('span', 'pk-label', 'Minutes'), minutes);
+  minutesRow.hidden = true;
   const hint = el('p', 'focus-hint');
   const grant = el('button', null, 'Allow window titles');
   grant.type = 'button'; grant.hidden = true;
-  root.append(primaryLabel, allowedSet, modeLabel, minutesLabel, hint, grant);
+  root.append(primaryRow, allowedRow, modeRow, minutesRow, hint, grant);
 
-  function drawAllowed() {
-    const chosen = Number(primary.value);
-    allowedHost.replaceChildren(...focusWindows.map((win, index) => {
-      const label = el('label', 'focus-allow');
-      const box = el('input');
-      box.type = 'checkbox'; box.value = String(index); box.disabled = index === chosen;
-      label.append(box, ' ' + winLabel(win));
-      return label;
-    }));
-    allowedSet.hidden = focusWindows.length < 2;
-  }
-  primary.onchange = drawAllowed;
-  mode.onchange = () => { minutesLabel.hidden = mode.value !== 'down'; };
+  mode.onchange = () => { minutesRow.hidden = mode.value !== 'down'; sizeDesktop(); };
   grant.onclick = async () => {
     await native('request_accessibility');
     hint.textContent = 'Allow Niyyah Capture in System Settings > Privacy & Security > Accessibility, then try again.';
@@ -1384,18 +1397,20 @@ function makeFocusOptions() {
     root,
     async load() {
       await pollWindows();
-      primary.replaceChildren(...focusWindows.map((win, index) => new Option(winLabel(win), String(index))));
+      primary.setOptions(windowItems(), []);
+      allowed.setOptions(windowItems(), []);
       const previous = focusTarget ? focusWindows.findIndex(win => win.bundle_id === focusTarget.bundleId && (win.title || '') === (focusTarget.title || '')) : -1;
-      if (previous >= 0) primary.value = String(previous);
-      drawAllowed();
+      const first = previous >= 0 ? previous : (focusWindows.length ? 0 : -1);
+      if (first >= 0) { primary.setValue(String(first)); allowed.setDisabled([String(first)]); }
+      allowedRow.hidden = focusWindows.length < 2;
       hint.textContent = !focusWindows.length ? 'No open windows found.' : focusTrusted ? ''
         : 'Window titles need the Accessibility permission. Without it, focus works for the whole app. Window names stay on this Mac.';
       grant.hidden = focusTrusted;
       sizeDesktop();
     },
     read() {
-      const allowed = [...allowedHost.querySelectorAll('input:checked')].map(box => Number(box.value));
-      return readFocusOptions(focusWindows, Number(primary.value), allowed, mode.value, minutes.value);
+      const chosen = primary.value;
+      return readFocusOptions(focusWindows, chosen == null ? NaN : Number(chosen), allowed.value.map(Number), mode.value, minutes.value);
     },
   };
 }
@@ -1453,6 +1468,7 @@ get('welcome-ok').onclick = () => {
 };
 
 async function initialize() {
+  applyAvail();
   await loadTasks();
   await loadFocus();
   render();

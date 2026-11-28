@@ -394,7 +394,7 @@ html.desktop, .desktop body { background: transparent; overflow: hidden; }
 }
 .desktop .widget-top { background: #eaf0fa88; }
 .desktop:has(#voice[open]) .widget { visibility: hidden; }
-.desktop #voice { max-height: none; background: #edf3ffb8; }
+.desktop #voice { background: #edf3ffb8; }
 .desktop #voice::backdrop { background: transparent; backdrop-filter: none; }
 html:not(.desktop) .desktop-capture { display: none; }
 
@@ -577,20 +577,6 @@ html:not(.desktop) .desktop-capture { display: none; }
 .task-focus[data-state=away], .task-focus[data-state=lost] { color: #92400e; }
 .task-focus[data-state=paused] { color: var(--muted); }
 
-/* Capture picker: the user's streams in a pale-blue column (white chips), optional product chips beside.
-   Chips are small-radius, Next Up style, never full pills. Long names get an ellipsis and a tooltip. */
-.composer-niyyah { margin: 0 0 8px; }
-.picker { display: grid; grid-template-columns: fit-content(190px) minmax(0, 1fr); gap: 8px; align-items: start; }
-.stream-col { display: flex; flex-direction: column; gap: 4px; max-height: 232px; padding: 5px; overflow: auto; border-radius: 8px; background: #dfe8fb; }
-.chip { max-width: 100%; padding: 4px 9px; overflow: hidden; border-radius: 7px; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.tile { border: 1px solid #fff; background: #fff; color: var(--ink); text-align: left; box-shadow: 0 1px 0 #1b2b5a14; }
-.tile[aria-pressed=true] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 2px #224cc833; }
-.picker-side { display: grid; gap: 6px; align-content: start; min-width: 0; }
-.picker-label { color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-.chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
-.chip[aria-pressed=true]:not(.tile) { background: var(--accent); border-color: var(--accent); color: #fff; }
-.picker-empty { color: var(--muted); font-size: 12px; }
-
 /* Focus lives inside the task list: the block under the focused row, and the inline picker under a row. */
 .task-focus-block { list-style: none; padding: 0 0 2px 36px; }
 .row-picker { margin: 2px 0 6px; padding: 8px 10px 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff80; }
@@ -606,3 +592,50 @@ html:not(.desktop) .desktop-capture { display: none; }
 .composer-focus small { color: var(--muted); font-size: inherit; }
 .composer-focus[hidden], #composer-focus-options[hidden] { display: none; }
 #composer-focus-options { display: grid; gap: 6px; margin: 0 0 8px; }
+
+/* ---- Nothing is taller than the screen: dialogs scroll inside, header and footer stay put. ---------------
+   --avail is the usable window height in unzoomed px (set by panel.js from the real window); the 24px keeps
+   a margin. Dialogs scroll as a whole, with the title bar (settings) and the Save row (composer) sticky. */
+.desktop .widget { max-height: calc(var(--avail, 100vh) - 24px); min-height: 0; }
+.widget-body { min-height: 0; overscroll-behavior: contain; }
+:is(#voice, #settings, #welcome) { max-height: calc(var(--avail, 100vh) - 24px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+#settings > header { position: sticky; top: -14px; z-index: 3; margin: -14px -18px 8px; padding: 14px 18px 4px; background: #f4f7fff5; }
+#voice .composer-actions { position: sticky; bottom: -12px; z-index: 3; margin: 0 -12px -12px; padding: 8px 12px 12px; border-top: 1px solid var(--line); border-radius: 0 0 15px 15px; background: #eaf0fdf2; }
+html.quick #voice { max-height: calc(100vh - 24px); }
+.pk-row { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 8px; align-items: center; margin: 0 0 8px; font-size: 12px; }
+.pk-row[hidden] { display: none; }
+.pk-label { color: var(--muted); font-size: 11px; font-weight: 600; }
+.composer-niyyah { margin: 0; }
+
+/* ---- Dropdown (dropdown.js): Next Up look, 7px radius, Inter, Lucide chevron. -------------------------- */
+.dd { position: relative; min-width: 0; }
+.dd-trigger { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: #ffffffb0; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; text-align: left; }
+.dd-trigger:hover:not(:disabled) { background: #fff; }
+.dd-trigger:disabled { opacity: .55; cursor: default; }
+.dd-open .dd-trigger { border-color: var(--accent); }
+.dd-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-empty .dd-value { color: var(--muted); font-weight: 500; }
+.dd-trigger .ic { width: 14px; height: 14px; color: var(--muted); }
+.dd-menu { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 3px); display: flex; flex-direction: column; max-height: 220px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #fbfcff; box-shadow: 0 10px 28px #27396d33; }
+.dd-menu[hidden] { display: none; }
+.dd-up .dd-menu { top: auto; bottom: calc(100% + 3px); }
+.dd-search { flex: none; margin: 5px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); font: inherit; font-size: 12px; }
+.dd-search[hidden] { display: none; }
+.dd-list { flex: 1 1 auto; min-height: 0; margin: 0; padding: 3px; overflow-y: auto; overscroll-behavior: contain; list-style: none; }
+.dd-option { display: flex; align-items: center; gap: 6px; padding: 5px 7px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.dd-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-check { width: 12px; height: 12px; flex: none; visibility: hidden; color: var(--accent); }
+.dd-option[aria-selected=true] .dd-check { visibility: visible; }
+.dd-option[aria-selected=true] { font-weight: 600; color: var(--accent); }
+.dd-active, .dd-option:hover { background: #e8eefc; }
+.dd-disabled { opacity: .45; cursor: default; }
+.dd-none { padding: 6px 8px; color: var(--muted); font-size: 12px; }
+.ic-chevron-down { --ic: url(icons/chevron-down.svg); }
+.ic-check { --ic: url(icons/check.svg); }
+
+/* focus options reuse the same row layout */
+.focus-options .pk-row { margin: 0; }
+.focus-options .dd-menu { max-height: 200px; }
+
+.focus-options select, .focus-options input[type=number] { box-sizing: border-box; width: 100%; max-width: none; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: #ffffffb0; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600; }
+.focus-options select:focus-visible, .focus-options input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

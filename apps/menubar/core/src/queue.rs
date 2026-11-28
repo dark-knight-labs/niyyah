@@ -225,7 +225,7 @@ mod tests {
     use super::*;
 
     fn cap(text: &str) -> Capture {
-        Capture { text: text.into(), stream: "OT".into(), product: None, client_id: None }
+        Capture { text: text.into(), stream: "OT".into(), products: vec![], client_id: None }
     }
 
     #[test]

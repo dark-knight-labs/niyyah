@@ -96,11 +96,36 @@ are coloured images) and its dropdown (Capture, Show tasks, Settings, Quit) are 
 cannot style them, and Next Up itself uses a native menu. The timer text beside the icon is native too, in the
 system font. The popup and every dialog are the custom Next Up design.
 
+## Short screens, scrolling and dropdowns
+
+Nothing is taller than the screen. Rust caps the window to the monitor's work area (menu bar and Dock already out)
+minus 24 px, on every resize and again each time the popup opens (`core/src/layout.rs` `fit_height`, tested on
+480, 600, 720 and 768 px work areas and at scale 2). Inside the window the content scrolls: the task list, the
+New Task and settings dialogs scroll as a whole while the title bar (settings) and the **Save** row (composer)
+stay put, and every control is reachable with the wheel, the trackpad and Tab.
+
+Streams, products and windows are compact **dropdowns** in the Next Up style (7 px radius, Inter, Lucide chevron),
+not tall lists:
+
+- **Stream**: single select; the last stream you used is preselected; a search box appears above 8 streams.
+- **Products (optional)**: multi-select with checkmarks, shown only after a stream is chosen and only if it has
+  products; nothing preselected.
+- **Main window**: single select. **Also fine to use**: multi-select (the main window is not offered again).
+- Each menu has its own max height and scrolls, opens upwards when there is no room below, and keeps the window
+  from resizing under it. Keyboard: Enter, Space or the arrows open; arrows, Home and End move; Enter or Space
+  picks; type to jump; **Esc closes the menu first** (the popup stays open); Tab leaves. Long names get an
+  ellipsis and a tooltip.
+
+Checked by `ui-tests/dropdown.test.js` (filter, typeahead, keyboard stepping, summary) and `ui-tests/layout-check.js`
+(a Playwright function, run through the Playwright MCP: 20 streams and 30 windows at window heights 600, 480 and
+300; 51 assertions: dialogs and widget inside the window, Save and New Task visible, content scrolls to its last
+child, menus fit and scroll, Tab reaches Save, Esc order). It is not wired into CI.
+
 ## Streams and products
 
-The picker lists your Niyyah **streams** (Kahf, Alisha Noor, ...) in a pale-blue column of small-radius chips;
-long names get an ellipsis and a tooltip. **Products are optional**: the chosen stream's products show as a
-second pick with nothing preselected, and a capture works with a stream alone. There is **no lane** in the UI or
+The picker lists your Niyyah **streams** (Kahf, Alisha Noor, ...) in a dropdown; long names get an ellipsis and a
+tooltip. **Products are optional**: the chosen stream's products show as a
+multi-select dropdown with nothing preselected, and a capture works with a stream alone. There is **no lane** in the UI or
 in the payload; lanes and products are not linked by default, and Niyyah uses them for its per-stream weekly log
 of finished tasks. The last stream you used is preselected.
 

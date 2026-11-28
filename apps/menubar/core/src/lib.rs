@@ -16,6 +16,7 @@ pub mod client;
 pub mod error;
 pub mod focus;
 pub mod focusstore;
+pub mod layout;
 pub mod link;
 pub mod options;
 pub mod payload;

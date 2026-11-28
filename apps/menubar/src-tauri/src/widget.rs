@@ -113,6 +113,17 @@ pub fn toggle_panel(app: &AppHandle, rect: Option<&Rect>) {
     }
 }
 
+/// A window that moved to another (shorter) display, or an older size, is brought back inside the work area.
+fn fit_to_screen(window: &WebviewWindow) {
+    let (Ok(Some(monitor)), Ok(size)) = (window.current_monitor(), window.outer_size()) else { return };
+    let scale = monitor.scale_factor();
+    let current = (f64::from(size.height) / scale).round() as u32;
+    let fitted = niyyah_capture_core::layout::fit_height(current, monitor.work_area().size.height, scale);
+    if fitted < current {
+        let _ = window.set_size(LogicalSize::new((f64::from(size.width) / scale).round() as u32, fitted));
+    }
+}
+
 /// Show and focus the panel, anchored under the tray icon.
 pub fn open_panel(app: &AppHandle, rect: Option<&Rect>, settings: bool) {
     let Some(window) = app.get_webview_window("main") else { return };
@@ -120,6 +131,7 @@ pub fn open_panel(app: &AppHandle, rect: Option<&Rect>, settings: bool) {
     if let Some(rect) = rect.or(tray_rect.as_ref()) {
         let _ = anchor_under(&window, rect);
     }
+    fit_to_screen(&window);
     let _ = window.show();
     let _ = window.set_focus();
     let _ = window.eval("window.dispatchEvent(new Event('desktop-show'))");
@@ -133,7 +145,11 @@ pub fn resize_widget(window: WebviewWindow, width: u32, height: u32) -> Result<(
     let position = window.outer_position().ok();
     let monitor = window.current_monitor().ok().flatten();
     let width = width.clamp(336, 420);
-    let height = height.clamp(76, 540);
+    // Never taller than the screen's usable height (work area: menu bar and Dock already out), minus a margin.
+    let height = match &monitor {
+        Some(m) => niyyah_capture_core::layout::fit_height(height, m.work_area().size.height, m.scale_factor()),
+        None => height.clamp(76, 540),
+    };
     if let (Ok(size), Ok(scale)) = (window.inner_size(), window.scale_factor()) {
         if size == LogicalSize::new(width, height).to_physical::<u32>(scale) {
             return Ok(());

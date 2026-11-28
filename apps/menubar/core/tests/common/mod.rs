@@ -103,7 +103,7 @@ pub fn capture(text: &str) -> niyyah_capture_core::Capture {
     niyyah_capture_core::Capture {
         text: text.into(),
         stream: "OT".into(),
-        product: Some("alisha".into()),
+        products: vec!["alisha".into()],
         client_id: None,
     }
 }
