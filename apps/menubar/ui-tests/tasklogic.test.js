@@ -138,3 +138,20 @@ test('trayTitle: timer, away and closed states, long names clipped', () => {
   assert.equal(T.trayTitle(null, 'Call the bank'), 'Call the bank');
   assert.equal(T.trayTitle(null, undefined), '');
 });
+
+test('pickBlock: block fills its products, product survives only inside its block', () => {
+  const blocks = [
+    {value: 'soul', tile: 'SOUL', products: [{slug: 'quran', name: 'Quran'}]},
+    {value: 'ops', tile: 'OPS', products: [{slug: 'alisha', name: 'Alisha'}, {slug: 'quran', name: 'Quran'}]},
+    {value: 'one', tile: 'ONE', products: []},
+  ];
+  assert.deepEqual(T.pickBlock(blocks, 'ops', null).products.map(p => p.slug), ['alisha', 'quran']);
+  assert.equal(T.pickBlock(blocks, 'ops', 'alisha').product, 'alisha');
+  assert.equal(T.pickBlock(blocks, 'soul', 'alisha').product, null, 'alisha is not a SOUL product');
+  assert.equal(T.pickBlock(blocks, 'ops', 'quran').product, 'quran');
+  assert.equal(T.pickBlock(blocks, 'soul', 'quran').product, 'quran', 'kept when the new block has it too');
+  assert.equal(T.pickBlock(blocks, 'one', 'quran').products.length, 0);
+  assert.equal(T.pickBlock(blocks, 'missing', null).block, 'soul', 'unknown value falls back to the first block');
+  assert.deepEqual(T.pickBlock([], 'x', null), {block: null, product: null, products: []});
+  assert.deepEqual(T.LANES, ['now', 'next', 'backlog']);
+});

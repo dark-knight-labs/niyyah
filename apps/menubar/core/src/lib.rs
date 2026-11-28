@@ -26,7 +26,7 @@ pub mod url_guard;
 
 pub use capturer::{Capturer, FlushReport};
 pub use error::Error;
-pub use options::{BlockOption, Options, ProductOption};
+pub use options::{BlockOption, Options, PickerBlock, ProductOption};
 pub use payload::{Capture, ItemPayload, Lane};
 pub use queue::{Entry, EntryState, Queue};
 pub use focusstore::FocusStore;

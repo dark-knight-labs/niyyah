@@ -37,8 +37,8 @@ try {
 } catch {}
 try { workBrowser = localStorage.getItem(browserKey); } catch {}
 let next = Date.now() + interval();
-let pinned = true;
-try { pinned = localStorage.getItem(alwaysOnTopKey) !== 'false'; } catch {}
+let pinned = false; // menu-bar popup: closes when you click elsewhere unless pinned
+try { pinned = localStorage.getItem(alwaysOnTopKey) === 'true'; } catch {}
 let recognition;
 let captureCurrent = false;
 let editingTask;
@@ -65,7 +65,7 @@ try {
 const voice = get('voice');
 const settings = get('settings');
 const focusDialog = get('focus');
-const modalOpen = () => voice.open || settings.open || focusDialog.open;
+const modalOpen = () => voice.open || settings.open || focusDialog.open || get('welcome').open;
 let transcript = get('transcript');
 const deadline = get('deadline');
 const taskLink = get('task-link');
@@ -486,7 +486,22 @@ function reorder(fromId, toId) {
   get('announcement').textContent = item.name + ' moved.';
 }
 
+let panelOpen = false;
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+let attentionTimer;
+
+// Menu-bar attention: the tray icon blinks (steady amber with Reduce Motion) until `off`.
+function trayAttention(mode, forMs) {
+  if (!desktop) return;
+  clearTimeout(attentionTimer);
+  native('set_tray_attention', {mode: mode === 'off' ? 'off' : reduceMotion() ? 'steady' : 'blink'});
+  if (forMs) attentionTimer = setTimeout(() => trayAttention(focusAwayNow() ? 'blink' : 'off'), forMs);
+}
+const focusAwayNow = () => Boolean(focus && focus.state !== 'on');
+
 function show(focus = false) {
+  panelOpen = true;
+  if (!focusAwayNow()) trayAttention('off');
   get('widget').classList.remove('closed');
   get('widget').inert = false;
   clearTimeout(nativeHideTimer);
@@ -516,6 +531,7 @@ function collapse() {
 
 let nativeHideTimer;
 function dismiss() {
+  panelOpen = false;
   collapse();
   get('widget').classList.add('closed');
   get('widget').inert = true;
@@ -544,6 +560,11 @@ function checkIn(now = Date.now()) {
   if (!preferences.minutes) return;
   next = now + interval();
   if (modalOpen()) return;
+  if (desktop && !panelOpen) {
+    trayAttention('blink', 8000);
+    get('announcement').textContent = 'Time for a focus check-in.';
+    return;
+  }
   show();
   const widget = get('widget');
   if (preferences.shake && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -600,25 +621,18 @@ function deadlineInputValue(timestamp) {
 // ---- Niyyah side: every new task is also filed in Niyyah (block, product, lane). The link, timer and
 // deadline stay in this app. A capture that cannot be queued is reported, never dropped silently.
 let niyyahOptions;
-function fillSelect(select, items, empty) {
-  select.replaceChildren();
-  if (empty != null) select.append(new Option(empty, ''));
-  for (const item of items) select.append(new Option(item.label, item.value));
-}
+const picker = window.NiyyahPicker.mount(get('composer-niyyah'));
 
 async function loadNiyyahOptions(refresh = false) {
   const status = get('niyyah-status');
   try {
     const reply = await desktop.invoke('load_options', {refresh});
-    niyyahOptions = reply.options;
-    fillSelect(get('niyyah-block'), reply.options.blocks.map(b => ({value: b.stream || b.block, label: b.what ? b.block + ' · ' + b.what : b.block})));
-    fillSelect(get('niyyah-product'), reply.options.products.map(p => ({value: p.slug, label: p.name})), 'No product');
-    if (reply.current_stream) get('niyyah-block').value = reply.current_stream;
+    niyyahOptions = reply;
+    picker.setOptions(reply);
     return true;
   } catch (error) {
     niyyahOptions = undefined;
-    fillSelect(get('niyyah-block'), []);
-    fillSelect(get('niyyah-product'), [], 'No product');
+    picker.clear();
     status.textContent = 'Niyyah is not reachable yet: ' + error + ' Tasks stay local until it is.';
     status.classList.add('error');
     status.hidden = false;
@@ -628,13 +642,13 @@ async function loadNiyyahOptions(refresh = false) {
 
 async function fileInNiyyah(items) {
   const status = get('niyyah-status');
-  const block = get('niyyah-block').value;
+  const {stream: block, product, lane} = picker.value;
   if (!desktop || !block) return;
   let queued = 0;
   const problems = [];
   for (const {name, id} of items) {
     try {
-      await desktop.invoke('submit_capture', {capture: captureFor(name, get('niyyah-lane').value, block, get('niyyah-product').value, id)});
+      await desktop.invoke('submit_capture', {capture: captureFor(name, lane, block, product, id)});
       queued++;
     } catch (error) {
       problems.push(String(error));
@@ -923,6 +937,11 @@ for (const [action, {label}] of Object.entries(shortcutDefinitions)) {
 renderShortcutGuide();
 
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && taskMenu.hidden && !modalOpen() && !editingTask && !document.querySelector('.task-editor')) {
+    event.preventDefault();
+    dismiss();
+    return;
+  }
   if (event.key === 'Escape' && !taskMenu.hidden) {
     event.preventDefault();
     closeTaskMenu(true);
@@ -1019,7 +1038,7 @@ function sizeDesktop() {
   if (!desktop) return;
   const scale = appSizes[preferences.appSize];
   const widget = get('widget');
-  const dialog = settings.open ? settings : focusDialog.open ? focusDialog : voice;
+  const dialog = settings.open ? settings : focusDialog.open ? focusDialog : get('welcome').open ? get('welcome') : voice;
   const height = dialog.open ? Math.max(widget.offsetHeight, Math.max(dialog.offsetHeight, dialog.scrollHeight) + 12) : widget.offsetHeight;
   return native('resize_widget', {
     width: Math.round(420 * scale),
@@ -1120,6 +1139,7 @@ function startFocus(target, mode, minutes) {
 
 function stopFocus() {
   if (!focus) return;
+  trayAttention('off');
   const record = focusRecord(focus, Date.now());
   native('log_focus_session', {session: record});
   focus = null;
@@ -1128,6 +1148,13 @@ function stopFocus() {
   persistFocus(true);
   renderFocus();
   get('announcement').textContent = 'Focus ended.';
+}
+
+// The switch-away alert: the popup shakes (when it is open) while the tray icon blinks and the full-screen
+// reminder names the window to go back to. With Reduce Motion there is no shake.
+function shakePanel() {
+  if (!panelOpen || reduceMotion()) return;
+  get('widget').animate([0, -7, 7, -6, 5, -3, 2, 0].map(x => ({translate: `${x}px 0`})), {duration: 620, easing: 'ease-out'});
 }
 
 function tickFocus() {
@@ -1156,9 +1183,15 @@ window.addEventListener('focus-state', event => {
   focus = focusState(focus, event.detail);
   persistFocus(true);
   renderFocus();
+  if (event.detail === 'on') {
+    trayAttention('off');
+  } else {
+    trayAttention('blink');
+    shakePanel();
+  }
   if (event.detail === 'away') {
     native('show_task_reminder', {title: 'Back to ' + focus.app});
-    if (!get('widget').classList.contains('closed')) pulseTask(focusTask() ?? {id: ''});
+    if (panelOpen && !get('widget').classList.contains('closed')) pulseTask(focusTask() ?? {id: ''});
     get('announcement').textContent = 'You left ' + focus.app + '.';
   } else if (event.detail === 'lost') {
     native('show_task_reminder', {title: focus.app + ' window closed'});
@@ -1209,6 +1242,19 @@ get('focus-form').onsubmit = event => {
   if (startFocus({app: win.app, bundleId: win.bundle_id, title: win.title}, get('focus-mode').value, minutes)) focusDialog.close();
 };
 
+// First run: say what each permission is for, once, before it is asked for.
+function showWelcome() {
+  let seen = false;
+  try { seen = localStorage.getItem('niyyah-focus-welcomed') === '1'; } catch {}
+  if (seen || modalOpen() || !desktop) return;
+  get('welcome').showModal();
+  sizeDesktop();
+}
+get('welcome-ok').onclick = () => {
+  try { localStorage.setItem('niyyah-focus-welcomed', '1'); } catch {}
+  get('welcome').close();
+};
+
 async function initialize() {
   await loadTasks();
   await loadFocus();
@@ -1223,14 +1269,16 @@ async function initialize() {
         if (!registered) get('shortcut-status').textContent = 'Some shortcuts are only available while Niyyah Capture is focused.';
       });
     }
-    window.addEventListener('desktop-show', () => show(true));
+    window.addEventListener('desktop-show', () => { show(true); showWelcome(); });
+    window.addEventListener('desktop-hidden', () => { panelOpen = false; collapse(); });
     const observer = new ResizeObserver(sizeDesktop);
     observer.observe(get('widget'));
     observer.observe(voice);
     observer.observe(settings);
     observer.observe(focusDialog);
+    observer.observe(get('welcome'));
     window.addEventListener('desktop-checkin', () => checkIn());
-    Promise.all([initialPin, sizeDesktop()]).then(() => native('show_widget'));
+    Promise.all([initialPin, sizeDesktop()]);
   }
   scheduleCheckIn();
 }

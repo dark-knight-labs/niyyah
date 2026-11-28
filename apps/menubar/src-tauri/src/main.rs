@@ -10,9 +10,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Timelike;
-use niyyah_capture_core::options::current_block;
+use niyyah_capture_core::options::{current_block, PickerBlock};
 use niyyah_capture_core::queue::Entry;
-use niyyah_capture_core::{now_secs, Capture, Capturer, KeychainStore, Options, TaskStore, FocusStore};
+use niyyah_capture_core::{now_secs, Capture, Capturer, FocusStore, KeychainStore, TaskStore};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -35,8 +35,9 @@ type Shared = Arc<Capturer>;
 
 #[derive(Serialize)]
 struct OptionsReply {
-    options: Options,
-    /// The stream of the block covering the current time, to pre-fill the select.
+    /// Blocks for the picker, each with its own products.
+    picker: Vec<PickerBlock>,
+    /// The block to pre-select (the one covering the current time, when the server sends times).
     current_stream: Option<String>,
 }
 
@@ -89,7 +90,7 @@ async fn load_options(state: State<'_, Shared>, refresh: bool) -> Result<Options
     let now = chrono::Local::now();
     let minutes = now.hour() * 60 + now.minute();
     let current_stream = current_block(&options.blocks, minutes).map(|b| b.stream_slug().to_string());
-    Ok(OptionsReply { options, current_stream })
+    Ok(OptionsReply { picker: options.picker(), current_stream })
 }
 
 #[tauri::command]
@@ -148,6 +149,8 @@ fn main() {
         .manage(Arc::new(AtomicU64::new(0)))
         .manage(focus_switch::BrowserPreference::default())
         .manage(clock)
+        .manage(widget::PanelState::default())
+        .manage(widget::Attention::default())
         .manage(window_focus::WatchState::default())
         // No global handler: each shortcut carries its own (quick capture here, panel actions in widget.rs).
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -180,12 +183,13 @@ fn main() {
                 }
             })?;
 
+            widget::start_attention(app.handle().clone(), app.state::<widget::Attention>().inner().clone());
+
             // The focus panel: task list, timer, reminders. Hidden until the web layer has sized it.
             if let Err(error) = focus_switch::create_overlay(app) {
                 log::warn!("could not create the task reminder overlay: {error}");
             }
             if let Some(window) = app.get_webview_window(PANEL) {
-                let _ = widget::place_widget(&window);
                 window_focus::start(window.clone(), app.state::<window_focus::WatchState>().inner().clone());
                 focus_switch::start(window);
             }
@@ -207,8 +211,8 @@ fn main() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
-                        toggle_popover(tray.app_handle());
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, rect, .. } = event {
+                        widget::toggle_panel(tray.app_handle(), Some(&rect));
                     }
                 });
             // A monochrome template image: macOS tints it for light, dark and the selected state.
@@ -223,11 +227,12 @@ fn main() {
                     POPOVER => {
                         let _ = window.hide();
                     }
-                    // The panel collapses (it stays on screen) when it loses focus.
+                    // A menu-bar popup: it collapses, and closes unless pinned, when you click elsewhere.
                     PANEL => {
                         if let Some(webview) = window.get_webview_window(PANEL) {
                             let _ = webview.eval("window.dispatchEvent(new Event('desktop-blur'))");
                         }
+                        widget::hide_on_blur(window.app_handle());
                     }
                     _ => {}
                 }
@@ -257,6 +262,7 @@ fn main() {
             widget::save_focus_state,
             widget::log_focus_session,
             widget::set_tray_title,
+            widget::set_tray_attention,
             widget::open_panel_settings,
             window_focus::list_focus_windows,
             window_focus::request_accessibility,

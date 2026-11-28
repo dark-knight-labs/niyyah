@@ -11,6 +11,8 @@ pub enum Lane {
     Now,
     #[default]
     Next,
+    /// The plan page calls this lane Backlog; older builds said Someday.
+    #[serde(alias = "backlog")]
     Someday,
 }
 
@@ -145,13 +147,22 @@ mod local_only_fields {
     fn local_only_fields_never_reach_the_wire() {
         let from_panel = serde_json::json!({
             "text": "Call the bank", "lane": "next", "stream": "OT", "product": "alisha", "client_id": "7b1c-uuid",
-            "link": "https://example.com", "deadlineAt": 1, "trackedMs": 5, "startedAt": 2, "done": false
+            "link": "https://example.com", "deadlineAt": 1, "window": "Quarterly report", "title": "Quarterly report", "app": "Safari", "bundle_id": "com.apple.Safari", "trackedMs": 5, "startedAt": 2, "done": false
         });
         let capture: Capture = serde_json::from_value(from_panel).unwrap();
         let wire = serde_json::to_string(&capture.validated().unwrap().to_item()).unwrap();
-        for key in ["link", "deadline", "tracked", "started", "done", "example.com", "client"] {
+        for key in ["link", "deadline", "tracked", "started", "done", "example.com", "client", "window", "title", "app", "bundle", "Safari"] {
             assert!(!wire.contains(key), "{key} leaked into {wire}");
         }
         assert!(wire.contains("Call the bank") && wire.contains("alisha"));
+    }
+
+    #[test]
+    fn backlog_and_someday_are_the_same_lane() {
+        for word in ["backlog", "someday"] {
+            let c: Capture = serde_json::from_value(serde_json::json!({"text": "x", "lane": word, "stream": "OT"})).unwrap();
+            assert_eq!(c.lane, Lane::Someday);
+            assert_eq!(c.lane.wire(), "backlog");
+        }
     }
 }

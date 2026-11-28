@@ -140,8 +140,20 @@
     return runningTaskName ? clip(runningTaskName, 26) : '';
   }
 
+  // Block picker: choosing a block fills the product chips from that block's products. The chosen
+  // product survives only if the new block has it.
+  function pickBlock(blocks, value, product) {
+    const block = blocks.find(item => item.value === value) ?? blocks[0];
+    if (!block) return { block: null, product: null, products: [] };
+    const kept = block.products.some(item => item.slug === product) ? product : null;
+    return { block: block.value, product: kept, products: block.products };
+  }
+
+  // The lane word the API takes (the plan page says Backlog).
+  const LANES = ['now', 'next', 'backlog'];
+
   return {
-    newSession, focusTick, focusState, focusShown, focusFinished, focusRecord, trayTitle,
+    pickBlock, LANES, newSession, focusTick, focusState, focusShown, focusFinished, focusRecord, trayTitle,
     DEADLINE_SOON_MS, BROWSERS, webLink, formatStamp, creditDelta, addTracked, isDueSoon, moveTask,
     cycleTarget, namesFrom, captureFor,
   };

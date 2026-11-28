@@ -14,17 +14,7 @@
         <input class="transcript" id="text" type="text" maxlength="300" placeholder="What is on your mind?" aria-label="Capture" autofocus>
       </div>
       <p id="status" role="status"></p>
-      <div class="composer-niyyah">
-        <label>Block <select id="block" aria-label="Block"></select></label>
-        <label>Product <select id="product" aria-label="Product"></select></label>
-        <label>Lane
-          <select id="lane" aria-label="Lane">
-            <option value="now">Now</option>
-            <option value="next" selected>Next</option>
-            <option value="someday">Someday</option>
-          </select>
-        </label>
-      </div>
+      <div class="composer-niyyah" id="picker"></div>
       <div class="composer-actions">
         <button id="open-settings" type="button">Settings</button>
         <button class="primary save" id="save" type="submit">Save</button>
@@ -32,6 +22,8 @@
       <ul id="queue" aria-label="Waiting to be sent"></ul>
     </form>
   </dialog>
+  <script src="tasklogic.js"></script>
+  <script src="picker.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

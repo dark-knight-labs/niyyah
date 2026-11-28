@@ -5,41 +5,23 @@
   const invoke = window.__TAURI__.core.invoke;
   const $ = (id) => document.getElementById(id);
 
-  let options = { blocks: [], products: [] };
 
   function say(el, message, isError) {
     el.textContent = message || "";
     el.classList.toggle("error", Boolean(isError));
   }
 
-  function fill(select, items, emptyLabel) {
-    select.replaceChildren();
-    if (emptyLabel !== null) {
-      const none = document.createElement("option");
-      none.value = "";
-      none.textContent = emptyLabel;
-      select.appendChild(none);
-    }
-    for (const item of items) {
-      const o = document.createElement("option");
-      o.value = item.value;
-      o.textContent = item.label;
-      select.appendChild(o);
-    }
-  }
+  const picker = window.NiyyahPicker.mount($("picker"));
 
   async function loadOptions(refresh) {
     try {
-      const res = await invoke("load_options", { refresh });
-      options = res.options;
-      fill($("block"), options.blocks.map((b) => ({ value: b.stream || b.block, label: b.what ? b.block + " · " + b.what : b.block })), null);
-      fill($("product"), options.products.map((p) => ({ value: p.slug, label: p.name })), "No product");
-      if (res.current_stream) $("block").value = res.current_stream;
+      picker.setOptions(await invoke("load_options", { refresh }));
       say($("status"), "");
     } catch (e) {
+      picker.clear();
       say($("status"), String(e), true);
     }
-    $("save").disabled = $("block").options.length === 0;
+    $("save").disabled = picker.value.stream === null;
   }
 
   async function renderQueue() {
@@ -77,7 +59,7 @@
     if (!text) return;
     try {
       await invoke("submit_capture", {
-        capture: { text, lane: $("lane").value, stream: $("block").value, product: $("product").value || null, client_id: crypto.randomUUID() },
+        capture: { text, lane: picker.value.lane, stream: picker.value.stream, product: picker.value.product, client_id: crypto.randomUUID() },
       });
       $("text").value = "";
       say($("status"), "Saved");
@@ -96,7 +78,7 @@
   // The shell emits this each time the popover is shown: reset the field, re-pick the current block.
   window.__TAURI__.event.listen("popover-shown", async () => {
     $("text").value = "";
-    $("lane").value = "next";
+    picker.reset();
     await loadOptions(false);
     renderQueue();
     $("text").focus();

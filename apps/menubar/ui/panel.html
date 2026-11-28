@@ -6,6 +6,7 @@
 <title>Niyyah Capture · Focus</title>
 <link rel="stylesheet" href="panel.css">
 <script src="tasklogic.js"></script>
+<script src="picker.js"></script>
 <script src="panel.js" defer></script>
 </head>
 <body>
@@ -26,7 +27,7 @@
       <button id="glance-focus" class="glance-focus"><span id="glance-description"><strong id="glance-name"></strong></span><span id="glance-time"></span></button>
       <ul id="glance-next" aria-label="Upcoming priorities"></ul>
     </div>
-    <header class="widget-top"><div class="checkin"><span class="dot"></span><span id="status">FOCUS CHECK-IN</span></div><div class="window-actions"><button class="icon desktop-capture" id="desktop-capture" aria-label="Add priorities" title="Add priorities"><span class="ic ic-plus" aria-hidden="true"></span></button><button class="icon" id="expand" aria-controls="tasks" aria-label="Keep task list expanded" aria-pressed="false" title="Keep task list expanded"><span class="ic ic-chevron-up" aria-hidden="true"></span></button><button class="icon" id="open-settings" aria-label="Settings" title="Settings"><span class="ic ic-settings" aria-hidden="true"></span></button><button class="icon" id="pin" aria-label="Always on Top" aria-pressed="true" title="Always on Top"><span class="ic ic-pin" aria-hidden="true"></span></button><button class="icon" id="close" aria-label="Close reminder" title="Close reminder"><span class="ic ic-x" aria-hidden="true"></span></button></div></header>
+    <header class="widget-top"><div class="checkin"><span class="dot"></span><span id="status">FOCUS CHECK-IN</span></div><div class="window-actions"><button class="icon desktop-capture" id="desktop-capture" aria-label="Add priorities" title="Add priorities"><span class="ic ic-plus" aria-hidden="true"></span></button><button class="icon" id="expand" aria-controls="tasks" aria-label="Keep task list expanded" aria-pressed="false" title="Keep task list expanded"><span class="ic ic-chevron-up" aria-hidden="true"></span></button><button class="icon" id="open-settings" aria-label="Settings" title="Settings"><span class="ic ic-settings" aria-hidden="true"></span></button><button class="icon" id="pin" aria-label="Stay open" aria-pressed="true" title="Stay open when I click elsewhere"><span class="ic ic-pin" aria-hidden="true"></span></button><button class="icon" id="close" aria-label="Close reminder" title="Close reminder"><span class="ic ic-x" aria-hidden="true"></span></button></div></header>
     <div class="widget-body">
       <div class="list-head"><h3 id="focus-question">Which task are you working on?</h3><span id="remaining"></span></div>
       <ul id="tasks" aria-label="Priorities in order"></ul>
@@ -41,7 +42,7 @@
 </main>
 <dialog id="settings" aria-labelledby="settings-title">
   <header><h2 id="settings-title">Settings</h2><form method="dialog"><button class="icon" aria-label="Close settings"><span class="ic ic-x" aria-hidden="true"></span></button></form></header>
-  <label>Always on Top <input id="settings-pin" type="checkbox"></label>
+  <label>Stay open when I click elsewhere <input id="settings-pin" type="checkbox"></label>
 <label>App size
   <select id="app-size">
     <option value="compact">Compact (80%)</option>
@@ -84,6 +85,17 @@
     <p id="shortcut-status" role="status"></p>
   </fieldset>
 </dialog>
+<dialog id="welcome" aria-labelledby="welcome-title">
+  <header><h2 id="welcome-title">Niyyah Capture</h2></header>
+  <p class="welcome-text">It lives in the menu bar: click the ring to open this panel, or press Option+Command+N to capture a task fast. Every task you add is also filed in Niyyah, under a block and product. Your Niyyah token stays in the macOS Keychain.</p>
+  <p class="welcome-text">macOS will ask for these only when you use the feature:</p>
+  <ul class="welcome-list">
+    <li><strong>Accessibility</strong>: to read window titles for Focus. Without it, Focus works for the whole app. Window names stay on this Mac and are never sent to Niyyah.</li>
+    <li><strong>Automation</strong>: to see which browser tab is active (optional reminder).</li>
+    <li><strong>Microphone and Speech Recognition</strong>: only for dictation.</li>
+  </ul>
+  <button class="primary" id="welcome-ok" type="button">Got it</button>
+</dialog>
 <dialog id="focus" aria-labelledby="focus-title">
   <header><h2 id="focus-title">Focus window</h2><form method="dialog"><button class="icon" aria-label="Close focus window"><span class="ic ic-x" aria-hidden="true"></span></button></form></header>
   <form id="focus-form">
@@ -108,11 +120,7 @@
     </div>
     <p id="voice-status" role="status"></p>
     <label class="composer-link" for="task-link">Link <small>(optional)</small><input id="task-link" type="url" placeholder="https://example.com"></label>
-    <div class="composer-niyyah" id="composer-niyyah">
-      <label>Block <select id="niyyah-block" aria-label="Block"></select></label>
-      <label>Product <select id="niyyah-product" aria-label="Product"></select></label>
-      <label>Lane <select id="niyyah-lane" aria-label="Lane"><option value="now">Now</option><option value="next" selected>Next</option><option value="someday">Someday</option></select></label>
-    </div>
+    <div class="composer-niyyah" id="composer-niyyah"></div>
     <div class="composer-actions">
       <label for="deadline"><span class="deadline-label">Deadline <small>(optional)</small></span><input type="datetime-local" id="deadline"></label>
       <button class="primary save" id="save" disabled>Save</button>
