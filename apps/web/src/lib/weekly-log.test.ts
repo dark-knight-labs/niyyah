@@ -24,5 +24,12 @@ describe("weekly log", () => {
     const odd: WeeklyLogData = { ...log, streams: [], days: [{ day: "2026-11-23", entries: [entry(9, "mystery", true)] }] };
     expect(groupByDay(odd)[0].groups[0].stream).toMatchObject({ stream: "mystery", name: "mystery" });
   });
+  it("shows a capture with no stream under Unfiled, after the named streams", () => {
+    const withNone: WeeklyLogData = {
+      ...log, streams: [...log.streams, { stream: null, name: "Unfiled", color: "slate", done: 0, total: 1 }],
+      days: [{ day: "2026-11-23", entries: [{ ...entry(7, "kahf", false), stream: null }, entry(2, "kahf", true)] }],
+    };
+    expect(groupByDay(withNone)[0].groups.map((g) => g.stream.name)).toEqual(["Kahf", "Unfiled"]);
+  });
   it("words the per-stream count", () => expect(doneText(log.streams[0])).toBe("1 of 2 done"));
 });

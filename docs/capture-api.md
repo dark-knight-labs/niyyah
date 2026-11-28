@@ -40,9 +40,10 @@ Window names are not stored or accepted anywhere in Niyyah: an unknown field suc
 
 `POST /vault/items` from a device token is a **task on a day with a stream**:
 
-- `stream` (a slug from `streams`): the one link that matters. Unknown slug: 422. Missing: accepted (older clients), but the task has no place in the weekly log, so send it.
+- `stream` (a slug from `streams`): the one link that matters. Unknown slug: 422. Missing: accepted (older clients); the task shows in the weekly log as **Unfiled**, so send it.
 - `products`: optional tags, e.g. `["cart"]`.
 - `day`: optional, default today (planner timezone).
+- Ignored without an error, so an older client keeps working: `lane`, `parent_id` (a device cannot attach a task to another task), `checklist`, `start_min`, `end_min`, `weight`. Kept: `text`, `day`, `stream`, `products`, `description`, `status` and the extras below.
 - `lane`: **removed from the contract.** No lane is required or defaulted and no pipeline item is made. An older client that still sends `lane` (`now`, `next`, `backlog`) is not refused: the field is ignored and the task is created as a day task. (`lane: "done"` is a 422 as before.)
 - `status: "done"`: born done; `client_id`, `link`, `deadline_at`, `tracked_seconds`, `timer_started_at` as below.
 
@@ -50,7 +51,7 @@ Logins keep the old rule (exactly one of `day` and `lane`).
 
 ## Weekly log: `GET /vault/weekly-log?week=2026-W48`
 
-Login only (a device token gets 403). `week` is optional (default: this week), Sunday to Saturday, numbered as the Plan page does. The Plan page's "Weekly log" section reads it.
+Login only (a device token gets 403). `week` is optional (default: this week), Sunday to Saturday, numbered as the Plan page does; the year must be 2000 to 2100 (else 422). The Plan page's "Weekly log" section reads it.
 
 ```json
 {"week": "2026-W48", "start": "2026-11-22", "end": "2026-11-28", "prev_week": "2026-W47", "next_week": "2026-W49",
@@ -62,7 +63,7 @@ Login only (a device token gets 403). `week` is optional (default: this week), S
 
 - A task sits on the day it was **finished** (`done_on`, `on: "done"`) or, while open, on the day it is **for** (`scheduled_on`; else the day it was added) with `on: "captured"`. A task planned three weeks ago and finished today shows today.
 - `streams[].done` = finished this week; `total` = listed this week (finished + open). Only streams with something this week are listed.
-- Left out: skipped tasks, week objectives, tasks without a stream.
+- Left out: skipped tasks, week objectives, and tasks without a stream **unless a device captured them**: those are grouped as `{"stream": null, "name": "Unfiled"}` (entries carry `"stream": null`), listed last, so nothing a capture creates is invisible.
 - `days` always has seven entries, Sunday first.
 
 Why captures were not on the Plan page: it only lists pipeline items (rows with a lane under a stream with a pipeline), and a day task has no lane. The weekly log lists tasks by day and stream, so a capture shows there.
@@ -121,7 +122,7 @@ Only the fields sent change. Body fields, all optional: `done` (bool), `text` (1
 | 403 | a login (no device) on the two sync routes; a device token on any other route |
 | 404 | PATCH: no task for this `client_id` on this device (also another user's or device's) |
 | 409 | not used by these routes |
-| 422 | validation: bad link scheme or length, negative or huge `tracked_seconds`, date-time without zone, timer in the future, text over 300, null on a non-clearable field, malformed UUID, `limit` out of range. Body `{"detail": ...}` and nothing is saved |
+| 422 | validation (also a date-time out of range such as year 1): bad link scheme or length, negative or huge `tracked_seconds`, date-time without zone, timer in the future, text over 300, null on a non-clearable field, malformed UUID, `limit` out of range. Body `{"detail": ...}` and nothing is saved |
 | 429 | rate limit; wait `Retry-After` seconds |
 
 ## Examples

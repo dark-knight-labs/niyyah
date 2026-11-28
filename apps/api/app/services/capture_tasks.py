@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.planner import QuarterStream, Task
 from app.models.user import DeviceCapture
+from app.models.user import DeviceCapture
 from app.services import device_tokens, planner_items, planner_products, planner_work
 from app.services.rules import quarter_for, week_for
 
@@ -45,12 +46,19 @@ async def patch_for_device(db: AsyncSession, user_id: int, token_id: int, client
     return capture_task(task, client_id)
 
 
+# What a capture may not set. `lane` (no pipeline items) and `parent_id` (a device must not attach to another task) are the point;
+# checklist, start_min/end_min and weight are not in the capture contract. Kept: text, day, stream, products, description, status
+# and the extras (link, deadline_at, tracked_seconds, timer_started_at).
+DEVICE_IGNORED = ("lane", "parent_id", "checklist", "start_min", "end_min", "weight")
+
+
 def capture_target(day: date | None, fields: dict, today: date) -> tuple[date, dict]:
     """A device capture is always a task on a day (`day`, else today) with an optional stream; it never becomes a pipeline item.
+    The fields in DEVICE_IGNORED are dropped without an error, so an older client keeps working.
 
     The Plan page's pipelines (lanes now/next/someday) are not part of capture: a `lane` an older client still sends is ignored,
     not refused. The stream is the link that matters (the weekly log groups by it); products stay optional tags."""
-    fields = {k: v for k, v in fields.items() if k != "lane"}
+    fields = {k: v for k, v in fields.items() if k not in DEVICE_IGNORED}
     return day or today, fields
 
 
@@ -83,8 +91,9 @@ async def weekly_log(db: AsyncSession, user_id: int, today: date, week: str | No
     was added). Skipped tasks, week objectives and tasks without a stream are left out. Per stream: `done` finished this week,
     `total` listed this week (finished + still open)."""
     start, end, label = _week(today, week)
+    captured = select(DeviceCapture.task_id)  # a capture without a stream is shown too, as "Unfiled": nothing a capture makes is invisible
     rows = (await db.execute(select(Task).where(
-        Task.user_id == user_id, Task.stream.is_not(None), Task.status != "skipped",
+        Task.user_id == user_id, Task.stream.is_not(None) | Task.id.in_(captured), Task.status != "skipped",
         Task.done_on.between(start, end) | (Task.done.is_(False) & (Task.scheduled_on.between(start, end) |
                                                                      (Task.scheduled_on.is_(None) & Task.added_on.between(start, end)))))
         .order_by(Task.id))).scalars().all()
@@ -97,15 +106,15 @@ async def weekly_log(db: AsyncSession, user_id: int, today: date, week: str | No
         on = t.done_on if t.done else (t.scheduled_on or t.added_on)
         if on not in days:
             continue
-        info = streams.get(t.stream)
+        info = streams.get(t.stream) if t.stream else None
         days[on].append({"id": t.id, "text": t.text, "stream": t.stream, "done": t.done, "on": "done" if t.done else "captured",
                          "link": t.link, "tracked_seconds": t.tracked_seconds or 0})
-        row = totals.setdefault(t.stream, {"stream": t.stream, "name": info.name if info else t.stream, "color": info.color if info else "slate",
-                                           "done": 0, "total": 0})
+        row = totals.setdefault(t.stream, {"stream": t.stream, "name": info.name if info else (t.stream or "Unfiled"),
+                                           "color": info.color if info else "slate", "done": 0, "total": 0})
         row["total"] += 1
         row["done"] += 1 if t.done else 0
     return {"week": label, "start": start, "end": end, "prev_week": week_for(start - timedelta(days=1))[2],
-            "next_week": week_for(end + timedelta(days=1))[2], "streams": list(totals.values()),
+            "next_week": week_for(end + timedelta(days=1))[2], "streams": sorted(totals.values(), key=lambda r: r["stream"] is None),  # Unfiled last
             "days": [{"day": d, "entries": days[d]} for d in sorted(days)]}
 
 
@@ -115,12 +124,12 @@ def _week(today: date, week: str | None) -> tuple[date, date, str]:
         return week_for(today)
     try:
         year, number = int(week[:4]), int(week[6:])
-        if week[4:6] != "-W" or not 1 <= number <= 53:
+        if week[4:6] != "-W" or not 1 <= number <= 53 or not 2000 <= year <= 2100:
             raise ValueError
         # week_for numbers a Sunday-Saturday week by the ISO week of its Tuesday
         tuesday = date.fromisocalendar(year, number, 2)
     except (ValueError, IndexError):
-        raise ValueError("week must look like 2026-W48")
+        raise ValueError("week must look like 2026-W48, in the years 2000 to 2100")
     return week_for(tuesday)
 
 

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.vault import _db_run, _local_now
+from app.api.v1.vault import _item_run, _local_now
 from app.core.database import get_db
 from app.core.deps import get_capture_user
 from app.models.user import User
@@ -30,16 +30,16 @@ class CaptureProduct(BaseModel):
     block: str  # the planner stores a product's stream under this name: it is a stream slug, not a schedule block key
 
 
+class CaptureStreamProduct(BaseModel):
+    slug: str
+    name: str
+
+
 class CaptureStream(BaseModel):
     slug: str
     name: str
     color: str | None = None  # a colour key such as "violet"; the web app maps it to a token
     products: list[CaptureStreamProduct] = []  # optional second pick: this stream's products
-
-
-class CaptureStreamProduct(BaseModel):
-    slug: str
-    name: str
 
 
 class CaptureOptions(BaseModel):
@@ -88,7 +88,7 @@ async def patch_capture_task(client_id: UUID, data: CaptureTaskPatch, request: R
     user_id = user.id  # read now: a rollback expires the user object
     fields = data.model_dump(exclude_unset=True)
     today = _local_now().date()
-    result = await _db_run(db, lambda: capture_tasks.patch_for_device(db, user_id, token_id, str(client_id), fields, today))
+    result = await _item_run(db, lambda: capture_tasks.patch_for_device(db, user_id, token_id, str(client_id), fields, today))
     if result is None:
         raise HTTPException(status_code=404, detail="No task for this client_id on this device")
     return result

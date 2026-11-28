@@ -33,7 +33,10 @@ def aware(value: datetime | None) -> datetime | None:
         return None
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("send a date-time with a zone, e.g. 2026-12-01T17:30:00Z")
-    return value.astimezone(timezone.utc)
+    try:
+        return value.astimezone(timezone.utc)
+    except OverflowError:  # year 1 with a positive offset, year 9999 with a negative one
+        raise ValueError("that date-time is out of range")
 
 
 class TaskExtrasIn(BaseModel):
@@ -99,7 +102,7 @@ class CaptureTasks(BaseModel):
 class WeeklyLogEntry(BaseModel):
     id: int
     text: str
-    stream: str
+    stream: str | None  # null = filed under no stream ("Unfiled")
     done: bool
     on: Literal["done", "captured"]  # which date it sits on: the day it was finished, or (still open) the day it is for
     link: str | None
@@ -112,7 +115,7 @@ class WeeklyLogDay(BaseModel):
 
 
 class WeeklyLogStream(BaseModel):
-    stream: str
+    stream: str | None  # null = "Unfiled": captures that named no stream
     name: str
     color: str
     done: int  # finished this week

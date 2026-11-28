@@ -7,11 +7,11 @@ export interface DayGroup { day: string; groups: { stream: WeeklyLogStream; entr
 export function groupByDay(log: WeeklyLogData): DayGroup[] {
   const order = new Map(log.streams.map((s, i) => [s.stream, i] as const));
   return log.days.map(({ day, entries }) => {
-    const by = new Map<string, WeeklyLogEntry[]>();
+    const by = new Map<string | null, WeeklyLogEntry[]>();
     for (const e of entries) by.set(e.stream, [...(by.get(e.stream) ?? []), e]);
     const groups = [...by.entries()]
       .sort(([a], [b]) => (order.get(a) ?? 1e9) - (order.get(b) ?? 1e9))
-      .map(([slug, list]) => ({ stream: log.streams.find((s) => s.stream === slug) ?? { stream: slug, name: slug, color: "slate", done: 0, total: 0 }, entries: list }));
+      .map(([slug, list]) => ({ stream: log.streams.find((s) => s.stream === slug) ?? { stream: slug, name: slug ?? "Unfiled", color: "slate", done: 0, total: 0 }, entries: list }));
     return { day, groups, count: entries.length };
   });
 }

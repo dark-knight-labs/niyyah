@@ -44,7 +44,7 @@ export function WeeklyLog({ reloadKey }: { reloadKey?: unknown }) {
       ) : (
         <ul className="flex flex-wrap gap-x-6 gap-y-1 border-b border-[var(--border)] px-4 py-3" aria-label="Finished per stream">
           {log.streams.map((s) => (
-            <li key={s.stream} className="flex items-center gap-2 text-sm">
+            <li key={s.stream ?? "unfiled"} className="flex items-center gap-2 text-sm">
               <span className="h-2 w-2 shrink-0" style={{ background: colorVar(s.color) }} aria-hidden="true" />
               <span className="font-medium">{s.name}</span>
               <span className="mono tabular-nums text-[var(--muted-foreground)]">{doneText(s)}</span>
@@ -59,7 +59,7 @@ export function WeeklyLog({ reloadKey }: { reloadKey?: unknown }) {
             {d.count === 0 ? <p className="text-sm text-[var(--muted-foreground)]">·</p> : (
               <div className="grid gap-2">
                 {d.groups.map((g) => (
-                  <div key={g.stream.stream}>
+                  <div key={g.stream.stream ?? "unfiled"}>
                     <p className="mono flex items-center gap-2"><span className="h-2 w-2" style={{ background: colorVar(g.stream.color) }} aria-hidden="true" />{g.stream.name}</p>
                     <ul className="mt-0.5">
                       {g.entries.map((e) => (

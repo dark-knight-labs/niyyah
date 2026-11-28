@@ -240,8 +240,8 @@ async def test_logins_and_other_tokens_are_refused_on_the_sync_routes(db_client)
     assert (await client.patch(f"{TASKS}/{key}", json={"done": True})).status_code == 403
     assert (await client.get(TASKS, headers=bearer("nyd_" + "x" * 43))).status_code == 401
     made = await client.post("/api/v1/tokens", json={"name": "export"})
-    if made.status_code in (200, 201):
-        assert (await client.get(TASKS, headers=bearer(made.json()["token"]))).status_code == 401
+    assert made.status_code == 201, made.text
+    assert (await client.get(TASKS, headers=bearer(made.json()["token"]))).status_code == 401
 
 
 @pytest.mark.asyncio
@@ -373,9 +373,11 @@ async def test_capture_to_weekly_log_regression(db_client):
     by_text = {e["text"]: e for e in today_entries}
     assert by_text["open kahf task"]["on"] == "captured" and by_text["open kahf task"]["done"] is False
     assert by_text["finished kahf task"]["on"] == "done" and by_text["born done"]["stream"] == "studio"
-    assert "no stream" not in by_text  # a task without a stream has no place in a per-stream log
+    assert by_text["no stream"]["stream"] is None  # a capture without a stream is shown too, as Unfiled
     totals = {s["stream"]: s for s in log["streams"]}
     assert (totals["kahf"]["done"], totals["kahf"]["total"], totals["kahf"]["name"]) == (1, 2, "Kahf")
+    assert (totals[None]["name"], totals[None]["done"], totals[None]["total"]) == ("Unfiled", 0, 1)
+    assert log["streams"][-1]["stream"] is None  # Unfiled last
     assert totals["studio"]["done"] == 2  # "born done" and the sample account's own pipeline item finished today: pipeline items count too
     assert open_id in {e["id"] for e in today_entries}
 
@@ -421,8 +423,65 @@ async def test_window_names_are_never_stored_or_returned(db_client):
     as_device = await device(client)
     res = await client.post(ITEMS, headers=as_device, json={"text": "t", "window_title": "Secret doc", "window": "Safari", "client_id": cid()})
     assert res.status_code == 201 and "Secret" not in res.text and "Safari" not in res.text  # ignored, not stored
+    key = cid()
+    await client.post(ITEMS, headers=as_device, json={"text": "u", "client_id": key})
+    patched = await client.patch(f"{TASKS}/{key}", headers=as_device, json={"done": True, "window_title": "Secret doc", "window_name": "Safari"})
+    assert patched.status_code == 200 and "Secret" not in patched.text and "Safari" not in patched.text
+    listed = await client.get(TASKS, headers=as_device, params={"include_done": True})
+    assert "Secret" not in listed.text and "Safari" not in listed.text and "window" not in listed.text
     assert not [f for f in ItemCreateIn.model_fields if "window" in f]
     assert not [c.name for model in (Task, DeviceCapture) for c in inspect(model).columns if "window" in c.name]
     async with TestSession() as db:
         rows = (await db.execute(select(Task))).scalars().all()
     assert not any("Secret" in str(r.__dict__) or "Safari" in str(r.__dict__) for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_a_task_that_became_a_week_objective_is_a_404_not_a_500(db_client):
+    client, _ = db_client
+    as_device = await device(client)
+    key = cid()
+    made = (await client.post(ITEMS, headers=as_device, json={"text": "later an objective", "client_id": key})).json()
+    async with TestSession() as db:
+        row = (await db.execute(select(Task).where(Task.id == made["id"]))).scalar_one()
+        row.lane, row.focus_week = None, "2026-W48"  # objective-only: not an item anyone can edit
+        await db.commit()
+    assert (await client.patch(f"{TASKS}/{key}", headers=as_device, json={"done": True})).status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad", [{"deadline_at": "0001-01-01T00:00:00+06:00"}, {"deadline_at": "9999-12-31T23:59:59-06:00"},
+                                 {"timer_started_at": "0001-01-01T00:00:00+06:00"}])
+async def test_overflowing_date_times_are_a_422(db_client, bad):
+    client, _ = db_client
+    as_device = await device(client)
+    key = cid()
+    assert (await client.post(ITEMS, headers=as_device, json=body(client_id=cid(), **bad))).status_code == 422
+    await client.post(ITEMS, headers=as_device, json=body(client_id=key))
+    assert (await client.patch(f"{TASKS}/{key}", headers=as_device, json=bad)).status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("week", ["9999-W52", "0001-W01", "1999-W52", "2101-W01", "2026-W00", "2026-W54", "2026-48"])
+async def test_weekly_log_week_is_bounded(db_client, week):
+    client, _ = db_client
+    assert (await client.get(WEEKLY, params={"week": week})).status_code == 422
+    assert (await client.get(WEEKLY, params={"week": "2000-W01"})).status_code == 200
+    assert (await client.get(WEEKLY, params={"week": "2100-W40"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_device_cannot_attach_to_another_task_or_set_what_the_contract_leaves_out(db_client):
+    client, today = db_client
+    as_device = await device(client)
+    parent = (await client.post(ITEMS, json=body(text="someone else's task"))).json()  # a login's own task
+    res = await client.post(ITEMS, headers=as_device, json=body(text="piece", parent_id=parent["id"], client_id=cid(), checklist=[{"text": "a"}],
+                                                                 start_min=60, end_min=120, weight=3, description="notes"))
+    got = res.json()
+    assert res.status_code == 201 and got["parent_id"] is None and got["checklist"] == [] and got["weight"] == 0
+    assert got["all_day"] is True and got["start_min"] is None and got["description"] == "notes"  # description stays
+    # another user's task id is no better
+    _, theirs = await second_user_device(client)
+    other = (await client.post(ITEMS, headers=theirs, json=body(text="theirs", client_id=cid()))).json()
+    res = await client.post(ITEMS, headers=as_device, json=body(text="sneaky", parent_id=other["id"], client_id=cid()))
+    assert res.status_code == 201 and res.json()["parent_id"] is None
