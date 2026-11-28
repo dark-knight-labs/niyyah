@@ -1,14 +1,11 @@
-//! `GET /api/v1/capture/options`: the user's streams to file under, and their products.
+//! `GET /api/v1/capture/options`: the user's streams to file under, each with its optional products.
 //!
-//! A capture is filed under a **stream** (Kahf, Alisha Noor, ...). Products are an optional second pick.
-//! Read tolerantly, so an older or newer server never crashes the picker:
+//! Contract (niyyah `docs/capture-api.md`): every non-archived stream, products nested under each stream.
 //! ```json
-//! { "streams":  [{"slug": "kahf", "name": "Kahf", "products": [{"slug": "dns", "name": "DNS"}]}],
-//!   "products": [{"slug": "alisha", "name": "Alisha Noor", "block": "alisha"}] }
+//! { "streams": [{"slug": "kahf", "name": "Kahf", "color": "violet", "products": []},
+//!               {"slug": "alisha", "name": "Alisha Noor", "color": "rose", "products": [{"slug": "cart", "name": "Cart"}]}] }
 //! ```
-//! A stream's products come from its own `products` list, else from the top-level `products` whose `block`
-//! (the stream slug the planner stores a product under) is this stream. Products may also be bare slugs.
-//! Unknown fields (the old schedule `blocks`, `day`) are ignored.
+//! A stream has no short name: show `name`. The deprecated top-level `blocks`, `products` and `day` are ignored.
 
 use serde::{Deserialize, Serialize};
 
@@ -16,8 +13,6 @@ use serde::{Deserialize, Serialize};
 pub struct Options {
     #[serde(default)]
     pub streams: Vec<StreamOption>,
-    #[serde(default)]
-    pub products: Vec<ProductOption>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,41 +21,18 @@ pub struct StreamOption {
     pub slug: String,
     #[serde(default)]
     pub name: String,
+    /// A colour key ("violet", "rose", ...).
+    #[serde(default)]
+    pub color: String,
     #[serde(default)]
     pub products: Vec<ProductOption>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(from = "ProductWire")]
 pub struct ProductOption {
     pub slug: String,
-    pub name: String,
-    /// The stream slug this product belongs to, when the server says.
     #[serde(default)]
-    pub block: Option<String>,
-}
-
-/// A product is an object, or just its slug.
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum ProductWire {
-    Slug(String),
-    Full {
-        slug: String,
-        #[serde(default)]
-        name: Option<String>,
-        #[serde(default)]
-        block: Option<String>,
-    },
-}
-
-impl From<ProductWire> for ProductOption {
-    fn from(wire: ProductWire) -> Self {
-        match wire {
-            ProductWire::Slug(slug) => ProductOption { name: slug.clone(), slug, block: None },
-            ProductWire::Full { slug, name, block } => ProductOption { name: name.filter(|n| !n.is_empty()).unwrap_or_else(|| slug.clone()), slug, block },
-        }
-    }
+    pub name: String,
 }
 
 /// What the picker shows for one stream.
@@ -70,12 +42,13 @@ pub struct PickerStream {
     pub value: String,
     /// The name on the chip.
     pub label: String,
+    pub color: String,
     /// Optional second pick; empty when the stream has none.
     pub products: Vec<ProductOption>,
 }
 
 impl Options {
-    /// Streams for the picker, in server order, one per slug, each with its own products.
+    /// Streams for the picker, in server order, one per slug.
     pub fn picker(&self) -> Vec<PickerStream> {
         let mut out: Vec<PickerStream> = Vec::new();
         for s in &self.streams {
@@ -83,13 +56,14 @@ impl Options {
             if value.is_empty() || out.iter().any(|p| p.value == value) {
                 continue;
             }
-            let products = if s.products.is_empty() {
-                self.products.iter().filter(|p| p.block.as_deref() == Some(value.as_str())).cloned().collect()
-            } else {
-                s.products.clone()
-            };
             let label = if s.name.trim().is_empty() { value.clone() } else { s.name.trim().to_string() };
-            out.push(PickerStream { value, label, products });
+            let products = s
+                .products
+                .iter()
+                .filter(|p| !p.slug.trim().is_empty())
+                .map(|p| ProductOption { slug: p.slug.clone(), name: if p.name.trim().is_empty() { p.slug.clone() } else { p.name.clone() } })
+                .collect();
+            out.push(PickerStream { value, label, color: s.color.clone(), products });
         }
         out
     }
@@ -100,21 +74,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn streams_with_their_products_from_either_place() {
+    fn nested_products_and_names() {
         let o: Options = serde_json::from_str(
             r#"{"streams":[
-                 {"slug":"kahf","name":"Kahf","products":[{"slug":"dns","name":"DNS"},"router"]},
-                 {"slug":"alisha","name":"Alisha Noor"},
-                 {"slug":"solo","name":""}],
-                "products":[{"slug":"alisha-store","name":"Store","block":"alisha"},{"slug":"x","name":"X","block":"elsewhere"}]}"#,
+                 {"slug":"kahf","name":"Kahf","color":"violet","products":[]},
+                 {"slug":"alisha","name":"Alisha Noor","color":"rose","products":[{"slug":"cart","name":"Cart"},{"slug":"store"}]},
+                 {"slug":"solo","name":""}]}"#,
         )
         .unwrap();
         let p = o.picker();
-        assert_eq!(p.iter().map(|s| s.label.as_str()).collect::<Vec<_>>(), ["Kahf", "Alisha Noor", "solo"]);
-        assert_eq!(p[0].products.iter().map(|x| x.slug.as_str()).collect::<Vec<_>>(), ["dns", "router"]);
-        assert_eq!(p[0].products[1].name, "router", "a bare slug is its own name");
-        assert_eq!(p[1].products[0].slug, "alisha-store", "tied by the top-level `block`");
-        assert!(p[2].products.is_empty(), "products are optional");
+        assert_eq!(p.iter().map(|s| s.label.as_str()).collect::<Vec<_>>(), ["Kahf", "Alisha Noor", "solo"], "the name is shown");
+        assert!(p[0].products.is_empty(), "products are optional");
+        assert_eq!(p[1].products.iter().map(|x| (x.slug.as_str(), x.name.as_str())).collect::<Vec<_>>(), [("cart", "Cart"), ("store", "store")]);
+        assert_eq!(p[1].color, "rose");
+    }
+
+    #[test]
+    fn deprecated_top_level_fields_are_ignored() {
+        let o: Options = serde_json::from_str(
+            r#"{"streams":[{"slug":"alisha","name":"Alisha Noor","products":[]}],
+                "products":[{"slug":"old","name":"Old","block":"alisha"}],
+                "blocks":[{"block":"OT","start":"06:00","end":"10:00","what":"w"}],"day":"weekday"}"#,
+        )
+        .unwrap();
+        assert!(o.picker()[0].products.is_empty(), "the flat products list is no longer read");
     }
 
     #[test]
@@ -124,18 +107,8 @@ mod tests {
     }
 
     #[test]
-    fn the_old_reply_with_schedule_blocks_is_ignored_not_fatal() {
-        let o: Options = serde_json::from_str(
-            r#"{"blocks":[{"block":"OT","start":"06:00","end":"10:00","what":"w","stream":"OT"}],"day":"weekday",
-                "streams":[{"slug":"ot","name":"One Thing"}],"products":[{"slug":"a","name":"A"}]}"#,
-        )
-        .unwrap();
-        assert_eq!(o.picker().len(), 1);
-    }
-
-    #[test]
     fn junk_never_crashes() {
-        for body in ["{}", r#"{"streams":[{}]}"#, r#"{"streams":[],"products":["a"]}"#, r#"{"blocks":[{}]}"#] {
+        for body in ["{}", r#"{"streams":[{}]}"#, r#"{"streams":[]}"#, r#"{"blocks":[{}]}"#] {
             let o: Options = serde_json::from_str(body).unwrap();
             assert!(o.picker().is_empty());
         }

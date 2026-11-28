@@ -40,21 +40,17 @@ impl Capture {
     pub fn to_item(&self) -> ItemPayload {
         ItemPayload {
             text: self.text.clone(),
-            lane: None,
             stream: self.stream.clone(),
             products: self.product.as_ref().map(|p| vec![p.clone()]),
         }
     }
 }
 
-/// The JSON body of `POST /api/v1/vault/items`: text, stream, optional product. `day` is never sent.
-/// `lane` is `None` and skipped: the capture UI has no lane. A server that still insists on one is handled
-/// once, in `Client::post_item`.
+/// The JSON body of `POST /api/v1/vault/items`: text, stream, optional product. No `lane`, no `day`: the
+/// server files a device-token task on today, under the stream.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ItemPayload {
     pub text: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lane: Option<&'static str>,
     pub stream: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub products: Option<Vec<String>>,

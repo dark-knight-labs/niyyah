@@ -43,31 +43,19 @@ fn offline_then_online_sends_exactly_once_and_clears_the_queue() {
 }
 
 #[test]
-fn a_server_that_demands_a_lane_gets_one_retry_with_backlog_and_the_capture_still_lands() {
-    let dir = tempfile::tempdir().unwrap();
-    let mock = Mock::start(vec![Resp::Json(422, r#"{"detail":[{"msg":"Value error, send exactly one of `day` and `lane`"}]}"#)]);
-    let c = capturer(dir.path(), &mock.url);
-    c.submit(capture("Call the bank"), 1_000).unwrap();
-    let r = c.flush(1_001);
-    assert_eq!(r.sent, 1, "{r:?}");
-    let posts: Vec<_> = mock.seen().into_iter().filter(|s| s.method == "POST").collect();
-    assert_eq!(posts.len(), 2);
-    let first: serde_json::Value = serde_json::from_str(&posts[0].body).unwrap();
-    let second: serde_json::Value = serde_json::from_str(&posts[1].body).unwrap();
-    assert!(first.get("lane").is_none(), "the app itself sends no lane: {first}");
-    assert_eq!(second["lane"], "backlog");
-    assert_eq!(second["stream"], "OT");
-}
-
-#[test]
-fn another_422_is_refused_without_a_lane_retry() {
+fn a_422_is_a_real_error_shown_as_refused_and_never_retried() {
     let dir = tempfile::tempdir().unwrap();
     let mock = Mock::start(vec![Resp::Json(422, r#"{"detail":"unknown stream"}"#)]);
     let c = capturer(dir.path(), &mock.url);
-    c.submit(capture("x"), 1_000).unwrap();
+    c.submit(capture("Call the bank"), 1_000).unwrap();
     let r = c.flush(1_001);
     assert_eq!((r.sent, r.rejected), (0, 1), "{r:?}");
-    assert_eq!(mock.seen().iter().filter(|s| s.method == "POST").count(), 1);
+    assert_eq!(mock.seen().iter().filter(|s| s.method == "POST").count(), 1, "one POST, no second try");
+    let entry = &c.pending()[0];
+    assert_eq!(format!("{:?}", entry.state), "Rejected", "parked as refused, visible in the popover list");
+    let body: serde_json::Value = serde_json::from_str(&mock.seen()[0].body).unwrap();
+    assert!(body.get("lane").is_none() && body.get("day").is_none(), "{body}");
+    assert_eq!(body["stream"], "OT", "a capture always names its stream");
 }
 
 #[test]
@@ -205,8 +193,7 @@ fn options_are_fetched_once_per_session_and_fall_back_to_the_saved_copy() {
     let c = capturer(dir.path(), &mock.url);
     let o = c.options(false).unwrap();
     assert_eq!(o.streams[0].slug, "OT");
-    assert_eq!(o.picker()[0].products[0].slug, "alisha");
-    assert_eq!(o.products[0].slug, "alisha");
+    assert_eq!(o.picker()[0].products[0].slug, "alisha", "products are nested under their stream");
     c.options(false).unwrap();
     assert_eq!(mock.seen().iter().filter(|s| s.path == "/api/v1/capture/options").count(), 1, "second call is the cache");
     assert_eq!(mock.seen()[0].auth.as_deref(), Some(format!("Bearer {TOKEN}").as_str()));

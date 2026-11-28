@@ -18,8 +18,6 @@ use crate::url_guard::{endpoint, parse_base_url};
 
 pub const ITEMS_PATH: &str = "/api/v1/vault/items";
 pub const OPTIONS_PATH: &str = "/api/v1/capture/options";
-/// Only for servers that insist on a lane (see `Client::post_item`).
-const LEGACY_LANE: &str = "backlog";
 
 /// How one POST ended, in the terms the queue acts on.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,31 +50,16 @@ impl Client {
         Ok(Self { base, agent })
     }
 
-    fn send_item(&self, token: &Token, item: &ItemPayload) -> Result<ureq::Response, Box<ureq::Error>> {
-        self.agent
+    /// POST one capture. A 422 is a real error (unknown stream, text too long): it is refused and shown,
+    /// never retried.
+    pub fn post_item(&self, token: &Token, item: &ItemPayload) -> SendOutcome {
+        let res = self
+            .agent
             .post(&endpoint(&self.base, ITEMS_PATH))
             .set("Authorization", &format!("Bearer {}", token.expose()))
             .set("Accept", "application/json")
-            .send_json(item)
-            .map_err(Box::new)
-    }
-
-    /// POST one capture. The app never chooses a lane, but a server that still requires "exactly one of
-    /// `day` and `lane`" answers 422 to a stream-only body. That one answer is retried once with the least
-    /// intrusive lane (`backlog`), so captures still land. Remove this when the server accepts a stream alone.
-    pub fn post_item(&self, token: &Token, item: &ItemPayload) -> SendOutcome {
-        match self.send_item(token, item).map_err(|e| *e) {
-            Err(ureq::Error::Status(422, resp)) => {
-                let body = resp.into_string().unwrap_or_default();
-                if item.lane.is_none() && body.contains("`day` and `lane`") {
-                    let legacy = ItemPayload { lane: Some(LEGACY_LANE), ..item.clone() };
-                    classify(self.send_item(token, &legacy).map_err(|e| *e))
-                } else {
-                    SendOutcome::Rejected("the server refused this capture (HTTP 422)".into())
-                }
-            }
-            other => classify(other),
-        }
+            .send_json(item);
+        classify(res)
     }
 
     pub fn get_options(&self, token: &Token) -> Result<Options, Error> {

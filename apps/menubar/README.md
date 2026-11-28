@@ -95,15 +95,17 @@ second pick with nothing preselected, and a capture works with a stream alone. T
 in the payload; lanes and products are not linked by default, and Niyyah uses them for its per-stream weekly log
 of finished tasks. The last stream you used is preselected.
 
-`GET /api/v1/capture/options` is read as `streams` (`slug`, `name`, optional `products`) plus top-level
-`products` tied to a stream by `block` (the stream slug); products may be objects or bare slugs. Unknown
-fields (the old schedule `blocks`) are ignored, junk gives an empty picker and a message, never a crash. A
-capture is `{text, stream, products?}` plus `client_id` kept in the local queue.
+`GET /api/v1/capture/options` (niyyah `docs/capture-api.md`) lists every non-archived stream with its products
+nested: `streams: [{slug, name, color, products: [{slug, name}]}]`. The chip shows `name` (streams have no short
+name). The deprecated top-level `blocks`, `products` and `day` are ignored. Junk gives an empty picker and a
+message, never a crash. A capture is `{text, stream, products?}`; `client_id` stays in the local queue. The app
+always sends `stream`: a task with no stream would not appear in Niyyah's weekly log.
 
-**Server dependency (flagged):** today's server (`ItemCreateIn`) requires exactly one of `day` and `lane`, so a
-stream-only body gets a 422. Until the backend accepts a stream alone, `Client::post_item` retries that one
-answer **once** with `lane: "backlog"` (the least intrusive lane), so captures still land; the retry is tested
-and is the single place to delete when the server changes. Any other 422 is refused and shown, not retried.
+**Server release dependency:** the live server accepts a capture with a stream and no `lane` or `day` only after
+the Niyyah release that includes migration `b4d6f8a0c2e5` (an owner-approved release step). **Until that release,
+captures against production get a 422**; they are kept in the queue as "refused" with Retry and Dismiss, never
+dropped. A 422 is now a real error (an unknown stream is one) and is never retried; the earlier one-time
+`lane: "backlog"` retry was removed.
 
 ## Look: Next Up replica, with Lucide and Inter
 
@@ -142,23 +144,22 @@ contract means adding fields there and in `captureFor` (`ui/tasklogic.js`).
 Auth for both: `Authorization: Bearer nyd_...` (a device token, created and revoked in Niyyah under
 **Settings > Devices**; scope "create tasks only").
 
-`POST /api/v1/vault/items` (existing `ItemCreateIn`; the app sends a stream and no lane, see "Streams and products"):
+`POST /api/v1/vault/items` (a device-token task on today, under the stream):
 
 ```json
 {"text": "Call the bank", "stream": "kahf", "products": ["dns"]}
 ```
 
-`products` is omitted when none is picked. `day` and `lane` are never sent by the app; see the flagged server
-dependency in "Streams and products" for the one-time `backlog` retry.
+`products` is omitted when none is picked. `day` and `lane` are never sent (the server defaults the day to today
+and ignores a lane). See "Streams and products" for the release this depends on.
 
 `GET /api/v1/capture/options` (read-only, device token allowed):
 
 ```json
-{"streams":  [{"slug": "kahf", "name": "Kahf", "products": [{"slug": "dns", "name": "DNS"}]}],
- "products": [{"slug": "alisha-store", "name": "Store", "block": "alisha"}]}
+{"streams": [{"slug": "kahf", "name": "Kahf", "color": "violet", "products": []},
+             {"slug": "alisha", "name": "Alisha Noor", "color": "rose", "products": [{"slug": "cart", "name": "Cart"}]}]}
 ```
 
-A stream's products are its own `products`, else the top-level products whose `block` is the stream slug.
 The reply is cached for the session and the last good copy is kept on disk, so a capture can still be filed
 while offline.
 

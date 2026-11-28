@@ -24,7 +24,7 @@ pub enum Resp {
     Redirect(String),
 }
 
-pub const OPTIONS_JSON: &str = r#"{"streams":[{"slug":"OT","name":"One Thing"}],"products":[{"slug":"alisha","name":"Alisha Noor","block":"OT"}],"blocks":[{"block":"x","start":"06:00","end":"07:00","what":"old"}]}"#;
+pub const OPTIONS_JSON: &str = r#"{"streams":[{"slug":"OT","name":"One Thing","color":"violet","products":[{"slug":"alisha","name":"Alisha Noor"}]}]}"#;
 
 pub struct Mock {
     pub url: String,
