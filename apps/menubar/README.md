@@ -22,7 +22,7 @@ no code is taken from it.
 
 ## API contract (what the app calls)
 
-Auth for both: `Authorization: Bearer nyd_...` (a device token, minted by the Niyyah web app, scope
+Auth for both: `Authorization: Bearer nyd_...` (a device token, minted in the Niyyah web app under Settings > Devices, scope
 "create tasks only", revocable).
 
 `POST /api/v1/vault/items` (existing `ItemCreateIn`, lane form):
@@ -95,10 +95,16 @@ notarisation, so macOS will not open it silently the first time.
    and click **Open Anyway**, then confirm with your password.
 4. Last resort: `xattr -dr com.apple.quarantine "/Applications/Niyyah Capture.app"`.
 5. The app has no Dock icon. Look for the small ring in the menu bar, or press **Option+Command+N**.
-6. Click **Settings** in the popover. Paste your Niyyah API address and a device token (create one in Niyyah,
-   then copy it: it is shown once). Press Store. macOS may ask to let the app use the Keychain: allow it.
+6. In Niyyah (web), open **Settings > Devices**, type a name for this Mac (for example "Work MacBook") and press
+   **Create device token**. The token (`nyd_...`) is shown once: press **Copy**. If you lose it, revoke it there
+   and create another.
+7. In the app, click **Settings** in the popover. Set the server URL to `https://<your-niyyah-api-host>`
+   (the address of your Niyyah API) and paste it into **Device token**. Press **Store**. macOS may ask to let the app use the
+   Keychain: allow it.
+8. First capture: press **Option+Command+N**, type a task, pick a lane (Now, Next or Someday), press **Save**. It appears in Niyyah within
+   a few seconds. A refused-token message means the token was revoked or mistyped: create a new one.
 
-Revoke a lost laptop's access by revoking its device token in Niyyah; the app then keeps your captures and
+Revoke a lost laptop's access in Niyyah under **Settings > Devices > Revoke**; the app then keeps your captures and
 shows that the token was refused.
 
 ## What is verified
