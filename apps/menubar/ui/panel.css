@@ -576,7 +576,7 @@ html:not(.desktop) .desktop-capture { display: none; }
 .task-focus[data-state=allowed] { color: #5b72c3; }
 .task-focus[data-state=away], .task-focus[data-state=lost] { color: #92400e; }
 .task-focus[data-state=paused] { color: var(--muted); }
-.focus-allow { display: flex; gap: 6px; align-items: center; padding: 4px 0; font-size: 12px; border: 0; justify-content: flex-start; }
+#focus .focus-allow { display: flex; gap: 6px; align-items: center; justify-content: flex-start; padding: 3px 0; border-top: 0; font-size: 12px; }
 #focus-allowed { max-height: 110px; overflow: auto; }
 #focus-window { max-width: 230px; font: inherit; }
 #focus-hint, #focus-status { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
@@ -588,7 +588,7 @@ html:not(.desktop) .desktop-capture { display: none; }
 /* Capture picker: the user's streams in a pale-blue column (white chips), optional product chips beside.
    Chips are small-radius, Next Up style, never full pills. Long names get an ellipsis and a tooltip. */
 .composer-niyyah { margin: 0 0 8px; }
-.picker { display: grid; grid-template-columns: fit-content(150px) minmax(0, 1fr); gap: 8px; align-items: start; }
+.picker { display: grid; grid-template-columns: fit-content(190px) minmax(0, 1fr); gap: 8px; align-items: start; }
 .stream-col { display: flex; flex-direction: column; gap: 4px; max-height: 232px; padding: 5px; overflow: auto; border-radius: 8px; background: #dfe8fb; }
 .chip { max-width: 100%; padding: 4px 9px; overflow: hidden; border-radius: 7px; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .tile { border: 1px solid #fff; background: #fff; color: var(--ink); text-align: left; box-shadow: 0 1px 0 #1b2b5a14; }
@@ -598,3 +598,4 @@ html:not(.desktop) .desktop-capture { display: none; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
 .chip[aria-pressed=true]:not(.tile) { background: var(--accent); border-color: var(--accent); color: #fff; }
 .picker-empty { color: var(--muted); font-size: 12px; }
+#focus-open .ic { width: 12px; height: 12px; vertical-align: -1px; }

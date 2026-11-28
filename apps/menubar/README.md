@@ -31,65 +31,90 @@ Stack: Tauri 2. `core/` is plain Rust (queue, API client, token store) and is te
 | Offline queue for the Niyyah side | `core/src/queue.rs` (below) |
 | Software updater | **removed** (no endpoint, no plugin) |
 
-## Focus window and the menu bar
+## Focus: one task, one primary window
 
-**Focus window.** In the panel, **Focus** opens a picker of the open windows (app and title). Pick one, choose
-count-up or a countdown (1 to 240 minutes) and Start: the timer is tied to the current task (it starts the
-task if it is not running). If you leave the window for about 1.5 seconds the panel chip turns amber
-("Away from Safari"), a full-screen reminder says "Back to Safari" and the menu-bar text changes to
-"Away · 12:34 · Task". If the window or app is closed the chip turns red ("window closed"). Cmd-Tab and back
-within that grace time is not counted, and switching to Niyyah Capture itself (to pause the timer) never counts.
-The chosen window and the running session are saved (`focus.json`) and resume after a restart. Every finished
-session is appended to `sessions.jsonl` as one line: `task_id`, `client_id`, `task`, `app`, `window`, `mode`,
-`started_at`, `ended_at`, `duration_ms`, `away_ms`, `away_count`, `completed`. That file is what will sync to
-Niyyah once the backend has timer fields. Both files are owner-only (0600).
+A focus session is **one task + one primary window + optional allowed windows**, started in one step: **Focus**
+in the popup asks for the task (an open task, or "New task…" which also files it in Niyyah), the primary window,
+any extra windows that are fine to use, and a timer (count-up, or a countdown of 1 to 240 minutes). It starts
+the task's timer.
+
+Three states, shown the same way in the popup's window list, the task row and the tray icon:
+
+| Front window | Popup window list | Task row / chip | Tray icon | Popup shake |
+|---|---|---|---|---|
+| **Primary** | solid accent fill, "PRIMARY" tag | "Focus · <window> · 12:34" | calm template icon | no |
+| **Allowed** (secondary) | outlined, soft tint, "ALLOWED" tag, "Remove" button | "Focus · allowed window" | subtle blue tint | no |
+| **Other** (outside the set) | neutral, muted, "Allow" button | amber "Back to Safari" | **blinks amber** | **shakes** |
+| Primary closed | "CLOSED" tag | amber "<app> window closed" | blinks amber | shakes |
+
+The timer keeps running on the primary and on allowed windows; only an "other" window nudges (after about
+1.5 s, so a quick Cmd-Tab and back is not counted). Our own windows (the popup) are neutral. With macOS
+**Reduce Motion** on, there is no blink and no shake: the nudge becomes a steady amber icon and the allowed tint
+is unchanged. The state table is tested twice (`core/src/focus.rs` `presentation`, `ui/tasklogic.js`
+`presentFor`).
+
+Change it mid-session in the popup's window list: click any window to make it the **primary** (the old primary
+becomes allowed, so you can go back without a nudge); **Allow** and **Remove** add or drop secondary windows. The
+chip pauses and resumes (pause stops the session and the task timer), and **✕ ends** the session. The task earns
+tracked time only while you are on the primary or an allowed window and the session is not paused; ending or
+pausing stops the task timer, which writes the time to the task.
+
+The primary window and the running session are saved (`focus.json`) and resume after a restart. Every finished
+session is appended to `sessions.jsonl` (`task_id`, `client_id`, `task`, `app`, `window`, `allowed_count`,
+`mode`, times, `duration_ms`, `away_ms`, `away_count`, `completed`). Both files are owner-only (0600).
+
+**Window names never leave this Mac.** The app and title of the primary and allowed windows exist only in the
+running app, `focus.json` and the local part of `sessions.jsonl`. A capture has no field for them (a Rust test
+pins that none of window, title, app, bundle id, primary, allowed, lane, link, deadline, timer or client id is in
+the server body), and `syncable()` in `ui/tasklogic.js` strips `app` and `window` from a session record before
+it could ever be sent (tested).
 
 Permissions, least first: the front app and the list of running apps need none. **Window titles need
-Accessibility** (AXUIElement); the picker's "Allow window titles" button triggers the system prompt. Without it,
-focus works for the whole app. **Screen Recording is never needed** (titles are not read through CGWindowList).
+Accessibility** (AXUIElement); the dialog's "Allow window titles" button triggers the system prompt, and the
+first-run note explains it beforehand. Without it, focus works per app. **Screen Recording is never needed.**
 Automation is separate and only for the browser-tab reminder.
 
-**Menu bar.** The app lives in the menu bar only (no Dock icon). Click the ring: the Next Up style panel opens as
-a popup right under the icon and closes when you click elsewhere or press Esc (unless you tick "Stay open when I
-click elsewhere" in Settings). Option+Command+N opens the quick-capture popover instead.
+## Menu bar
 
-**Switch-away alert (what "leaving the window" does).** While a focus session runs, leaving the chosen window
-makes the tray icon **blink amber** until you return or end the session; the popup shakes if it is open; the
-chip turns amber; and a full-screen "Back to Safari" names the window to return to. With macOS **Reduce Motion**
-on, the icon stays steadily amber and the popup does not shake. The same blink (8 s) is used for the timed
-check-in when the popup is closed.
+The app lives in the menu bar only (no Dock icon). The **menu-bar item is the icon and, while a focus session
+runs, the timer** (`12:34`). It never shows a window title or task text. Click the icon: the Next Up style panel
+opens as a popup right under it and closes when you click elsewhere or press Esc (unless "Stay open when I click
+elsewhere" is ticked). Option+Command+N opens the quick-capture popover instead. The timed check-in also blinks
+the icon (8 s) when the popup is closed.
 
-Native vs custom: the tray icon (a monochrome template image, so macOS tints it; amber, coloured, while
-alerting) and its dropdown menu (Capture, Show tasks, Settings, Quit) are the **native** macOS menu; Tauri cannot
-style them, and Next Up itself uses a native menu. The text next to the icon (running timer and task) is native
-too, in the system font. The popup and every dialog are the custom Next Up design, anchored under the icon.
+Native vs custom: the tray icon (a monochrome template image, so macOS tints it; blue-tinted and amber variants
+are coloured images) and its dropdown (Capture, Show tasks, Settings, Quit) are the **native** macOS menu; Tauri
+cannot style them, and Next Up itself uses a native menu. The timer text beside the icon is native too, in the
+system font. The popup and every dialog are the custom Next Up design.
 
-**Window names stay on this Mac.** The chosen window's app and title live only in `focus.json` and
-`sessions.jsonl` in the app data folder. They are never part of a capture: `Capture` has no field for them and a
-test (`local_only_fields_never_reach_the_wire`) pins that none of window, title, app, bundle id, link, deadline,
-timer or client id reaches the server body.
+## Streams and products
 
-## Blocks and products
+The picker lists your Niyyah **streams** (Kahf, Alisha Noor, ...) in a pale-blue column of small-radius chips;
+long names get an ellipsis and a tooltip. **Products are optional**: the chosen stream's products show as a
+second pick with nothing preselected, and a capture works with a stream alone. There is **no lane** in the UI or
+in the payload; lanes and products are not linked by default, and Niyyah uses them for its per-stream weekly log
+of finished tasks. The last stream you used is preselected.
 
-The block picker shows the plan page's tiles (SOUL, BODY, ONE, OPS, PLAN, DIST, FNF, SLEEP: white tiles in a
-pale-blue column, monospace caps). Picking a block fills the product chips from that block's products; the
-lane defaults to **NOW** (NOW, NEXT, BACKLOG). `GET /api/v1/capture/options` is read tolerantly in two shapes:
-planner blocks (`key`, `ring_name`, `label`, `color`, `products`) and the first server version's schedule rows
-(`block`, `start`, `end`, `what`, `stream`, with top-level `products` tied by `block`). A reply that matches
-neither shows an empty picker and a message; it never crashes the app. A capture is filed under the block's
-`stream`, else its `key`, else its `block`.
+`GET /api/v1/capture/options` is read as `streams` (`slug`, `name`, optional `products`) plus top-level
+`products` tied to a stream by `block` (the stream slug); products may be objects or bare slugs. Unknown
+fields (the old schedule `blocks`) are ignored, junk gives an empty picker and a message, never a crash. A
+capture is `{text, stream, products?}` plus `client_id` kept in the local queue.
+
+**Server dependency (flagged):** today's server (`ItemCreateIn`) requires exactly one of `day` and `lane`, so a
+stream-only body gets a 422. Until the backend accepts a stream alone, `Client::post_item` retries that one
+answer **once** with `lane: "backlog"` (the least intrusive lane), so captures still land; the retry is tested
+and is the single place to delete when the server changes. Any other 422 is refused and shown, not retried.
 
 ## Look: Next Up replica, with Lucide and Inter
 
 The layout, spacing, states and animations are Next Up's (same HTML and CSS, same window sizes). Deliberate
-differences: accent colour teal instead of blue; Lucide icons (one set, stroke 1.75) instead of text glyphs and
-CSS shapes; Inter variable (tabular numerals for timers) instead of the system font; added Niyyah rows (block,
-product, lane in the composer; connection in Settings; Focus button and chip); no software-update section. The
+differences: Lucide icons (one set, stroke 2) instead of text glyphs and CSS shapes; Inter variable (tabular numerals for timers) instead of the system font; added Niyyah rows (stream and
+optional product in the composer; connection in Settings; Focus button, chip and window list); the pin means "stay open when I click elsewhere" (off by default, it is a menu-bar popup); no software-update section. The
 quick-capture popover is the same composer, always open. Assets and licences: `THIRD_PARTY.md`.
 
 ### What stays on your Mac
 
-Niyyah stores a task's name, lane, block (stream) and product. These fields are **local only** for now, kept in
+Niyyah stores a task's name, stream and product (and, with the new sync routes, link, deadline, tracked time and timer; this app does not send those yet). These fields are **local only** for now, kept in
 `tasks.json` in the app data folder and shown in the panel: **link**, **timer (tracked time, running state)**,
 **deadline with a time**, and later **edits** of a task's name. Marking a task done in the panel does not
 complete it in Niyyah either. Proposed backend follow-up: item fields `link`, `deadline_at` (datetime),
@@ -102,8 +127,8 @@ contract means adding fields there and in `captureFor` (`ui/tasklogic.js`).
 
 ## How a capture travels
 
-1. The popover has a text field, a **block** select (pre-filled from the current time), a **product**
-   select, a **lane** chip (Now, **Next**, Someday) and Save. Enter saves, Escape closes.
+1. The popover has a text field, the **stream** column (last used preselected), optional **product** chips and
+   Save. Enter saves, Escape closes. No lane.
 2. Save writes the capture to a queue file in the app data folder (mode 0600) and returns at once.
 3. A background sender posts it. The server's 201 is the only thing that removes it from the queue.
    Network errors, 429 and 5xx back off 5 s, 10 s, 20 s ... up to 15 min. A 401/403 keeps the capture
@@ -117,25 +142,23 @@ contract means adding fields there and in `captureFor` (`ui/tasklogic.js`).
 Auth for both: `Authorization: Bearer nyd_...` (a device token, created and revoked in Niyyah under
 **Settings > Devices**; scope "create tasks only").
 
-`POST /api/v1/vault/items` (existing `ItemCreateIn`, lane form):
+`POST /api/v1/vault/items` (existing `ItemCreateIn`; the app sends a stream and no lane, see "Streams and products"):
 
 ```json
-{"text": "Call the bank", "lane": "next", "stream": "OT", "products": ["alisha"]}
+{"text": "Call the bank", "stream": "kahf", "products": ["dns"]}
 ```
 
-`lane` is `now`, `next` or `backlog` (the app's "Someday"). `stream` is required with `lane` (the API files
-an undated item under a stream); `products` is omitted when none is picked. `day` is never sent.
+`products` is omitted when none is picked. `day` and `lane` are never sent by the app; see the flagged server
+dependency in "Streams and products" for the one-time `backlog` retry.
 
-`GET /api/v1/capture/options` (new in Part A, read-only; field names are this app's assumption and must match
-Part A):
+`GET /api/v1/capture/options` (read-only, device token allowed):
 
 ```json
-{"blocks":   [{"block": "OT", "start": "06:00", "end": "16:03", "what": "Outcome time", "stream": "OT"}],
- "products": [{"slug": "alisha", "name": "Alisha Noor", "block": "OT"}]}
+{"streams":  [{"slug": "kahf", "name": "Kahf", "products": [{"slug": "dns", "name": "DNS"}]}],
+ "products": [{"slug": "alisha-store", "name": "Store", "block": "alisha"}]}
 ```
 
-The block pre-selected at capture time is the one whose `start`..`end` (local time, end exclusive, wraps past
-midnight) covers now. A capture is filed under the block's `stream`, or its `block` key if `stream` is null.
+A stream's products are its own `products`, else the top-level products whose `block` is the stream slug.
 The reply is cached for the session and the last good copy is kept on disk, so a capture can still be filed
 while offline.
 
@@ -201,7 +224,7 @@ notarisation, so macOS will not open it silently the first time.
    **Microphone** and **Speech Recognition** (dictation). Window-switch reminders and global shortcuts need no
    permission on current macOS; if a shortcut does nothing, add the app under **Privacy & Security >
    Accessibility** or **Input Monitoring**.
-8. First capture: press **Option+Command+N**, type a task, pick a block and product, press **Save**. It appears in
+8. First capture: press **Option+Command+N**, type a task, pick a stream (and, if you like, a product), press **Save**. It appears in
    Niyyah within a few seconds. A refused-token message means the token was revoked or mistyped: create a new one.
 
 Revoke a lost laptop's access in Niyyah under **Settings > Devices > Revoke**; the app then keeps your captures and
