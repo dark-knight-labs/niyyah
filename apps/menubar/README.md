@@ -98,8 +98,8 @@ notarisation, so macOS will not open it silently the first time.
 6. In Niyyah (web), open **Settings > Devices**, type a name for this Mac (for example "Work MacBook") and press
    **Create device token**. The token (`nyd_...`) is shown once: press **Copy**. If you lose it, revoke it there
    and create another.
-7. In the app, click **Settings** in the popover. Set the server URL to `https://niyyah-api.alamin.rocks`
-   (your own address if you self-host) and paste it into **Device token**. Press **Store**. macOS may ask to let the app use the
+7. In the app, click **Settings** in the popover. Set the server URL to `https://<your-niyyah-api-host>`
+   (the address of your Niyyah API) and paste it into **Device token**. Press **Store**. macOS may ask to let the app use the
    Keychain: allow it.
 8. First capture: press **Option+Command+N**, type a task, pick a lane (Now, Next or Someday), press **Save**. It appears in Niyyah within
    a few seconds. A refused-token message means the token was revoked or mistyped: create a new one.

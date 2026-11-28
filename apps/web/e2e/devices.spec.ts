@@ -133,3 +133,122 @@ test("devices: leaving the page drops an undismissed token, and a server refusal
   expect(logged.join("\n")).not.toContain("secret-detail");
   errors.length = 0; // the stubbed 500 is logged by the browser on purpose
 });
+
+const create = async (page: Page, name: string) => {
+  await section(page).getByLabel("Device name").fill(name);
+  await section(page).getByRole("button", { name: "Create device token" }).click();
+};
+const rowOf = (page: Page, name: string) => section(page).getByRole("listitem").filter({ hasText: name });
+const cleanUp = async (page: Page, name: string) => {
+  await page.unroute("**/api/v1/devices/tokens");
+  await page.reload();
+  await rowOf(page, name).getByRole("button", { name: `Revoke ${name}` }).click();
+  await rowOf(page, name).getByRole("button", { name: "Yes, revoke" }).click();
+  await expect(rowOf(page, name)).toHaveCount(0);
+};
+
+test("devices: a hidden tab keeps the token; it hides itself after 5 minutes with a visible message", async ({ page }) => {
+  const name = `Timer ${Date.now().toString(36)}`;
+  await page.clock.install();
+  await page.goto("/settings");
+  await create(page, name);
+  const box = section(page).getByRole("status", { name: "New device token" });
+  const raw = await box.getByLabel("Device token", { exact: true }).inputValue();
+
+  // Another window covering the browser must not cost the owner the token.
+  await page.evaluate(() => { Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true }); document.dispatchEvent(new Event("visibilitychange")); });
+  await page.clock.fastForward(4 * 60 * 1000);
+  await expect(box).toBeVisible();
+
+  await page.clock.fastForward(61 * 1000);
+  await expect(box).toHaveCount(0);
+  await expect(section(page).getByText("Token hidden after 5 minutes. Revoke this device and create a new one if you did not copy it.")).toBeVisible();
+  expect(await pageHolds(page, raw), "token anywhere after auto-hide").toBe(false);
+
+  // A new create clears the message.
+  await create(page, `${name} b`);
+  await expect(section(page).getByText(/Token hidden after 5 minutes/)).toHaveCount(0);
+  for (const n of [`${name} b`, name]) {
+    await rowOf(page, n).getByRole("button", { name: `Revoke ${n}` }).click();
+    await rowOf(page, n).getByRole("button", { name: "Yes, revoke" }).click();
+    await expect(rowOf(page, n)).toHaveCount(0);
+  }
+});
+
+test("devices: a failed list call shows the error, not the empty state, and keeps the known rows", async ({ page }) => {
+  const name = `Keep ${Date.now().toString(36)}`;
+  // First load fails: unknown list, no "No devices yet."
+  await page.route("**/api/v1/devices/tokens", (r) => r.request().method() === "GET" ? r.fulfill({ status: 500, contentType: "application/json", body: "{}" }) : r.continue());
+  await page.goto("/settings");
+  await expect(section(page).getByRole("alert")).toContainText("Could not load the device list");
+  await expect(section(page).getByText("No devices yet.")).toHaveCount(0);
+  await page.unroute("**/api/v1/devices/tokens");
+  await page.reload();
+  await create(page, name);
+  await section(page).getByRole("button", { name: "I have copied it" }).click();
+  await expect(rowOf(page, name)).toBeVisible();
+
+  // A later reload fails: the row stays, the error shows.
+  await page.route("**/api/v1/devices/tokens", (r) => r.request().method() === "GET" ? r.fulfill({ status: 500, contentType: "application/json", body: "{}" }) : r.continue());
+  await create(page, `${name} 2`);
+  await expect(section(page).getByRole("alert")).toContainText("Could not load the device list");
+  await expect(rowOf(page, name)).toBeVisible();
+  await expect(section(page).getByText("No devices yet.")).toHaveCount(0);
+  errors.length = 0;
+  await page.unroute("**/api/v1/devices/tokens");
+  await page.reload();
+  for (const n of [`${name} 2`, name]) {
+    await rowOf(page, n).getByRole("button", { name: `Revoke ${n}` }).click();
+    await rowOf(page, n).getByRole("button", { name: "Yes, revoke" }).click();
+    await expect(rowOf(page, n)).toHaveCount(0);
+  }
+});
+
+test("devices: revoking a row that is already gone (404) reloads the list so the stale row disappears", async ({ page, request }) => {
+  const name = `Stale ${Date.now().toString(36)}`;
+  await page.goto("/settings");
+  await create(page, name);
+  await section(page).getByRole("button", { name: "I have copied it" }).click();
+  const list = await (await request.get(`${API}/api/v1/devices/tokens`, { headers: { Authorization: `Bearer ${tokens!.access_token}` } })).json();
+  const mine = list.find((t: { name: string }) => t.name === name);
+  expect((await request.delete(`${API}/api/v1/devices/tokens/${mine.id}`, { headers: { Authorization: `Bearer ${tokens!.access_token}` } })).status()).toBe(204);
+
+  await rowOf(page, name).getByRole("button", { name: `Revoke ${name}` }).click();
+  await rowOf(page, name).getByRole("button", { name: "Yes, revoke" }).click();
+  await expect(section(page).getByRole("alert")).toHaveText("Could not revoke the device token");
+  await expect(rowOf(page, name)).toHaveCount(0);
+  errors.length = 0; // the 404 is logged by the browser
+});
+
+test("devices: revoking the just-created device clears the shown token", async ({ page }) => {
+  const name = `Fresh ${Date.now().toString(36)}`;
+  await page.goto("/settings");
+  await create(page, name);
+  const box = section(page).getByRole("status", { name: "New device token" });
+  const raw = await box.getByLabel("Device token", { exact: true }).inputValue();
+  await rowOf(page, name).getByRole("button", { name: `Revoke ${name}` }).click();
+  await rowOf(page, name).getByRole("button", { name: "Yes, revoke" }).click();
+  await expect(rowOf(page, name)).toHaveCount(0);
+  await expect(box).toHaveCount(0);
+  expect(await pageHolds(page, raw)).toBe(false);
+});
+
+test("devices: Enter submits, Copy puts the token on the clipboard, and the 422 rule text is shown", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const name = `Enter ${Date.now().toString(36)}`;
+  await page.goto("/settings");
+  await section(page).getByLabel("Device name").fill(name);
+  await section(page).getByLabel("Device name").press("Enter");
+  const box = section(page).getByRole("status", { name: "New device token" });
+  const raw = await box.getByLabel("Device token", { exact: true }).inputValue();
+  await box.getByRole("button", { name: "Copy" }).click();
+  await expect(box.getByRole("button", { name: "Copied" })).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(raw);
+
+  await page.route("**/api/v1/devices/tokens", (r) => r.request().method() === "POST"
+    ? r.fulfill({ status: 422, contentType: "application/json", body: JSON.stringify({ detail: "at most 20 device tokens; revoke one first" }) }) : r.continue());
+  await create(page, "one more");
+  await expect(section(page).getByRole("alert")).toHaveText("at most 20 device tokens; revoke one first");
+  errors.length = 0;
+  await cleanUp(page, name);
+});
