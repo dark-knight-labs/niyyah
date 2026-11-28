@@ -177,8 +177,10 @@ notarisation, so macOS will not open it silently the first time.
    **Microphone** and **Speech Recognition** (dictation). Window-switch reminders and global shortcuts need no
    permission on current macOS; if a shortcut does nothing, add the app under **Privacy & Security >
    Accessibility** or **Input Monitoring**.
+8. First capture: press **Option+Command+N**, type a task, pick a block and product, press **Save**. It appears in
+   Niyyah within a few seconds. A refused-token message means the token was revoked or mistyped: create a new one.
 
-Revoke a lost laptop's access by revoking its device token in Niyyah; the app then keeps your captures and
+Revoke a lost laptop's access in Niyyah under **Settings > Devices > Revoke**; the app then keeps your captures and
 shows that the token was refused.
 
 ## What is verified
