@@ -16,7 +16,7 @@ DEVICE_WINDOW = 60
 
 
 def _refuse_device_token(raw: str) -> None:
-    """A device token opens two routes (get_capture_user) and nothing else: anywhere else it is a 403, never a login."""
+    """A device token opens four routes (get_capture_user) and nothing else: anywhere else it is a 403, never a login."""
     if raw.startswith(device_tokens.PREFIX):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="A device token cannot be used here")
 
@@ -72,7 +72,7 @@ async def get_capture_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """A login or a device token (nyd_), rate limited per device token. Only POST /vault/items and GET /capture/options use
+    """A login or a device token (nyd_), rate limited per device token. Only POST /vault/items and the /capture routes (options, tasks list, task patch) use
     this. An export token (nyt_) is not a login, so it fails here with 401."""
     raw = credentials.credentials
     if raw.startswith(device_tokens.PREFIX):

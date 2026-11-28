@@ -16,7 +16,7 @@ from tests.conftest import TestSession
 D = "/api/v1/devices/tokens"
 ITEMS = "/api/v1/vault/items"
 OPTIONS = "/api/v1/capture/options"
-ALLOWED = {("POST", ITEMS), ("GET", OPTIONS)}
+ALLOWED = {("POST", ITEMS), ("GET", OPTIONS), ("GET", "/api/v1/capture/tasks"), ("PATCH", "/api/v1/capture/tasks/{client_id}")}
 # Routes that take no bearer token at all: a device token is irrelevant there.
 OPEN = {("GET", "/health"), ("POST", "/api/v1/auth/register"), ("POST", "/api/v1/auth/login"), ("POST", "/api/v1/auth/refresh"),
         ("POST", "/api/v1/auth/logout"),

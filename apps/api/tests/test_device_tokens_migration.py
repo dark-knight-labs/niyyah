@@ -37,7 +37,10 @@ def _has_table(c: sqlite3.Connection, name: str) -> bool:
 
 
 def test_this_revision_is_the_only_head():
-    assert _alembic("sqlite+aiosqlite:///:memory:", "heads").split()[0] == THIS
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    script = ScriptDirectory.from_config(Config(str(API_DIR / "alembic.ini")))
+    assert len(script.get_heads()) == 1 and script.get_revision(THIS) is not None  # later revisions sit on top of this one
 
 
 def test_sqlite_upgrade_downgrade_upgrade(tmp_path):

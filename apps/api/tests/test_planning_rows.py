@@ -79,7 +79,7 @@ async def test_an_item_needs_a_day_or_a_lane_not_both_not_neither(db_client):
     assert (await client.post(f"{V}/items", json={"text": "x", "lane": "next"})).status_code == 422  # a lane needs a stream
     assert (await client.post(f"{V}/items", json={**base, "lane": "done"})).status_code == 422
     assert (await client.post(f"{V}/items", json={"text": "x", "stream": "nope", "lane": "next"})).status_code == 422
-    assert (await client.post(f"{V}/items", json={**base, "lane": "next", "status": "done"})).status_code == 422
+    assert (await client.post(f"{V}/items", json={**base, "lane": "next", "status": "skipped"})).status_code == 422
     assert (await client.post(f"{V}/items", json={**base, "lane": "next", "start_min": 540, "end_min": 600})).status_code == 422  # a time needs a day
     assert (await client.post(f"{V}/items", json={"text": "plain", "day": today.isoformat()})).status_code == 201
 

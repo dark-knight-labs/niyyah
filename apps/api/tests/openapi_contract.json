@@ -653,6 +653,90 @@
    "type": "object"
   }
  },
+ "GET /api/v1/capture/tasks": {
+  "params": [
+   "query:include_done",
+   "query:limit"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "tasks": {
+     "items": {
+      "properties": {
+       "client_id": {
+        "type": "string"
+       },
+       "deadline_at": {
+        "type": "string"
+       },
+       "done": {
+        "type": "boolean"
+       },
+       "due_on": {
+        "type": "string"
+       },
+       "id": {
+        "type": "integer"
+       },
+       "lane": {
+        "type": "string"
+       },
+       "link": {
+        "type": "string"
+       },
+       "products": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "scheduled_on": {
+        "type": "string"
+       },
+       "status": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "text": {
+        "type": "string"
+       },
+       "timer_started_at": {
+        "type": "string"
+       },
+       "tracked_seconds": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "client_id",
+       "deadline_at",
+       "done",
+       "due_on",
+       "id",
+       "lane",
+       "link",
+       "products",
+       "scheduled_on",
+       "status",
+       "stream",
+       "text",
+       "timer_started_at",
+       "tracked_seconds"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "tasks"
+   ],
+   "type": "object"
+  }
+ },
  "GET /api/v1/compass": {
   "params": [],
   "request": null,
@@ -1803,6 +1887,9 @@
        "day": {
         "type": "string"
        },
+       "deadline_at": {
+        "type": "string"
+       },
        "description": {
         "type": "string"
        },
@@ -1834,6 +1921,9 @@
         "type": "string"
        },
        "lane": {
+        "type": "string"
+       },
+       "link": {
         "type": "string"
        },
        "location": {
@@ -1869,8 +1959,14 @@
        "stream": {
         "type": "string"
        },
+       "timer_started_at": {
+        "type": "string"
+       },
        "title": {
         "type": "string"
+       },
+       "tracked_seconds": {
+        "type": "integer"
        },
        "uid": {
         "type": "string"
@@ -2041,6 +2137,9 @@
        "day": {
         "type": "string"
        },
+       "deadline_at": {
+        "type": "string"
+       },
        "description": {
         "type": "string"
        },
@@ -2072,6 +2171,9 @@
         "type": "string"
        },
        "lane": {
+        "type": "string"
+       },
+       "link": {
         "type": "string"
        },
        "location": {
@@ -2113,8 +2215,14 @@
        "stream": {
         "type": "string"
        },
+       "timer_started_at": {
+        "type": "string"
+       },
        "title": {
         "type": "string"
+       },
+       "tracked_seconds": {
+        "type": "integer"
        },
        "uid": {
         "type": "string"
@@ -3140,6 +3248,101 @@
    "type": "object"
   }
  },
+ "PATCH /api/v1/capture/tasks/{client_id}": {
+  "params": [
+   "path:client_id*"
+  ],
+  "request": {
+   "properties": {
+    "deadline_at": {
+     "type": "string"
+    },
+    "done": {
+     "type": "boolean"
+    },
+    "link": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "timer_started_at": {
+     "type": "string"
+    },
+    "tracked_seconds": {
+     "type": "integer"
+    }
+   },
+   "required": [],
+   "type": "object"
+  },
+  "response": {
+   "properties": {
+    "client_id": {
+     "type": "string"
+    },
+    "deadline_at": {
+     "type": "string"
+    },
+    "done": {
+     "type": "boolean"
+    },
+    "due_on": {
+     "type": "string"
+    },
+    "id": {
+     "type": "integer"
+    },
+    "lane": {
+     "type": "string"
+    },
+    "link": {
+     "type": "string"
+    },
+    "products": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
+    "scheduled_on": {
+     "type": "string"
+    },
+    "status": {
+     "type": "string"
+    },
+    "stream": {
+     "type": "string"
+    },
+    "text": {
+     "type": "string"
+    },
+    "timer_started_at": {
+     "type": "string"
+    },
+    "tracked_seconds": {
+     "type": "integer"
+    }
+   },
+   "required": [
+    "client_id",
+    "deadline_at",
+    "done",
+    "due_on",
+    "id",
+    "lane",
+    "link",
+    "products",
+    "scheduled_on",
+    "status",
+    "stream",
+    "text",
+    "timer_started_at",
+    "tracked_seconds"
+   ],
+   "type": "object"
+  }
+ },
  "PATCH /api/v1/personas/{persona_id}": {
   "params": [
    "path:persona_id*"
@@ -3574,11 +3777,17 @@
     "day": {
      "type": "string"
     },
+    "deadline_at": {
+     "type": "string"
+    },
     "description": {
      "type": "string"
     },
     "end_min": {
      "type": "integer"
+    },
+    "link": {
+     "type": "string"
     },
     "parent_id": {
      "type": "integer"
@@ -3600,6 +3809,12 @@
     },
     "text": {
      "type": "string"
+    },
+    "timer_started_at": {
+     "type": "string"
+    },
+    "tracked_seconds": {
+     "type": "integer"
     },
     "weight": {
      "type": "integer"
@@ -3653,6 +3868,9 @@
     "day": {
      "type": "string"
     },
+    "deadline_at": {
+     "type": "string"
+    },
     "description": {
      "type": "string"
     },
@@ -3684,6 +3902,9 @@
      "type": "string"
     },
     "lane": {
+     "type": "string"
+    },
+    "link": {
      "type": "string"
     },
     "location": {
@@ -3719,8 +3940,14 @@
     "stream": {
      "type": "string"
     },
+    "timer_started_at": {
+     "type": "string"
+    },
     "title": {
      "type": "string"
+    },
+    "tracked_seconds": {
+     "type": "integer"
     },
     "uid": {
      "type": "string"
@@ -6033,6 +6260,9 @@
     "day": {
      "type": "string"
     },
+    "deadline_at": {
+     "type": "string"
+    },
     "description": {
      "type": "string"
     },
@@ -6040,6 +6270,9 @@
      "type": "integer"
     },
     "lane": {
+     "type": "string"
+    },
+    "link": {
      "type": "string"
     },
     "parent_id": {
@@ -6062,6 +6295,12 @@
     },
     "text": {
      "type": "string"
+    },
+    "timer_started_at": {
+     "type": "string"
+    },
+    "tracked_seconds": {
+     "type": "integer"
     },
     "weight": {
      "type": "integer"
@@ -6117,6 +6356,9 @@
     "day": {
      "type": "string"
     },
+    "deadline_at": {
+     "type": "string"
+    },
     "description": {
      "type": "string"
     },
@@ -6148,6 +6390,9 @@
      "type": "string"
     },
     "lane": {
+     "type": "string"
+    },
+    "link": {
      "type": "string"
     },
     "location": {
@@ -6183,8 +6428,14 @@
     "stream": {
      "type": "string"
     },
+    "timer_started_at": {
+     "type": "string"
+    },
     "title": {
      "type": "string"
+    },
+    "tracked_seconds": {
+     "type": "integer"
     },
     "uid": {
      "type": "string"

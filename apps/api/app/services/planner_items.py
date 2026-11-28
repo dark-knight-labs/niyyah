@@ -4,7 +4,7 @@ An own item is a planner_tasks row. A time (start_min/end_min) belongs to its `s
 has a due or start date shows on those days too, all day. A calendar event's title and time always come from its feed;
 the user's additions live in planner_event_overlays, matched by event key. Writes flush; the caller commits.
 """
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,20 @@ def _iso(value: date | None) -> str | None:
     return value.isoformat() if value else None
 
 
+def utc(value: datetime | None) -> datetime | None:
+    """A stored moment as UTC with a zone (SQLite hands back naive values; Postgres aware ones)."""
+    if value is None:
+        return None
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
+def set_extras(task: Task, fields: dict) -> None:
+    """Apply the capture extras that were sent (link, deadline_at, tracked_seconds, timer_started_at); the others stay."""
+    for name in ("link", "deadline_at", "tracked_seconds", "timer_started_at"):
+        if name in fields:
+            setattr(task, name, fields[name])
+
+
 def task_item(task: Task, day: date | None) -> dict:
     """A task as an item on `day`; its time shows only on its scheduled date."""
     timed = task.start_min is not None and task.scheduled_on is not None and task.scheduled_on == day
@@ -43,6 +57,8 @@ def task_item(task: Task, day: date | None) -> dict:
         "all_day": not timed, "start_min": task.start_min if timed else None, "end_min": task.end_min if timed else None,
         "due_on": _iso(task.due_on), "scheduled_on": _iso(task.scheduled_on), "start_on": _iso(task.start_on),
         "path": task.source_path or "",
+        "link": task.link, "deadline_at": utc(task.deadline_at), "tracked_seconds": task.tracked_seconds or 0,
+        "timer_started_at": utc(task.timer_started_at),
         "lane": task.lane, "focus_week": task.focus_week, "checkpoint": task.checkpoint, "parent_id": task.parent_id,
     }
 
@@ -199,6 +215,7 @@ async def create_item(db: AsyncSession, user_id: int, day: date | None, fields: 
         if fields.get("status"):
             set_status(task, fields["status"], today)
         db.add(task)
+    set_extras(task, fields)
     await db.flush()
     if fields.get("parent_id") is not None:
         await _set_parent(db, task, fields["parent_id"])
@@ -215,11 +232,13 @@ async def _create_planning(db: AsyncSession, user_id: int, lane: str, fields: di
         raise ValueError("an item in a lane needs a stream")
     if stream not in await planner_work.pipeline_streams(db, user_id, today):
         raise ValueError(f"unknown stream '{stream}'")
-    if fields.get("status") not in (None, "open"):
-        raise ValueError("add the item first, then tick it")
+    if fields.get("status") not in (None, "open", "done"):
+        raise ValueError("a new pipeline item can only be open or done")
     task = (await planner_work.add_rows(db, user_id, stream, [fields["text"]], lane, today))[0]
     _set_time(task, fields)
     await _annotate(db, user_id, task, {k: v for k, v in fields.items() if k != "stream"}, list(task.products or []))
+    if fields.get("status") == "done":  # born done (a capture client that already finished it): the pipeline's own tick
+        await planner_work.set_row_done(db, user_id, task, True, today)
     return task
 
 
@@ -246,6 +265,7 @@ async def update_item(db: AsyncSession, user_id: int, task_id: int, fields: dict
         await planner_work.set_row_stream(db, user_id, task, fields["stream"], today)
         fields = {k: v for k, v in fields.items() if k != "stream"}
     await _annotate(db, user_id, task, fields, text_tags)
+    set_extras(task, fields)
     if "status" in fields:
         if planning:
             await planner_work.set_row_done(db, user_id, task, fields["status"] == "done", today)
