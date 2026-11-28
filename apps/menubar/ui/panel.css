@@ -1,3 +1,5 @@
+@font-face { font-family: "Inter Variable"; font-style: normal; font-weight: 100 900; font-display: swap; src: url(fonts/inter-latin-wght-normal.woff2) format("woff2-variations"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Inter Variable"; font-style: normal; font-weight: 100 900; font-display: swap; src: url(fonts/inter-latin-ext-wght-normal.woff2) format("woff2-variations"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 :root {
   color-scheme: light;
   --ink: #182238;
@@ -8,7 +10,9 @@
   --surface: #f9faff;
   --hover: #eef2fb;
   --ease: cubic-bezier(.2,.75,.25,1);
-  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font: "Inter Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font: 14px/1.45 var(--font);
+  font-feature-settings: "cv11", "ss03";
 }
 * { box-sizing: border-box; }
 body { -webkit-user-select: none; user-select: none; }
@@ -131,7 +135,7 @@ h1 { font-size: clamp(38px, 5vw, 68px); line-height: 1.03; letter-spacing: -.04e
   box-shadow: 0 20px 52px #27396d36, 0 3px 9px #27396d18;
   transition: transform .38s var(--ease), opacity .24s, visibility .38s, background-color .24s, box-shadow .24s, border-color .24s;
 }
-:is(.widget, #settings, #voice) { zoom: var(--app-scale, .8); }
+:is(.widget, #settings, #focus, #voice) { zoom: var(--app-scale, .8); }
 .widget.closed { transform: translateX(calc(-100% - 55px)); opacity: 0; visibility: hidden; }
 #task-menu {
   position: absolute;
@@ -159,7 +163,7 @@ h1 { font-size: clamp(38px, 5vw, 68px); line-height: 1.03; letter-spacing: -.04e
   padding: 0;
   border-color: transparent;
   background: transparent;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   color: var(--muted);
 }
@@ -167,15 +171,6 @@ h1 { font-size: clamp(38px, 5vw, 68px); line-height: 1.03; letter-spacing: -.04e
 .icon[aria-pressed=true] { color: var(--accent); background: #dce6ff; }
 #expand { transition: rotate .22s var(--ease), background-color .18s; }
 #expand[aria-pressed=true] { rotate: 180deg; }
-.pin-glyph {
-  width: 9px;
-  height: 8px;
-  border: 1.5px solid currentColor;
-  border-radius: 2px 2px 4px 4px;
-  position: relative;
-  translate: 0 -2px;
-}
-.pin-glyph::after { content: ""; position: absolute; top: 100%; left: 50%; width: 1px; height: 5px; background: currentColor; }
 .widget-body { overflow: auto; padding: 12px; }
 .list-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 #focus-question { font-size: 13px; font-weight: 650; }
@@ -250,10 +245,11 @@ button.task-time { padding: 3px 6px; border-color: transparent; background: tran
 }
 .task-playback::before {
   content: "";
-  width: 9px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   background: currentColor;
-  clip-path: polygon(12% 0, 100% 50%, 12% 100%);
+  -webkit-mask: url(icons/play.svg) center / contain no-repeat;
+  mask: url(icons/play.svg) center / contain no-repeat;
 }
 .task.running .task-playback {
   background: var(--accent);
@@ -262,7 +258,8 @@ button.task-time { padding: 3px 6px; border-color: transparent; background: tran
 }
 .task.running .task-playback:hover { background: var(--accent-hover); }
 .task.running .task-playback::before {
-  clip-path: polygon(0 0, 33% 0, 33% 100%, 0 100%, 0 0, 67% 0, 100% 0, 100% 100%, 67% 100%, 67% 0);
+  -webkit-mask-image: url(icons/pause.svg);
+  mask-image: url(icons/pause.svg);
 }
 .empty { padding: 10px 0; color: var(--muted); }
 .check-question { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 5px 12px 3px; }
@@ -358,31 +355,6 @@ button.task-time { padding: 3px 6px; border-color: transparent; background: tran
 }
 textarea.transcript:not([hidden]) { min-height: 76px; }
 #mic { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
-.mic-glyph {
-  position: relative;
-  width: 7px;
-  height: 11px;
-  margin: 0 4px 4px;
-  border-radius: 5px;
-  background: currentColor;
-}
-.mic-glyph::before {
-  content: "";
-  position: absolute;
-  inset: 4px -3px -3px;
-  border: 1px solid currentColor;
-  border-top: 0;
-  border-radius: 0 0 8px 8px;
-}
-.mic-glyph::after {
-  content: "";
-  position: absolute;
-  top: 14px;
-  left: 3px;
-  width: 1px;
-  height: 3px;
-  background: currentColor;
-}
 #voice #mic { position: absolute; top: 7px; right: 7px; width: 34px; height: 34px; padding: 0; color: var(--accent); background: #edf2ff; }
 #voice #mic[aria-pressed=true] { color: white; background: var(--accent); }
 #voice .save { display: block; min-width: 72px; margin-left: auto; }
@@ -404,7 +376,7 @@ textarea.transcript:not([hidden]) { min-height: 76px; }
 }
 
 html.desktop, .desktop body { background: transparent; overflow: hidden; }
-.desktop { font-family: -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; }
+.desktop { font-family: var(--font); }
 .desktop :is(.bar, .intro, .wallpaper) { display: none; }
 .desktop main { display: block; min-height: 0; padding: 0; isolation: auto; }
 .desktop .widget {
@@ -454,7 +426,7 @@ html:not(.desktop) .desktop-capture { display: none; }
   }
 }
 
-#settings {
+:is(#settings, #focus) {
   width: min(360px, calc(100% - 24px));
   box-sizing: border-box;
   padding: 14px 18px;
@@ -464,14 +436,14 @@ html:not(.desktop) .desktop-capture { display: none; }
   color: var(--ink);
   box-shadow: 0 12px 38px #27396d33;
 }
-#settings::backdrop { background: #202f5524; backdrop-filter: blur(3px); }
-.desktop #settings::backdrop { background: transparent; backdrop-filter: none; }
-.desktop:has(#settings[open]) .widget { visibility: hidden; }
-#settings header, #settings label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-#settings h2 { margin: 0; font-size: 18px; }
-#settings label { padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
-#settings header { margin-bottom: 8px; }
-#settings select {
+:is(#settings, #focus)::backdrop { background: #202f5524; backdrop-filter: blur(3px); }
+.desktop :is(#settings, #focus)::backdrop { background: transparent; backdrop-filter: none; }
+.desktop:has(:is(#settings, #focus)[open]) .widget { visibility: hidden; }
+:is(#settings, #focus) header, :is(#settings, #focus) label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+:is(#settings, #focus) h2 { margin: 0; font-size: 18px; }
+:is(#settings, #focus) label { padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
+:is(#settings, #focus) header { margin-bottom: 8px; }
+:is(#settings, #focus) select {
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -556,3 +528,41 @@ html:not(.desktop) .desktop-capture { display: none; }
 .composer-niyyah label { display: grid; gap: 3px; color: var(--muted); }
 .composer-niyyah select { font: inherit; color: var(--ink); min-width: 0; }
 .composer-niyyah[hidden] { display: none; }
+
+/* Icons: Lucide SVGs as masks, so they take the text colour. One size, one stroke weight. */
+.ic {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  background: currentColor;
+  -webkit-mask: var(--ic) center / contain no-repeat;
+  mask: var(--ic) center / contain no-repeat;
+}
+.ic-arrow-up-right { --ic: url(icons/arrow-up-right.svg); }
+.ic-plus { --ic: url(icons/plus.svg); }
+.ic-chevron-up { --ic: url(icons/chevron-up.svg); }
+.ic-settings { --ic: url(icons/settings.svg); }
+.ic-pin { --ic: url(icons/pin.svg); }
+.ic-x { --ic: url(icons/x.svg); }
+.ic-grip { --ic: url(icons/grip-vertical.svg); width: 14px; height: 14px; }
+.ic-mic { --ic: url(icons/mic.svg); width: 18px; height: 18px; }
+.ic-external { --ic: url(icons/external-link.svg); width: 13px; height: 13px; vertical-align: -2px; }
+.ic-target { --ic: url(icons/target.svg); }
+.ic-timer { --ic: url(icons/timer.svg); }
+
+/* Focus window: chip on the panel, dialog to pick the window. */
+.focus-chip { display: flex; align-items: center; gap: 8px; margin: 6px 12px 0; padding: 5px 5px 5px 9px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff80; font-size: 12px; }
+.focus-chip[hidden] { display: none; }
+.focus-chip #focus-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-chip strong { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.focus-chip .icon { width: 22px; height: 22px; }
+.focus-chip[data-state=away] { border-color: #d97706; background: #fff7e6; color: #92400e; }
+.focus-chip[data-state=lost] { border-color: #b42318; background: #fff1f0; color: #b42318; }
+#focus-window { max-width: 230px; font: inherit; }
+#focus-hint, #focus-status { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+#focus-hint:empty, #focus-status:empty { display: none; }
+#focus-task { font-weight: 600; }
+#focus .primary { margin-top: 10px; width: 100%; }
+#focus input[type=number] { width: 72px; font: inherit; }

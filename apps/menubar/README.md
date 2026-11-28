@@ -31,6 +31,38 @@ Stack: Tauri 2. `core/` is plain Rust (queue, API client, token store) and is te
 | Offline queue for the Niyyah side | `core/src/queue.rs` (below) |
 | Software updater | **removed** (no endpoint, no plugin) |
 
+## Focus window and the menu bar
+
+**Focus window.** In the panel, **Focus** opens a picker of the open windows (app and title). Pick one, choose
+count-up or a countdown (1 to 240 minutes) and Start: the timer is tied to the current task (it starts the
+task if it is not running). If you leave the window for about 1.5 seconds the panel chip turns amber
+("Away from Safari"), a full-screen reminder says "Back to Safari" and the menu-bar text changes to
+"Away · 12:34 · Task". If the window or app is closed the chip turns red ("window closed"). Cmd-Tab and back
+within that grace time is not counted, and switching to Niyyah Capture itself (to pause the timer) never counts.
+The chosen window and the running session are saved (`focus.json`) and resume after a restart. Every finished
+session is appended to `sessions.jsonl` as one line: `task_id`, `client_id`, `task`, `app`, `window`, `mode`,
+`started_at`, `ended_at`, `duration_ms`, `away_ms`, `away_count`, `completed`. That file is what will sync to
+Niyyah once the backend has timer fields. Both files are owner-only (0600).
+
+Permissions, least first: the front app and the list of running apps need none. **Window titles need
+Accessibility** (AXUIElement); the picker's "Allow window titles" button triggers the system prompt. Without it,
+focus works for the whole app. **Screen Recording is never needed** (titles are not read through CGWindowList).
+Automation is separate and only for the browser-tab reminder.
+
+**Menu bar.** Native vs custom: the tray icon (a monochrome template image, so macOS tints it) and its dropdown
+menu (Capture, Show tasks, Settings, Quit) are the **native** macOS menu; Tauri cannot style them, and Next Up
+itself uses a native menu. The text next to the icon (running timer and task, or the current task) is native
+too, in the system font. The popups it opens (quick capture, the panel, settings) are the custom Next Up
+design. A tray-anchored custom popup was not built: Tauri has no stable tray anchor position on macOS.
+
+## Look: Next Up replica, with Lucide and Inter
+
+The layout, spacing, states and animations are Next Up's (same HTML and CSS, same window sizes). Deliberate
+differences: accent colour teal instead of blue; Lucide icons (one set, stroke 1.75) instead of text glyphs and
+CSS shapes; Inter variable (tabular numerals for timers) instead of the system font; added Niyyah rows (block,
+product, lane in the composer; connection in Settings; Focus button and chip); no software-update section. The
+quick-capture popover is the same composer, always open. Assets and licences: `THIRD_PARTY.md`.
+
 ### What stays on your Mac
 
 Niyyah stores a task's name, lane, block (stream) and product. These fields are **local only** for now, kept in

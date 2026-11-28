@@ -43,7 +43,7 @@ impl TaskStore {
     }
 }
 
-fn write_atomic(path: &Path, tasks: &[Value]) -> io::Result<()> {
+pub(crate) fn write_atomic<T: serde::Serialize + ?Sized>(path: &Path, value: &T) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }
@@ -55,7 +55,7 @@ fn write_atomic(path: &Path, tasks: &[Value]) -> io::Result<()> {
             use std::os::unix::fs::PermissionsExt;
             file.set_permissions(fs::Permissions::from_mode(0o600))?;
         }
-        serde_json::to_writer(&mut file, tasks)?;
+        serde_json::to_writer(&mut file, value)?;
         file.flush()?;
         file.sync_all()?;
         drop(file);

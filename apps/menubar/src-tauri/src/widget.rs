@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use niyyah_capture_core::link::validate_web_link;
-use niyyah_capture_core::TaskStore;
+use niyyah_capture_core::{FocusStore, TaskStore};
 use serde_json::Value;
 use tauri::{AppHandle, LogicalSize, PhysicalPosition, State, WebviewWindow};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
@@ -192,4 +192,33 @@ pub fn show_panel(app: &AppHandle, settings: bool) {
             let _ = window.eval("window.dispatchEvent(new Event('desktop-settings'))");
         }
     }
+}
+
+#[tauri::command]
+pub fn load_focus_state(store: State<'_, FocusStore>) -> Result<Option<Value>, String> {
+    store.load_state().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_focus_state(store: State<'_, FocusStore>, state: Value) -> Result<(), String> {
+    store.save_state(&state).map_err(|e| e.to_string())
+}
+
+/// Append a finished focus session (task, window, duration) to the local log.
+#[tauri::command]
+pub fn log_focus_session(store: State<'_, FocusStore>, session: Value) -> Result<(), String> {
+    store.append_session(&session).map_err(|e| e.to_string())
+}
+
+/// Menu-bar text next to the tray icon (the running timer and task). Empty clears it.
+#[tauri::command]
+pub fn set_tray_title(app: AppHandle, title: String) {
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_title(if title.is_empty() { None } else { Some(title) });
+    }
+}
+
+#[tauri::command]
+pub fn open_panel_settings(app: AppHandle) {
+    show_panel(&app, true);
 }

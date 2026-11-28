@@ -6,6 +6,17 @@ fn app_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
 }
 
+fn collect(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
+    for e in std::fs::read_dir(dir).unwrap() {
+        let p = e.unwrap().path();
+        if p.is_dir() {
+            collect(&p, out);
+        } else {
+            out.push(p);
+        }
+    }
+}
+
 fn csp() -> String {
     let conf: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(app_dir().join("src-tauri/tauri.conf.json")).unwrap()).unwrap();
     conf["app"]["security"]["csp"].as_str().expect("app.security.csp is a string").to_string()
@@ -23,6 +34,8 @@ fn csp_has_no_unsafe_directives_and_no_remote_host() {
     assert_eq!(directive("style-src"), "style-src 'self'");
     assert_eq!(directive("object-src"), "object-src 'none'");
     // The webview never talks to the network itself; the Rust core does. Only Tauri's IPC is allowed.
+    assert_eq!(directive("font-src"), "font-src 'self'");
+    assert_eq!(directive("img-src"), "img-src 'self'");
     assert_eq!(directive("connect-src"), "connect-src ipc:");
 }
 
@@ -30,8 +43,14 @@ fn csp_has_no_unsafe_directives_and_no_remote_host() {
 fn ui_files_load_nothing_remote_and_have_no_inline_code() {
     let ui = app_dir().join("ui");
     let mut seen = 0;
-    for e in std::fs::read_dir(&ui).unwrap() {
-        let p = e.unwrap().path();
+    let mut files = Vec::new();
+    collect(&ui, &mut files);
+    for p in files {
+        // Fonts are binary; every text asset (html, js, css, svg) is scanned.
+        if !p.extension().is_some_and(|x| ["html", "js", "css", "svg"].iter().any(|t| x == *t)) {
+            assert!(p.extension().is_some_and(|x| x == "woff2"), "unexpected asset type: {}", p.display());
+            continue;
+        }
         let text = std::fs::read_to_string(&p).unwrap();
         seen += 1;
         let name = p.display();

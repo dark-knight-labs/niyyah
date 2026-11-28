@@ -1,5 +1,6 @@
 const desktop = window.__TAURI__?.core;
-const {webLink, formatStamp, creditDelta, isDueSoon, moveTask, cycleTarget, namesFrom, captureFor} = window.NiyyahTasks;
+const {webLink, formatStamp, creditDelta, isDueSoon, moveTask, cycleTarget, namesFrom, captureFor,
+  newSession, focusTick, focusState, focusShown, focusFinished, focusRecord, trayTitle} = window.NiyyahTasks;
 function native(command, args) {
   return desktop?.invoke(command, args).catch(error => console.warn(command, error));
 }
@@ -63,6 +64,8 @@ try {
 } catch {}
 const voice = get('voice');
 const settings = get('settings');
+const focusDialog = get('focus');
+const modalOpen = () => voice.open || settings.open || focusDialog.open;
 let transcript = get('transcript');
 const deadline = get('deadline');
 const taskLink = get('task-link');
@@ -157,7 +160,7 @@ function render() {
     row.dataset.id = task.id;
     const handle = document.createElement('span');
     handle.className = 'drag-handle';
-    handle.textContent = '⠿';
+    handle.append(Object.assign(document.createElement('span'), {className: 'ic ic-grip'}));
     handle.setAttribute('aria-hidden', 'true');
     const reorderable = !task.done && !running;
     handle.classList.toggle('reorderable', reorderable);
@@ -540,7 +543,7 @@ function pulseTask(task) {
 function checkIn(now = Date.now()) {
   if (!preferences.minutes) return;
   next = now + interval();
-  if (voice.open || settings.open) return;
+  if (modalOpen()) return;
   show();
   const widget = get('widget');
   if (preferences.shake && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -558,6 +561,7 @@ function checkIn(now = Date.now()) {
 function tick() {
   const now = Date.now();
   sampleTrackingClock();
+  tickFocus();
   if (desktop) void flushTasks();
   updateTimes(now);
   if (!desktop && preferences.minutes && now >= next) checkIn(now);
@@ -645,7 +649,7 @@ async function fileInNiyyah(items) {
 }
 
 function openVoice(other, task) {
-  if (voice.open || settings.open) return;
+  if (modalOpen()) return;
   closeTaskMenu();
   editingTask = task;
   captureCurrent = other;
@@ -813,7 +817,7 @@ get('save-connection').onclick = async () => {
 };
 
 function openSettings() {
-  if (settings.open || voice.open) return;
+  if (modalOpen()) return;
   void refreshConnection();
   get('connection-status').textContent = '';
   settings.showModal();
@@ -822,6 +826,7 @@ function openSettings() {
 get('open-settings').onclick = get('toolbar-settings').onclick = openSettings;
 window.addEventListener('desktop-settings', openSettings);
 settings.addEventListener('close', sizeDesktop);
+focusDialog.addEventListener('close', sizeDesktop);
 window.addEventListener(desktop ? 'desktop-blur' : 'blur', () => {
   if (!voice.open && !settings.open) collapse();
 });
@@ -926,14 +931,14 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Tab' && !taskMenu.hidden) closeTaskMenu(true);
   const binding = eventBinding(event);
   const action = Object.keys(bindings).find(action => bindings[action] === binding);
-  if (!action || registeredShortcuts[action] === binding || settings.open || voice.open) return;
+  if (!action || registeredShortcuts[action] === binding || modalOpen()) return;
   event.preventDefault();
   if (!event.repeat) useShortcut(shortcutDefinitions[action].detail);
 });
 window.addEventListener('desktop-shortcut', event => useShortcut(event.detail));
 
 function useShortcut(direction) {
-  if (voice.open || settings.open) return;
+  if (modalOpen()) return;
   if (direction === 'pause') {
     const running = currentTask();
     if (running) {
@@ -1014,7 +1019,7 @@ function sizeDesktop() {
   if (!desktop) return;
   const scale = appSizes[preferences.appSize];
   const widget = get('widget');
-  const dialog = settings.open ? settings : voice;
+  const dialog = settings.open ? settings : focusDialog.open ? focusDialog : voice;
   const height = dialog.open ? Math.max(widget.offsetHeight, Math.max(dialog.offsetHeight, dialog.scrollHeight) + 12) : widget.offsetHeight;
   return native('resize_widget', {
     width: Math.round(420 * scale),
@@ -1044,8 +1049,169 @@ window.addEventListener('desktop-focus-switch', () => {
   }
 });
 
+// ---- Focus window: stay on one window, with a timer tied to the current task. ---------------------
+// The Rust side watches (window_focus.rs) and sends `focus-state` events; the session itself (timer,
+// away time) lives here, is saved to focus.json, and each finished session is logged to sessions.jsonl.
+let focus = null;
+let focusTarget = null;
+let focusSample;
+let focusClockPending = false;
+let focusSavedAt = 0;
+let lastTrayTitle;
+let focusWindows = [];
+
+function focusTask() {
+  return currentTask() ?? tasks.find(task => !task.done);
+}
+
+function renderFocus() {
+  const chip = get('focus-chip');
+  chip.hidden = !focus;
+  chip.dataset.state = focus?.state ?? '';
+  get('focus-open').hidden = Boolean(focus);
+  if (focus) {
+    get('focus-label').textContent = focus.state === 'on' ? focus.app
+      : focus.state === 'away' ? 'Away from ' + focus.app : focus.app + ' window closed';
+    get('focus-time').textContent = formatStamp(focusShown(focus)) + (focus.mode === 'down' ? ' left' : '');
+    chip.title = focus.title ? focus.app + ' — ' + focus.title : focus.app;
+  }
+  const title = trayTitle(focus, currentTask()?.name);
+  if (desktop && title !== lastTrayTitle) {
+    lastTrayTitle = title;
+    native('set_tray_title', {title});
+  }
+}
+
+function persistFocus(force = false) {
+  const now = Date.now();
+  if (!desktop || (!force && now - focusSavedAt < 5000)) return;
+  focusSavedAt = now;
+  native('save_focus_state', {state: {target: focusTarget, session: focus}});
+}
+
+async function loadFocus() {
+  if (!desktop) return;
+  try {
+    const saved = await desktop.invoke('load_focus_state');
+    if (saved?.target) focusTarget = saved.target;
+    if (saved?.session) {
+      focus = {...saved.session, state: 'on'};
+      native('set_focus_target', {target: {app: focus.app, bundle_id: focus.bundleId, title: focus.title}});
+    }
+  } catch (error) {
+    console.warn('load_focus_state', error);
+  }
+  renderFocus();
+}
+
+function startFocus(target, mode, minutes) {
+  const task = focusTask();
+  if (!task) return false;
+  if (currentTask() !== task) startTask(task);
+  focus = newSession(task, target, mode, minutes, Date.now());
+  focusTarget = target;
+  focusSample = undefined;
+  native('set_focus_target', {target: {app: target.app, bundle_id: target.bundleId, title: target.title}});
+  persistFocus(true);
+  renderFocus();
+  get('announcement').textContent = 'Focus started on ' + target.app + '.';
+  return true;
+}
+
+function stopFocus() {
+  if (!focus) return;
+  const record = focusRecord(focus, Date.now());
+  native('log_focus_session', {session: record});
+  focus = null;
+  focusSample = undefined;
+  native('set_focus_target', {target: null});
+  persistFocus(true);
+  renderFocus();
+  get('announcement').textContent = 'Focus ended.';
+}
+
+function tickFocus() {
+  if (!focus) return;
+  renderFocus();
+  if (!desktop || focusClockPending) return;
+  focusClockPending = true;
+  native('awake_millis').then(ms => {
+    if (!focus || !Number.isFinite(ms)) return;
+    const previous = focusSample;
+    focusSample = ms;
+    if (previous === undefined) return;
+    focus = focusTick(focus, creditDelta(previous, ms, true));
+    persistFocus();
+    if (focusFinished(focus)) {
+      native('show_task_reminder', {title: 'Focus time is up'});
+      show();
+      stopFocus();
+      get('announcement').textContent = 'Focus time is up.';
+    }
+  }).finally(() => { focusClockPending = false; });
+}
+
+window.addEventListener('focus-state', event => {
+  if (!focus) return;
+  focus = focusState(focus, event.detail);
+  persistFocus(true);
+  renderFocus();
+  if (event.detail === 'away') {
+    native('show_task_reminder', {title: 'Back to ' + focus.app});
+    if (!get('widget').classList.contains('closed')) pulseTask(focusTask() ?? {id: ''});
+    get('announcement').textContent = 'You left ' + focus.app + '.';
+  } else if (event.detail === 'lost') {
+    native('show_task_reminder', {title: focus.app + ' window closed'});
+    get('announcement').textContent = 'The focus window was closed.';
+  } else {
+    get('announcement').textContent = 'Back on ' + focus.app + '.';
+  }
+});
+
+async function fillFocusWindows() {
+  const select = get('focus-window');
+  let list = {trusted: false, windows: []};
+  try { list = await desktop.invoke('list_focus_windows'); } catch (error) { console.warn('list_focus_windows', error); }
+  focusWindows = list.windows;
+  select.replaceChildren(...focusWindows.map((win, index) =>
+    new Option(win.title ? win.app + ' — ' + win.title : win.app, String(index))));
+  const previous = focusTarget && focusWindows.findIndex(win => win.bundle_id === focusTarget.bundleId && win.title === focusTarget.title);
+  if (previous > 0) select.value = String(previous);
+  get('focus-hint').textContent = list.trusted ? '' :
+    'Window titles need the Accessibility permission. Without it, focus works for the whole app.';
+  get('focus-grant').hidden = list.trusted;
+  get('focus-start').disabled = !focusWindows.length || !focusTask();
+  get('focus-status').textContent = !focusTask() ? 'Add a task first.' : !focusWindows.length ? 'No open windows found.' : '';
+}
+
+function openFocus() {
+  if (!desktop || modalOpen() || focus) return;
+  closeTaskMenu();
+  get('focus-task').textContent = focusTask()?.name ?? 'None';
+  show();
+  focusDialog.showModal();
+  void fillFocusWindows();
+  sizeDesktop();
+}
+
+get('focus-open').onclick = openFocus;
+get('focus-stop').onclick = stopFocus;
+get('focus-mode').onchange = event => { get('focus-minutes-row').hidden = event.target.value !== 'down'; };
+get('focus-grant').onclick = async () => {
+  await native('request_accessibility');
+  get('focus-status').textContent = 'Allow Niyyah Capture in System Settings > Privacy & Security > Accessibility, then reopen this window.';
+};
+get('focus-form').onsubmit = event => {
+  event.preventDefault();
+  const win = focusWindows[Number(get('focus-window').value)];
+  if (!win) return;
+  const minutes = Number(get('focus-minutes').value) || 25;
+  if (startFocus({app: win.app, bundleId: win.bundle_id, title: win.title}, get('focus-mode').value, minutes)) focusDialog.close();
+};
+
 async function initialize() {
   await loadTasks();
+  await loadFocus();
   render();
   tick();
   setInterval(tick, 1000);
@@ -1062,6 +1228,7 @@ async function initialize() {
     observer.observe(get('widget'));
     observer.observe(voice);
     observer.observe(settings);
+    observer.observe(focusDialog);
     window.addEventListener('desktop-checkin', () => checkIn());
     Promise.all([initialPin, sizeDesktop()]).then(() => native('show_widget'));
   }

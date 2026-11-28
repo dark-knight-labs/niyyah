@@ -46,6 +46,76 @@ impl Tab {
     }
 }
 
+/// What the watcher saw this tick, relative to the window the user chose to stay on.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Observation {
+    /// The chosen window (or its app, when titles are unavailable) is in front.
+    OnTarget,
+    /// This app (the panel or popover) is in front: neutral, so pausing the timer never counts as drifting.
+    Own,
+    /// Something else is in front.
+    Away,
+    /// The chosen window or its app no longer exists.
+    Gone,
+}
+
+/// Where the user is relative to the chosen window.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FocusState {
+    On,
+    Away,
+    Lost,
+}
+
+/// Debounces observations into state changes: away only after `grace` consecutive away ticks (a quick
+/// Cmd-Tab and back is not a drift), lost at once, back on target at once.
+pub struct FocusMonitor {
+    state: FocusState,
+    away_ticks: u32,
+    grace: u32,
+}
+
+impl FocusMonitor {
+    pub fn new(grace: u32) -> Self {
+        Self { state: FocusState::On, away_ticks: 0, grace }
+    }
+
+    pub fn state(&self) -> FocusState {
+        self.state
+    }
+
+    /// Back to "on target" for a newly chosen window.
+    pub fn reset(&mut self) {
+        self.state = FocusState::On;
+        self.away_ticks = 0;
+    }
+
+    /// The new state when this observation changes it.
+    pub fn observe(&mut self, seen: Observation) -> Option<FocusState> {
+        let next = match seen {
+            Observation::Own => return None,
+            Observation::OnTarget => {
+                self.away_ticks = 0;
+                FocusState::On
+            }
+            Observation::Gone => FocusState::Lost,
+            Observation::Away => {
+                self.away_ticks += 1;
+                match self.state {
+                    FocusState::Lost => FocusState::Lost,
+                    _ if self.away_ticks >= self.grace => FocusState::Away,
+                    state => state,
+                }
+            }
+        };
+        (next != self.state).then(|| {
+            self.state = next;
+            next
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,5 +146,44 @@ mod tests {
         for bad in [&b""[..], b"\n", b"20", b":42", b"20:", b"\xff\xfe"] {
             assert!(Tab::parse(1, bad).is_none());
         }
+    }
+
+    #[test]
+    fn away_needs_consecutive_ticks_and_back_is_immediate() {
+        use Observation::*;
+        let mut m = FocusMonitor::new(3);
+        assert_eq!(m.observe(Away), None);
+        assert_eq!(m.observe(Away), None);
+        assert_eq!(m.observe(OnTarget), None, "a quick Cmd-Tab and back is not a drift");
+        for _ in 0..2 {
+            assert_eq!(m.observe(Away), None);
+        }
+        assert_eq!(m.observe(Away), Some(FocusState::Away));
+        assert_eq!(m.observe(Away), None, "only the change is reported");
+        assert_eq!(m.observe(OnTarget), Some(FocusState::On));
+    }
+
+    #[test]
+    fn own_windows_are_neutral() {
+        use Observation::*;
+        let mut m = FocusMonitor::new(2);
+        m.observe(Away);
+        assert_eq!(m.observe(Own), None);
+        assert_eq!(m.observe(Own), None);
+        assert_eq!(m.observe(Away), Some(FocusState::Away), "own ticks did not reset or advance the count");
+    }
+
+    #[test]
+    fn a_closed_window_is_lost_at_once_and_stays_lost_until_it_returns() {
+        use Observation::*;
+        let mut m = FocusMonitor::new(2);
+        assert_eq!(m.observe(Gone), Some(FocusState::Lost));
+        assert_eq!(m.observe(Away), None);
+        assert_eq!(m.observe(Away), None);
+        assert_eq!(m.state(), FocusState::Lost);
+        assert_eq!(m.observe(OnTarget), Some(FocusState::On));
+        m.observe(Gone);
+        m.reset();
+        assert_eq!(m.state(), FocusState::On);
     }
 }

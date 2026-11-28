@@ -14,13 +14,15 @@
         "label": "popover",
         "title": "Niyyah Capture",
         "width": 380,
-        "height": 300,
+        "height": 270,
         "visible": false,
         "resizable": false,
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "focus": true
+        "focus": true,
+        "transparent": true,
+        "shadow": false
       },
       {
         "label": "main",
@@ -38,7 +40,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src ipc:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      "csp": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src ipc:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     }
   },
   "bundle": {

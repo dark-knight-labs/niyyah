@@ -12,7 +12,7 @@ use std::time::Duration;
 use chrono::Timelike;
 use niyyah_capture_core::options::current_block;
 use niyyah_capture_core::queue::Entry;
-use niyyah_capture_core::{now_secs, Capture, Capturer, KeychainStore, Options, TaskStore};
+use niyyah_capture_core::{now_secs, Capture, Capturer, KeychainStore, Options, TaskStore, FocusStore};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -22,6 +22,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 mod awake_clock;
 mod focus_switch;
 mod widget;
+mod window_focus;
 
 use awake_clock::AwakeClock;
 
@@ -147,6 +148,7 @@ fn main() {
         .manage(Arc::new(AtomicU64::new(0)))
         .manage(focus_switch::BrowserPreference::default())
         .manage(clock)
+        .manage(window_focus::WatchState::default())
         // No global handler: each shortcut carries its own (quick capture here, panel actions in widget.rs).
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
@@ -159,6 +161,7 @@ fn main() {
             let capturer: Shared = Arc::new(Capturer::open(&dir, Box::new(store))?);
             app.manage(capturer.clone());
             app.manage(TaskStore::new(&dir));
+            app.manage(FocusStore::new(&dir));
 
             // Retry timer: wake every 5 s, send what is due.
             let timer = capturer.clone();
@@ -183,6 +186,7 @@ fn main() {
             }
             if let Some(window) = app.get_webview_window(PANEL) {
                 let _ = widget::place_widget(&window);
+                window_focus::start(window.clone(), app.state::<window_focus::WatchState>().inner().clone());
                 focus_switch::start(window);
             }
 
@@ -192,7 +196,7 @@ fn main() {
             let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Niyyah Capture", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &show, &settings, &quit])?;
-            let mut tray = TrayIconBuilder::new()
+            let mut tray = TrayIconBuilder::with_id("main")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -207,9 +211,8 @@ fn main() {
                         toggle_popover(tray.app_handle());
                     }
                 });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone()).icon_as_template(true);
-            }
+            // A monochrome template image: macOS tints it for light, dark and the selected state.
+            tray = tray.icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray@2x.png"))?).icon_as_template(true);
             tray.build(app)?;
             Ok(())
         })
@@ -250,6 +253,14 @@ fn main() {
             widget::pin_widget,
             widget::schedule_checkin,
             widget::set_task_shortcut,
+            widget::load_focus_state,
+            widget::save_focus_state,
+            widget::log_focus_session,
+            widget::set_tray_title,
+            widget::open_panel_settings,
+            window_focus::list_focus_windows,
+            window_focus::request_accessibility,
+            window_focus::set_focus_target,
             focus_switch::set_work_browser,
             focus_switch::show_task_reminder,
             focus_switch::hide_task_reminder

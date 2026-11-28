@@ -78,7 +78,70 @@
     return { text: name, lane, stream, product: product || null, client_id: clientId || null };
   }
 
+  // ---- Focus session: a timer tied to one task and one chosen window. -----------------------------
+  // session = {taskId, clientId, taskName, app, bundleId, title, mode: 'up'|'down', durationMs,
+  //            elapsedMs, awayMs, awayCount, state: 'on'|'away'|'lost', startedAt}
+
+  function newSession(task, target, mode, minutes, now) {
+    return {
+      taskId: task.id, clientId: task.id, taskName: task.name,
+      app: target.app, bundleId: target.bundleId, title: target.title || '',
+      mode: mode === 'down' ? 'down' : 'up',
+      durationMs: mode === 'down' ? Math.max(1, Math.round(minutes)) * 60000 : 0,
+      elapsedMs: 0, awayMs: 0, awayCount: 0, state: 'on', startedAt: now,
+    };
+  }
+
+  // Add `delta` awake ms. Time spent away from (or without) the window counts as away time.
+  function focusTick(session, delta) {
+    if (!(delta > 0)) return session;
+    return {
+      ...session,
+      elapsedMs: session.elapsedMs + delta,
+      awayMs: session.awayMs + (session.state === 'on' ? 0 : delta),
+    };
+  }
+
+  function focusState(session, state) {
+    if (session.state === state) return session;
+    return { ...session, state, awayCount: session.awayCount + (state === 'on' ? 0 : 1) };
+  }
+
+  function focusShown(session) {
+    return session.mode === 'down' ? Math.max(0, session.durationMs - session.elapsedMs) : session.elapsedMs;
+  }
+
+  function focusFinished(session) {
+    return session.mode === 'down' && session.elapsedMs >= session.durationMs;
+  }
+
+  // One line of the session log, in the shape that will sync to Niyyah's timer fields later.
+  function focusRecord(session, endedAt) {
+    return {
+      task_id: session.taskId, client_id: session.clientId, task: session.taskName,
+      app: session.app, window: session.title || null, mode: session.mode,
+      started_at: session.startedAt, ended_at: endedAt,
+      duration_ms: Math.min(session.elapsedMs, session.mode === 'down' ? session.durationMs : Infinity),
+      away_ms: session.awayMs, away_count: session.awayCount, completed: focusFinished(session),
+    };
+  }
+
+  function clip(text, max) {
+    return text.length > max ? text.slice(0, max - 1).trimEnd() + '…' : text;
+  }
+
+  // Menu-bar text. Plain text: the native tray can only show the system font.
+  function trayTitle(session, runningTaskName) {
+    if (session) {
+      const time = formatStamp(focusShown(session));
+      const lead = session.state === 'on' ? '' : session.state === 'away' ? 'Away · ' : 'Window closed · ';
+      return lead + time + ' · ' + clip(session.taskName, 22);
+    }
+    return runningTaskName ? clip(runningTaskName, 26) : '';
+  }
+
   return {
+    newSession, focusTick, focusState, focusShown, focusFinished, focusRecord, trayTitle,
     DEADLINE_SOON_MS, BROWSERS, webLink, formatStamp, creditDelta, addTracked, isDueSoon, moveTask,
     cycleTarget, namesFrom, captureFor,
   };

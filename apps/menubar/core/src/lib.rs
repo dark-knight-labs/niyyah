@@ -15,6 +15,7 @@ pub mod capturer;
 pub mod client;
 pub mod error;
 pub mod focus;
+pub mod focusstore;
 pub mod link;
 pub mod options;
 pub mod payload;
@@ -28,6 +29,7 @@ pub use error::Error;
 pub use options::{BlockOption, Options, ProductOption};
 pub use payload::{Capture, ItemPayload, Lane};
 pub use queue::{Entry, EntryState, Queue};
+pub use focusstore::FocusStore;
 pub use taskstore::TaskStore;
 pub use token::{MemoryStore, Token, TokenStore};
 

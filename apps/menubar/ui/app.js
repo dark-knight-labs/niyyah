@@ -5,7 +5,6 @@
   const invoke = window.__TAURI__.core.invoke;
   const $ = (id) => document.getElementById(id);
 
-  let lane = "next";
   let options = { blocks: [], products: [] };
 
   function say(el, message, isError) {
@@ -26,13 +25,6 @@
       o.value = item.value;
       o.textContent = item.label;
       select.appendChild(o);
-    }
-  }
-
-  function setLane(next) {
-    lane = next;
-    for (const chip of document.querySelectorAll(".chip")) {
-      chip.setAttribute("aria-pressed", String(chip.dataset.lane === next));
     }
   }
 
@@ -66,11 +58,11 @@
       li.append(text, state);
       if (e.state === "rejected") {
         const retry = document.createElement("button");
-        retry.className = "link";
+        
         retry.textContent = "Retry";
         retry.addEventListener("click", async () => { await invoke("requeue", { id: e.id }); renderQueue(); });
         const drop = document.createElement("button");
-        drop.className = "link";
+        
         drop.textContent = "Dismiss";
         drop.addEventListener("click", async () => { await invoke("discard", { id: e.id }); renderQueue(); });
         li.append(retry, drop);
@@ -85,7 +77,7 @@
     if (!text) return;
     try {
       await invoke("submit_capture", {
-        capture: { text, lane, stream: $("block").value, product: $("product").value || null },
+        capture: { text, lane: $("lane").value, stream: $("block").value, product: $("product").value || null, client_id: crypto.randomUUID() },
       });
       $("text").value = "";
       say($("status"), "Saved");
@@ -96,50 +88,15 @@
     renderQueue();
   }
 
-  async function showSettings(show) {
-    $("capture-view").hidden = show;
-    $("settings-view").hidden = !show;
-    if (show) {
-      const s = await invoke("get_settings");
-      $("server-url").value = s.server_url || "";
-      $("token").value = "";
-      say($("token-state"), s.has_token ? "A token is stored in the Keychain." : "No token stored yet.");
-      say($("settings-status"), "");
-    } else {
-      $("text").focus();
-    }
-  }
-
-  async function saveSettings(event) {
-    event.preventDefault();
-    try {
-      await invoke("save_settings", { serverUrl: $("server-url").value, token: $("token").value });
-      $("token").value = ""; // cleared as soon as it is stored
-      say($("settings-status"), "Stored.");
-      const s = await invoke("get_settings");
-      say($("token-state"), s.has_token ? "A token is stored in the Keychain." : "No token stored yet.");
-      await loadOptions(true);
-    } catch (e) {
-      $("token").value = "";
-      say($("settings-status"), String(e), true);
-    }
-  }
-
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.preventDefault(); invoke("hide_popover"); }
   });
   $("capture-form").addEventListener("submit", submit);
-  $("settings-form").addEventListener("submit", saveSettings);
-  $("open-settings").addEventListener("click", () => showSettings(true));
-  $("close-settings").addEventListener("click", () => showSettings(false));
-  for (const chip of document.querySelectorAll(".chip")) {
-    chip.addEventListener("click", () => setLane(chip.dataset.lane));
-  }
+  $("open-settings").addEventListener("click", () => invoke("open_panel_settings"));
   // The shell emits this each time the popover is shown: reset the field, re-pick the current block.
   window.__TAURI__.event.listen("popover-shown", async () => {
     $("text").value = "";
-    setLane("next");
-    await showSettings(false);
+    $("lane").value = "next";
     await loadOptions(false);
     renderQueue();
     $("text").focus();

@@ -86,3 +86,55 @@ test('captureFor sends only what Niyyah can store', () => {
   assert.deepEqual(T.captureFor('x', 'now', 'OT', ''), {text: 'x', lane: 'now', stream: 'OT', product: null, client_id: null});
   assert.deepEqual(Object.keys(T.captureFor('x', 'now', 'OT', '')).sort(), ['client_id', 'lane', 'product', 'stream', 'text']);
 });
+
+const target = {app: 'Safari', bundleId: 'com.apple.Safari', title: 'Docs'};
+
+test('focus session: count-up and countdown', () => {
+  const up = T.newSession({id: 't1', name: 'Write'}, target, 'up', 25, 1000);
+  assert.equal(up.durationMs, 0);
+  assert.equal(T.focusShown(T.focusTick(up, 5000)), 5000);
+  assert.equal(T.focusFinished(T.focusTick(up, 9e9)), false, 'count-up never finishes by itself');
+  const down = T.newSession({id: 't1', name: 'Write'}, target, 'down', 25, 1000);
+  assert.equal(down.durationMs, 25 * 60000);
+  assert.equal(T.focusShown(T.focusTick(down, 60000)), 24 * 60000);
+  assert.equal(T.focusFinished(T.focusTick(down, 25 * 60000 - 1)), false);
+  assert.equal(T.focusFinished(T.focusTick(down, 25 * 60000)), true);
+  assert.equal(T.focusShown(T.focusTick(down, 99 * 60000)), 0, 'never negative');
+});
+
+test('focus session: away time and away count', () => {
+  let s = T.newSession({id: 't1', name: 'Write'}, target, 'up', 0, 0);
+  s = T.focusTick(s, 3000);
+  s = T.focusState(s, 'away');
+  s = T.focusTick(s, 4000);
+  s = T.focusState(s, 'away');
+  assert.equal(s.awayCount, 1, 'same state twice counts once');
+  s = T.focusState(s, 'on');
+  s = T.focusTick(s, 1000);
+  s = T.focusState(s, 'lost');
+  s = T.focusTick(s, 2000);
+  assert.deepEqual([s.elapsedMs, s.awayMs, s.awayCount], [10000, 6000, 2]);
+  assert.equal(T.focusTick(s, 0), s);
+  assert.equal(T.focusTick(s, -5), s);
+});
+
+test('focus record: shape that will sync, countdown capped at its length', () => {
+  let s = T.newSession({id: 't1', name: 'Write'}, target, 'down', 1, 100);
+  s = T.focusTick(s, 61000);
+  assert.deepEqual(T.focusRecord(s, 200), {
+    task_id: 't1', client_id: 't1', task: 'Write', app: 'Safari', window: 'Docs', mode: 'down',
+    started_at: 100, ended_at: 200, duration_ms: 60000, away_ms: 0, away_count: 0, completed: true,
+  });
+  const none = T.newSession({id: 't2', name: 'x'}, {app: 'Notes', bundleId: 'n', title: ''}, 'up', 0, 1);
+  assert.equal(T.focusRecord(none, 2).window, null);
+});
+
+test('trayTitle: timer, away and closed states, long names clipped', () => {
+  let s = T.newSession({id: 't1', name: 'Write the quarterly report for finance'}, target, 'up', 0, 0);
+  s = T.focusTick(s, 754000);
+  assert.equal(T.trayTitle(s, 'x'), '12:34 · Write the quarterly r…');
+  assert.equal(T.trayTitle(T.focusState(s, 'away'), 'x').startsWith('Away · 12:34'), true);
+  assert.equal(T.trayTitle(T.focusState(s, 'lost'), 'x').startsWith('Window closed · '), true);
+  assert.equal(T.trayTitle(null, 'Call the bank'), 'Call the bank');
+  assert.equal(T.trayTitle(null, undefined), '');
+});
