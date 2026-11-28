@@ -226,7 +226,7 @@ mod tests {
     use crate::payload::Lane;
 
     fn cap(text: &str) -> Capture {
-        Capture { text: text.into(), lane: Lane::Next, stream: "OT".into(), product: None }
+        Capture { text: text.into(), lane: Lane::Next, stream: "OT".into(), product: None, client_id: None }
     }
 
     #[test]

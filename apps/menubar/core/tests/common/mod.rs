@@ -105,6 +105,7 @@ pub fn capture(text: &str) -> niyyah_capture_core::Capture {
         lane: niyyah_capture_core::Lane::Next,
         stream: "OT".into(),
         product: Some("alisha".into()),
+        client_id: None,
     }
 }
 

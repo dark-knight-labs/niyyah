@@ -1,26 +1,34 @@
-//! Niyyah Capture: the Tauri shell. Tray icon, global shortcut, popover window, and the commands the
-//! web layer calls. All real work (queue, network, token) is in `niyyah-capture-core`.
+//! Niyyah Capture: the Tauri shell. Tray icon, global shortcuts, the capture popover, the focus panel
+//! (ported from Next Up, see `widget.rs`), and the commands the web layer calls. All real work (queue, network, token) is in `niyyah-capture-core`.
 //!
 //! Not compiled or run on the Linux jump host (no webview there): see README.md, "What is verified".
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Timelike;
 use niyyah_capture_core::options::current_block;
 use niyyah_capture_core::queue::Entry;
-use niyyah_capture_core::{now_secs, Capture, Capturer, KeychainStore, Options};
+use niyyah_capture_core::{now_secs, Capture, Capturer, KeychainStore, Options, TaskStore};
 use serde::Serialize;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+mod awake_clock;
+mod focus_switch;
+mod widget;
+
+use awake_clock::AwakeClock;
 
 const KEYCHAIN_SERVICE: &str = "bd.burak.niyyah.menubar";
 const KEYCHAIN_ACCOUNT: &str = "device-token";
 const POPOVER: &str = "popover";
+const PANEL: &str = "main";
 
 type Shared = Arc<Capturer>;
 
@@ -133,16 +141,14 @@ fn hide_popover(app: AppHandle) {
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
+    let clock = AwakeClock::default();
+    clock.start();
     tauri::Builder::default()
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        toggle_popover(app);
-                    }
-                })
-                .build(),
-        )
+        .manage(Arc::new(AtomicU64::new(0)))
+        .manage(focus_switch::BrowserPreference::default())
+        .manage(clock)
+        // No global handler: each shortcut carries its own (quick capture here, panel actions in widget.rs).
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             // A menu-bar utility: no Dock icon, no app menu.
             #[cfg(target_os = "macos")]
@@ -152,6 +158,7 @@ fn main() {
             let store = KeychainStore::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT);
             let capturer: Shared = Arc::new(Capturer::open(&dir, Box::new(store))?);
             app.manage(capturer.clone());
+            app.manage(TaskStore::new(&dir));
 
             // Retry timer: wake every 5 s, send what is due.
             let timer = capturer.clone();
@@ -163,19 +170,35 @@ fn main() {
             });
             flush_in_background(&capturer);
 
-            // Option+Command+N.
-            let shortcut = Shortcut::new(Some(Modifiers::ALT | Modifiers::SUPER), Code::KeyN);
-            app.global_shortcut().register(shortcut)?;
+            // Option+Command+N: quick capture popover.
+            app.global_shortcut().on_shortcut(widget::capture_shortcut(), |app, _, event| {
+                if event.state() == ShortcutState::Pressed {
+                    toggle_popover(app);
+                }
+            })?;
+
+            // The focus panel: task list, timer, reminders. Hidden until the web layer has sized it.
+            if let Err(error) = focus_switch::create_overlay(app) {
+                log::warn!("could not create the task reminder overlay: {error}");
+            }
+            if let Some(window) = app.get_webview_window(PANEL) {
+                let _ = widget::place_widget(&window);
+                focus_switch::start(window);
+            }
 
             // Tray icon: click opens the popover; the menu has Quit.
             let open = MenuItem::with_id(app, "open", "Capture (⌥⌘N)", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Show tasks", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Niyyah Capture", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &quit])?;
+            let menu = Menu::with_items(app, &[&open, &show, &settings, &quit])?;
             let mut tray = TrayIconBuilder::new()
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => show_popover(app),
+                    "show" => widget::show_panel(app, false),
+                    "settings" => widget::show_panel(app, true),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -193,8 +216,17 @@ fn main() {
         // The popover behaves like a menu: it goes away when it loses focus.
         .on_window_event(|window, event| {
             if let WindowEvent::Focused(false) = event {
-                if window.label() == POPOVER {
-                    let _ = window.hide();
+                match window.label() {
+                    POPOVER => {
+                        let _ = window.hide();
+                    }
+                    // The panel collapses (it stays on screen) when it loses focus.
+                    PANEL => {
+                        if let Some(webview) = window.get_webview_window(PANEL) {
+                            let _ = webview.eval("window.dispatchEvent(new Event('desktop-blur'))");
+                        }
+                    }
+                    _ => {}
                 }
             }
         })
@@ -206,7 +238,21 @@ fn main() {
             discard,
             get_settings,
             save_settings,
-            hide_popover
+            hide_popover,
+            widget::awake_millis,
+            widget::load_tasks,
+            widget::save_tasks,
+            widget::open_task_link,
+            widget::resize_widget,
+            widget::start_widget_drag,
+            widget::show_widget,
+            widget::hide_widget,
+            widget::pin_widget,
+            widget::schedule_checkin,
+            widget::set_task_shortcut,
+            focus_switch::set_work_browser,
+            focus_switch::show_task_reminder,
+            focus_switch::hide_task_reminder
         ])
         .run(tauri::generate_context!())
         .expect("error while running Niyyah Capture");

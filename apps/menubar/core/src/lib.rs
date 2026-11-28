@@ -10,12 +10,16 @@
 //!   app), is never written to a file, never logged, and is sent only to the
 //!   configured Niyyah host over https (http only to localhost, for tests).
 
+pub mod awake;
 pub mod capturer;
 pub mod client;
 pub mod error;
+pub mod focus;
+pub mod link;
 pub mod options;
 pub mod payload;
 pub mod queue;
+pub mod taskstore;
 pub mod token;
 pub mod url_guard;
 
@@ -24,6 +28,7 @@ pub use error::Error;
 pub use options::{BlockOption, Options, ProductOption};
 pub use payload::{Capture, ItemPayload, Lane};
 pub use queue::{Entry, EntryState, Queue};
+pub use taskstore::TaskStore;
 pub use token::{MemoryStore, Token, TokenStore};
 
 #[cfg(feature = "keychain")]

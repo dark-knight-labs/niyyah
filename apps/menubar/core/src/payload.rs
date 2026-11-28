@@ -35,6 +35,10 @@ pub struct Capture {
     /// A product slug, if one was picked.
     #[serde(default)]
     pub product: Option<String>,
+    /// The panel task's UUID. Kept in the queue but NOT sent yet: the server has no idempotency key or
+    /// sync-back. When the backend contract lands, `to_item` is the one place that starts sending it.
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 impl Capture {
@@ -82,7 +86,7 @@ mod tests {
     use serde_json::json;
 
     fn cap(lane: Lane, product: Option<&str>) -> Capture {
-        Capture { text: "  Call the bank #errand ".into(), lane, stream: "OT".into(), product: product.map(String::from) }
+        Capture { text: "  Call the bank #errand ".into(), lane, stream: "OT".into(), product: product.map(String::from), client_id: None }
     }
 
     #[test]
@@ -128,5 +132,26 @@ mod tests {
         c.stream = " ".into();
         assert!(matches!(c.validated(), Err(Error::NoBlock)));
         assert!(cap(Lane::Next, Some("  ")).validated().unwrap().product.is_none());
+    }
+}
+
+#[cfg(test)]
+mod local_only_fields {
+    use super::*;
+
+    /// The focus panel sends the task's name plus block/product/lane. Link, timer and deadline stay on
+    /// the Mac: even if the web layer passes them along, they must not reach the server.
+    #[test]
+    fn local_only_fields_never_reach_the_wire() {
+        let from_panel = serde_json::json!({
+            "text": "Call the bank", "lane": "next", "stream": "OT", "product": "alisha", "client_id": "7b1c-uuid",
+            "link": "https://example.com", "deadlineAt": 1, "trackedMs": 5, "startedAt": 2, "done": false
+        });
+        let capture: Capture = serde_json::from_value(from_panel).unwrap();
+        let wire = serde_json::to_string(&capture.validated().unwrap().to_item()).unwrap();
+        for key in ["link", "deadline", "tracked", "started", "done", "example.com", "client"] {
+            assert!(!wire.contains(key), "{key} leaked into {wire}");
+        }
+        assert!(wire.contains("Call the bank") && wire.contains("alisha"));
     }
 }

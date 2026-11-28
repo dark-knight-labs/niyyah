@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Niyyah Capture · Focus</title>
+<link rel="stylesheet" href="panel.css">
+<script src="tasklogic.js"></script>
+<script src="panel.js" defer></script>
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><span class="mark" aria-hidden="true">↗</span> Niyyah Capture</div>
+  <div class="tools"><span class="timer"><span class="dot"></span> Next check-in <strong id="countdown">5:00</strong></span><button id="toolbar-settings">Settings</button><button id="show">Show check-in <span aria-hidden="true">↗</span></button></div>
+</header>
+<main>
+  <div class="wallpaper" aria-hidden="true"></div>
+  <section class="intro">
+    <div class="app-icon" aria-hidden="true"><span></span><span></span><span></span></div>
+    <h1>What’s next for you?</h1>
+    <p>Say your priorities out loud. Niyyah Capture keeps them close and checks in at your chosen interval.</p>
+    <button id="capture" class="start"><span aria-hidden="true"></span> Speak your priorities</button>
+  </section>
+  <section class="widget" id="widget" aria-label="Focus check-in">
+    <div class="glance">
+      <button id="glance-focus" class="glance-focus"><span id="glance-description"><strong id="glance-name"></strong></span><span id="glance-time"></span></button>
+      <ul id="glance-next" aria-label="Upcoming priorities"></ul>
+    </div>
+    <header class="widget-top"><div class="checkin"><span class="dot"></span><span id="status">FOCUS CHECK-IN</span></div><div class="window-actions"><button class="icon desktop-capture" id="desktop-capture" aria-label="Add priorities" title="Add priorities">+</button><button class="icon" id="expand" aria-controls="tasks" aria-label="Keep task list expanded" aria-pressed="false" title="Keep task list expanded">⌃</button><button class="icon" id="open-settings" aria-label="Settings" title="Settings">⚙</button><button class="icon" id="pin" aria-label="Always on Top" aria-pressed="true" title="Always on Top"><span class="pin-glyph" aria-hidden="true"></span></button><button class="icon" id="close" aria-label="Close reminder" title="Close reminder">×</button></div></header>
+    <div class="widget-body">
+      <div class="list-head"><h3 id="focus-question">Which task are you working on?</h3><span id="remaining"></span></div>
+      <ul id="tasks" aria-label="Priorities in order"></ul>
+    </div>
+    <div class="check-question"><a id="task-link-open" target="_blank" rel="noopener noreferrer" hidden><span class="link-label">Open link ↗</span><span class="link-spinner" aria-hidden="true"></span></a><button id="different">New Task</button></div>
+    <p id="task-storage-status" role="status" hidden></p>
+    <p id="niyyah-status" role="status" hidden></p>
+    <ul id="shortcut-guide" aria-label="Keyboard shortcuts"></ul>
+    <div id="task-menu" hidden><button type="button" id="edit-task">Edit task, deadline or link</button></div>
+  </section>
+</main>
+<dialog id="settings" aria-labelledby="settings-title">
+  <header><h2 id="settings-title">Settings</h2><form method="dialog"><button class="icon" aria-label="Close settings">×</button></form></header>
+  <label>Always on Top <input id="settings-pin" type="checkbox"></label>
+<label>App size
+  <select id="app-size">
+    <option value="compact">Compact (80%)</option>
+    <option value="small">Small (90%)</option>
+    <option value="standard">Standard (100%)</option>
+  </select>
+</label>
+  <label>Flash floating window
+    <select id="checkin-minutes">
+      <option value="0">Off</option>
+      <option value="1">Every minute</option>
+      <option value="3">Every 3 minutes</option>
+      <option value="5">Every 5 minutes</option>
+      <option value="10">Every 10 minutes</option>
+      <option value="15">Every 15 minutes</option>
+      <option value="30">Every 30 minutes</option>
+      <option value="60">Every hour</option>
+    </select>
+  </label>
+  <label>Shake during check-in <input id="settings-shake" type="checkbox"></label>
+  <label>Show task reminder on window switch <input id="settings-switch" type="checkbox"></label>
+  <label>Watch browser tab switches
+    <select id="settings-browser">
+      <option value="">Off</option>
+      <option value="chrome">Chrome</option>
+      <option value="safari">Safari</option>
+    </select>
+  </label>
+  <fieldset class="settings-group" id="niyyah-settings">
+    <legend>Niyyah connection</legend>
+    <label>Server URL <input id="server-url" type="url" placeholder="Your Niyyah address" spellcheck="false" autocomplete="off"></label>
+    <label>Device token <input id="token" type="password" placeholder="Paste a device token" spellcheck="false" autocomplete="off"></label>
+    <p id="token-state"></p>
+    <button type="button" id="save-connection">Store</button>
+    <p id="connection-status" role="status"></p>
+  </fieldset>
+  <fieldset id="shortcut-settings" class="settings-group">
+    <legend>Keyboard shortcuts</legend>
+    <div id="shortcut-controls"></div>
+    <p id="shortcut-status" role="status"></p>
+  </fieldset>
+</dialog>
+<dialog id="voice" aria-label="New task">
+  <form id="voice-form">
+    <div class="composer-field">
+      <input class="transcript" id="transcript" type="text" aria-label="Task" placeholder="What are you working on?">
+      <textarea class="transcript" id="bulk-transcript" rows="3" aria-label="Priorities" placeholder="One priority per line" hidden></textarea>
+      <button type="button" id="mic" aria-label="Start dictation" aria-pressed="false" title="Dictate"><span aria-hidden="true" class="mic-glyph"></span></button>
+    </div>
+    <p id="voice-status" role="status"></p>
+    <label class="composer-link" for="task-link">Link <small>(optional)</small><input id="task-link" type="url" placeholder="https://example.com"></label>
+    <div class="composer-niyyah" id="composer-niyyah">
+      <label>Block <select id="niyyah-block" aria-label="Block"></select></label>
+      <label>Product <select id="niyyah-product" aria-label="Product"></select></label>
+      <label>Lane <select id="niyyah-lane" aria-label="Lane"><option value="now">Now</option><option value="next" selected>Next</option><option value="someday">Someday</option></select></label>
+    </div>
+    <div class="composer-actions">
+      <label for="deadline"><span class="deadline-label">Deadline <small>(optional)</small></span><input type="datetime-local" id="deadline"></label>
+      <button class="primary save" id="save" disabled>Save</button>
+    </div>
+  </form>
+</dialog>
+<p class="sr" id="announcement" role="status"></p>
+</body>
+</html>

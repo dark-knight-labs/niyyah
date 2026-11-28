@@ -1,12 +1,48 @@
 # Niyyah Capture (menu-bar app)
 
-A small macOS menu-bar app that files a task into Niyyah in a few keystrokes. Press **Option+Command+N**,
-type, press Enter. Bundle id `bd.burak.niyyah.menubar`, shown as "Niyyah Capture". Tasks only (v1).
+A macOS menu-bar app with two parts. Bundle id `bd.burak.niyyah.menubar`, shown as "Niyyah Capture".
+
+- **Quick capture:** press **Option+Command+N**, type, press Enter. The task goes to Niyyah.
+- **Focus panel** (ported from [Next Up](https://github.com/alamin-mahamud/nextup)): a floating task list in the
+  bottom-left corner with a timer per task, deadlines, links, check-in flashes, window-switch reminders,
+  dictation and global shortcuts. Every task you add there is also filed in Niyyah.
 
 Stack: Tauri 2. `core/` is plain Rust (queue, API client, token store) and is tested on Linux;
 `src-tauri/` is the thin shell (tray icon, global shortcut, popover); `ui/` is the web layer
-(plain HTML/CSS/JS, no build step, no remote scripts or styles). Next Up is a reference for the idea only:
-no code is taken from it.
+(plain HTML/CSS/JS, no build step, no remote scripts or styles). The focus panel is derived from Next Up
+(owner decision 2026-11-28: copy freely, take every feature). Its updater and its release workflow are **not** ported.
+
+## Focus panel: Next Up features and where they live
+
+| Feature | Where |
+|---|---|
+| Task list: name, done, deadline, link; drag to reorder; edit from the right-click menu | `ui/panel.js`, `ui/panel.html` |
+| Per-task timer (`trackedMs`, `startedAt`), awake time only (sleep and display-off excluded) | `ui/tasklogic.js`, `core/src/awake.rs`, `src-tauri/src/awake_clock.rs` |
+| Deadlines, highlighted in the last 3 hours | `ui/tasklogic.js` |
+| Open a task link (http/https, no credentials, checked in JS and again in Rust) | `core/src/link.rs`, `widget.rs` |
+| Check-in flash and shake every N minutes (1 to 60, or off) | `ui/panel.js`, `widget.rs` (`schedule_checkin`) |
+| Window-switch reminder: task name flashes over the screen | `focus_switch.rs`, `core/src/focus.rs`, `ui/reminder.*` |
+| Browser-tab reminder (Chrome or Safari, via AppleScript) | `focus_switch/browser.rs`; pick the browser in Settings |
+| Dictation (speech recognition of the webview) and bulk "one priority per line" | `ui/panel.js` |
+| Global shortcuts (previous, next, new task, pause), rebindable | `widget.rs` (`set_task_shortcut`) |
+| Tray menu: Capture, Show tasks, Settings, Quit | `main.rs` |
+| Settings window: Always on Top, app size, check-in, shake, reminders, shortcuts, Niyyah connection | `ui/panel.html` |
+| Local `tasks.json`, atomic writes, mode 0600 | `core/src/taskstore.rs` |
+| Offline queue for the Niyyah side | `core/src/queue.rs` (below) |
+| Software updater | **removed** (no endpoint, no plugin) |
+
+### What stays on your Mac
+
+Niyyah stores a task's name, lane, block (stream) and product. These fields are **local only** for now, kept in
+`tasks.json` in the app data folder and shown in the panel: **link**, **timer (tracked time, running state)**,
+**deadline with a time**, and later **edits** of a task's name. Marking a task done in the panel does not
+complete it in Niyyah either. Proposed backend follow-up: item fields `link`, `deadline_at` (datetime),
+`tracked_ms`, and a way to update or complete an item with a device token. No backend change is part of this app.
+
+Sync layer, ready for that contract: each panel task has a client UUID (`id`), which travels with its capture
+as `client_id` through the offline queue but is **not sent yet** (`Capture::to_item` in `core/src/payload.rs`
+is the one place that maps app fields to the wire; a test pins that nothing local-only leaks). Adopting the
+contract means adding fields there and in `captureFor` (`ui/tasklogic.js`).
 
 ## How a capture travels
 
@@ -22,8 +58,8 @@ no code is taken from it.
 
 ## API contract (what the app calls)
 
-Auth for both: `Authorization: Bearer nyd_...` (a device token, minted by the Niyyah web app, scope
-"create tasks only", revocable).
+Auth for both: `Authorization: Bearer nyd_...` (a device token, created and revoked in Niyyah under
+**Settings > Devices**; scope "create tasks only").
 
 `POST /api/v1/vault/items` (existing `ItemCreateIn`, lane form):
 
@@ -63,11 +99,17 @@ while offline.
 
 ```sh
 cd apps/menubar/core
-cargo test                    # queue, retry, offline-then-online, payload, https rule, secrets, CSP
+cargo test                    # queue, retry, offline-then-online, payload, https rule, secrets, CSP,
+                              # task store, link rule, awake clock, focus rules
+cargo clippy --all-targets -- -D warnings
 cargo test -- --ignored       # the end-to-end test (see below)
+cd ..
+node --test ui-tests/*.test.js   # timer math, deadlines, link check, reorder, shortcut cycling, payload mapping
 ```
 
-End-to-end against the real API (pending until the device-token API is merged and deployed):
+`src-tauri` (the shell) needs a webview and only builds on the Mac: `cd src-tauri && cargo clippy -- -D warnings`.
+
+End-to-end against the real API (device-token API is merged, PR #114):
 
 ```sh
 NIYYAH_E2E_URL=https://<niyyah-api-host> NIYYAH_E2E_TOKEN=nyd_... cargo test -- --ignored
@@ -95,16 +137,24 @@ notarisation, so macOS will not open it silently the first time.
    and click **Open Anyway**, then confirm with your password.
 4. Last resort: `xattr -dr com.apple.quarantine "/Applications/Niyyah Capture.app"`.
 5. The app has no Dock icon. Look for the small ring in the menu bar, or press **Option+Command+N**.
-6. Click **Settings** in the popover. Paste your Niyyah API address and a device token (create one in Niyyah,
-   then copy it: it is shown once). Press Store. macOS may ask to let the app use the Keychain: allow it.
+6. Create a device token in Niyyah: **Settings > Devices**, copy it (it is shown once). In the app, open the tray
+   menu, **Settings…**, and under "Niyyah connection" paste your Niyyah address and the token. Press Store.
+   (The quick-capture popover has the same fields under its own Settings link.) macOS may ask to let the app
+   use the Keychain: allow it.
+7. Permissions, asked when each feature is first used: **Automation** (browser-tab reminders, Chrome or Safari),
+   **Microphone** and **Speech Recognition** (dictation). Window-switch reminders and global shortcuts need no
+   permission on current macOS; if a shortcut does nothing, add the app under **Privacy & Security >
+   Accessibility** or **Input Monitoring**.
 
 Revoke a lost laptop's access by revoking its device token in Niyyah; the app then keeps your captures and
 shows that the token was refused.
 
 ## What is verified
 
-On the Linux jump host: everything in `core/` (23 unit tests, 11 flow tests, the secrets test, the CSP test), against a
-scripted local HTTP server. Not verified on Linux, and so to be checked on the Mac: the macOS build and `.dmg`,
-the Keychain store (`KeychainStore`, `keyring` crate), the global shortcut, the tray icon and its template
-rendering, popover placement (it opens centred, not under the icon) and hide-on-blur, and the CSP running inside
-a real webview. The end-to-end test against the real API waits for the device-token API.
+On the Linux jump host: everything in `core/` (unit tests, flow tests, the secrets test, the CSP test), against a
+scripted local HTTP server, and the pure panel logic in `ui-tests/`. On the Mac (Apple Silicon, macOS 26.5): `cargo clippy -D warnings` on `core` and `src-tauri`, the core tests, the
+release build, an ad-hoc signed `.app`/`.dmg`, and a launch that stays up and runs its queue flush without a token.
+Not verified (needs a person at the screen, a token, or both): the Keychain store, tray icon and template
+rendering, the global shortcuts, the focus panel's look and drag, dictation and its permission prompts,
+Automation prompts for the browser-tab reminder, window-switch reminders, and the CSP inside the real webview
+(a blocked script would show as a dead panel). The end-to-end test against the real API needs a real token.

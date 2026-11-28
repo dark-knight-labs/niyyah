@@ -1,14 +1,14 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Niyyah Capture",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "bd.burak.niyyah.menubar",
   "build": {
     "frontendDist": "../ui"
   },
   "app": {
     "withGlobalTauri": true,
-    "macOSPrivateApi": false,
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "popover",
@@ -21,6 +21,20 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "focus": true
+      },
+      {
+        "label": "main",
+        "title": "Niyyah Capture",
+        "url": "panel.html",
+        "width": 420,
+        "height": 180,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true
       }
     ],
     "security": {
@@ -29,12 +43,19 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Productivity",
-    "icon": ["icons/icon.png"],
+    "icon": [
+      "icons/icon.png"
+    ],
     "macOS": {
       "minimumSystemVersion": "12.0",
-      "signingIdentity": "-"
-    }
+      "signingIdentity": "-",
+      "entitlements": "Entitlements.plist"
+    },
+    "copyright": "Focus panel derived from Next Up (github.com/alamin-mahamud/nextup)."
   }
 }

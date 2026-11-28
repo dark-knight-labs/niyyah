@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Niyyah Capture checks which tab is active in your chosen browser to remind you of your current task when you switch tabs.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Niyyah Capture uses your microphone when you dictate a task.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>Niyyah Capture converts your dictation into task text.</string>
+</dict>
+</plist>

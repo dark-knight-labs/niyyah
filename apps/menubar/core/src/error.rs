@@ -19,6 +19,8 @@ pub enum Error {
     TextTooLong,
     #[error("pick a block: the server files a capture under one")]
     NoBlock,
+    #[error("expected an http or https link without a username or password")]
+    BadLink,
     #[error("storage error: {0}")]
     Storage(String),
     #[error("keychain error: {0}")]
