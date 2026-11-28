@@ -279,6 +279,9 @@ export interface GoalIn { title: string; value: string; caption: string; progres
 
 export interface ApiTokenData { id: number; name: string; prefix: string; created_at: string; last_used_at: string | null }
 export interface NewApiToken extends ApiTokenData { token: string }
+export interface DeviceTokenData { id: number; name: string; prefix: string; scope: string; created_at: string; last_used_at: string | null }
+/** The raw token is only in the create response: hold it in component state, never persist or log it. */
+export interface NewDeviceToken extends DeviceTokenData { token: string }
 
 export type HabitStage = "installing" | "rails" | "retired";
 export type HabitLevel = "done" | "min";
