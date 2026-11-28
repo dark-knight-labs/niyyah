@@ -255,7 +255,10 @@ test("week calendar: tick a task, move it to another day, toggle its pin star", 
   const star = (await task(page, other, "Call bank")).getByRole("button", { name: "Important: Call bank" });
   await star.click();
   await expect(star).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByLabel("Important", { exact: true }).getByText("Call bank")).toBeVisible();
+  // The Important row lists upcoming pins only: on a Saturday `other` is the Friday before, which is past, so it is not there.
+  const important = page.getByLabel("Important", { exact: true }).getByText("Call bank");
+  if (other >= today) await expect(important).toBeVisible();
+  else await expect(important).toHaveCount(0);
 
   await page.reload();
   await expect(grid(page, today).getByText("Daily standup")).toBeVisible({ timeout: 30_000 });
@@ -809,10 +812,13 @@ test("one bar: menus opened from the header paint above the calendar", async ({ 
 test("one bar: a day with several all-day items shows a count; its list opens on top, inside the window, and closes on Esc", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openOverview(page);
-  for (const t of ["Lane one", "Lane two"]) await quickAdd(page, `${t} sat #lane`);
   const sat = (await page.locator("[data-allday][data-day]").last().getAttribute("data-day"))!;
+  // The last day is empty on most days, but on a Saturday it is today and holds the seeded tasks: count from what is there.
+  const base = await allDay(page, sat).locator('[data-item^="t:"]').count();
+  for (const t of ["Lane one", "Lane two"]) await quickAdd(page, `${t} sat #lane`);
   const count = page.locator(`[data-allday-count="${sat}"]`);
-  await expect(count).toHaveAccessibleName(/: 2 tasks/);
+  const tasks = (n: number) => new RegExp(`: ${n} tasks`);
+  await expect(count).toHaveAccessibleName(tasks(base + 2));
   await expect(allDayTask(page, sat, "Lane one")).toBeHidden(); // in the DOM, list closed
   await count.click();
   const list = page.locator(`[data-allday-list="${sat}"]`);
@@ -830,15 +836,19 @@ test("one bar: a day with several all-day items shows a count; its list opens on
   await patched;
   await expect(grid(page, sat).locator('[data-item^="t:"]').filter({ hasText: "Lane two" })).toBeVisible();
   await expect(list).toBeHidden();
-  // One item left: it shows in the cell itself, and the day still has an add button.
-  await expect(count).toHaveCount(0);
-  await expect(allDayTask(page, sat, "Lane one")).toBeVisible();
+  // One item left on an empty day: it shows in the cell itself (more than one: the count stays); the day still has an add button.
+  if (base === 0) {
+    await expect(count).toHaveCount(0);
+    await expect(allDayTask(page, sat, "Lane one")).toBeVisible();
+  } else {
+    await expect(count).toHaveAccessibleName(tasks(base + 1));
+  }
   await allDay(page, sat).getByRole("button", { name: /^Add a task on / }).click();
   const made = page.waitForResponse((r) => r.url().endsWith("/vault/items") && r.request().method() === "POST");
   await page.getByRole("textbox", { name: `New task for ${sat}` }).fill("Lane three");
   await page.getByRole("textbox", { name: `New task for ${sat}` }).press("Enter");
   expect((await made).status()).toBe(201);
-  await expect(count).toHaveAccessibleName(/: 2 tasks/);
+  await expect(count).toHaveAccessibleName(tasks(base + 2));
 });
 
 test("one bar: the calendar status says not set up or not connected (amber), and nothing when connected", async ({ page }) => {
