@@ -1,109 +1,141 @@
-//! `GET /api/v1/capture/options`: the user's products and the day's block list.
+//! `GET /api/v1/capture/options`: the user's streams to file under, each with its optional products.
 //!
-//! Contract (Part A, read-only, device-token allowed):
+//! Contract (niyyah PR #118, `docs/capture-api.md`): every non-archived stream, products nested under each stream.
 //! ```json
-//! { "blocks":   [{"block": "OT", "start": "06:00", "end": "16:03", "what": "...", "stream": "OT"}],
-//!   "products": [{"slug": "alisha", "name": "Alisha Noor", "block": "OT"}] }
+//! { "streams": [{"slug": "kahf", "name": "Kahf", "color": "violet", "products": []},
+//!               {"slug": "alisha", "name": "Alisha Noor", "color": "rose", "products": [{"slug": "cart", "name": "Cart"}]}] }
 //! ```
-//! `blocks` mirrors the schedule's block rows. A capture is filed under the block's
-//! `stream` (or its `block` key if `stream` is null). Unknown fields are ignored.
+//! A stream has no short name: show `name`. The deprecated top-level `blocks`, `products` and `day` are ignored.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// `null` reads as the default: a server may send `"streams": null` or `"name": null`.
+fn nullable<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Options {
-    #[serde(default)]
-    pub blocks: Vec<BlockOption>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "nullable")]
+    pub streams: Vec<StreamOption>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreamOption {
+    #[serde(default, deserialize_with = "nullable")]
+    pub slug: String,
+    #[serde(default, deserialize_with = "nullable")]
+    pub name: String,
+    /// A colour key ("violet", "rose", ...).
+    #[serde(default, deserialize_with = "nullable")]
+    pub color: String,
+    #[serde(default, deserialize_with = "nullable")]
     pub products: Vec<ProductOption>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BlockOption {
-    pub block: String,
-    /// "HH:MM", local time of the day the list is for.
-    pub start: String,
-    pub end: String,
-    #[serde(default)]
-    pub what: String,
-    #[serde(default)]
-    pub stream: Option<String>,
-}
-
-impl BlockOption {
-    /// The value sent as `stream` when capturing under this block.
-    pub fn stream_slug(&self) -> &str {
-        self.stream.as_deref().filter(|s| !s.is_empty()).unwrap_or(&self.block)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProductOption {
+    #[serde(default, deserialize_with = "nullable")]
     pub slug: String,
+    #[serde(default, deserialize_with = "nullable")]
     pub name: String,
-    #[serde(default)]
-    pub block: Option<String>,
 }
 
-fn minutes(hhmm: &str) -> Option<u32> {
-    let (h, m) = hhmm.split_once(':')?;
-    let (h, m): (u32, u32) = (h.trim().parse().ok()?, m.trim().parse().ok()?);
-    (h < 24 && m < 60).then_some(h * 60 + m)
+/// What the picker shows for one stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PickerStream {
+    /// The value filed as `stream`.
+    pub value: String,
+    /// The name on the chip.
+    pub label: String,
+    pub color: String,
+    /// Optional second pick; empty when the stream has none.
+    pub products: Vec<ProductOption>,
 }
 
-/// The block covering `now_minutes` (minutes since local midnight), to pre-fill the select.
-/// A block that ends at or before its start wraps past midnight.
-pub fn current_block(blocks: &[BlockOption], now_minutes: u32) -> Option<&BlockOption> {
-    blocks.iter().find(|b| {
-        let (Some(s), Some(e)) = (minutes(&b.start), minutes(&b.end)) else { return false };
-        if s < e {
-            s <= now_minutes && now_minutes < e
-        } else {
-            now_minutes >= s || now_minutes < e
+impl Options {
+    /// Streams for the picker, in server order, one per slug.
+    pub fn picker(&self) -> Vec<PickerStream> {
+        let mut out: Vec<PickerStream> = Vec::new();
+        for s in &self.streams {
+            let value = s.slug.trim().to_string();
+            if value.is_empty() || out.iter().any(|p| p.value == value) {
+                continue;
+            }
+            let label = if s.name.trim().is_empty() { value.clone() } else { s.name.trim().to_string() };
+            let products = s
+                .products
+                .iter()
+                .filter(|p| !p.slug.trim().is_empty())
+                .map(|p| ProductOption { slug: p.slug.clone(), name: if p.name.trim().is_empty() { p.slug.clone() } else { p.name.clone() } })
+                .collect();
+            out.push(PickerStream { value, label, color: s.color.clone(), products });
         }
-    })
+        out
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn b(block: &str, start: &str, end: &str, stream: Option<&str>) -> BlockOption {
-        BlockOption { block: block.into(), start: start.into(), end: end.into(), what: String::new(), stream: stream.map(String::from) }
-    }
-
     #[test]
-    fn picks_the_block_covering_now() {
-        let blocks = vec![b("DW", "06:00", "10:00", None), b("OT", "10:00", "16:03", Some("OT")), b("N", "22:00", "02:00", None)];
-        assert_eq!(current_block(&blocks, 6 * 60).unwrap().block, "DW");
-        assert_eq!(current_block(&blocks, 10 * 60).unwrap().block, "OT", "end is exclusive, start inclusive");
-        assert_eq!(current_block(&blocks, 23 * 60).unwrap().block, "N");
-        assert_eq!(current_block(&blocks, 60).unwrap().block, "N", "wraps past midnight");
-        assert!(current_block(&blocks, 18 * 60).is_none());
-    }
-
-    #[test]
-    fn bad_times_never_match() {
-        assert!(current_block(&[b("X", "25:00", "26:00", None)], 600).is_none());
-        assert!(current_block(&[b("X", "soon", "later", None)], 600).is_none());
-    }
-
-    #[test]
-    fn stream_falls_back_to_block() {
-        assert_eq!(b("OT", "1:00", "2:00", None).stream_slug(), "OT");
-        assert_eq!(b("OT", "1:00", "2:00", Some("")).stream_slug(), "OT");
-        assert_eq!(b("OT", "1:00", "2:00", Some("deep")).stream_slug(), "deep");
-    }
-
-    #[test]
-    fn parses_the_contract_and_ignores_extras() {
+    fn nested_products_and_names() {
         let o: Options = serde_json::from_str(
-            r#"{"blocks":[{"block":"OT","start":"06:00","end":"10:00","what":"w","stream":null,"extra":1}],
-                "products":[{"slug":"a","name":"A"}],"date":"2026-11-27"}"#,
+            r#"{"streams":[
+                 {"slug":"kahf","name":"Kahf","color":"violet","products":[]},
+                 {"slug":"alisha","name":"Alisha Noor","color":"rose","products":[{"slug":"cart","name":"Cart"},{"slug":"store"}]},
+                 {"slug":"solo","name":""}]}"#,
         )
         .unwrap();
-        assert_eq!(o.blocks.len(), 1);
-        assert_eq!(o.products[0].block, None);
-        assert_eq!(serde_json::from_str::<Options>("{}").unwrap(), Options::default());
+        let p = o.picker();
+        assert_eq!(p.iter().map(|s| s.label.as_str()).collect::<Vec<_>>(), ["Kahf", "Alisha Noor", "solo"], "the name is shown");
+        assert!(p[0].products.is_empty(), "products are optional");
+        assert_eq!(p[1].products.iter().map(|x| (x.slug.as_str(), x.name.as_str())).collect::<Vec<_>>(), [("cart", "Cart"), ("store", "store")]);
+        assert_eq!(p[1].color, "rose");
+    }
+
+    #[test]
+    fn deprecated_top_level_fields_are_ignored() {
+        let o: Options = serde_json::from_str(
+            r#"{"streams":[{"slug":"alisha","name":"Alisha Noor","products":[]}],
+                "products":[{"slug":"old","name":"Old","block":"alisha"}],
+                "blocks":[{"block":"OT","start":"06:00","end":"10:00","what":"w"}],"day":"weekday"}"#,
+        )
+        .unwrap();
+        assert!(o.picker()[0].products.is_empty(), "the flat products list is no longer read");
+    }
+
+    #[test]
+    fn duplicates_and_blank_slugs_are_dropped_and_order_is_kept() {
+        let o: Options = serde_json::from_str(r#"{"streams":[{"slug":"b","name":"B"},{"slug":" ","name":"?"},{"slug":"a","name":"A"},{"slug":"b","name":"again"}]}"#).unwrap();
+        assert_eq!(o.picker().iter().map(|s| s.value.as_str()).collect::<Vec<_>>(), ["b", "a"]);
+    }
+
+    #[test]
+    fn nulls_and_missing_slugs_are_tolerated() {
+        let o: Options = serde_json::from_str(r#"{"streams":null}"#).unwrap();
+        assert!(o.picker().is_empty());
+        let o: Options = serde_json::from_str(
+            r#"{"streams":[{"slug":"kahf","name":null,"color":null,"products":null},
+                           {"slug":"alisha","name":"Alisha Noor","products":[{"name":"No slug"},{"slug":"cart","name":null}]}]}"#,
+        )
+        .unwrap();
+        let p = o.picker();
+        assert_eq!(p[0].label, "kahf", "a null name falls back to the slug");
+        assert!(p[0].products.is_empty());
+        assert_eq!(p[1].products.iter().map(|x| (x.slug.as_str(), x.name.as_str())).collect::<Vec<_>>(), [("cart", "cart")], "a product without a slug is dropped");
+    }
+
+    #[test]
+    fn junk_never_crashes() {
+        for body in ["{}", r#"{"streams":[{}]}"#, r#"{"streams":[]}"#, r#"{"blocks":[{}]}"#] {
+            let o: Options = serde_json::from_str(body).unwrap();
+            assert!(o.picker().is_empty());
+        }
     }
 }

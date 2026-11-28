@@ -77,14 +77,53 @@ impl Capturer {
     }
 
     /// Validate (https, or http to localhost) and save the server URL. Drops the options cache.
+    /// Moving to a different origin (scheme, host, port) while a token is stored is refused: that token
+    /// belongs to the old host and must never be sent to a new one. Use [`Capturer::save_settings`] with a
+    /// new token, or clear the token first.
     pub fn set_server_url(&self, raw: &str) -> Result<String, Error> {
-        let url = parse_base_url(raw)?.to_string().trim_end_matches('/').to_string();
+        let url = parse_base_url(raw)?;
+        if self.origin_changes(&url) && self.has_token()? {
+            return Err(Error::OriginChanged);
+        }
+        self.write_server_url(url.to_string().trim_end_matches('/'))
+    }
+
+    fn origin_changes(&self, new: &url::Url) -> bool {
+        self.server_url().and_then(|old| parse_base_url(&old).ok()).is_some_and(|old| old.origin() != new.origin())
+    }
+
+    fn write_server_url(&self, url: &str) -> Result<String, Error> {
         let mut s = lock(&self.settings);
-        s.server_url = Some(url.clone());
+        s.server_url = Some(url.to_string());
         let bytes = serde_json::to_vec_pretty(&*s).map_err(|e| Error::Storage(e.to_string()))?;
         write_private_atomic(&self.dir.join(SETTINGS_FILE), &bytes)?;
         *lock(&self.options) = None;
-        Ok(url)
+        Ok(url.to_string())
+    }
+
+    /// The Settings form: server URL and, optionally, a pasted token. Order matters:
+    /// 1. a pasted token is validated before anything is saved;
+    /// 2. a different origin without a new token is refused (nothing changes; the old token stays with the old
+    ///    host);
+    /// 3. a different origin with a new token drops the old token first, then saves the URL, then stores the
+    ///    new token, all while no send can run, so the old token never reaches the new host.
+    pub fn save_settings(&self, raw_url: &str, raw_token: &str) -> Result<(), Error> {
+        let token = if raw_token.trim().is_empty() { None } else { Some(Token::new(raw_token)?) };
+        let url = parse_base_url(raw_url)?;
+        let _no_send = lock(&self.flush_lock);
+        let moving = self.origin_changes(&url);
+        if moving && token.is_none() && self.has_token()? {
+            return Err(Error::OriginChanged);
+        }
+        if moving {
+            self.store.delete()?;
+        }
+        self.write_server_url(url.to_string().trim_end_matches('/'))?;
+        if let Some(token) = token {
+            self.store.set(&token)?;
+            *lock(&self.options) = None;
+        }
+        Ok(())
     }
 
     // ---- token ----------------------------------------------------------------------------------------------

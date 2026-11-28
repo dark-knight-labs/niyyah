@@ -24,7 +24,7 @@ pub enum Resp {
     Redirect(String),
 }
 
-pub const OPTIONS_JSON: &str = r#"{"blocks":[{"block":"OT","start":"06:00","end":"16:03","what":"Outcome time","stream":"OT"}],"products":[{"slug":"alisha","name":"Alisha Noor","block":"OT"}]}"#;
+pub const OPTIONS_JSON: &str = r#"{"streams":[{"slug":"OT","name":"One Thing","color":"violet","products":[{"slug":"alisha","name":"Alisha Noor"}]}]}"#;
 
 pub struct Mock {
     pub url: String,
@@ -102,9 +102,9 @@ pub const TOKEN: &str = "nyd_Zk3Vq9Lw2Xe7Rt5Yb8Nc1Mh4Jd6Fg0Sa-_Ppu1QwErT";
 pub fn capture(text: &str) -> niyyah_capture_core::Capture {
     niyyah_capture_core::Capture {
         text: text.into(),
-        lane: niyyah_capture_core::Lane::Next,
         stream: "OT".into(),
-        product: Some("alisha".into()),
+        products: vec!["alisha".into()],
+        client_id: None,
     }
 }
 

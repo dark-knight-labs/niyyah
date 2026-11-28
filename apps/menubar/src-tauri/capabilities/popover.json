@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "popover",
+  "description": "The quick-capture popover: capture commands only. No file, shell, http or opener access.",
+  "windows": [
+    "popover"
+  ],
+  "permissions": [
+    "core:default",
+    "allow-load-options",
+    "allow-submit-capture",
+    "allow-pending",
+    "allow-requeue",
+    "allow-discard",
+    "allow-hide-popover",
+    "allow-open-panel-settings"
+  ]
+}

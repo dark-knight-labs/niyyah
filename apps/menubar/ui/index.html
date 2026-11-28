@@ -1,54 +1,30 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="desktop quick">
 <head>
   <meta charset="utf-8">
   <title>Niyyah Capture</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="panel.css">
+  <link rel="stylesheet" href="popover.css">
 </head>
 <body>
-  <main id="capture-view">
+  <dialog id="voice" open aria-label="Quick capture">
     <form id="capture-form" autocomplete="off">
-      <input id="text" type="text" maxlength="300" placeholder="What is on your mind?" aria-label="Capture" autofocus>
-      <div class="row">
-        <label>Block
-          <select id="block" aria-label="Block"></select>
-        </label>
-        <label>Product
-          <select id="product" aria-label="Product"></select>
-        </label>
+      <div class="composer-field">
+        <input class="transcript" id="text" type="text" maxlength="300" placeholder="What is on your mind?" aria-label="Capture" autofocus>
       </div>
-      <div class="row">
-        <div id="lanes" role="group" aria-label="Lane">
-          <button type="button" class="chip" data-lane="now" aria-pressed="false">Now</button>
-          <button type="button" class="chip" data-lane="next" aria-pressed="true">Next</button>
-          <button type="button" class="chip" data-lane="someday" aria-pressed="false">Someday</button>
-        </div>
-        <button id="save" type="submit">Save</button>
+      <p id="status" role="status"></p>
+      <div class="composer-niyyah" id="picker"></div>
+      <div class="composer-actions">
+        <button id="open-settings" type="button">Settings</button>
+        <button class="primary save" id="save" type="submit">Save</button>
       </div>
+      <ul id="queue" aria-label="Waiting to be sent"></ul>
     </form>
-    <p id="status" role="status"></p>
-    <ul id="queue"></ul>
-    <button id="open-settings" type="button" class="link">Settings</button>
-  </main>
-
-  <main id="settings-view" hidden>
-    <form id="settings-form" autocomplete="off">
-      <label>Server URL
-        <input id="server-url" type="url" placeholder="Your Niyyah address" spellcheck="false">
-      </label>
-      <label>Device token
-        <input id="token" type="password" placeholder="Paste a device token" spellcheck="false" autocomplete="off">
-      </label>
-      <p class="hint" id="token-state"></p>
-      <div class="row">
-        <button id="close-settings" type="button" class="link">Back</button>
-        <button id="save-settings" type="submit">Store</button>
-      </div>
-    </form>
-    <p id="settings-status" role="status"></p>
-  </main>
-
+  </dialog>
+  <script src="tasklogic.js"></script>
+  <script src="dropdown.js"></script>
+  <script src="picker.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

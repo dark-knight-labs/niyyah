@@ -1,14 +1,14 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Niyyah Capture",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "bd.burak.niyyah.menubar",
   "build": {
     "frontendDist": "../ui"
   },
   "app": {
     "withGlobalTauri": true,
-    "macOSPrivateApi": false,
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "popover",
@@ -20,21 +20,47 @@
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "focus": true
+        "focus": true,
+        "transparent": true,
+        "shadow": false
+      },
+      {
+        "label": "main",
+        "title": "Niyyah Capture",
+        "url": "panel.html",
+        "width": 420,
+        "height": 180,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true
       }
     ],
     "security": {
-      "csp": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src ipc:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      "csp": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src ipc:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "Productivity",
-    "icon": ["icons/icon.png"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns"
+    ],
     "macOS": {
       "minimumSystemVersion": "12.0",
-      "signingIdentity": "-"
-    }
+      "signingIdentity": "-",
+      "entitlements": "Entitlements.plist"
+    },
+    "copyright": "Focus panel derived from Next Up (github.com/alamin-mahamud/nextup)."
   }
 }

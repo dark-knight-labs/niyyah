@@ -6,6 +6,7 @@
 //! The token goes only in the `Authorization` header to the configured host.
 //! Redirects are never followed, so a redirect cannot carry it to another host.
 
+use std::io::Read;
 use std::time::Duration;
 
 use url::Url;
@@ -17,6 +18,8 @@ use crate::token::Token;
 use crate::url_guard::{endpoint, parse_base_url};
 
 pub const ITEMS_PATH: &str = "/api/v1/vault/items";
+/// Upper bound for the options reply body.
+const MAX_OPTIONS_BYTES: u64 = 1 << 20;
 pub const OPTIONS_PATH: &str = "/api/v1/capture/options";
 
 /// How one POST ended, in the terms the queue acts on.
@@ -50,11 +53,12 @@ impl Client {
         Ok(Self { base, agent })
     }
 
+    /// POST one capture. A 422 is a real error (unknown stream, text too long): it is refused and shown,
+    /// never retried.
     pub fn post_item(&self, token: &Token, item: &ItemPayload) -> SendOutcome {
-        let url = endpoint(&self.base, ITEMS_PATH);
         let res = self
             .agent
-            .post(&url)
+            .post(&endpoint(&self.base, ITEMS_PATH))
             .set("Authorization", &format!("Bearer {}", token.expose()))
             .set("Accept", "application/json")
             .send_json(item);
@@ -70,7 +74,10 @@ impl Client {
             .set("Accept", "application/json")
             .call();
         match res {
-            Ok(resp) if (200..300).contains(&resp.status()) => resp.into_json::<Options>().map_err(|_| Error::Fetch("the options reply was not understood".into())),
+            Ok(resp) if (200..300).contains(&resp.status()) => {
+                // A well-behaved reply is a few KB; never read more than 1 MiB from a server.
+                serde_json::from_reader::<_, Options>(resp.into_reader().take(MAX_OPTIONS_BYTES)).map_err(|_| Error::Fetch("the options reply was not understood".into()))
+            }
             Ok(resp) => Err(Error::Fetch(format!("HTTP {}", resp.status()))),
             Err(ureq::Error::Status(code, _)) => Err(Error::Fetch(format!("HTTP {code}"))),
             Err(ureq::Error::Transport(t)) => Err(Error::Fetch(transport_kind(&t))),
@@ -92,6 +99,8 @@ fn classify(res: Result<ureq::Response, ureq::Error>) -> SendOutcome {
         Err(ureq::Error::Status(code, _)) => match code {
             401 | 403 => SendOutcome::AuthFailed(code),
             408 | 425 | 429 | 500..=599 => SendOutcome::Retry(format!("HTTP {code}")),
+            // The route is not there: almost always a wrong server URL, which the user can fix. Keep the capture.
+            404 | 405 => SendOutcome::Retry(format!("HTTP {code}; check the server URL")),
             _ => SendOutcome::Rejected(format!("the server refused this capture (HTTP {code})")),
         },
         Err(ureq::Error::Transport(t)) => SendOutcome::Retry(transport_kind(&t)),

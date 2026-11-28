@@ -1,0 +1,13 @@
+/* Quick capture popover: the panel's composer, always open. Everything else comes from panel.css. */
+html.quick, html.quick body { margin: 0; background: transparent; overflow: hidden; }
+html.quick #voice { zoom: 1; margin: 12px auto 0; animation: none; }
+html.quick #voice .transcript { padding-right: 11px; margin-bottom: 6px; min-height: 0; }
+html.quick .composer-actions { margin-top: 2px; }
+#status { margin: 0 2px 7px; min-height: 0; color: var(--muted); font-size: 12px; }
+#status:empty { display: none; }
+#status.error { color: #b42318; }
+#queue { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+#queue:empty { display: none; }
+#queue li { display: flex; align-items: center; gap: 6px; justify-content: space-between; padding-top: 5px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+#queue .q-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#queue button { padding: 2px 8px; font-size: 12px; }

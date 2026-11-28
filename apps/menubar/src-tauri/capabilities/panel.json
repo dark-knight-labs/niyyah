@@ -1,0 +1,36 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "panel",
+  "description": "The panel (menu-bar popup): tasks, timer, focus and settings commands. No file, shell, http or opener access.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "allow-load-options",
+    "allow-submit-capture",
+    "allow-get-settings",
+    "allow-save-settings",
+    "allow-awake-millis",
+    "allow-load-tasks",
+    "allow-save-tasks",
+    "allow-open-task-link",
+    "allow-resize-widget",
+    "allow-start-widget-drag",
+    "allow-show-widget",
+    "allow-hide-widget",
+    "allow-pin-widget",
+    "allow-schedule-checkin",
+    "allow-set-task-shortcut",
+    "allow-load-focus-state",
+    "allow-save-focus-state",
+    "allow-log-focus-session",
+    "allow-set-tray-title",
+    "allow-set-tray-attention",
+    "allow-list-focus-windows",
+    "allow-request-accessibility",
+    "allow-set-focus-targets",
+    "allow-set-work-browser",
+    "allow-show-task-reminder"
+  ]
+}

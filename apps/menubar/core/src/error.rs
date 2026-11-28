@@ -17,8 +17,12 @@ pub enum Error {
     EmptyText,
     #[error("the capture is longer than 300 characters")]
     TextTooLong,
-    #[error("pick a block: the server files a capture under one")]
+    #[error("pick a stream: the server files a capture under one")]
     NoBlock,
+    #[error("expected an http or https link without a username or password")]
+    BadLink,
+    #[error("this changes the server to a different host: paste a device token for it, or clear the stored token first (the old token is never sent to a new host)")]
+    OriginChanged,
     #[error("storage error: {0}")]
     Storage(String),
     #[error("keychain error: {0}")]
