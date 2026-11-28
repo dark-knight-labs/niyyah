@@ -11,7 +11,7 @@ from app.services import api_tokens, device_tokens
 
 bearer_scheme = HTTPBearer()
 
-DEVICE_LIMIT = 60  # requests per minute per device token
+DEVICE_LIMIT = 60  # requests per minute per device token; counted in this process, so the ceiling is 60 x the number of api pods
 DEVICE_WINDOW = 60
 
 
