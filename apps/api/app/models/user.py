@@ -57,7 +57,7 @@ class ApiToken(Base):
 
 
 class DeviceToken(Base):
-    """A revocable credential for one capture device (the menu-bar app). It can create tasks and read capture options, nothing else.
+    """A revocable credential for one capture device (the menu-bar app). It can create tasks, read capture options, and list and patch the tasks it created, nothing else.
     Only the SHA-256 is stored; the raw value is shown once."""
     __tablename__ = "device_tokens"
 

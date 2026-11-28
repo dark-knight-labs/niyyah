@@ -31,6 +31,7 @@ import {
   NotebookEntryData,
   NotebookKind,
   NotebooksData,
+  WeeklyLogData,
   PipelineItemData,
   PipelinesData,
   ProductData,
@@ -109,6 +110,8 @@ export const vaultApi = {
     api.put<VaultEditData>("/vault/pipeline/reorder", { stream, line: item.line, hash: item.hash, direction }),
   removePipelineItem: (stream: string, item: PipelineItemData) =>
     api.post<VaultEditData>("/vault/pipeline/remove", { stream, line: item.line, hash: item.hash }),
+  /** The weekly log of one week ("2026-W48"; default this week), Sunday to Saturday. */
+  weeklyLog: (week?: string) => api.get<WeeklyLogData>(`/vault/weekly-log${week ? `?week=${week}` : ""}`),
   notebooks: () => api.get<NotebooksData>("/vault/notebooks"),
   addNotebookEntry: (stream: string, kind: NotebookKind, title: string, body: string) =>
     api.post<VaultEditData>(`/vault/notebook/${stream}/entries`, { kind, title, body }),

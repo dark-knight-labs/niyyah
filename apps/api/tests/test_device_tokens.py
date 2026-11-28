@@ -16,7 +16,7 @@ from tests.conftest import TestSession
 D = "/api/v1/devices/tokens"
 ITEMS = "/api/v1/vault/items"
 OPTIONS = "/api/v1/capture/options"
-ALLOWED = {("POST", ITEMS), ("GET", OPTIONS)}
+ALLOWED = {("POST", ITEMS), ("GET", OPTIONS), ("GET", "/api/v1/capture/tasks"), ("PATCH", "/api/v1/capture/tasks/{client_id}")}
 # Routes that take no bearer token at all: a device token is irrelevant there.
 OPEN = {("GET", "/health"), ("POST", "/api/v1/auth/register"), ("POST", "/api/v1/auth/login"), ("POST", "/api/v1/auth/refresh"),
         ("POST", "/api/v1/auth/logout"),
@@ -90,7 +90,7 @@ async def test_a_device_token_creates_a_task_and_reads_options(auth_client):
     _, as_device = await make_device(auth_client)
     made = await auth_client.post(ITEMS, json=item_body(), headers=as_device)
     assert made.status_code == 201 and made.json()["title"].startswith("call the bank")
-    assert (await auth_client.post(ITEMS, json={"text": "later", "lane": "next"}, headers=as_device)).status_code == 422  # a lane needs a stream
+    assert (await auth_client.post(ITEMS, json={"text": "later", "lane": "next"}, headers=as_device)).status_code == 201  # a lane is ignored: a day task
     opts = await auth_client.get(OPTIONS, headers=as_device)
     assert opts.status_code == 200
     body = opts.json()

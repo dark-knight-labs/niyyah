@@ -58,6 +58,12 @@ class Task(Base):
     goal_ref: Mapped[str | None] = mapped_column(String(16), nullable=True)  # id of a goal line of the stream's quarter goals
     label_month: Mapped[str | None] = mapped_column(String(7), nullable=True)  # "2026-11": the item's month label
     label_date: Mapped[dt.date | None] = mapped_column(Date, nullable=True)  # a day label, instead of a month; never both
+    # Capture extras (docs/capture-api.md). All nullable with no default, so adding them is a catalog-only change on Postgres and an
+    # older image can still insert a task. `deadline_at` is the exact moment; `due_on` stays the date-only due day and is not derived from it.
+    link: Mapped[str | None] = mapped_column(String(2048), nullable=True)  # an http(s) URL the task points at
+    deadline_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    tracked_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)  # time banked before the running timer started; None = 0
+    timer_started_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # set while a timer runs
 
 
 class EventOverlay(Base):

@@ -444,3 +444,13 @@ export interface OverlayIn extends ItemFields {
   calendar?: string;
   day?: string;
 }
+
+/** One task in the Plan page's weekly log: on the day it was finished (`on` "done") or, still open, the day it is for ("captured"). */
+export interface WeeklyLogEntry { id: number; text: string; stream: string | null; done: boolean; on: "done" | "captured"; link: string | null; tracked_seconds: number; }
+/** `stream` null is "Unfiled": captures that named no stream. */
+export interface WeeklyLogStream { stream: string | null; name: string; color: string; done: number; total: number; }
+export interface WeeklyLogData {
+  week: string; start: string; end: string; prev_week: string; next_week: string;
+  streams: WeeklyLogStream[];
+  days: { day: string; entries: WeeklyLogEntry[] }[];
+}

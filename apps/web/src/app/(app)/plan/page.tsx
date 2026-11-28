@@ -10,6 +10,7 @@ import { Notice, Spinner } from "@/components/planner/page-title";
 import { PlanHeader } from "@/components/planner/plan-header";
 import { PlanTable, Reveal } from "@/components/planner/plan-table";
 import { StreamEditor } from "@/components/planner/stream-editor";
+import { WeeklyLog } from "@/components/planner/weekly-log";
 import { dateInTz } from "@/lib/routine";
 import { PLANNER_TZ } from "@/lib/streams";
 import { vaultApi } from "@/lib/vault-api";
@@ -158,6 +159,10 @@ export default function PlanPage() {
             <PlanTable streams={streams} quarter={quarter} pipelines={pipelines} notebooks={notebooks} today={dateInTz(now, PLANNER_TZ)}
               block={stream} onBlock={pick} editor={editor} onEdit={setEditing} onAddBlock={() => setEditing("new")}
               busy={busy} run={run} message={message} habits={habits} runHabits={runHabits} makeHabit={makeHabit} onAdd={addTo} reveal={reveal} />
+          </section>
+          <section id="plan-weekly-log" aria-label="Weekly log" className="mt-6 border border-[var(--border)] bg-[var(--surface)]">
+            <Strip n="02" title="Weekly log" aside="finished per stream, and each day's tasks under their stream" />
+            <WeeklyLog reloadKey={pipelines} />
           </section>
         </>
       )}

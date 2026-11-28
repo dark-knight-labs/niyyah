@@ -1,6 +1,6 @@
 """Device tokens for capture clients. The raw value is returned once, at creation; afterwards only its SHA-256 is known.
 
-A device token is accepted on exactly two routes (see app.core.deps.get_capture_user); every other route refuses it with 403."""
+A device token is accepted on exactly four routes (see app.core.deps.get_capture_user); every other route refuses it with 403."""
 import hmac
 import secrets
 from datetime import datetime, timezone

@@ -1,9 +1,11 @@
-from datetime import date
+from datetime import date, datetime
 
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_serializer, model_validator
+
+from app.schemas.capture import TaskExtrasIn
 
 
 class VaultDayResponse(BaseModel):
@@ -694,7 +696,7 @@ class ItemFieldsIn(BaseModel):
     checklist: list[ChecklistItemIn] | None = Field(default=None, max_length=50)
 
 
-class ItemCreateIn(ItemFieldsIn):
+class ItemCreateIn(ItemFieldsIn, TaskExtrasIn):
     day: date | None = None  # a scheduled item ...
     lane: Literal["now", "next", "backlog"] | None = None  # ... or an undated one in this lane of its stream's pipeline (send `stream`)
     parent_id: int | None = None  # makes it a piece of another item (one level)
@@ -705,12 +707,12 @@ class ItemCreateIn(ItemFieldsIn):
 
     @model_validator(mode="after")
     def _day_or_lane(self):
-        if (self.day is None) == (self.lane is None):
-            raise ValueError("send exactly one of `day` and `lane`")
+        if self.day is not None and self.lane is not None:
+            raise ValueError("send exactly one of `day` and `lane`")  # neither is refused later (create_item); a device token always gets a day (capture_target)
         return self
 
 
-class ItemPatchIn(ItemFieldsIn):
+class ItemPatchIn(ItemFieldsIn, TaskExtrasIn):
     text: str | None = Field(default=None, min_length=1, max_length=300)
     day: date | None = None  # reschedules: sets the scheduled date, leaves due and start dates alone (an undated item takes the day)
     parent_id: int | None = None  # a piece of another item; send null to unlink
@@ -747,6 +749,11 @@ class ItemResponse(BaseModel):
     scheduled_on: date | None = None
     start_on: date | None = None
     path: str | None = None
+    # capture extras of an own item (docs/capture-api.md); tracked_seconds is 0 when none is banked
+    link: str | None = None
+    deadline_at: datetime | None = None
+    tracked_seconds: int = 0
+    timer_started_at: datetime | None = None
     # pipeline fields of an own item (null for a plain task)
     lane: Lane | None = None
     focus_week: str | None = None

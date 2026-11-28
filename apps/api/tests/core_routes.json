@@ -68,6 +68,14 @@
   "GET"
  ],
  [
+  "/api/v1/capture/tasks",
+  "GET"
+ ],
+ [
+  "/api/v1/capture/tasks/{client_id}",
+  "PATCH"
+ ],
+ [
   "/api/v1/compass",
   "GET"
  ],
@@ -541,6 +549,10 @@
  ],
  [
   "/api/v1/vault/week",
+  "GET"
+ ],
+ [
+  "/api/v1/vault/weekly-log",
   "GET"
  ],
  [

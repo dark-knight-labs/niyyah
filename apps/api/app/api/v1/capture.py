@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.vault import _local_now
+from app.api.v1.vault import _item_run, _local_now
 from app.core.database import get_db
 from app.core.deps import get_capture_user
 from app.models.user import User
-from app.services import planner_products, planner_store
+from app.schemas.capture import CaptureTask, CaptureTaskPatch, CaptureTasks
+from app.services import capture_tasks, planner_products, planner_store
 
 router = APIRouter(prefix="/capture", tags=["capture"])
 
@@ -27,15 +30,22 @@ class CaptureProduct(BaseModel):
     block: str  # the planner stores a product's stream under this name: it is a stream slug, not a schedule block key
 
 
-class CaptureStream(BaseModel):
+class CaptureStreamProduct(BaseModel):
     slug: str
     name: str
 
 
+class CaptureStream(BaseModel):
+    slug: str
+    name: str
+    color: str | None = None  # a colour key such as "violet"; the web app maps it to a token
+    products: list[CaptureStreamProduct] = []  # optional second pick: this stream's products
+
+
 class CaptureOptions(BaseModel):
-    blocks: list[CaptureBlock]  # today's schedule in order, so a client can pick the current one
-    products: list[CaptureProduct]
-    streams: list[CaptureStream]  # this quarter's streams with a pipeline: a task in a lane (now/next/backlog) needs one
+    blocks: list[CaptureBlock]  # DEPRECATED: today's schedule rows; captures are filed by stream now
+    products: list[CaptureProduct]  # DEPRECATED: flat list; use streams[].products
+    streams: list[CaptureStream]  # THE PICKER: every non-archived stream, with or without a quarter goal or pipeline
     day: str  # "weekday" or "weekend": which schedule `blocks` come from
 
 
@@ -49,5 +59,36 @@ async def capture_options(user: User = Depends(get_capture_user), db: AsyncSessi
     blocks = [CaptureBlock(block=r["block"], start=r["start"], end=r["end"], what=r["what"], stream=r["stream"])
               for r in (sched or {}).get("days", {}).get(day, [])]
     products = [CaptureProduct(slug=p.slug, name=p.name, block=p.block) for p in await planner_products.rows_of(db, user.id)]
-    streams = [CaptureStream(slug=s.id, name=s.name) for s in await planner_store.streams_for(db, user.id, now.date()) if s.goal and not s.archived]
+    streams = [CaptureStream(**s) for s in await capture_tasks.capture_streams(db, user.id, now.date())]
     return CaptureOptions(blocks=blocks, products=products, streams=streams, day=day)
+
+
+def _device_token_id(request: Request) -> int:
+    """The device token that made this call. The sync routes belong to one device's own tasks, so a login (no device) is refused."""
+    token_id = getattr(request.state, "device_token_id", None)
+    if token_id is None:
+        raise HTTPException(status_code=403, detail="These routes are for device tokens")
+    return token_id
+
+
+@router.get("/tasks", response_model=CaptureTasks)
+async def list_capture_tasks(request: Request, include_done: bool = False, limit: int = Query(default=200, ge=1, le=500),
+                             user: User = Depends(get_capture_user), db: AsyncSession = Depends(get_db)):
+    """The tasks this device created, newest first: open ones, or all with `include_done`. Never another device's or user's."""
+    token_id = _device_token_id(request)
+    return {"tasks": await capture_tasks.list_for_device(db, user.id, token_id, include_done, limit)}
+
+
+@router.patch("/tasks/{client_id}", response_model=CaptureTask)
+async def patch_capture_task(client_id: UUID, data: CaptureTaskPatch, request: Request,
+                             user: User = Depends(get_capture_user), db: AsyncSession = Depends(get_db)):
+    """Change the fields sent on the task this device created with `client_id`: done, text, link, deadline_at, tracked_seconds,
+    timer_started_at. Sending the same values again changes nothing. 404 when this device has no task for the id."""
+    token_id = _device_token_id(request)
+    user_id = user.id  # read now: a rollback expires the user object
+    fields = data.model_dump(exclude_unset=True)
+    today = _local_now().date()
+    result = await _item_run(db, lambda: capture_tasks.patch_for_device(db, user_id, token_id, str(client_id), fields, today))
+    if result is None:
+        raise HTTPException(status_code=404, detail="No task for this client_id on this device")
+    return result
