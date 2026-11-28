@@ -1,6 +1,7 @@
 from datetime import date
 
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field, model_serializer, model_validator
 
@@ -697,6 +698,7 @@ class ItemCreateIn(ItemFieldsIn):
     day: date | None = None  # a scheduled item ...
     lane: Literal["now", "next", "backlog"] | None = None  # ... or an undated one in this lane of its stream's pipeline (send `stream`)
     parent_id: int | None = None  # makes it a piece of another item (one level)
+    client_id: UUID | None = None  # a capture client's retry key: with a device token, a repeat returns the first item (200)
     text: str = Field(min_length=1, max_length=300)
     start_min: int | None = Field(default=None, ge=0, le=1440)  # both omitted = all day
     end_min: int | None = Field(default=None, ge=0, le=1440)

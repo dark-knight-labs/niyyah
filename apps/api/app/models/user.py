@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -54,6 +54,34 @@ class ApiToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DeviceToken(Base):
+    """A revocable credential for one capture device (the menu-bar app). It can create tasks and read capture options, nothing else.
+    Only the SHA-256 is stored; the raw value is shown once."""
+    __tablename__ = "device_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(12), nullable=False)  # first characters, to tell devices apart
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    scope: Mapped[str] = mapped_column(String(20), nullable=False, default="capture")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DeviceCapture(Base):
+    """Which task a capture client's `client_id` created, so a retried capture returns that task instead of making a second one."""
+    __tablename__ = "device_captures"
+    __table_args__ = (UniqueConstraint("device_token_id", "client_id", name="uq_device_capture_client"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    device_token_id: Mapped[int] = mapped_column(Integer, ForeignKey("device_tokens.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(String(36), nullable=False)  # a UUID, as text
+    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("planner_tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class UserSettings(Base):

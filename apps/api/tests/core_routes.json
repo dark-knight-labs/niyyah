@@ -64,6 +64,10 @@
   "POST"
  ],
  [
+  "/api/v1/capture/options",
+  "GET"
+ ],
+ [
   "/api/v1/compass",
   "GET"
  ],
@@ -74,6 +78,18 @@
  [
   "/api/v1/dashboard",
   "GET"
+ ],
+ [
+  "/api/v1/devices/tokens",
+  "GET"
+ ],
+ [
+  "/api/v1/devices/tokens",
+  "POST"
+ ],
+ [
+  "/api/v1/devices/tokens/{token_id}",
+  "DELETE"
  ],
  [
   "/api/v1/export",
