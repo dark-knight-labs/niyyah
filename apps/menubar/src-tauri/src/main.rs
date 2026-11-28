@@ -9,8 +9,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::Timelike;
-use niyyah_capture_core::options::{current_block, PickerBlock};
+use niyyah_capture_core::options::PickerStream;
 use niyyah_capture_core::queue::Entry;
 use niyyah_capture_core::{now_secs, Capture, Capturer, FocusStore, KeychainStore, TaskStore};
 use serde::Serialize;
@@ -35,10 +34,8 @@ type Shared = Arc<Capturer>;
 
 #[derive(Serialize)]
 struct OptionsReply {
-    /// Blocks for the picker, each with its own products.
-    picker: Vec<PickerBlock>,
-    /// The block to pre-select (the one covering the current time, when the server sends times).
-    current_stream: Option<String>,
+    /// The user's streams for the picker, each with its optional products.
+    picker: Vec<PickerStream>,
 }
 
 #[derive(Serialize)]
@@ -87,10 +84,7 @@ async fn load_options(state: State<'_, Shared>, refresh: bool) -> Result<Options
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())?;
-    let now = chrono::Local::now();
-    let minutes = now.hour() * 60 + now.minute();
-    let current_stream = current_block(&options.blocks, minutes).map(|b| b.stream_slug().to_string());
-    Ok(OptionsReply { picker: options.picker(), current_stream })
+    Ok(OptionsReply { picker: options.picker() })
 }
 
 #[tauri::command]
@@ -266,7 +260,7 @@ fn main() {
             widget::open_panel_settings,
             window_focus::list_focus_windows,
             window_focus::request_accessibility,
-            window_focus::set_focus_target,
+            window_focus::set_focus_targets,
             focus_switch::set_work_browser,
             focus_switch::show_task_reminder,
             focus_switch::hide_task_reminder

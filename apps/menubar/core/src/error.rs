@@ -17,7 +17,7 @@ pub enum Error {
     EmptyText,
     #[error("the capture is longer than 300 characters")]
     TextTooLong,
-    #[error("pick a block: the server files a capture under one")]
+    #[error("pick a stream: the server files a capture under one")]
     NoBlock,
     #[error("expected an http or https link without a username or password")]
     BadLink,

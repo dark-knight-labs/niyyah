@@ -11,7 +11,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use niyyah_capture_core::focus::FocusMonitor;
+use niyyah_capture_core::focus::{FocusMonitor, Observation};
 use serde::{Deserialize, Serialize};
 use tauri::{State, WebviewWindow};
 
@@ -39,7 +39,10 @@ pub struct WindowList {
 }
 
 pub struct Watch {
-    target: Option<Target>,
+    /// The session's primary window.
+    primary: Option<Target>,
+    /// Extra windows that are fine to be on (secondary).
+    allowed: Vec<Target>,
     monitor: FocusMonitor,
 }
 
@@ -48,7 +51,7 @@ pub struct WatchState(Arc<Mutex<Watch>>);
 
 impl Default for WatchState {
     fn default() -> Self {
-        Self(Arc::new(Mutex::new(Watch { target: None, monitor: FocusMonitor::new(3) })))
+        Self(Arc::new(Mutex::new(Watch { primary: None, allowed: Vec::new(), monitor: FocusMonitor::new(3) })))
     }
 }
 
@@ -63,10 +66,13 @@ pub fn request_accessibility() -> bool {
     platform::request_trust()
 }
 
+/// Set (or clear) the session's windows: one primary, any number of allowed. Window names stay in this
+/// process and on this Mac; nothing here sends them anywhere.
 #[tauri::command]
-pub fn set_focus_target(target: Option<Target>, state: State<'_, WatchState>) {
+pub fn set_focus_targets(primary: Option<Target>, allowed: Vec<Target>, state: State<'_, WatchState>) {
     if let Ok(mut watch) = state.0.lock() {
-        watch.target = target;
+        watch.primary = primary;
+        watch.allowed = allowed;
         watch.monitor.reset();
     }
 }
@@ -75,14 +81,26 @@ pub fn start(window: WebviewWindow, state: WatchState) {
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_millis(500));
         let Ok(mut watch) = state.0.lock() else { continue };
-        let Some(target) = watch.target.clone() else { continue };
-        let seen = platform::observe(&target);
+        let Some(primary) = watch.primary.clone() else { continue };
+        let seen = classify(&primary, &watch.allowed);
         if let Some(changed) = watch.monitor.observe(seen) {
             if let Ok(detail) = serde_json::to_string(&changed) {
                 let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('focus-state', {{ detail: {detail} }}))"));
             }
         }
     });
+}
+
+/// Primary, allowed, other, own or gone: what is in front relative to the session's windows.
+fn classify(primary: &Target, allowed: &[Target]) -> Observation {
+    match platform::observe(primary) {
+        // Own and Gone are about the primary alone: our own windows are neutral, a closed primary is lost.
+        Observation::Own => Observation::Own,
+        Observation::Gone => Observation::Gone,
+        Observation::Primary => Observation::Primary,
+        _ if allowed.iter().any(|t| platform::observe(t) == Observation::Primary) => Observation::Allowed,
+        _ => Observation::Other,
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -293,7 +311,7 @@ mod platform {
             if running.is_empty() {
                 return Observation::Gone;
             }
-            let Some(front) = workspace.frontmostApplication() else { return Observation::Away };
+            let Some(front) = workspace.frontmostApplication() else { return Observation::Other };
             let front_pid = front.processIdentifier();
             if front_pid as u32 == std::process::id() {
                 return Observation::Own;
@@ -301,18 +319,18 @@ mod platform {
             let by_title = !target.title.is_empty() && trusted();
             if running.contains(&front_pid) {
                 if !by_title {
-                    return Observation::OnTarget;
+                    return Observation::Primary;
                 }
                 if focused_title(front_pid).as_deref() == Some(target.title.as_str()) {
-                    return Observation::OnTarget;
+                    return Observation::Primary;
                 }
                 // Another window of the same app is in front: away, unless the chosen one was closed.
-                return if titles(front_pid).contains(&target.title) { Observation::Away } else { Observation::Gone };
+                return if titles(front_pid).contains(&target.title) { Observation::Other } else { Observation::Gone };
             }
             if by_title && !running.iter().any(|pid| titles(*pid).contains(&target.title)) {
                 return Observation::Gone;
             }
-            Observation::Away
+            Observation::Other
         })
     }
 }

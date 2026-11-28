@@ -1,6 +1,7 @@
 const desktop = window.__TAURI__?.core;
 const {webLink, formatStamp, creditDelta, isDueSoon, moveTask, cycleTarget, namesFrom, captureFor,
-  newSession, focusTick, focusState, focusShown, focusFinished, focusRecord, trayTitle} = window.NiyyahTasks;
+  newSession, focusTick, focusState, focusPause, taskEarns, setPrimary, toggleAllowed, windowRows, presentFor,
+  focusShown, focusFinished, focusRecord, trayTitle} = window.NiyyahTasks;
 function native(command, args) {
   return desktop?.invoke(command, args).catch(error => console.warn(command, error));
 }
@@ -241,6 +242,7 @@ function render() {
   }
   list.replaceChildren(...rows);
   updateTimes(Date.now());
+  renderTaskFocusLine();
   if (previousGlance.size && glanceFocus.getClientRects().length) {
     const glanceRows = [glanceFocus, ...glanceNext.children];
     const positions = glanceRows.map(row => row.getBoundingClientRect().top);
@@ -322,6 +324,7 @@ function sampleTrackingClock() {
     const previous = clockSample;
     clockSample = {task, millis};
     if (previous?.task !== task) return;
+    if (!taskEarns(focus)) return; // away from the focus windows, or paused: the task earns nothing
     const delta = creditDelta(previous.millis, millis, desktop);
     if (!delta) return;
     task.trackedMs = (task.trackedMs ?? 0) + delta;
@@ -490,18 +493,18 @@ let panelOpen = false;
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 let attentionTimer;
 
-// Menu-bar attention: the tray icon blinks (steady amber with Reduce Motion) until `off`.
+// Tray look: 'off' (calm), 'tint' (on an allowed window), 'blink' or 'steady' (the nudge). `forMs` is for
+// the timed check-in blink; afterwards the tray goes back to what the focus session calls for.
 function trayAttention(mode, forMs) {
   if (!desktop) return;
   clearTimeout(attentionTimer);
-  native('set_tray_attention', {mode: mode === 'off' ? 'off' : reduceMotion() ? 'steady' : 'blink'});
-  if (forMs) attentionTimer = setTimeout(() => trayAttention(focusAwayNow() ? 'blink' : 'off'), forMs);
+  native('set_tray_attention', {mode});
+  if (forMs) attentionTimer = setTimeout(() => trayAttention(sessionTray()), forMs);
 }
-const focusAwayNow = () => Boolean(focus && focus.state !== 'on');
+const sessionTray = () => (focus && !focus.paused ? presentFor(focus.state, reduceMotion()).tray : 'off');
 
 function show(focus = false) {
   panelOpen = true;
-  if (!focusAwayNow()) trayAttention('off');
   get('widget').classList.remove('closed');
   get('widget').inert = false;
   clearTimeout(nativeHideTimer);
@@ -561,7 +564,7 @@ function checkIn(now = Date.now()) {
   next = now + interval();
   if (modalOpen()) return;
   if (desktop && !panelOpen) {
-    trayAttention('blink', 8000);
+    trayAttention(reduceMotion() ? 'steady' : 'blink', 8000);
     get('announcement').textContent = 'Time for a focus check-in.';
     return;
   }
@@ -618,7 +621,7 @@ function deadlineInputValue(timestamp) {
   return new Date(timestamp - local.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-// ---- Niyyah side: every new task is also filed in Niyyah (block, product, lane). The link, timer and
+// ---- Niyyah side: every new task is also filed in Niyyah (stream, optional product). The link, timer and
 // deadline stay in this app. A capture that cannot be queued is reported, never dropped silently.
 let niyyahOptions;
 const picker = window.NiyyahPicker.mount(get('composer-niyyah'));
@@ -642,13 +645,13 @@ async function loadNiyyahOptions(refresh = false) {
 
 async function fileInNiyyah(items) {
   const status = get('niyyah-status');
-  const {stream: block, product, lane} = picker.value;
+  const {stream: block, product} = picker.value;
   if (!desktop || !block) return;
   let queued = 0;
   const problems = [];
   for (const {name, id} of items) {
     try {
-      await desktop.invoke('submit_capture', {capture: captureFor(name, lane, block, product, id)});
+      await desktop.invoke('submit_capture', {capture: captureFor(name, block, product, id)});
       queued++;
     } catch (error) {
       problems.push(String(error));
@@ -1068,33 +1071,107 @@ window.addEventListener('desktop-focus-switch', () => {
   }
 });
 
-// ---- Focus window: stay on one window, with a timer tied to the current task. ---------------------
-// The Rust side watches (window_focus.rs) and sends `focus-state` events; the session itself (timer,
-// away time) lives here, is saved to focus.json, and each finished session is logged to sessions.jsonl.
+// ---- Focus: ONE task + ONE primary window (+ optional allowed windows), as one flow. -----------------
+// The Rust side watches (window_focus.rs) and sends `focus-state` events: primary, allowed, away, lost. The
+// session (timer, away time) lives here, is saved to focus.json, and each finished session is appended to
+// sessions.jsonl. Window names stay in this app: they are never in a capture or a syncable record.
 let focus = null;
-let focusTarget = null;
+let focusTarget = null;     // the last primary window, to preselect next time
 let focusSample;
 let focusClockPending = false;
 let focusSavedAt = 0;
 let lastTrayTitle;
 let focusWindows = [];
+let focusTrusted = false;
+let windowsPolledAt = 0;
+
+const winLabel = w => (w.title ? w.app + ' — ' + w.title : w.app);
+const toShell = w => ({app: w.app, bundle_id: w.bundleId ?? w.bundle_id, title: w.title || ''});
+const fromShell = w => ({app: w.app, bundleId: w.bundle_id ?? w.bundleId, title: w.title || ''});
 
 function focusTask() {
   return currentTask() ?? tasks.find(task => !task.done);
 }
 
+function pushTargets() {
+  native('set_focus_targets', focus ? {primary: toShell(focus.primary), allowed: focus.allowed.map(toShell)} : {primary: null, allowed: []});
+}
+
+const KIND_TAG = {primary: 'Primary', allowed: 'Allowed', other: ''};
+
+function renderWindowList() {
+  const list = get('focus-windows');
+  if (!focus) { list.replaceChildren(); return; }
+  list.replaceChildren(...windowRows(focus, focusWindows).map(row => {
+    const item = document.createElement('li');
+    item.className = 'fw';
+    item.dataset.kind = row.kind;
+    const main = document.createElement('button');
+    main.type = 'button';
+    main.className = 'fw-main';
+    main.title = row.kind === 'primary' ? 'Primary window' : 'Make this the primary window';
+    main.disabled = row.kind === 'primary';
+    const name = document.createElement('span');
+    name.className = 'fw-name';
+    name.textContent = winLabel(row);
+    const tag = document.createElement('span');
+    tag.className = 'fw-tag';
+    tag.textContent = row.closed ? 'Closed' : KIND_TAG[row.kind];
+    main.append(name, tag);
+    main.onclick = () => { focus = setPrimary(focus, row); focusChanged(); };
+    item.append(main);
+    if (row.kind !== 'primary') {
+      const allow = document.createElement('button');
+      allow.type = 'button';
+      allow.className = 'fw-allow';
+      allow.textContent = row.kind === 'allowed' ? 'Remove' : 'Allow';
+      allow.title = row.kind === 'allowed' ? 'Stop treating this window as fine to use' : 'Mark this window as fine to use';
+      allow.setAttribute('aria-pressed', String(row.kind === 'allowed'));
+      allow.onclick = () => { focus = toggleAllowed(focus, row); focusChanged(); };
+      item.append(allow);
+    }
+    return item;
+  }));
+}
+
+// The task's own row shows the focus: state, time, primary window.
+function renderTaskFocusLine() {
+  for (const old of document.querySelectorAll('#tasks .task-focus')) old.remove();
+  if (!focus) return;
+  const row = findRow(focus.taskId);
+  const description = row?.querySelector('.task-description');
+  if (!description) return;
+  const line = document.createElement('span');
+  line.className = 'task-focus';
+  line.dataset.state = focus.paused ? 'paused' : focus.state;
+  line.textContent = (focus.paused ? 'Focus paused' : focus.state === 'allowed' ? 'Focus · allowed window'
+    : focus.state === 'away' ? 'Focus · away' : focus.state === 'lost' ? 'Focus · window closed' : 'Focus')
+    + ' · ' + winLabel(focus.primary) + ' · ' + formatStamp(focusShown(focus)) + (focus.mode === 'down' ? ' left' : '');
+  description.append(line);
+}
+
 function renderFocus() {
   const chip = get('focus-chip');
   chip.hidden = !focus;
-  chip.dataset.state = focus?.state ?? '';
+  const panel = get('focus-windows');
+  panel.hidden = !focus;
   get('focus-open').hidden = Boolean(focus);
+  chip.dataset.state = focus ? (focus.paused ? 'paused' : focus.state) : '';
   if (focus) {
-    get('focus-label').textContent = focus.state === 'on' ? focus.app
-      : focus.state === 'away' ? 'Away from ' + focus.app : focus.app + ' window closed';
+    get('focus-label').textContent = focus.paused ? 'Focus paused' : focus.state === 'primary' ? focus.taskName
+      : focus.state === 'allowed' ? focus.taskName + ' · allowed window'
+      : focus.state === 'away' ? 'Back to ' + focus.primary.app : focus.primary.app + ' window closed';
     get('focus-time').textContent = formatStamp(focusShown(focus)) + (focus.mode === 'down' ? ' left' : '');
-    chip.title = focus.title ? focus.app + ' — ' + focus.title : focus.app;
+    chip.title = winLabel(focus.primary);
+    const pause = get('focus-pause');
+    pause.setAttribute('aria-label', focus.paused ? 'Resume focus' : 'Pause focus');
+    pause.title = pause.getAttribute('aria-label');
+    pause.firstElementChild.className = 'ic ' + (focus.paused ? 'ic-play' : 'ic-pause');
   }
-  const title = trayTitle(focus, currentTask()?.name);
+  renderWindowList();
+  renderTaskFocusLine();
+  // Menu bar: an icon, and at most the timer. Never a window title or task text.
+  const title = trayTitle(focus);
   if (desktop && title !== lastTrayTitle) {
     lastTrayTitle = title;
     native('set_tray_title', {title});
@@ -1105,17 +1182,26 @@ function persistFocus(force = false) {
   const now = Date.now();
   if (!desktop || (!force && now - focusSavedAt < 5000)) return;
   focusSavedAt = now;
-  native('save_focus_state', {state: {target: focusTarget, session: focus}});
+  native('save_focus_state', {state: {primary: focusTarget, session: focus}});
+}
+
+// The windows or the primary changed: tell the watcher, save, redraw.
+function focusChanged() {
+  focusTarget = focus ? focus.primary : focusTarget;
+  pushTargets();
+  trayAttention(sessionTray());
+  persistFocus(true);
+  renderFocus();
 }
 
 async function loadFocus() {
   if (!desktop) return;
   try {
     const saved = await desktop.invoke('load_focus_state');
-    if (saved?.target) focusTarget = saved.target;
-    if (saved?.session) {
-      focus = {...saved.session, state: 'on'};
-      native('set_focus_target', {target: {app: focus.app, bundle_id: focus.bundleId, title: focus.title}});
+    if (saved?.primary) focusTarget = saved.primary;
+    if (saved?.session?.primary) {
+      focus = {...saved.session, state: 'primary'};
+      pushTargets();
     }
   } catch (error) {
     console.warn('load_focus_state', error);
@@ -1123,43 +1209,65 @@ async function loadFocus() {
   renderFocus();
 }
 
-function startFocus(target, mode, minutes) {
-  const task = focusTask();
-  if (!task) return false;
+function startFocus(task, primary, allowed, mode, minutes) {
   if (currentTask() !== task) startTask(task);
-  focus = newSession(task, target, mode, minutes, Date.now());
-  focusTarget = target;
+  focus = newSession(task, primary, allowed, mode, minutes, Date.now());
   focusSample = undefined;
-  native('set_focus_target', {target: {app: target.app, bundle_id: target.bundleId, title: target.title}});
-  persistFocus(true);
-  renderFocus();
-  get('announcement').textContent = 'Focus started on ' + target.app + '.';
-  return true;
+  focusChanged();
+  get('announcement').textContent = 'Focus started on ' + task.name + ', primary window ' + primary.app + '.';
 }
 
 function stopFocus() {
   if (!focus) return;
-  trayAttention('off');
-  const record = focusRecord(focus, Date.now());
-  native('log_focus_session', {session: record});
+  const task = tasks.find(item => item.id === focus.taskId);
+  native('log_focus_session', {session: focusRecord(focus, Date.now())});
   focus = null;
   focusSample = undefined;
-  native('set_focus_target', {target: null});
+  if (task && currentTask() === task) { stopTask(task); update(); } // writes the tracked time to the task
+  pushTargets();
+  trayAttention('off');
   persistFocus(true);
   renderFocus();
   get('announcement').textContent = 'Focus ended.';
 }
 
+function pauseFocus(paused) {
+  if (!focus) return;
+  focus = focusPause(focus, paused);
+  const task = tasks.find(item => item.id === focus.taskId);
+  if (task) {
+    if (paused && currentTask() === task) { stopTask(task); update(); }
+    else if (!paused && !currentTask()) startTask(task);
+  }
+  if (!paused) pushTargets(); // re-read where you are
+  trayAttention(sessionTray());
+  persistFocus(true);
+  renderFocus();
+}
+
 // The switch-away alert: the popup shakes (when it is open) while the tray icon blinks and the full-screen
-// reminder names the window to go back to. With Reduce Motion there is no shake.
+// reminder names the window to go back to. Reduce Motion: static highlight, no shake.
 function shakePanel() {
   if (!panelOpen || reduceMotion()) return;
   get('widget').animate([0, -7, 7, -6, 5, -3, 2, 0].map(x => ({translate: `${x}px 0`})), {duration: 620, easing: 'ease-out'});
 }
 
+async function pollWindows() {
+  windowsPolledAt = Date.now();
+  try {
+    const list = await desktop.invoke('list_focus_windows');
+    focusWindows = list.windows;
+    focusTrusted = list.trusted;
+    if (focus) renderWindowList();
+  } catch (error) {
+    console.warn('list_focus_windows', error);
+  }
+}
+
 function tickFocus() {
   if (!focus) return;
   renderFocus();
+  if (desktop && panelOpen && Date.now() - windowsPolledAt > 4000) void pollWindows();
   if (!desktop || focusClockPending) return;
   focusClockPending = true;
   native('awake_millis').then(ms => {
@@ -1179,56 +1287,87 @@ function tickFocus() {
 }
 
 window.addEventListener('focus-state', event => {
-  if (!focus) return;
-  focus = focusState(focus, event.detail);
+  if (!focus || focus.paused) return;
+  const state = event.detail; // 'primary' | 'allowed' | 'away' | 'lost'
+  focus = focusState(focus, state);
+  const look = presentFor(state, reduceMotion());
+  trayAttention(look.tray);
+  if (look.shake) shakePanel();
   persistFocus(true);
   renderFocus();
-  if (event.detail === 'on') {
-    trayAttention('off');
+  if (state === 'away') {
+    native('show_task_reminder', {title: 'Back to ' + focus.primary.app});
+    if (panelOpen && !get('widget').classList.contains('closed')) pulseTask(tasks.find(task => task.id === focus.taskId) ?? {id: ''});
+    get('announcement').textContent = 'You left your focus windows.';
+  } else if (state === 'lost') {
+    native('show_task_reminder', {title: focus.primary.app + ' window closed'});
+    get('announcement').textContent = 'The primary window was closed.';
+  } else if (state === 'allowed') {
+    get('announcement').textContent = 'On an allowed window.';
   } else {
-    trayAttention('blink');
-    shakePanel();
-  }
-  if (event.detail === 'away') {
-    native('show_task_reminder', {title: 'Back to ' + focus.app});
-    if (panelOpen && !get('widget').classList.contains('closed')) pulseTask(focusTask() ?? {id: ''});
-    get('announcement').textContent = 'You left ' + focus.app + '.';
-  } else if (event.detail === 'lost') {
-    native('show_task_reminder', {title: focus.app + ' window closed'});
-    get('announcement').textContent = 'The focus window was closed.';
-  } else {
-    get('announcement').textContent = 'Back on ' + focus.app + '.';
+    get('announcement').textContent = 'Back on the primary window.';
   }
 });
 
-async function fillFocusWindows() {
+// ---- Start dialog: pick or create the task and choose its windows in one step.
+function selectedWindow() {
+  return focusWindows[Number(get('focus-window').value)];
+}
+
+function renderAllowedChoices() {
+  const primary = selectedWindow();
+  const host = get('focus-allowed');
+  host.replaceChildren(...focusWindows.map((win, index) => {
+    const label = document.createElement('label');
+    label.className = 'focus-allow';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.value = String(index);
+    box.disabled = primary === win;
+    label.append(box, ' ' + winLabel(win));
+    return label;
+  }));
+  get('focus-allowed-set').hidden = focusWindows.length < 2;
+}
+
+async function fillFocusDialog() {
+  const taskSelect = get('focus-task-select');
+  const open = tasks.filter(task => !task.done);
+  taskSelect.replaceChildren(...open.map(task => new Option(task.name, task.id)), new Option('New task…', ''));
+  const current = focusTask();
+  taskSelect.value = current ? current.id : '';
+  get('focus-new-row').hidden = taskSelect.value !== '';
+  await pollWindows();
   const select = get('focus-window');
-  let list = {trusted: false, windows: []};
-  try { list = await desktop.invoke('list_focus_windows'); } catch (error) { console.warn('list_focus_windows', error); }
-  focusWindows = list.windows;
-  select.replaceChildren(...focusWindows.map((win, index) =>
-    new Option(win.title ? win.app + ' — ' + win.title : win.app, String(index))));
-  const previous = focusTarget && focusWindows.findIndex(win => win.bundle_id === focusTarget.bundleId && win.title === focusTarget.title);
-  if (previous > 0) select.value = String(previous);
-  get('focus-hint').textContent = list.trusted ? '' :
-    'Window titles need the Accessibility permission. Without it, focus works for the whole app.';
-  get('focus-grant').hidden = list.trusted;
-  get('focus-start').disabled = !focusWindows.length || !focusTask();
-  get('focus-status').textContent = !focusTask() ? 'Add a task first.' : !focusWindows.length ? 'No open windows found.' : '';
+  select.replaceChildren(...focusWindows.map((win, index) => new Option(winLabel(win), String(index))));
+  const previous = focusTarget ? focusWindows.findIndex(win => win.bundle_id === focusTarget.bundleId && (win.title || '') === (focusTarget.title || '')) : -1;
+  if (previous >= 0) select.value = String(previous);
+  renderAllowedChoices();
+  get('focus-hint').textContent = focusTrusted ? '' :
+    'Window titles need the Accessibility permission. Without it, focus works for the whole app. Window names stay on this Mac.';
+  get('focus-grant').hidden = focusTrusted;
+  get('focus-start').disabled = !focusWindows.length;
+  get('focus-status').textContent = !focusWindows.length ? 'No open windows found.' : '';
 }
 
 function openFocus() {
   if (!desktop || modalOpen() || focus) return;
   closeTaskMenu();
-  get('focus-task').textContent = focusTask()?.name ?? 'None';
   show();
   focusDialog.showModal();
-  void fillFocusWindows();
+  void fillFocusDialog();
+  void loadNiyyahOptions();
   sizeDesktop();
 }
 
 get('focus-open').onclick = openFocus;
 get('focus-stop').onclick = stopFocus;
+get('focus-pause').onclick = () => pauseFocus(!focus.paused);
+get('focus-task-select').onchange = event => {
+  get('focus-new-row').hidden = event.target.value !== '';
+  if (event.target.value === '') get('focus-new-task').focus();
+};
+get('focus-window').onchange = renderAllowedChoices;
 get('focus-mode').onchange = event => { get('focus-minutes-row').hidden = event.target.value !== 'down'; };
 get('focus-grant').onclick = async () => {
   await native('request_accessibility');
@@ -1236,10 +1375,20 @@ get('focus-grant').onclick = async () => {
 };
 get('focus-form').onsubmit = event => {
   event.preventDefault();
-  const win = focusWindows[Number(get('focus-window').value)];
+  const win = selectedWindow();
   if (!win) return;
+  let task = tasks.find(item => item.id === get('focus-task-select').value);
+  if (!task) {
+    const name = get('focus-new-task').value.trim();
+    if (!name) { get('focus-status').textContent = 'Name the new task.'; return; }
+    task = {id: crypto.randomUUID(), name, done: false, deadlineAt: null, link: null};
+    tasks.splice(currentTask() ? 1 : 0, 0, task);
+    void fileInNiyyah([{name, id: task.id}]);
+  }
+  const allowed = [...get('focus-allowed').querySelectorAll('input:checked')].map(box => fromShell(focusWindows[Number(box.value)]));
   const minutes = Number(get('focus-minutes').value) || 25;
-  if (startFocus({app: win.app, bundleId: win.bundle_id, title: win.title}, get('focus-mode').value, minutes)) focusDialog.close();
+  startFocus(task, fromShell(win), allowed, get('focus-mode').value, minutes);
+  focusDialog.close();
 };
 
 // First run: say what each permission is for, once, before it is asked for.

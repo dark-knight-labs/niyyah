@@ -279,7 +279,7 @@ pub fn open_panel_settings(app: AppHandle) {
     show_panel(&app, true);
 }
 
-/// Tray attention: 0 off, 1 blink, 2 steady highlight (used with Reduce Motion).
+/// Tray look: 0 calm, 1 blink (amber), 2 steady amber (Reduce Motion), 3 subtle tint (allowed window).
 #[derive(Default, Clone)]
 pub struct Attention(pub Arc<AtomicU8>);
 
@@ -288,6 +288,7 @@ pub fn set_tray_attention(mode: String, state: State<'_, Attention>) {
     let value = match mode.as_str() {
         "blink" => 1,
         "steady" => 2,
+        "tint" => 3,
         _ => 0,
     };
     state.0.store(value, Ordering::Relaxed);
@@ -298,26 +299,34 @@ pub fn start_attention(app: AppHandle, attention: Attention) {
     use tauri::image::Image;
     let normal = Image::from_bytes(include_bytes!("../icons/tray@2x.png"));
     let alert = Image::from_bytes(include_bytes!("../icons/tray-alert@2x.png"));
-    let (Ok(normal), Ok(alert)) = (normal, alert) else { return };
+    let tint = Image::from_bytes(include_bytes!("../icons/tray-tint@2x.png"));
+    let (Ok(normal), Ok(alert), Ok(tint)) = (normal, alert, tint) else { return };
     std::thread::spawn(move || {
         let mut phase = false;
-        let mut shown_alert: Option<bool> = None;
+        // 0 calm template, 1 amber alert, 2 blue tint: what is on the tray now.
+        let mut shown: Option<u8> = None;
         loop {
             std::thread::sleep(Duration::from_millis(550));
             phase = !phase;
-            let want_alert = match attention.0.load(Ordering::Relaxed) {
-                1 => phase,
-                2 => true,
-                _ => false,
+            let want = match attention.0.load(Ordering::Relaxed) {
+                1 if phase => 1,
+                2 => 1,
+                3 => 2,
+                _ => 0,
             };
-            if shown_alert == Some(want_alert) {
+            if shown == Some(want) {
                 continue;
             }
-            shown_alert = Some(want_alert);
+            shown = Some(want);
             if let Some(tray) = app.tray_by_id("main") {
-                let _ = tray.set_icon(Some(if want_alert { alert.clone() } else { normal.clone() }));
-                // The alert image is coloured on purpose: a template image would be tinted grey.
-                let _ = tray.set_icon_as_template(!want_alert);
+                let image = match want {
+                    1 => alert.clone(),
+                    2 => tint.clone(),
+                    _ => normal.clone(),
+                };
+                let _ = tray.set_icon(Some(image));
+                // Alert and tint are coloured on purpose: a template image would be tinted grey.
+                let _ = tray.set_icon_as_template(want == 0);
             }
         }
     });

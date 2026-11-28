@@ -79,79 +79,149 @@ test('namesFrom: one name in single mode, one per line in bulk mode', () => {
   assert.deepEqual(T.namesFrom('   ', true), []);
 });
 
-test('captureFor sends only what Niyyah can store', () => {
-  assert.deepEqual(T.captureFor('Call the bank', 'next', 'OT', 'alisha'),
-    {text: 'Call the bank', lane: 'next', stream: 'OT', product: 'alisha', client_id: null});
-  assert.equal(T.captureFor('x', 'now', 'OT', '', 'uuid-1').client_id, 'uuid-1');
-  assert.deepEqual(T.captureFor('x', 'now', 'OT', ''), {text: 'x', lane: 'now', stream: 'OT', product: null, client_id: null});
-  assert.deepEqual(Object.keys(T.captureFor('x', 'now', 'OT', '')).sort(), ['client_id', 'lane', 'product', 'stream', 'text']);
+test('captureFor sends only what Niyyah can store: text, stream, product, client id. No lane.', () => {
+  assert.deepEqual(T.captureFor('Call the bank', 'kahf', 'dns', 'u1'),
+    {text: 'Call the bank', stream: 'kahf', product: 'dns', client_id: 'u1'});
+  assert.deepEqual(T.captureFor('x', 'kahf', '', ''), {text: 'x', stream: 'kahf', product: null, client_id: null});
+  assert.deepEqual(Object.keys(T.captureFor('x', 'kahf', '')).sort(), ['client_id', 'product', 'stream', 'text']);
 });
 
-const target = {app: 'Safari', bundleId: 'com.apple.Safari', title: 'Docs'};
+const streams = [
+  {value: 'kahf', label: 'Kahf', products: [{slug: 'dns', name: 'DNS'}]},
+  {value: 'alisha', label: 'Alisha Noor', products: [{slug: 'dns', name: 'DNS'}, {slug: 'store', name: 'Store'}]},
+  {value: 'solo', label: 'Solo', products: []},
+];
 
-test('focus session: count-up and countdown', () => {
-  const up = T.newSession({id: 't1', name: 'Write'}, target, 'up', 25, 1000);
+test('pickStream: products are optional and follow the stream; nothing preselected', () => {
+  assert.equal(T.pickStream(streams, 'kahf', null).product, null);
+  assert.deepEqual(T.pickStream(streams, 'alisha', null).products.map(p => p.slug), ['dns', 'store']);
+  assert.equal(T.pickStream(streams, 'alisha', 'store').product, 'store');
+  assert.equal(T.pickStream(streams, 'kahf', 'store').product, null, 'store is not a Kahf product');
+  assert.equal(T.pickStream(streams, 'alisha', 'dns').product, 'dns');
+  assert.equal(T.pickStream(streams, 'kahf', 'dns').product, 'dns', 'kept when the new stream has it too');
+  assert.equal(T.pickStream(streams, 'solo', null).products.length, 0, 'a stream alone is enough');
+  assert.equal(T.pickStream(streams, 'missing', null).stream, 'kahf', 'unknown value falls back to the first stream');
+  assert.deepEqual(T.pickStream([], 'x', null), {stream: null, product: null, products: []});
+});
+
+const task = {id: 't1', name: 'Write the report'};
+const safari = {app: 'Safari', bundleId: 'com.apple.Safari', title: 'Quarterly report'};
+const notes = {app: 'Notes', bundleId: 'com.apple.Notes', title: 'Outline'};
+const slack = {app: 'Slack', bundleId: 'com.tinyspeck', title: ''};
+
+test('session: count-up and countdown', () => {
+  const up = T.newSession(task, safari, [], 'up', 25, 1000);
   assert.equal(up.durationMs, 0);
   assert.equal(T.focusShown(T.focusTick(up, 5000)), 5000);
-  assert.equal(T.focusFinished(T.focusTick(up, 9e9)), false, 'count-up never finishes by itself');
-  const down = T.newSession({id: 't1', name: 'Write'}, target, 'down', 25, 1000);
-  assert.equal(down.durationMs, 25 * 60000);
+  assert.equal(T.focusFinished(T.focusTick(up, 9e9)), false);
+  const down = T.newSession(task, safari, [], 'down', 25, 1000);
   assert.equal(T.focusShown(T.focusTick(down, 60000)), 24 * 60000);
-  assert.equal(T.focusFinished(T.focusTick(down, 25 * 60000 - 1)), false);
   assert.equal(T.focusFinished(T.focusTick(down, 25 * 60000)), true);
-  assert.equal(T.focusShown(T.focusTick(down, 99 * 60000)), 0, 'never negative');
+  assert.equal(T.focusShown(T.focusTick(down, 99 * 60000)), 0);
 });
 
-test('focus session: away time and away count', () => {
-  let s = T.newSession({id: 't1', name: 'Write'}, target, 'up', 0, 0);
-  s = T.focusTick(s, 3000);
-  s = T.focusState(s, 'away');
-  s = T.focusTick(s, 4000);
-  s = T.focusState(s, 'away');
-  assert.equal(s.awayCount, 1, 'same state twice counts once');
-  s = T.focusState(s, 'on');
-  s = T.focusTick(s, 1000);
-  s = T.focusState(s, 'lost');
-  s = T.focusTick(s, 2000);
-  assert.deepEqual([s.elapsedMs, s.awayMs, s.awayCount], [10000, 6000, 2]);
+test('session: the timer runs on primary and allowed windows, away time is counted separately, pause freezes it', () => {
+  let s = T.newSession(task, safari, [notes], 'up', 0, 0);
+  s = T.focusTick(s, 3000);                       // primary
+  s = T.focusTick(T.focusState(s, 'allowed'), 4000);   // secondary: still the session, not away
+  s = T.focusTick(T.focusState(s, 'away'), 2000); // other window
+  s = T.focusTick(T.focusState(s, 'primary'), 1000);
+  assert.deepEqual([s.elapsedMs, s.awayMs, s.awayCount], [10000, 2000, 1]);
+  assert.equal(T.focusState(s, 'primary'), s, 'same state is a no-op');
+  const paused = T.focusPause(s, true);
+  assert.equal(T.focusTick(paused, 5000), paused);
+  assert.equal(T.focusTick(T.focusPause(paused, false), 5000).elapsedMs, 15000);
   assert.equal(T.focusTick(s, 0), s);
   assert.equal(T.focusTick(s, -5), s);
+  const lost = T.focusState(s, 'lost');
+  assert.equal(lost.awayCount, 2, 'a closed primary counts as an away event');
 });
 
-test('focus record: shape that will sync, countdown capped at its length', () => {
-  let s = T.newSession({id: 't1', name: 'Write'}, target, 'down', 1, 100);
-  s = T.focusTick(s, 61000);
-  assert.deepEqual(T.focusRecord(s, 200), {
-    task_id: 't1', client_id: 't1', task: 'Write', app: 'Safari', window: 'Docs', mode: 'down',
-    started_at: 100, ended_at: 200, duration_ms: 60000, away_ms: 0, away_count: 0, completed: true,
-  });
-  const none = T.newSession({id: 't2', name: 'x'}, {app: 'Notes', bundleId: 'n', title: ''}, 'up', 0, 1);
-  assert.equal(T.focusRecord(none, 2).window, null);
+test('taskEarns: the task is credited on primary and allowed windows only', () => {
+  const s = T.newSession(task, safari, [notes], 'up', 0, 0);
+  assert.equal(T.taskEarns(null), true, 'no session: the task timer is its own business');
+  assert.equal(T.taskEarns(s), true);
+  assert.equal(T.taskEarns(T.focusState(s, 'allowed')), true);
+  assert.equal(T.taskEarns(T.focusState(s, 'away')), false);
+  assert.equal(T.taskEarns(T.focusState(s, 'lost')), false);
+  assert.equal(T.taskEarns(T.focusPause(s, true)), false);
 });
 
-test('trayTitle: timer, away and closed states, long names clipped', () => {
-  let s = T.newSession({id: 't1', name: 'Write the quarterly report for finance'}, target, 'up', 0, 0);
-  s = T.focusTick(s, 754000);
-  assert.equal(T.trayTitle(s, 'x'), '12:34 · Write the quarterly r…');
-  assert.equal(T.trayTitle(T.focusState(s, 'away'), 'x').startsWith('Away · 12:34'), true);
-  assert.equal(T.trayTitle(T.focusState(s, 'lost'), 'x').startsWith('Window closed · '), true);
-  assert.equal(T.trayTitle(null, 'Call the bank'), 'Call the bank');
-  assert.equal(T.trayTitle(null, undefined), '');
+test('setPrimary: one click; the old primary becomes allowed, so going back and forth is quiet', () => {
+  let s = T.newSession(task, safari, [notes], 'up', 0, 0);
+  s = T.setPrimary(s, notes);
+  assert.deepEqual([s.primary.app, s.allowed.map(w => w.app)], ['Notes', ['Safari']]);
+  assert.equal(s.state, 'primary');
+  s = T.setPrimary(s, slack);
+  assert.deepEqual([s.primary.app, s.allowed.map(w => w.app).sort()], ['Slack', ['Notes', 'Safari']]);
+  assert.equal(T.setPrimary(s, slack), s, 'already primary');
 });
 
-test('pickBlock: block fills its products, product survives only inside its block', () => {
-  const blocks = [
-    {value: 'soul', tile: 'SOUL', products: [{slug: 'quran', name: 'Quran'}]},
-    {value: 'ops', tile: 'OPS', products: [{slug: 'alisha', name: 'Alisha'}, {slug: 'quran', name: 'Quran'}]},
-    {value: 'one', tile: 'ONE', products: []},
+test('toggleAllowed: add, remove, never the primary', () => {
+  let s = T.newSession(task, safari, [], 'up', 0, 0);
+  s = T.toggleAllowed(s, notes);
+  assert.deepEqual(s.allowed.map(w => w.app), ['Notes']);
+  s = T.toggleAllowed(s, notes);
+  assert.deepEqual(s.allowed, []);
+  assert.equal(T.toggleAllowed(s, safari), s, 'the primary is not an allowed window');
+  assert.deepEqual(T.newSession(task, safari, [safari, notes], 'up', 0, 0).allowed.map(w => w.app), ['Notes'], 'primary is dropped from allowed at start');
+});
+
+test('windowRows: primary first, then allowed, then the other open windows; vanished ones are closed', () => {
+  const s = T.newSession(task, safari, [notes], 'up', 0, 0);
+  const listed = [
+    {app: 'Safari', bundle_id: 'com.apple.Safari', title: 'Quarterly report'},
+    {app: 'Slack', bundle_id: 'com.tinyspeck', title: ''},
   ];
-  assert.deepEqual(T.pickBlock(blocks, 'ops', null).products.map(p => p.slug), ['alisha', 'quran']);
-  assert.equal(T.pickBlock(blocks, 'ops', 'alisha').product, 'alisha');
-  assert.equal(T.pickBlock(blocks, 'soul', 'alisha').product, null, 'alisha is not a SOUL product');
-  assert.equal(T.pickBlock(blocks, 'ops', 'quran').product, 'quran');
-  assert.equal(T.pickBlock(blocks, 'soul', 'quran').product, 'quran', 'kept when the new block has it too');
-  assert.equal(T.pickBlock(blocks, 'one', 'quran').products.length, 0);
-  assert.equal(T.pickBlock(blocks, 'missing', null).block, 'soul', 'unknown value falls back to the first block');
-  assert.deepEqual(T.pickBlock([], 'x', null), {block: null, product: null, products: []});
-  assert.deepEqual(T.LANES, ['now', 'next', 'backlog']);
+  const rows = T.windowRows(s, listed);
+  assert.deepEqual(rows.map(r => [r.app, r.kind, r.closed]), [['Safari', 'primary', false], ['Notes', 'allowed', true], ['Slack', 'other', false]]);
+});
+
+test('state mapping: primary, allowed, other -> tray and popup', () => {
+  assert.deepEqual(T.presentFor('primary', false), {tray: 'off', shake: false});
+  assert.deepEqual(T.presentFor('allowed', false), {tray: 'tint', shake: false});
+  assert.deepEqual(T.presentFor('away', false), {tray: 'blink', shake: true});
+  assert.deepEqual(T.presentFor('lost', false), {tray: 'blink', shake: true});
+});
+
+test('Reduce Motion: static highlights only, no blink, no shake', () => {
+  for (const state of ['primary', 'allowed', 'away', 'lost']) {
+    const p = T.presentFor(state, true);
+    assert.notEqual(p.tray, 'blink', state);
+    assert.equal(p.shake, false, state);
+  }
+  assert.equal(T.presentFor('away', true).tray, 'steady');
+  assert.equal(T.presentFor('allowed', true).tray, 'tint');
+});
+
+test('record: countdown capped at its length; window names only in the local fields', () => {
+  let s = T.newSession(task, safari, [notes], 'down', 1, 100);
+  s = T.focusTick(s, 61000);
+  const rec = T.focusRecord(s, 200);
+  assert.deepEqual(rec, {
+    task_id: 't1', client_id: 't1', task: 'Write the report', app: 'Safari', window: 'Quarterly report', allowed_count: 1,
+    mode: 'down', started_at: 100, ended_at: 200, duration_ms: 60000, away_ms: 0, away_count: 0, completed: true,
+  });
+  assert.equal(T.focusRecord(T.newSession(task, slack, [], 'up', 0, 1), 2).window, null);
+});
+
+test('no window name leaves the Mac: syncable record and capture payload carry none', () => {
+  let s = T.newSession(task, safari, [notes], 'up', 0, 0);
+  s = T.focusTick(s, 5000);
+  const wire = JSON.stringify([T.syncable(T.focusRecord(s, 9)), T.captureFor(task.name, 'kahf', 'dns', task.id)]);
+  for (const secret of ['Safari', 'Quarterly report', 'Notes', 'Outline', 'com.apple', 'window', '"app"', 'title', 'bundle']) {
+    assert.equal(wire.includes(secret), false, secret + ' leaked: ' + wire);
+  }
+  assert.ok(wire.includes('Write the report') && wire.includes('duration_ms'));
+});
+
+test('trayTitle: only a timer while a session runs, never a window title or task text', () => {
+  let s = T.newSession({id: 't1', name: 'Secret client work'}, {app: 'Safari', bundleId: 'b', title: 'chorki.net invalid response'}, [], 'up', 0, 0);
+  s = T.focusTick(s, 754000);
+  assert.equal(T.trayTitle(s), '12:34');
+  assert.equal(T.trayTitle(T.focusState(s, 'away')), '12:34', 'the nudge is the icon, not text');
+  assert.equal(T.trayTitle(null), '');
+  const down = T.focusTick(T.newSession(task, safari, [], 'down', 25, 0), 60000);
+  assert.equal(T.trayTitle(down), '24:00');
+  assert.equal(/chorki|Secret|Safari/.test(T.trayTitle(s)), false);
 });

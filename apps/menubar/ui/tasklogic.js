@@ -73,38 +73,82 @@
     return (single ? [text] : text.split(/\n+/)).map(line => line.trim()).filter(Boolean);
   }
 
-  // The Niyyah side of a new task: only what the server can store. Link, timer and deadline stay local.
-  function captureFor(name, lane, stream, product, clientId) {
-    return { text: name, lane, stream, product: product || null, client_id: clientId || null };
+  // The Niyyah side of a new task: only what the server can store (text, stream, optional product).
+  // No lane. Link, timer, deadline and the focus window stay local.
+  function captureFor(name, stream, product, clientId) {
+    return { text: name, stream, product: product || null, client_id: clientId || null };
   }
 
-  // ---- Focus session: a timer tied to one task and one chosen window. -----------------------------
-  // session = {taskId, clientId, taskName, app, bundleId, title, mode: 'up'|'down', durationMs,
-  //            elapsedMs, awayMs, awayCount, state: 'on'|'away'|'lost', startedAt}
+  // Stream picker: choosing a stream shows that stream's products as an optional second pick. Nothing is
+  // preselected beyond the stream; a product survives a change of stream only if the new stream has it.
+  function pickStream(streams, value, product) {
+    const stream = streams.find(item => item.value === value) ?? streams[0];
+    if (!stream) return { stream: null, product: null, products: [] };
+    const kept = stream.products.some(item => item.slug === product) ? product : null;
+    return { stream: stream.value, product: kept, products: stream.products };
+  }
 
-  function newSession(task, target, mode, minutes, now) {
+  // ---- Focus session: ONE task, ONE primary window, optional allowed (secondary) windows. -------------
+  // session = {taskId, clientId, taskName, primary: {app, bundleId, title}, allowed: [{...}], mode: 'up'|'down',
+  //            durationMs, elapsedMs, awayMs, awayCount, paused,
+  //            state: 'primary'|'allowed'|'away'|'lost', startedAt}
+  // Window names (app, title) live in the session and its local files only. They never go into a capture.
+
+  const sameWindow = (a, b) => Boolean(a && b) && a.bundleId === b.bundleId && (a.title || '') === (b.title || '');
+  const windowKey = w => w.bundleId + '\u0000' + (w.title || '');
+  const plainWindow = w => ({ app: w.app, bundleId: w.bundleId, title: w.title || '' });
+
+  function newSession(task, primary, allowed, mode, minutes, now) {
     return {
       taskId: task.id, clientId: task.id, taskName: task.name,
-      app: target.app, bundleId: target.bundleId, title: target.title || '',
+      primary: plainWindow(primary),
+      allowed: allowed.filter(w => !sameWindow(w, primary)).map(plainWindow),
       mode: mode === 'down' ? 'down' : 'up',
       durationMs: mode === 'down' ? Math.max(1, Math.round(minutes)) * 60000 : 0,
-      elapsedMs: 0, awayMs: 0, awayCount: 0, state: 'on', startedAt: now,
+      elapsedMs: 0, awayMs: 0, awayCount: 0, paused: false, state: 'primary', startedAt: now,
     };
   }
 
-  // Add `delta` awake ms. Time spent away from (or without) the window counts as away time.
+  const isNudge = state => state === 'away' || state === 'lost';
+
+  // Add `delta` awake ms. The timer runs on the primary and on allowed windows; away time is counted too,
+  // so the session is honest about how much of it was spent off the set. Paused sessions do not move.
   function focusTick(session, delta) {
-    if (!(delta > 0)) return session;
+    if (!(delta > 0) || session.paused) return session;
     return {
       ...session,
       elapsedMs: session.elapsedMs + delta,
-      awayMs: session.awayMs + (session.state === 'on' ? 0 : delta),
+      awayMs: session.awayMs + (isNudge(session.state) ? delta : 0),
     };
   }
 
   function focusState(session, state) {
     if (session.state === state) return session;
-    return { ...session, state, awayCount: session.awayCount + (state === 'on' ? 0 : 1) };
+    return { ...session, state, awayCount: session.awayCount + (isNudge(state) ? 1 : 0) };
+  }
+
+  function focusPause(session, paused) {
+    return session.paused === paused ? session : { ...session, paused };
+  }
+
+  // Does the task's own timer earn time right now? Only on the primary or an allowed window, and not paused.
+  function taskEarns(session) {
+    return !session || (!session.paused && !isNudge(session.state));
+  }
+
+  // One click: make `target` the primary window. The old primary becomes an allowed window, so you can go
+  // back and forth without the nudge firing.
+  function setPrimary(session, target) {
+    if (sameWindow(session.primary, target)) return session;
+    const allowed = [session.primary, ...session.allowed].filter(w => !sameWindow(w, target));
+    return { ...session, primary: plainWindow(target), allowed, state: 'primary' };
+  }
+
+  // Add or remove an allowed window. The primary is never in the allowed list.
+  function toggleAllowed(session, target) {
+    if (sameWindow(session.primary, target)) return session;
+    const has = session.allowed.some(w => sameWindow(w, target));
+    return { ...session, allowed: has ? session.allowed.filter(w => !sameWindow(w, target)) : [...session.allowed, plainWindow(target)] };
   }
 
   function focusShown(session) {
@@ -115,45 +159,57 @@
     return session.mode === 'down' && session.elapsedMs >= session.durationMs;
   }
 
-  // One line of the session log, in the shape that will sync to Niyyah's timer fields later.
+  // Rows for the window list in the popup: the session's windows first (primary, then allowed), then every
+  // other open window. `listed` is what the shell reports as open; a session window that is not listed is
+  // shown as closed.
+  function windowRows(session, reported) {
+    // The shell reports `bundle_id`; sessions use `bundleId`.
+    const listed = reported.map(w => ({ app: w.app, bundleId: w.bundle_id ?? w.bundleId, title: w.title || '' }));
+    const open = new Set(listed.map(windowKey));
+    const rows = [{ ...session.primary, kind: 'primary', closed: !open.has(windowKey(session.primary)) }];
+    for (const w of session.allowed) rows.push({ ...w, kind: 'allowed', closed: !open.has(windowKey(w)) });
+    for (const w of listed) {
+      if (!sameWindow(w, session.primary) && !session.allowed.some(a => sameWindow(a, w))) {
+        rows.push({ ...w, kind: 'other', closed: false });
+      }
+    }
+    return rows;
+  }
+
+  // How a focus state looks in the tray icon and the popup. Mirrors core/src/focus.rs `presentation`
+  // (both are tested): calm on the primary, a soft tint on an allowed window, a blink plus popup shake
+  // for a window outside the set; Reduce Motion turns the blink into a steady highlight and drops the shake.
+  function presentFor(state, reduceMotion) {
+    if (state === 'allowed') return { tray: 'tint', shake: false };
+    if (isNudge(state)) return { tray: reduceMotion ? 'steady' : 'blink', shake: !reduceMotion };
+    return { tray: 'off', shake: false };
+  }
+
+  // One line of the local session log. `app` and `window` are for the local display only.
   function focusRecord(session, endedAt) {
     return {
       task_id: session.taskId, client_id: session.clientId, task: session.taskName,
-      app: session.app, window: session.title || null, mode: session.mode,
-      started_at: session.startedAt, ended_at: endedAt,
+      app: session.primary.app, window: session.primary.title || null, allowed_count: session.allowed.length,
+      mode: session.mode, started_at: session.startedAt, ended_at: endedAt,
       duration_ms: Math.min(session.elapsedMs, session.mode === 'down' ? session.durationMs : Infinity),
       away_ms: session.awayMs, away_count: session.awayCount, completed: focusFinished(session),
     };
   }
 
-  function clip(text, max) {
-    return text.length > max ? text.slice(0, max - 1).trimEnd() + '…' : text;
+  // The part of a session record that may ever leave the Mac (when timer sync exists): no window names.
+  function syncable(record) {
+    const { app, window, ...rest } = record;
+    return rest;
   }
 
-  // Menu-bar text. Plain text: the native tray can only show the system font.
-  function trayTitle(session, runningTaskName) {
-    if (session) {
-      const time = formatStamp(focusShown(session));
-      const lead = session.state === 'on' ? '' : session.state === 'away' ? 'Away · ' : 'Window closed · ';
-      return lead + time + ' · ' + clip(session.taskName, 22);
-    }
-    return runningTaskName ? clip(runningTaskName, 26) : '';
+  // Menu-bar text: only the timer, while a focus session runs. Never a window title or task text.
+  function trayTitle(session) {
+    return session ? formatStamp(focusShown(session)) : '';
   }
-
-  // Block picker: choosing a block fills the product chips from that block's products. The chosen
-  // product survives only if the new block has it.
-  function pickBlock(blocks, value, product) {
-    const block = blocks.find(item => item.value === value) ?? blocks[0];
-    if (!block) return { block: null, product: null, products: [] };
-    const kept = block.products.some(item => item.slug === product) ? product : null;
-    return { block: block.value, product: kept, products: block.products };
-  }
-
-  // The lane word the API takes (the plan page says Backlog).
-  const LANES = ['now', 'next', 'backlog'];
 
   return {
-    pickBlock, LANES, newSession, focusTick, focusState, focusShown, focusFinished, focusRecord, trayTitle,
+    pickStream, newSession, focusTick, focusState, focusPause, taskEarns, setPrimary, toggleAllowed, windowRows,
+    presentFor, syncable, sameWindow, windowKey, focusShown, focusFinished, focusRecord, trayTitle,
     DEADLINE_SOON_MS, BROWSERS, webLink, formatStamp, creditDelta, addTracked, isDueSoon, moveTask,
     cycleTarget, namesFrom, captureFor,
   };

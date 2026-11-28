@@ -548,14 +548,36 @@ html:not(.desktop) .desktop-capture { display: none; }
 .ic-target { --ic: url(icons/target.svg); }
 .ic-timer { --ic: url(icons/timer.svg); }
 
-/* Focus window: chip on the panel, dialog to pick the window. */
-.focus-chip { display: flex; align-items: center; gap: 8px; margin: 6px 12px 0; padding: 5px 5px 5px 9px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff80; font-size: 12px; }
-.focus-chip[hidden] { display: none; }
+/* Focus: chip, window list (primary / allowed / other) and the focused task's row. */
+.focus-chip { display: flex; align-items: center; gap: 8px; margin: 6px 12px 0; padding: 5px 5px 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: #ffffff80; font-size: 12px; }
+.focus-chip[hidden], .focus-windows[hidden] { display: none; }
 .focus-chip #focus-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .focus-chip strong { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .focus-chip .icon { width: 22px; height: 22px; }
-.focus-chip[data-state=away] { border-color: #d97706; background: #fff7e6; color: #92400e; }
-.focus-chip[data-state=lost] { border-color: #b42318; background: #fff1f0; color: #b42318; }
+.focus-chip[data-state=primary] { border-color: var(--accent); }
+.focus-chip[data-state=allowed] { border-color: #8aa2e6; background: #eef2ff; }
+.focus-chip[data-state=paused] { color: var(--muted); }
+.focus-chip[data-state=away], .focus-chip[data-state=lost] { border-color: #d97706; background: #fff7e6; color: #92400e; }
+.ic-play { --ic: url(icons/play-fill.svg); }
+.ic-pause { --ic: url(icons/pause-fill.svg); }
+.focus-windows { max-height: 118px; margin: 4px 12px 0; padding: 0; overflow: auto; list-style: none; }
+.fw { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.fw-main { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 7px; font-size: 12px; font-weight: 600; text-align: left; }
+.fw-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fw-tag { flex: none; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; }
+.fw-allow { flex: none; padding: 4px 8px; border-radius: 7px; font-size: 11px; }
+/* PRIMARY: the strongest highlight. ALLOWED: softer, outlined. OTHER: neutral and de-emphasised. */
+.fw[data-kind=primary] .fw-main { border-color: var(--accent); background: var(--accent); color: #fff; opacity: 1; }
+.fw[data-kind=allowed] .fw-main { border: 1px solid #8aa2e6; background: #eef2ff; color: var(--accent); }
+.fw[data-kind=other] .fw-main { border-color: transparent; background: transparent; color: var(--muted); font-weight: 500; }
+.fw[data-kind=other] .fw-name { opacity: .8; }
+.fw-allow[aria-pressed=true] { color: var(--accent); }
+.task-focus { display: block; margin-top: 2px; color: var(--accent); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.task-focus[data-state=allowed] { color: #5b72c3; }
+.task-focus[data-state=away], .task-focus[data-state=lost] { color: #92400e; }
+.task-focus[data-state=paused] { color: var(--muted); }
+.focus-allow { display: flex; gap: 6px; align-items: center; padding: 4px 0; font-size: 12px; border: 0; justify-content: flex-start; }
+#focus-allowed { max-height: 110px; overflow: auto; }
 #focus-window { max-width: 230px; font: inherit; }
 #focus-hint, #focus-status { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
 #focus-hint:empty, #focus-status:empty { display: none; }
@@ -563,29 +585,16 @@ html:not(.desktop) .desktop-capture { display: none; }
 #focus .primary { margin-top: 10px; width: 100%; }
 #focus input[type=number] { width: 72px; font: inherit; }
 
-/* Capture picker: block tiles (white, monospace caps) in a pale-blue column; product and lane chips beside. */
+/* Capture picker: the user's streams in a pale-blue column (white chips), optional product chips beside.
+   Chips are small-radius, Next Up style, never full pills. Long names get an ellipsis and a tooltip. */
 .composer-niyyah { margin: 0 0 8px; }
-.picker { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; align-items: start; }
-.block-col { display: flex; flex-direction: column; gap: 4px; max-height: 232px; padding: 5px; overflow: auto; border-radius: 10px; background: #dfe8fb; }
-.tile { position: relative; padding: 6px 4px 6px 15px; border: 1px solid #fff; border-radius: 7px; background: #fff; color: var(--ink); box-shadow: 0 1px 0 #1b2b5a14; font: 600 11px/1.1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .05em; text-align: left; text-transform: uppercase; }
-.tile::before { content: ""; position: absolute; left: 6px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: var(--tile, transparent); }
+.picker { display: grid; grid-template-columns: fit-content(150px) minmax(0, 1fr); gap: 8px; align-items: start; }
+.stream-col { display: flex; flex-direction: column; gap: 4px; max-height: 232px; padding: 5px; overflow: auto; border-radius: 8px; background: #dfe8fb; }
+.chip { max-width: 100%; padding: 4px 9px; overflow: hidden; border-radius: 7px; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tile { border: 1px solid #fff; background: #fff; color: var(--ink); text-align: left; box-shadow: 0 1px 0 #1b2b5a14; }
 .tile[aria-pressed=true] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 2px #224cc833; }
 .picker-side { display: grid; gap: 6px; align-content: start; min-width: 0; }
 .picker-label { color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
-.chip { padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-.chip.lane { font: 600 11px/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .05em; }
 .chip[aria-pressed=true]:not(.tile) { background: var(--accent); border-color: var(--accent); color: #fff; }
 .picker-empty { color: var(--muted); font-size: 12px; }
-
-#welcome { width: min(360px, calc(100% - 28px)); padding: 14px; border: 1px solid #ffffffbd; border-radius: 16px; background: #edf3ffe6; color: var(--ink); box-shadow: 0 16px 48px #222f6538; }
-#welcome header { margin-bottom: 6px; }
-#welcome h2 { margin: 0; font-size: 18px; }
-.welcome-text { margin: 6px 0; font-size: 13px; color: var(--muted); }
-.welcome-list { margin: 6px 0 10px; padding-left: 18px; font-size: 12px; color: var(--muted); }
-.welcome-list li { margin-bottom: 4px; }
-.welcome-list strong { color: var(--ink); }
-#welcome .primary { width: 100%; }
-.desktop:has(#welcome[open]) .widget { visibility: hidden; }
-.desktop #welcome::backdrop { background: transparent; }
-#focus-open .ic { width: 14px; height: 14px; vertical-align: -2px; }

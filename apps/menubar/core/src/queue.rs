@@ -223,10 +223,9 @@ pub fn write_private_atomic(path: &Path, bytes: &[u8]) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::payload::Lane;
 
     fn cap(text: &str) -> Capture {
-        Capture { text: text.into(), lane: Lane::Next, stream: "OT".into(), product: None, client_id: None }
+        Capture { text: text.into(), stream: "OT".into(), product: None, client_id: None }
     }
 
     #[test]

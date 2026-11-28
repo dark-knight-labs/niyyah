@@ -39,7 +39,35 @@ fn offline_then_online_sends_exactly_once_and_clears_the_queue() {
     assert_eq!(seen[0].auth.as_deref(), Some(format!("Bearer {TOKEN}").as_str()));
     assert!(seen[0].content_type.as_deref().unwrap().starts_with("application/json"));
     let body: serde_json::Value = serde_json::from_str(&seen[0].body).unwrap();
-    assert_eq!(body, json!({"text": "Call the bank", "lane": "next", "stream": "OT", "products": ["alisha"]}));
+    assert_eq!(body, json!({"text": "Call the bank", "stream": "OT", "products": ["alisha"]}));
+}
+
+#[test]
+fn a_server_that_demands_a_lane_gets_one_retry_with_backlog_and_the_capture_still_lands() {
+    let dir = tempfile::tempdir().unwrap();
+    let mock = Mock::start(vec![Resp::Json(422, r#"{"detail":[{"msg":"Value error, send exactly one of `day` and `lane`"}]}"#)]);
+    let c = capturer(dir.path(), &mock.url);
+    c.submit(capture("Call the bank"), 1_000).unwrap();
+    let r = c.flush(1_001);
+    assert_eq!(r.sent, 1, "{r:?}");
+    let posts: Vec<_> = mock.seen().into_iter().filter(|s| s.method == "POST").collect();
+    assert_eq!(posts.len(), 2);
+    let first: serde_json::Value = serde_json::from_str(&posts[0].body).unwrap();
+    let second: serde_json::Value = serde_json::from_str(&posts[1].body).unwrap();
+    assert!(first.get("lane").is_none(), "the app itself sends no lane: {first}");
+    assert_eq!(second["lane"], "backlog");
+    assert_eq!(second["stream"], "OT");
+}
+
+#[test]
+fn another_422_is_refused_without_a_lane_retry() {
+    let dir = tempfile::tempdir().unwrap();
+    let mock = Mock::start(vec![Resp::Json(422, r#"{"detail":"unknown stream"}"#)]);
+    let c = capturer(dir.path(), &mock.url);
+    c.submit(capture("x"), 1_000).unwrap();
+    let r = c.flush(1_001);
+    assert_eq!((r.sent, r.rejected), (0, 1), "{r:?}");
+    assert_eq!(mock.seen().iter().filter(|s| s.method == "POST").count(), 1);
 }
 
 #[test]
@@ -176,7 +204,8 @@ fn options_are_fetched_once_per_session_and_fall_back_to_the_saved_copy() {
     let mock = Mock::start(vec![]);
     let c = capturer(dir.path(), &mock.url);
     let o = c.options(false).unwrap();
-    assert_eq!(o.blocks[0].stream_slug(), "OT");
+    assert_eq!(o.streams[0].slug, "OT");
+    assert_eq!(o.picker()[0].products[0].slug, "alisha");
     assert_eq!(o.products[0].slug, "alisha");
     c.options(false).unwrap();
     assert_eq!(mock.seen().iter().filter(|s| s.path == "/api/v1/capture/options").count(), 1, "second call is the cache");
@@ -204,10 +233,10 @@ fn e2e_against_the_real_api() {
     c.set_server_url(&url).unwrap();
     c.set_token(&token).unwrap();
     let opts = c.options(true).expect("GET /api/v1/capture/options");
-    let block = opts.blocks.first().expect("at least one block");
+    let stream = opts.streams.first().expect("at least one stream");
     let mut cap = capture("menubar e2e capture (delete me)");
-    cap.stream = block.stream_slug().to_string();
-    cap.product = opts.products.first().map(|p| p.slug.clone());
+    cap.stream = stream.slug.clone();
+    cap.product = None; // optional
     c.submit(cap, niyyah_capture_core::now_secs()).unwrap();
     let r = c.flush(niyyah_capture_core::now_secs());
     assert_eq!(r.sent, 1, "{r:?}");

@@ -46,30 +46,33 @@ impl Tab {
     }
 }
 
-/// What the watcher saw this tick, relative to the window the user chose to stay on.
+/// What the watcher saw this tick, relative to the focus session's windows.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Observation {
-    /// The chosen window (or its app, when titles are unavailable) is in front.
-    OnTarget,
+    /// The primary window (or its app, when titles are unavailable) is in front.
+    Primary,
+    /// An allowed (secondary) window is in front.
+    Allowed,
     /// This app (the panel or popover) is in front: neutral, so pausing the timer never counts as drifting.
     Own,
-    /// Something else is in front.
-    Away,
-    /// The chosen window or its app no longer exists.
+    /// A window outside the set is in front.
+    Other,
+    /// The primary window or its app no longer exists.
     Gone,
 }
 
-/// Where the user is relative to the chosen window.
+/// Where the user is relative to the focus session's windows.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FocusState {
-    On,
+    Primary,
+    Allowed,
     Away,
     Lost,
 }
 
-/// Debounces observations into state changes: away only after `grace` consecutive away ticks (a quick
-/// Cmd-Tab and back is not a drift), lost at once, back on target at once.
+/// Debounces observations into state changes: away only after `grace` consecutive "other" ticks (a quick
+/// Cmd-Tab and back is not a drift); primary and allowed apply at once; a closed primary is lost at once.
 pub struct FocusMonitor {
     state: FocusState,
     away_ticks: u32,
@@ -78,16 +81,16 @@ pub struct FocusMonitor {
 
 impl FocusMonitor {
     pub fn new(grace: u32) -> Self {
-        Self { state: FocusState::On, away_ticks: 0, grace }
+        Self { state: FocusState::Primary, away_ticks: 0, grace }
     }
 
     pub fn state(&self) -> FocusState {
         self.state
     }
 
-    /// Back to "on target" for a newly chosen window.
+    /// Back to "primary" for a newly started session or a changed primary window.
     pub fn reset(&mut self) {
-        self.state = FocusState::On;
+        self.state = FocusState::Primary;
         self.away_ticks = 0;
     }
 
@@ -95,12 +98,16 @@ impl FocusMonitor {
     pub fn observe(&mut self, seen: Observation) -> Option<FocusState> {
         let next = match seen {
             Observation::Own => return None,
-            Observation::OnTarget => {
+            Observation::Primary => {
                 self.away_ticks = 0;
-                FocusState::On
+                FocusState::Primary
+            }
+            Observation::Allowed => {
+                self.away_ticks = 0;
+                FocusState::Allowed
             }
             Observation::Gone => FocusState::Lost,
-            Observation::Away => {
+            Observation::Other => {
                 self.away_ticks += 1;
                 match self.state {
                     FocusState::Lost => FocusState::Lost,
@@ -113,6 +120,37 @@ impl FocusMonitor {
             self.state = next;
             next
         })
+    }
+}
+
+/// How a focus state looks in the tray icon and the popup. One table, used by the shell and mirrored (and
+/// tested against) by the web layer's `presentFor`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TrayLook {
+    /// Calm template icon.
+    Calm,
+    /// Subtle tint: on an allowed secondary window.
+    Tint,
+    /// Amber icon that blinks (the nudge).
+    Blink,
+    /// Amber icon, steady (the nudge under Reduce Motion).
+    Steady,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Presentation {
+    pub tray: TrayLook,
+    /// Shake the popup (only the nudge does).
+    pub shake: bool,
+}
+
+pub fn presentation(state: FocusState, reduce_motion: bool) -> Presentation {
+    match state {
+        FocusState::Primary => Presentation { tray: TrayLook::Calm, shake: false },
+        FocusState::Allowed => Presentation { tray: TrayLook::Tint, shake: false },
+        FocusState::Away | FocusState::Lost => {
+            Presentation { tray: if reduce_motion { TrayLook::Steady } else { TrayLook::Blink }, shake: !reduce_motion }
+        }
     }
 }
 
@@ -149,41 +187,77 @@ mod tests {
     }
 
     #[test]
-    fn away_needs_consecutive_ticks_and_back_is_immediate() {
+    fn away_needs_consecutive_other_ticks_and_back_is_immediate() {
         use Observation::*;
         let mut m = FocusMonitor::new(3);
-        assert_eq!(m.observe(Away), None);
-        assert_eq!(m.observe(Away), None);
-        assert_eq!(m.observe(OnTarget), None, "a quick Cmd-Tab and back is not a drift");
+        assert_eq!(m.observe(Other), None);
+        assert_eq!(m.observe(Other), None);
+        assert_eq!(m.observe(Primary), None, "a quick Cmd-Tab and back is not a drift");
         for _ in 0..2 {
-            assert_eq!(m.observe(Away), None);
+            assert_eq!(m.observe(Other), None);
         }
-        assert_eq!(m.observe(Away), Some(FocusState::Away));
-        assert_eq!(m.observe(Away), None, "only the change is reported");
-        assert_eq!(m.observe(OnTarget), Some(FocusState::On));
+        assert_eq!(m.observe(Other), Some(FocusState::Away));
+        assert_eq!(m.observe(Other), None, "only the change is reported");
+        assert_eq!(m.observe(Primary), Some(FocusState::Primary));
+    }
+
+    #[test]
+    fn allowed_windows_never_nudge() {
+        use Observation::*;
+        let mut m = FocusMonitor::new(2);
+        assert_eq!(m.observe(Allowed), Some(FocusState::Allowed));
+        for _ in 0..10 {
+            assert_eq!(m.observe(Allowed), None, "staying on a secondary window is quiet");
+        }
+        assert_eq!(m.observe(Primary), Some(FocusState::Primary));
+        assert_eq!(m.observe(Allowed), Some(FocusState::Allowed));
+        assert_eq!(m.observe(Other), None);
+        assert_eq!(m.observe(Other), Some(FocusState::Away), "only a window outside the set nudges");
+        assert_eq!(m.observe(Allowed), Some(FocusState::Allowed), "back to a secondary clears the nudge");
     }
 
     #[test]
     fn own_windows_are_neutral() {
         use Observation::*;
         let mut m = FocusMonitor::new(2);
-        m.observe(Away);
+        m.observe(Other);
         assert_eq!(m.observe(Own), None);
         assert_eq!(m.observe(Own), None);
-        assert_eq!(m.observe(Away), Some(FocusState::Away), "own ticks did not reset or advance the count");
+        assert_eq!(m.observe(Other), Some(FocusState::Away), "own ticks did not reset or advance the count");
     }
 
     #[test]
-    fn a_closed_window_is_lost_at_once_and_stays_lost_until_it_returns() {
+    fn a_closed_primary_is_lost_at_once_and_stays_lost_until_it_returns() {
         use Observation::*;
         let mut m = FocusMonitor::new(2);
         assert_eq!(m.observe(Gone), Some(FocusState::Lost));
-        assert_eq!(m.observe(Away), None);
-        assert_eq!(m.observe(Away), None);
+        assert_eq!(m.observe(Other), None);
+        assert_eq!(m.observe(Other), None);
         assert_eq!(m.state(), FocusState::Lost);
-        assert_eq!(m.observe(OnTarget), Some(FocusState::On));
+        assert_eq!(m.observe(Primary), Some(FocusState::Primary));
         m.observe(Gone);
         m.reset();
-        assert_eq!(m.state(), FocusState::On);
+        assert_eq!(m.state(), FocusState::Primary);
+    }
+
+    #[test]
+    fn state_to_tray_and_popup_mapping() {
+        use FocusState::*;
+        assert_eq!(presentation(Primary, false), Presentation { tray: TrayLook::Calm, shake: false });
+        assert_eq!(presentation(Allowed, false), Presentation { tray: TrayLook::Tint, shake: false });
+        assert_eq!(presentation(Away, false), Presentation { tray: TrayLook::Blink, shake: true });
+        assert_eq!(presentation(Lost, false), Presentation { tray: TrayLook::Blink, shake: true });
+    }
+
+    #[test]
+    fn reduce_motion_means_static_highlights_and_no_shake() {
+        use FocusState::*;
+        for state in [Primary, Allowed, Away, Lost] {
+            let p = presentation(state, true);
+            assert_ne!(p.tray, TrayLook::Blink, "{state:?} must not blink");
+            assert!(!p.shake, "{state:?} must not shake");
+        }
+        assert_eq!(presentation(Away, true).tray, TrayLook::Steady);
+        assert_eq!(presentation(Allowed, true).tray, TrayLook::Tint);
     }
 }

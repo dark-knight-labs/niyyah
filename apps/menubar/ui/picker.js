@@ -1,11 +1,11 @@
-// Block / product / lane chips for a capture (shared by the panel composer and the quick popover).
-// Blocks are the plan page's tiles (SOUL, BODY, ...): white tiles in a pale-blue column, monospace caps.
-// Choosing a block fills the product chips from that block's products. Lane defaults to NOW.
-// Text is only ever set with textContent. Nothing here talks to the network.
+// Stream picker for a capture (shared by the panel composer and the quick popover).
+// The left column lists the user's Niyyah streams (Kahf, Alisha Noor, ...). Products are an optional second
+// pick: shown for the chosen stream, nothing preselected. There is no lane. Text is only ever set with
+// textContent. Nothing here talks to the network.
 (function () {
   'use strict';
-  const { pickBlock, LANES } = window.NiyyahTasks;
-  const LANE_LABEL = { now: 'NOW', next: 'NEXT', backlog: 'BACKLOG' };
+  const { pickStream } = window.NiyyahTasks;
+  const LAST_KEY = 'niyyah-focus-last-stream';
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -17,64 +17,58 @@
   function chip(label, pressed, onClick, extraClass) {
     const button = el('button', 'chip ' + (extraClass || ''), label);
     button.type = 'button';
+    button.title = label; // names are never clipped silently: an ellipsis always has the full name on hover
     button.setAttribute('aria-pressed', String(pressed));
     button.addEventListener('click', onClick);
     return button;
   }
 
   function mount(host) {
-    const state = { blocks: [], block: null, product: null, products: [], lane: 'now' };
+    const state = { streams: [], stream: null, product: null, products: [] };
 
     function render() {
       host.replaceChildren();
       host.classList.add('picker');
-      const column = el('div', 'block-col');
+      const column = el('div', 'stream-col');
       column.setAttribute('role', 'group');
-      column.setAttribute('aria-label', 'Block');
-      for (const block of state.blocks) {
-        const tile = chip(block.tile || block.value.toUpperCase(), block.value === state.block, () => {
-          Object.assign(state, pickBlock(state.blocks, block.value, state.product));
+      column.setAttribute('aria-label', 'Stream');
+      for (const stream of state.streams) {
+        column.append(chip(stream.label, stream.value === state.stream, () => {
+          Object.assign(state, pickStream(state.streams, stream.value, state.product));
+          try { localStorage.setItem(LAST_KEY, state.stream); } catch (_) { /* private mode */ }
           render();
-        }, 'tile');
-        tile.title = block.label || block.tile;
-        if (block.color) tile.style.setProperty('--tile', block.color);
-        column.append(tile);
+        }, 'tile'));
       }
-      if (!state.blocks.length) column.append(el('span', 'picker-empty', 'No blocks'));
+      if (!state.streams.length) column.append(el('span', 'picker-empty', 'No streams'));
 
       const side = el('div', 'picker-side');
       const products = el('div', 'chip-row');
       products.setAttribute('role', 'group');
-      products.setAttribute('aria-label', 'Product');
+      products.setAttribute('aria-label', 'Product (optional)');
       for (const product of state.products) {
         products.append(chip(product.name, product.slug === state.product, () => {
           state.product = state.product === product.slug ? null : product.slug;
           render();
         }, 'product'));
       }
-      if (!state.products.length) products.append(el('span', 'picker-empty', state.block ? 'No products in this block' : ''));
-
-      const lanes = el('div', 'chip-row lanes');
-      lanes.setAttribute('role', 'group');
-      lanes.setAttribute('aria-label', 'Lane');
-      for (const lane of LANES) {
-        lanes.append(chip(LANE_LABEL[lane], lane === state.lane, () => { state.lane = lane; render(); }, 'lane'));
-      }
-      side.append(el('div', 'picker-label', 'Product'), products, el('div', 'picker-label', 'Lane'), lanes);
+      if (state.stream && !state.products.length) products.append(el('span', 'picker-empty', 'No products for this stream'));
+      side.append(el('div', 'picker-label', 'Product (optional)'), products);
       host.append(column, side);
     }
 
     render();
     return {
-      // `reply` is what the shell's load_options returns: { picker, current_stream }.
+      // `reply` is what the shell's load_options returns: { picker: [{ value, label, products }] }.
       setOptions(reply) {
-        state.blocks = reply?.picker ?? [];
-        Object.assign(state, pickBlock(state.blocks, reply?.current_stream, null));
+        state.streams = reply?.picker ?? [];
+        let last = null;
+        try { last = localStorage.getItem(LAST_KEY); } catch (_) { /* private mode */ }
+        Object.assign(state, pickStream(state.streams, last, null));
         render();
       },
-      clear() { state.blocks = []; Object.assign(state, pickBlock([], null, null)); render(); },
-      reset() { state.lane = 'now'; state.product = null; render(); },
-      get value() { return { stream: state.block, product: state.product, lane: state.lane }; },
+      clear() { state.streams = []; Object.assign(state, pickStream([], null, null)); render(); },
+      reset() { state.product = null; render(); },
+      get value() { return { stream: state.stream, product: state.product }; },
     };
   }
 
