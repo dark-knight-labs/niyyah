@@ -66,12 +66,11 @@ async def test_an_old_client_that_sends_none_of_them_still_works(db_client):
 
 
 @pytest.mark.asyncio
-async def test_a_pipeline_item_can_be_born_done(db_client):
+async def test_a_capture_can_be_born_done_and_a_stale_lane_is_ignored(db_client):
     client, _ = db_client
     as_device = await device(client)
     res = await client.post(ITEMS, headers=as_device, json=lane(status="done", link="http://example.com"))
-    assert res.status_code == 201 and res.json()["done"] is True and res.json()["lane"] == "done"
-    assert (await client.post(ITEMS, headers=as_device, json=lane(status="skipped"))).status_code == 422
+    assert res.status_code == 201 and res.json()["done"] is True and res.json()["lane"] is None
 
 
 @pytest.mark.asyncio
@@ -164,16 +163,6 @@ async def test_patching_twice_with_the_same_body_is_a_no_op(db_client):
     assert first == second
     async with TestSession() as db:
         assert (await db.execute(select(Task.done_on).where(Task.id == first["id"]))).scalar_one() == done_on
-
-
-@pytest.mark.asyncio
-async def test_a_pipeline_task_follows_the_pipeline_when_ticked(db_client):
-    client, _ = db_client
-    as_device = await device(client)
-    key = cid()
-    assert (await client.post(ITEMS, headers=as_device, json=lane(client_id=key))).json()["lane"] == "next"
-    got = (await client.patch(f"{TASKS}/{key}", headers=as_device, json={"done": True})).json()
-    assert got["lane"] == "done" and got["done"] is True
 
 
 @pytest.mark.asyncio
@@ -282,3 +271,158 @@ async def test_extras_show_in_the_day_read(db_client):
     items = (await client.get("/api/v1/vault/items", params={"from": today.isoformat(), "to": today.isoformat()})).json()
     mine = next(i for i in (items["items"] if isinstance(items, dict) else items) if i.get("title") == "ship the report")
     assert mine["link"] == "https://example.com" and mine["tracked_seconds"] == 12
+
+
+OPTIONS = "/api/v1/capture/options"
+PIPELINES = "/api/v1/vault/pipelines"
+WEEKLY = "/api/v1/vault/weekly-log"
+
+
+async def add_streams(*rows):
+    """Streams in the current quarter, bypassing the Plan page: (slug, name, has_pipeline, status)."""
+    from app.api.v1.vault import _local_now
+    from app.models.planner import QuarterStream
+    from app.services.rules import quarter_for
+    async with TestSession() as db:
+        label = quarter_for(_local_now().date())
+        for n, (slug, name, goal, status) in enumerate(rows, start=50):
+            db.add(QuarterStream(user_id=1, quarter=label, slug=slug, name=name, color="violet", icon="circle-dot", slot="", weekly=True,
+                                 has_pipeline=goal, in_note=True, goal="", goal_checklist=[], status=status, checkpoints=[], position=n))
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_options_list_every_non_archived_stream_with_its_optional_products(db_client):
+    from app.models.planner import PlannerProduct
+    client, _ = db_client
+    as_device = await device(client)
+    await add_streams(("kahf", "Kahf", False, "committed"), ("alisha", "Alisha Noor", False, "active"), ("old", "Old", True, "archived"))
+    async with TestSession() as db:
+        db.add_all([PlannerProduct(user_id=1, block="studio", slug="router", name="Router", position=0),
+                    PlannerProduct(user_id=1, block="shop", slug="cart", name="Cart", position=0)])
+        await db.commit()
+    opts = (await client.get(OPTIONS, headers=as_device)).json()
+    assert {"blocks", "products", "streams", "day"} <= set(opts) and "day_blocks" not in opts  # the v1.33 keys stay
+    by = {s["slug"]: s for s in opts["streams"]}
+    assert {"studio", "shop", "kahf", "alisha"} <= set(by) and "old" not in by  # no goal or pipeline needed; archived is out
+    assert by["kahf"]["name"] == "Kahf" and by["kahf"]["color"] == "violet" and by["kahf"]["products"] == []
+    assert by["studio"]["products"] == [{"slug": "router", "name": "Router"}]
+    assert all(set(s) == {"slug", "name", "color", "products"} for s in opts["streams"])
+
+
+@pytest.mark.asyncio
+async def test_options_carry_a_stream_that_only_the_earlier_quarter_has(db_client):
+    from app.api.v1.vault import _local_now
+    from app.models.planner import QuarterStream
+    client, _ = db_client
+    as_device = await device(client)
+    async with TestSession() as db:
+        db.add(QuarterStream(user_id=1, quarter="2020-Q1", slug="past", name="Past", color="rose", icon="circle-dot", slot="", weekly=True,
+                             has_pipeline=False, in_note=True, goal="", goal_checklist=[], status="committed", checkpoints=[], position=0))
+        await db.commit()
+    assert "past" in {s["slug"] for s in (await client.get(OPTIONS, headers=as_device)).json()["streams"]}
+
+
+@pytest.mark.asyncio
+async def test_a_capture_is_a_day_task_with_a_stream_and_never_a_pipeline_item(db_client):
+    client, today = db_client
+    as_device = await device(client)
+    await add_streams(("kahf", "Kahf", False, "committed"))
+    res = await client.post(ITEMS, headers=as_device, json={"text": "ship it", "stream": "kahf", "products": ["x"], "client_id": cid()})
+    got = res.json()
+    assert res.status_code == 201 and got["stream"] == "kahf" and got["day"] == today.isoformat() and got["lane"] is None and got["products"] == ["x"]
+    # an older client that still sends a lane (with or without a stream, or one without a pipeline) is not refused: the lane is ignored
+    for extra in ({"lane": "now", "stream": "studio"}, {"lane": "next"}, {"lane": "backlog", "stream": "kahf"}):
+        res = await client.post(ITEMS, headers=as_device, json={"text": f"old {extra}", "client_id": cid(), **extra})
+        assert res.status_code == 201 and res.json()["lane"] is None and res.json()["day"] == today.isoformat(), (extra, res.text)
+    plan = (await client.get(PIPELINES)).json()
+    assert not any("old" in i["text"] or i["text"] == "ship it" for s in plan["streams"] for i in s["items"])  # no lane entries made
+    assert (await client.post(ITEMS, headers=as_device, json={"text": "x", "stream": "nope"})).status_code == 422  # an unknown stream is refused
+
+
+@pytest.mark.asyncio
+async def test_a_login_keeps_the_day_or_lane_rule(db_client):
+    client, today = db_client
+    assert (await client.post(ITEMS, json={"text": "x"})).status_code == 422
+    as_device = await device(client)
+    assert (await client.post(ITEMS, headers=as_device, json={"text": "x", "day": today.isoformat(), "lane": "now", "stream": "studio"})).status_code == 422
+
+
+def sunday_of(day):
+    from app.services.rules import week_for
+    return week_for(day)[0]
+
+
+@pytest.mark.asyncio
+async def test_capture_to_weekly_log_regression(db_client):
+    """What the owner hit: a capture was not on the Plan page. The pipelines read never lists it (it has no lane); the weekly log does."""
+    client, today = db_client
+    as_device = await device(client)
+    await add_streams(("kahf", "Kahf", False, "committed"))
+    open_id = (await client.post(ITEMS, headers=as_device, json={"text": "open kahf task", "stream": "kahf", "client_id": cid()})).json()["id"]
+    key = cid()
+    await client.post(ITEMS, headers=as_device, json={"text": "finished kahf task", "stream": "kahf", "client_id": key})
+    await client.patch(f"{TASKS}/{key}", headers=as_device, json={"done": True})
+    await client.post(ITEMS, headers=as_device, json={"text": "born done", "stream": "studio", "status": "done", "client_id": cid()})
+    await client.post(ITEMS, headers=as_device, json={"text": "no stream", "client_id": cid()})
+    plan = (await client.get(PIPELINES)).json()
+    assert not any("kahf task" in i["text"] for s in plan["streams"] for i in s["items"])  # the old read: invisible
+    log = (await client.get(WEEKLY)).json()
+    assert log["week"] and log["start"] == sunday_of(today).isoformat() and len(log["days"]) == 7
+    today_entries = next(d for d in log["days"] if d["day"] == today.isoformat())["entries"]
+    by_text = {e["text"]: e for e in today_entries}
+    assert by_text["open kahf task"]["on"] == "captured" and by_text["open kahf task"]["done"] is False
+    assert by_text["finished kahf task"]["on"] == "done" and by_text["born done"]["stream"] == "studio"
+    assert "no stream" not in by_text  # a task without a stream has no place in a per-stream log
+    totals = {s["stream"]: s for s in log["streams"]}
+    assert (totals["kahf"]["done"], totals["kahf"]["total"], totals["kahf"]["name"]) == (1, 2, "Kahf")
+    assert totals["studio"]["done"] == 2  # "born done" and the sample account's own pipeline item finished today: pipeline items count too
+    assert open_id in {e["id"] for e in today_entries}
+
+
+@pytest.mark.asyncio
+async def test_weekly_log_puts_a_task_on_its_finish_day_and_picks_the_week(db_client):
+    client, today = db_client
+    as_device = await device(client)
+    await add_streams(("kahf", "Kahf", False, "committed"))
+    last_week = sunday_of(today) - timedelta(days=1)  # the Saturday before this week: inside the 7-day edit window
+    old_day = last_week.isoformat()
+    key = cid()
+    assert (await client.post(ITEMS, headers=as_device, json={"text": "old one", "stream": "kahf", "day": old_day, "client_id": key})).status_code == 201
+    await client.patch(f"{TASKS}/{key}", headers=as_device, json={"done": True})  # finished today, planned the week before
+    here = (await client.get(WEEKLY)).json()
+    assert "old one" in [e["text"] for d in here["days"] for e in d["entries"]]  # on the day it was finished
+    from app.services.rules import week_for
+    far = (await client.get(WEEKLY, params={"week": week_for(last_week)[2]})).json()
+    assert "old one" not in [e["text"] for d in far["days"] for e in d["entries"]]
+    assert (await client.get(WEEKLY, params={"week": "nonsense"})).status_code == 422
+    assert (await client.get(WEEKLY, params={"week": "2026-W99"})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_weekly_log_is_private_and_logins_only(db_client):
+    client, _ = db_client
+    as_device = await device(client)
+    await add_streams(("kahf", "Kahf", False, "committed"))
+    await client.post(ITEMS, headers=as_device, json={"text": "mine", "stream": "kahf", "client_id": cid()})
+    as_login, theirs = await second_user_device(client)
+    assert (await client.get(WEEKLY, headers=as_login)).json()["streams"] == []
+    assert (await client.get(WEEKLY, headers=theirs)).status_code == 403  # a device token cannot read it
+    assert (await client.get(WEEKLY, headers=as_device)).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_window_names_are_never_stored_or_returned(db_client):
+    from sqlalchemy import inspect
+    from app.models.planner import Task
+    from app.models.user import DeviceCapture
+    from app.schemas.vault import ItemCreateIn
+    client, _ = db_client
+    as_device = await device(client)
+    res = await client.post(ITEMS, headers=as_device, json={"text": "t", "window_title": "Secret doc", "window": "Safari", "client_id": cid()})
+    assert res.status_code == 201 and "Secret" not in res.text and "Safari" not in res.text  # ignored, not stored
+    assert not [f for f in ItemCreateIn.model_fields if "window" in f]
+    assert not [c.name for model in (Task, DeviceCapture) for c in inspect(model).columns if "window" in c.name]
+    async with TestSession() as db:
+        rows = (await db.execute(select(Task))).scalars().all()
+    assert not any("Secret" in str(r.__dict__) or "Safari" in str(r.__dict__) for r in rows)

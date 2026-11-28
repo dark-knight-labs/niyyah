@@ -707,8 +707,8 @@ class ItemCreateIn(ItemFieldsIn, TaskExtrasIn):
 
     @model_validator(mode="after")
     def _day_or_lane(self):
-        if (self.day is None) == (self.lane is None):
-            raise ValueError("send exactly one of `day` and `lane`")
+        if self.day is not None and self.lane is not None:
+            raise ValueError("send exactly one of `day` and `lane`")  # neither is refused later, except for a device token (it defaults to lane now)
         return self
 
 

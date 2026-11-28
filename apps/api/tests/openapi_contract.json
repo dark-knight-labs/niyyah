@@ -628,8 +628,29 @@
     "streams": {
      "items": {
       "properties": {
+       "color": {
+        "type": "string"
+       },
        "name": {
         "type": "string"
+       },
+       "products": {
+        "items": {
+         "properties": {
+          "name": {
+           "type": "string"
+          },
+          "slug": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "slug"
+         ],
+         "type": "object"
+        },
+        "type": "array"
        },
        "slug": {
         "type": "string"
@@ -3097,6 +3118,124 @@
     "week_pct",
     "week_possible",
     "week_total"
+   ],
+   "type": "object"
+  }
+ },
+ "GET /api/v1/vault/weekly-log": {
+  "params": [
+   "query:week"
+  ],
+  "request": null,
+  "response": {
+   "properties": {
+    "days": {
+     "items": {
+      "properties": {
+       "day": {
+        "type": "string"
+       },
+       "entries": {
+        "items": {
+         "properties": {
+          "done": {
+           "type": "boolean"
+          },
+          "id": {
+           "type": "integer"
+          },
+          "link": {
+           "type": "string"
+          },
+          "on": {
+           "type": "string"
+          },
+          "stream": {
+           "type": "string"
+          },
+          "text": {
+           "type": "string"
+          },
+          "tracked_seconds": {
+           "type": "integer"
+          }
+         },
+         "required": [
+          "done",
+          "id",
+          "link",
+          "on",
+          "stream",
+          "text",
+          "tracked_seconds"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "day",
+       "entries"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "end": {
+     "type": "string"
+    },
+    "next_week": {
+     "type": "string"
+    },
+    "prev_week": {
+     "type": "string"
+    },
+    "start": {
+     "type": "string"
+    },
+    "streams": {
+     "items": {
+      "properties": {
+       "color": {
+        "type": "string"
+       },
+       "done": {
+        "type": "integer"
+       },
+       "name": {
+        "type": "string"
+       },
+       "stream": {
+        "type": "string"
+       },
+       "total": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "color",
+       "done",
+       "name",
+       "stream",
+       "total"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "week": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "days",
+    "end",
+    "next_week",
+    "prev_week",
+    "start",
+    "streams",
+    "week"
    ],
    "type": "object"
   }

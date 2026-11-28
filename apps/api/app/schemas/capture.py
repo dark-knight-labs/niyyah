@@ -94,3 +94,36 @@ class CaptureTask(BaseModel):
 
 class CaptureTasks(BaseModel):
     tasks: list[CaptureTask]
+
+
+class WeeklyLogEntry(BaseModel):
+    id: int
+    text: str
+    stream: str
+    done: bool
+    on: Literal["done", "captured"]  # which date it sits on: the day it was finished, or (still open) the day it is for
+    link: str | None
+    tracked_seconds: int
+
+
+class WeeklyLogDay(BaseModel):
+    day: date
+    entries: list[WeeklyLogEntry]
+
+
+class WeeklyLogStream(BaseModel):
+    stream: str
+    name: str
+    color: str
+    done: int  # finished this week
+    total: int  # listed this week: finished + still open
+
+
+class WeeklyLog(BaseModel):
+    week: str  # "2026-W48", Sunday to Saturday
+    start: date
+    end: date
+    prev_week: str  # for the previous / next buttons
+    next_week: str
+    streams: list[WeeklyLogStream]  # only streams with something this week
+    days: list[WeeklyLogDay]  # always seven, Sunday first

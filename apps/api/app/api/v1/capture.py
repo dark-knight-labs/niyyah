@@ -33,12 +33,19 @@ class CaptureProduct(BaseModel):
 class CaptureStream(BaseModel):
     slug: str
     name: str
+    color: str | None = None  # a colour key such as "violet"; the web app maps it to a token
+    products: list[CaptureStreamProduct] = []  # optional second pick: this stream's products
+
+
+class CaptureStreamProduct(BaseModel):
+    slug: str
+    name: str
 
 
 class CaptureOptions(BaseModel):
-    blocks: list[CaptureBlock]  # today's schedule in order, so a client can pick the current one
-    products: list[CaptureProduct]
-    streams: list[CaptureStream]  # this quarter's streams with a pipeline: a task in a lane (now/next/backlog) needs one
+    blocks: list[CaptureBlock]  # DEPRECATED: today's schedule rows; captures are filed by stream now
+    products: list[CaptureProduct]  # DEPRECATED: flat list; use streams[].products
+    streams: list[CaptureStream]  # THE PICKER: every non-archived stream, with or without a quarter goal or pipeline
     day: str  # "weekday" or "weekend": which schedule `blocks` come from
 
 
@@ -52,7 +59,7 @@ async def capture_options(user: User = Depends(get_capture_user), db: AsyncSessi
     blocks = [CaptureBlock(block=r["block"], start=r["start"], end=r["end"], what=r["what"], stream=r["stream"])
               for r in (sched or {}).get("days", {}).get(day, [])]
     products = [CaptureProduct(slug=p.slug, name=p.name, block=p.block) for p in await planner_products.rows_of(db, user.id)]
-    streams = [CaptureStream(slug=s.id, name=s.name) for s in await planner_store.streams_for(db, user.id, now.date()) if s.goal and not s.archived]
+    streams = [CaptureStream(**s) for s in await capture_tasks.capture_streams(db, user.id, now.date())]
     return CaptureOptions(blocks=blocks, products=products, streams=streams, day=day)
 
 

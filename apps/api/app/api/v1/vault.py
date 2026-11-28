@@ -21,6 +21,7 @@ from app.models.google import GoogleCredential
 from app.models.planner import PlannerPin
 from app.models.user import User
 from app.models.vault import VaultDay
+from app.schemas.capture import WeeklyLog
 from app.schemas.vault import (
     BlocksConfigIn,
     BlocksConfigResponse,
@@ -104,7 +105,7 @@ from app.schemas.vault import (
     VaultWeekResponse,
     VoteIn,
 )
-from app.services import device_tokens, google_calendar, plan_v2, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_products, planner_store, planner_work
+from app.services import capture_tasks, device_tokens, google_calendar, plan_v2, planner_blocks, planner_config, planner_day, planner_habits, planner_items, planner_products, planner_store, planner_work
 from app.services.calendar_events import events_for_day, events_for_range, fixture_feeds
 from app.services.google_calendar import GoogleCalendarError
 from app.services.planner_views import notebooks_response, objectives_response, pipelines_response, quarter_response
@@ -697,6 +698,9 @@ async def post_item(data: ItemCreateIn, request: Request, response: Response, us
     fields.pop("client_id", None)
     user_id = user.id  # read now: a rollback below expires the user object
     token_id = getattr(request.state, "device_token_id", None)  # set only when a device token made the call
+    if token_id is not None:  # a device capture is a task on a day with an optional stream: no lane, never a pipeline item
+        data_day, fields = capture_tasks.capture_target(data.day, fields, _local_now().date())
+        data = data.model_copy(update={"day": data_day, "lane": None})
     client_id = str(data.client_id) if data.client_id is not None and token_id is not None else None
 
     async def repeat():
@@ -847,6 +851,16 @@ async def post_stream(data: StreamAddIn, user: User = Depends(get_current_user),
     fields = _fields(data)
     await _db_run(db, lambda: planner_work.add_stream(db, user.id, label, data.stream, fields, *_lists(data)))
     return await _quarter(db, user, today)
+
+
+@router.get("/weekly-log", response_model=WeeklyLog)
+async def get_weekly_log(week: str | None = Query(default=None, pattern=r"^\d{4}-W\d{2}$"), user: User = Depends(get_current_user),
+                         db: AsyncSession = Depends(get_db)):
+    """One week (Sunday to Saturday; default this week) of tasks under the stream each belongs to, for the Plan page's weekly log."""
+    try:
+        return await capture_tasks.weekly_log(db, user.id, _local_now().date(), week)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/pipelines", response_model=PipelinesResponse)

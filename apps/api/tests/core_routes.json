@@ -552,6 +552,10 @@
   "GET"
  ],
  [
+  "/api/v1/vault/weekly-log",
+  "GET"
+ ],
+ [
   "/docs",
   "GET"
  ],
