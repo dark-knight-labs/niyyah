@@ -1,2 +1,4 @@
 # false positive: prose line in the Plan v3 design note read as a generic API key (rewritten in a later commit)
 d875eddcbe686458adec866c3d7c9f7b36c53f8c:docs/superpowers/specs/2026-11-09-plan-v3.md:generic-api-key:126
+# false positive: a localStorage key name (const storageKey = '...') read as a generic API key; renamed in the next commit
+5265509dbe12cdfac0edc93923b86fa958d7fc82:apps/menubar/ui/panel.js:generic-api-key:21

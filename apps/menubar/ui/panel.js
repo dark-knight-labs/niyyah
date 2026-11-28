@@ -19,7 +19,7 @@ try {
   if (typeof stored?.focusSwitch === 'boolean') preferences.focusSwitch = stored.focusSwitch;
 } catch {}
 const interval = () => preferences.minutes * 60000;
-const storageKey = 'niyyah-focus-priorities-v1';
+const storageKey = 'niyyah-focus-task-list';
 const browserKey = 'niyyah-focus-work-browser';
 const macDesktop = desktop && /Mac/.test(navigator.platform);
 let workBrowser;
