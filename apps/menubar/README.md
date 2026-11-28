@@ -3,8 +3,8 @@
 A macOS menu-bar app with two parts. Bundle id `bd.burak.niyyah.menubar`, shown as "Niyyah Capture".
 
 - **Quick capture:** press **Option+Command+N**, type, press Enter. The task goes to Niyyah.
-- **Focus panel** (ported from [Next Up](https://github.com/alamin-mahamud/nextup)): a floating task list in the
-  bottom-left corner with a timer per task, deadlines, links, check-in flashes, window-switch reminders,
+- **Focus panel** (ported from [Next Up](https://github.com/alamin-mahamud/nextup)): a task list that opens as a popup under the
+  menu-bar icon with a timer per task, deadlines, links, check-in flashes, window-switch reminders,
   dictation and global shortcuts. Every task you add there is also filed in Niyyah.
 
 Stack: Tauri 2. `core/` is plain Rust (queue, API client, token store) and is tested on Linux;
@@ -49,11 +49,35 @@ Accessibility** (AXUIElement); the picker's "Allow window titles" button trigger
 focus works for the whole app. **Screen Recording is never needed** (titles are not read through CGWindowList).
 Automation is separate and only for the browser-tab reminder.
 
-**Menu bar.** Native vs custom: the tray icon (a monochrome template image, so macOS tints it) and its dropdown
-menu (Capture, Show tasks, Settings, Quit) are the **native** macOS menu; Tauri cannot style them, and Next Up
-itself uses a native menu. The text next to the icon (running timer and task, or the current task) is native
-too, in the system font. The popups it opens (quick capture, the panel, settings) are the custom Next Up
-design. A tray-anchored custom popup was not built: Tauri has no stable tray anchor position on macOS.
+**Menu bar.** The app lives in the menu bar only (no Dock icon). Click the ring: the Next Up style panel opens as
+a popup right under the icon and closes when you click elsewhere or press Esc (unless you tick "Stay open when I
+click elsewhere" in Settings). Option+Command+N opens the quick-capture popover instead.
+
+**Switch-away alert (what "leaving the window" does).** While a focus session runs, leaving the chosen window
+makes the tray icon **blink amber** until you return or end the session; the popup shakes if it is open; the
+chip turns amber; and a full-screen "Back to Safari" names the window to return to. With macOS **Reduce Motion**
+on, the icon stays steadily amber and the popup does not shake. The same blink (8 s) is used for the timed
+check-in when the popup is closed.
+
+Native vs custom: the tray icon (a monochrome template image, so macOS tints it; amber, coloured, while
+alerting) and its dropdown menu (Capture, Show tasks, Settings, Quit) are the **native** macOS menu; Tauri cannot
+style them, and Next Up itself uses a native menu. The text next to the icon (running timer and task) is native
+too, in the system font. The popup and every dialog are the custom Next Up design, anchored under the icon.
+
+**Window names stay on this Mac.** The chosen window's app and title live only in `focus.json` and
+`sessions.jsonl` in the app data folder. They are never part of a capture: `Capture` has no field for them and a
+test (`local_only_fields_never_reach_the_wire`) pins that none of window, title, app, bundle id, link, deadline,
+timer or client id reaches the server body.
+
+## Blocks and products
+
+The block picker shows the plan page's tiles (SOUL, BODY, ONE, OPS, PLAN, DIST, FNF, SLEEP: white tiles in a
+pale-blue column, monospace caps). Picking a block fills the product chips from that block's products; the
+lane defaults to **NOW** (NOW, NEXT, BACKLOG). `GET /api/v1/capture/options` is read tolerantly in two shapes:
+planner blocks (`key`, `ring_name`, `label`, `color`, `products`) and the first server version's schedule rows
+(`block`, `start`, `end`, `what`, `stream`, with top-level `products` tied by `block`). A reply that matches
+neither shows an empty picker and a message; it never crashes the app. A capture is filed under the block's
+`stream`, else its `key`, else its `block`.
 
 ## Look: Next Up replica, with Lucide and Inter
 
@@ -168,7 +192,7 @@ notarisation, so macOS will not open it silently the first time.
    app once, then go to **System Settings > Privacy & Security**, scroll to the message about "Niyyah Capture"
    and click **Open Anyway**, then confirm with your password.
 4. Last resort: `xattr -dr com.apple.quarantine "/Applications/Niyyah Capture.app"`.
-5. The app has no Dock icon. Look for the small ring in the menu bar, or press **Option+Command+N**.
+5. The app has no Dock icon. Click the small ring in the menu bar to open the panel under it, or press **Option+Command+N** for quick capture. The first time, a short note explains each permission before macOS asks for it.
 6. Create a device token in Niyyah: **Settings > Devices**, copy it (it is shown once). In the app, open the tray
    menu, **Settings…**, and under "Niyyah connection" paste your Niyyah address and the token. Press Store.
    (The quick-capture popover has the same fields under its own Settings link.) macOS may ask to let the app
