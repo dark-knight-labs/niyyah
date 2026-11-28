@@ -1,37 +1,47 @@
 //! `GET /api/v1/capture/options`: the user's streams to file under, each with its optional products.
 //!
-//! Contract (niyyah `docs/capture-api.md`): every non-archived stream, products nested under each stream.
+//! Contract (niyyah PR #118, `docs/capture-api.md`): every non-archived stream, products nested under each stream.
 //! ```json
 //! { "streams": [{"slug": "kahf", "name": "Kahf", "color": "violet", "products": []},
 //!               {"slug": "alisha", "name": "Alisha Noor", "color": "rose", "products": [{"slug": "cart", "name": "Cart"}]}] }
 //! ```
 //! A stream has no short name: show `name`. The deprecated top-level `blocks`, `products` and `day` are ignored.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// `null` reads as the default: a server may send `"streams": null` or `"name": null`.
+fn nullable<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Options {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "nullable")]
     pub streams: Vec<StreamOption>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StreamOption {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "nullable")]
     pub slug: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "nullable")]
     pub name: String,
     /// A colour key ("violet", "rose", ...).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "nullable")]
     pub color: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "nullable")]
     pub products: Vec<ProductOption>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProductOption {
+    #[serde(default, deserialize_with = "nullable")]
     pub slug: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "nullable")]
     pub name: String,
 }
 
@@ -104,6 +114,21 @@ mod tests {
     fn duplicates_and_blank_slugs_are_dropped_and_order_is_kept() {
         let o: Options = serde_json::from_str(r#"{"streams":[{"slug":"b","name":"B"},{"slug":" ","name":"?"},{"slug":"a","name":"A"},{"slug":"b","name":"again"}]}"#).unwrap();
         assert_eq!(o.picker().iter().map(|s| s.value.as_str()).collect::<Vec<_>>(), ["b", "a"]);
+    }
+
+    #[test]
+    fn nulls_and_missing_slugs_are_tolerated() {
+        let o: Options = serde_json::from_str(r#"{"streams":null}"#).unwrap();
+        assert!(o.picker().is_empty());
+        let o: Options = serde_json::from_str(
+            r#"{"streams":[{"slug":"kahf","name":null,"color":null,"products":null},
+                           {"slug":"alisha","name":"Alisha Noor","products":[{"name":"No slug"},{"slug":"cart","name":null}]}]}"#,
+        )
+        .unwrap();
+        let p = o.picker();
+        assert_eq!(p[0].label, "kahf", "a null name falls back to the slug");
+        assert!(p[0].products.is_empty());
+        assert_eq!(p[1].products.iter().map(|x| (x.slug.as_str(), x.name.as_str())).collect::<Vec<_>>(), [("cart", "cart")], "a product without a slug is dropped");
     }
 
     #[test]

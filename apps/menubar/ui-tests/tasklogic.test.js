@@ -225,3 +225,19 @@ test('trayTitle: only a timer while a session runs, never a window title or task
   assert.equal(T.trayTitle(down), '24:00');
   assert.equal(/chorki|Secret|Safari/.test(T.trayTitle(s)), false);
 });
+
+test('readFocusOptions: one primary, allowed never includes it, minutes clamped, countdown only when asked', () => {
+  const windows = [
+    {app: 'Safari', bundle_id: 'com.apple.Safari', title: 'Quarterly report'},
+    {app: 'Notes', bundle_id: 'com.apple.Notes', title: 'Outline'},
+    {app: 'Slack', bundle_id: 'com.tinyspeck', title: ''},
+  ];
+  const o = T.readFocusOptions(windows, 0, [0, 1, 1, 2, 9, -1], 'down', 500);
+  assert.deepEqual(o.primary, {app: 'Safari', bundleId: 'com.apple.Safari', title: 'Quarterly report'});
+  assert.deepEqual(o.allowed.map(w => w.app), ['Notes', 'Slack'], 'no primary, no duplicates, no out-of-range');
+  assert.deepEqual([o.mode, o.minutes], ['down', 240]);
+  assert.deepEqual([T.readFocusOptions(windows, 1, [], 'up', 5).mode, T.readFocusOptions(windows, 1, [], 'up', 5).minutes], ['up', 0]);
+  assert.equal(T.readFocusOptions(windows, 0, [], 'down', 'x').minutes, 25, 'a bad number falls back to 25');
+  assert.equal(T.readFocusOptions(windows, 7, [], 'up', 1), null, 'no valid primary, no focus');
+  assert.equal(T.readFocusOptions([], 0, [], 'up', 1), null);
+});

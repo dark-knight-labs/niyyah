@@ -27,14 +27,12 @@
       <button id="glance-focus" class="glance-focus"><span id="glance-description"><strong id="glance-name"></strong></span><span id="glance-time"></span></button>
       <ul id="glance-next" aria-label="Upcoming priorities"></ul>
     </div>
-    <header class="widget-top"><div class="checkin"><span class="dot"></span><span id="status">FOCUS CHECK-IN</span></div><div class="window-actions"><button class="icon desktop-capture" id="desktop-capture" aria-label="Add priorities" title="Add priorities"><span class="ic ic-plus" aria-hidden="true"></span></button><button class="icon" id="expand" aria-controls="tasks" aria-label="Keep task list expanded" aria-pressed="false" title="Keep task list expanded"><span class="ic ic-chevron-up" aria-hidden="true"></span></button><button class="icon" id="open-settings" aria-label="Settings" title="Settings"><span class="ic ic-settings" aria-hidden="true"></span></button><button class="icon" id="pin" aria-label="Stay open" aria-pressed="true" title="Stay open when I click elsewhere"><span class="ic ic-pin" aria-hidden="true"></span></button><button class="icon" id="close" aria-label="Close reminder" title="Close reminder"><span class="ic ic-x" aria-hidden="true"></span></button></div></header>
+    <header class="widget-top"><div class="checkin"><span class="dot"></span><span id="status">FOCUS CHECK-IN</span></div><div class="window-actions"><button class="icon" id="expand" aria-controls="tasks" aria-label="Keep task list expanded" aria-pressed="false" title="Keep task list expanded"><span class="ic ic-chevron-up" aria-hidden="true"></span></button><button class="icon" id="open-settings" aria-label="Settings" title="Settings"><span class="ic ic-settings" aria-hidden="true"></span></button><button class="icon" id="pin" aria-label="Stay open" aria-pressed="true" title="Stay open when I click elsewhere"><span class="ic ic-pin" aria-hidden="true"></span></button><button class="icon" id="close" aria-label="Close reminder" title="Close reminder"><span class="ic ic-x" aria-hidden="true"></span></button></div></header>
     <div class="widget-body">
       <div class="list-head"><h3 id="focus-question">Which task are you working on?</h3><span id="remaining"></span></div>
       <ul id="tasks" aria-label="Priorities in order"></ul>
     </div>
-    <div class="focus-chip" id="focus-chip" data-state="" hidden><span class="ic ic-timer" aria-hidden="true"></span><span id="focus-label"></span><strong id="focus-time"></strong><button class="icon" id="focus-pause" type="button" aria-label="Pause focus" title="Pause focus"><span class="ic ic-pause" aria-hidden="true"></span></button><button class="icon" id="focus-stop" type="button" aria-label="End focus" title="End focus"><span class="ic ic-x" aria-hidden="true"></span></button></div>
-    <ul class="focus-windows" id="focus-windows" aria-label="Focus windows" hidden></ul>
-    <div class="check-question"><a id="task-link-open" target="_blank" rel="noopener noreferrer" hidden><span class="link-label">Open link <span class="ic ic-external" aria-hidden="true"></span></span><span class="link-spinner" aria-hidden="true"></span></a><button id="focus-open" type="button"><span class="ic ic-target" aria-hidden="true"></span> Focus</button><button id="different">New Task</button></div>
+    <div class="check-question"><a id="task-link-open" target="_blank" rel="noopener noreferrer" hidden><span class="link-label">Open link <span class="ic ic-external" aria-hidden="true"></span></span><span class="link-spinner" aria-hidden="true"></span></a><button id="different">New Task</button></div>
     <p id="task-storage-status" role="status" hidden></p>
     <p id="niyyah-status" role="status" hidden></p>
     <ul id="shortcut-guide" aria-label="Keyboard shortcuts"></ul>
@@ -97,26 +95,6 @@
   </ul>
   <button class="primary" id="welcome-ok" type="button">Got it</button>
 </dialog>
-<dialog id="focus" aria-labelledby="focus-title">
-  <header><h2 id="focus-title">Focus</h2><form method="dialog"><button class="icon" aria-label="Close focus window"><span class="ic ic-x" aria-hidden="true"></span></button></form></header>
-  <form id="focus-form">
-    <label>Task <select id="focus-task-select" aria-label="Task to focus on"></select></label>
-    <label id="focus-new-row" hidden>New task <input id="focus-new-task" type="text" maxlength="300" placeholder="What will you work on?"></label>
-    <label>Primary window <select id="focus-window" aria-label="Primary window"></select></label>
-    <fieldset class="settings-group" id="focus-allowed-set" hidden>
-      <legend>Also fine to use (optional)</legend>
-      <div id="focus-allowed"></div>
-    </fieldset>
-    <label>Timer
-      <select id="focus-mode"><option value="up">Count up</option><option value="down">Countdown</option></select>
-    </label>
-    <label id="focus-minutes-row" hidden>Minutes <input id="focus-minutes" type="number" min="1" max="240" value="25"></label>
-    <p id="focus-hint"></p>
-    <button type="button" id="focus-grant" hidden>Allow window titles</button>
-    <button class="primary" id="focus-start" type="submit">Start focus</button>
-    <p id="focus-status" role="status"></p>
-  </form>
-</dialog>
 <dialog id="voice" aria-label="New task">
   <form id="voice-form">
     <div class="composer-field">
@@ -127,6 +105,8 @@
     <p id="voice-status" role="status"></p>
     <label class="composer-link" for="task-link">Link <small>(optional)</small><input id="task-link" type="url" placeholder="https://example.com"></label>
     <div class="composer-niyyah" id="composer-niyyah"></div>
+    <label class="composer-focus" id="composer-focus"><input type="checkbox" id="focus-toggle"> Focus on this task <small>(pick its main window)</small></label>
+    <div id="composer-focus-options" hidden></div>
     <div class="composer-actions">
       <label for="deadline"><span class="deadline-label">Deadline <small>(optional)</small></span><input type="datetime-local" id="deadline"></label>
       <button class="primary save" id="save" disabled>Save</button>

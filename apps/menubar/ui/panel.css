@@ -135,7 +135,7 @@ h1 { font-size: clamp(38px, 5vw, 68px); line-height: 1.03; letter-spacing: -.04e
   box-shadow: 0 20px 52px #27396d36, 0 3px 9px #27396d18;
   transition: transform .38s var(--ease), opacity .24s, visibility .38s, background-color .24s, box-shadow .24s, border-color .24s;
 }
-:is(.widget, #settings, #focus, #voice, #welcome) { zoom: var(--app-scale, .8); }
+:is(.widget, #settings, #voice, #welcome) { zoom: var(--app-scale, .8); }
 .widget.closed { transform: translateX(calc(-100% - 55px)); opacity: 0; visibility: hidden; }
 #task-menu {
   position: absolute;
@@ -251,20 +251,20 @@ button.task-time { padding: 3px 6px; border-color: transparent; background: tran
   -webkit-mask: url(icons/play-fill.svg) center / contain no-repeat;
   mask: url(icons/play-fill.svg) center / contain no-repeat;
 }
-.task.running .task-playback {
+.task.focused:not(.paused) .task-playback {
   background: var(--accent);
   color: white;
   border-color: transparent;
 }
-.task.running .task-playback:hover { background: var(--accent-hover); }
-.task.running .task-playback::before {
+.task.focused:not(.paused) .task-playback:hover { background: var(--accent-hover); }
+.task.focused:not(.paused) .task-playback::before {
   -webkit-mask-image: url(icons/pause-fill.svg);
   mask-image: url(icons/pause-fill.svg);
 }
 .empty { padding: 10px 0; color: var(--muted); }
 .check-question { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 5px 12px 3px; }
 .record { display: flex; gap: 7px; flex-wrap: wrap; }
-#different, #focus-open, #task-link-open {
+#different, #task-link-open {
   background: #18223808;
   border: 1px solid transparent;
   border-radius: 7px;
@@ -275,8 +275,8 @@ button.task-time { padding: 3px 6px; border-color: transparent; background: tran
   padding: 5px 9px;
   transition: background-color .18s;
 }
-#different, #focus-open { background: #1822380d; }
-#different:hover:not(:disabled), #focus-open:hover:not(:disabled), #task-link-open:hover { background: #18223816; }
+#different { background: #1822380d; }
+#different:hover:not(:disabled), #task-link-open:hover { background: #18223816; }
 .glance { display: none; padding: 10px 12px 0; }
 .glance-focus {
   display: flex;
@@ -426,7 +426,7 @@ html:not(.desktop) .desktop-capture { display: none; }
   }
 }
 
-:is(#settings, #focus) {
+#settings {
   width: min(360px, calc(100% - 24px));
   box-sizing: border-box;
   padding: 14px 18px;
@@ -436,14 +436,14 @@ html:not(.desktop) .desktop-capture { display: none; }
   color: var(--ink);
   box-shadow: 0 12px 38px #27396d33;
 }
-:is(#settings, #focus)::backdrop { background: #202f5524; backdrop-filter: blur(3px); }
-.desktop :is(#settings, #focus)::backdrop { background: transparent; backdrop-filter: none; }
-.desktop:has(:is(#settings, #focus)[open]) .widget { visibility: hidden; }
-:is(#settings, #focus) header, :is(#settings, #focus) label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-:is(#settings, #focus) h2 { margin: 0; font-size: 18px; }
-:is(#settings, #focus) label { padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
-:is(#settings, #focus) header { margin-bottom: 8px; }
-:is(#settings, #focus) select {
+#settings::backdrop { background: #202f5524; backdrop-filter: blur(3px); }
+.desktop #settings::backdrop { background: transparent; backdrop-filter: none; }
+.desktop:has(#settings[open]) .widget { visibility: hidden; }
+#settings header, #settings label { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#settings h2 { margin: 0; font-size: 18px; }
+#settings label { padding: 10px 0; border-top: 1px solid var(--line); font-size: 13px; }
+#settings header { margin-bottom: 8px; }
+#settings select {
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -549,8 +549,8 @@ html:not(.desktop) .desktop-capture { display: none; }
 .ic-timer { --ic: url(icons/timer.svg); }
 
 /* Focus: chip, window list (primary / allowed / other) and the focused task's row. */
-.focus-chip { display: flex; align-items: center; gap: 8px; margin: 6px 12px 0; padding: 5px 5px 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: #ffffff80; font-size: 12px; }
-.focus-chip[hidden], .focus-windows[hidden] { display: none; }
+.focus-chip { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; padding: 5px 5px 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: #ffffff80; font-size: 12px; }
+.task-focus-block[hidden] { display: none; }
 .focus-chip #focus-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .focus-chip strong { margin-left: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .focus-chip .icon { width: 22px; height: 22px; }
@@ -560,7 +560,7 @@ html:not(.desktop) .desktop-capture { display: none; }
 .focus-chip[data-state=away], .focus-chip[data-state=lost] { border-color: #d97706; background: #fff7e6; color: #92400e; }
 .ic-play { --ic: url(icons/play-fill.svg); }
 .ic-pause { --ic: url(icons/pause-fill.svg); }
-.focus-windows { max-height: 118px; margin: 4px 12px 0; padding: 0; overflow: auto; list-style: none; }
+.focus-windows { max-height: 118px; margin: 4px 0 0; padding: 0; overflow: auto; list-style: none; }
 .fw { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
 .fw-main { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 7px; font-size: 12px; font-weight: 600; text-align: left; }
 .fw-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -576,14 +576,6 @@ html:not(.desktop) .desktop-capture { display: none; }
 .task-focus[data-state=allowed] { color: #5b72c3; }
 .task-focus[data-state=away], .task-focus[data-state=lost] { color: #92400e; }
 .task-focus[data-state=paused] { color: var(--muted); }
-#focus .focus-allow { display: flex; gap: 6px; align-items: center; justify-content: flex-start; padding: 3px 0; border-top: 0; font-size: 12px; }
-#focus-allowed { max-height: 110px; overflow: auto; }
-#focus-window { max-width: 230px; font: inherit; }
-#focus-hint, #focus-status { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
-#focus-hint:empty, #focus-status:empty { display: none; }
-#focus-task { font-weight: 600; }
-#focus .primary { margin-top: 10px; width: 100%; }
-#focus input[type=number] { width: 72px; font: inherit; }
 
 /* Capture picker: the user's streams in a pale-blue column (white chips), optional product chips beside.
    Chips are small-radius, Next Up style, never full pills. Long names get an ellipsis and a tooltip. */
@@ -598,4 +590,19 @@ html:not(.desktop) .desktop-capture { display: none; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
 .chip[aria-pressed=true]:not(.tile) { background: var(--accent); border-color: var(--accent); color: #fff; }
 .picker-empty { color: var(--muted); font-size: 12px; }
-#focus-open .ic { width: 12px; height: 12px; vertical-align: -1px; }
+
+/* Focus lives inside the task list: the block under the focused row, and the inline picker under a row. */
+.task-focus-block { list-style: none; padding: 0 0 2px 36px; }
+.row-picker { margin: 2px 0 6px; padding: 8px 10px 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff80; }
+.row-picker .focus-options { display: grid; gap: 6px; }
+.focus-options label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
+.focus-options select, .focus-options input[type=number] { font: inherit; max-width: 210px; }
+.row-picker-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.focus-hint { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.focus-hint:empty { display: none; }
+.focus-options .focus-allow { display: flex; justify-content: flex-start; padding: 2px 0; }
+.focus-allowed { max-height: 96px; overflow: auto; }
+.composer-focus { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 12px; }
+.composer-focus small { color: var(--muted); font-size: inherit; }
+.composer-focus[hidden], #composer-focus-options[hidden] { display: none; }
+#composer-focus-options { display: grid; gap: 6px; margin: 0 0 8px; }

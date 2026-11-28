@@ -6,11 +6,14 @@ Bundled with Niyyah Capture. Nothing is loaded from a CDN at run time.
 |---|---|---|---|
 | **Next Up** (focus panel UI, timer, reminders, shortcuts; ported and changed) | `ui/panel.*`, `ui/reminder.*`, `src-tauri/src/{widget,focus_switch,awake_clock}.rs`, `core/src/{awake,focus}.rs` | The Next Up repository carries no licence file; owner decision 2026-11-28 allows copying it. Attribution kept. | https://github.com/alamin-mahamud/nextup (commit 95979c8) |
 | **Inter** variable font, v5.3.0, latin and latin-ext subsets (`ui/fonts/*.woff2`) | UI text, tabular numerals for timers | SIL Open Font License 1.1 | https://rsms.me/inter/ via npm `@fontsource-variable/inter` |
-| **Lucide** icons (13 SVGs in `ui/icons/`, stroke width set to 1.75) | all UI icons, drawn as CSS masks | ISC (not MIT: Lucide is ISC; Feather-derived parts are MIT) | https://lucide.dev via npm `lucide-static` 1.82.0 |
-| App icon and menu-bar template icon (`src-tauri/icons/`) | generated for this app from the Lucide "target" shape | ISC (Lucide shape) | `/tmp`-built with Pillow; no external art |
+| **Lucide** icons (13 SVGs in `ui/icons/`, stroke width 2) | all UI icons, drawn as CSS masks | ISC; the Feather-derived icons (arrow-up-right, chevron-up, external-link, plus, target, x) are MIT, see the full licence below | https://lucide.dev via npm `lucide-static` 1.82.0 |
+| App icon and menu-bar template icon (`src-tauri/icons/`) | generated for this app from the Lucide "target" shape | MIT (Feather-derived `target` shape, see below) | drawn with Pillow; no external art |
 
-## Lucide (ISC)
+## Lucide (ISC, with MIT for the Feather-derived icons), full upstream LICENSE
 
+Copied unchanged from `lucide-static` 1.82.0. Of the icons used here, `arrow-up-right`, `chevron-up`, `external-link`, `plus`, `target` and `x` are on the Feather list and so are under the MIT licence (Copyright (c) 2013-present Cole Bemis); the rest are ISC. The app and tray icons are drawn from the `target` shape, so MIT applies to them too.
+
+```
 ISC License
 
 Copyright (c) 2026 Lucide Icons and Contributors
@@ -30,6 +33,31 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ---
 
 The following Lucide icons are derived from the Feather project:
+
+airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
+
+The MIT License (MIT) (for the icons listed above)
+
+Copyright (c) 2013-present Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Inter (SIL Open Font License 1.1)
 

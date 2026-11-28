@@ -33,10 +33,19 @@ Stack: Tauri 2. `core/` is plain Rust (queue, API client, token store) and is te
 
 ## Focus: one task, one primary window
 
-A focus session is **one task + one primary window + optional allowed windows**, started in one step: **Focus**
-in the popup asks for the task (an open task, or "New task…" which also files it in Niyyah), the primary window,
-any extra windows that are fine to use, and a timer (count-up, or a countdown of 1 to 240 minutes). It starts
-the task's timer.
+Focus is part of the task, not a second thing. There is **one entry point, "New Task"**, and one control on
+every open task row (the play icon). There is no separate Focus button, screen or tab, and no focus without a task.
+
+- **New Task** (button, or Ctrl+Alt+N): type the task, pick a stream and optional products, and tick **"Focus on this
+  task"** to also choose its main window, any extra windows that are fine to use, and a timer (count-up, or a
+  countdown of 1 to 240 minutes). **Save** then creates the task, files it in Niyyah and starts the focus on that
+  same task, in one step. A quick focus is just a new task with the text you type.
+- **Play on a task row** starts a focus on exactly that task: a small picker opens right under the row (main window,
+  allowed windows, timer, **Start focus**). On the task being focused the same control pauses and resumes.
+- The focused task's row is highlighted and shows the state, the timer and the primary window; the status chip and
+  the window list (below) sit directly under that row, in the same popup list.
+
+Starting a focus starts the task's timer.
 
 Three states, shown the same way in the popup's window list, the task row and the tray icon:
 
@@ -111,7 +120,7 @@ dropped. A 422 is now a real error (an unknown stream is one) and is never retri
 
 The layout, spacing, states and animations are Next Up's (same HTML and CSS, same window sizes). Deliberate
 differences: Lucide icons (one set, stroke 2) instead of text glyphs and CSS shapes; Inter variable (tabular numerals for timers) instead of the system font; added Niyyah rows (stream and
-optional product in the composer; connection in Settings; Focus button, chip and window list); the pin means "stay open when I click elsewhere" (off by default, it is a menu-bar popup); no software-update section. The
+optional product in the composer; connection in Settings; a Focus switch in the composer and a play control on each task row); the pin means "stay open when I click elsewhere" (off by default, it is a menu-bar popup); no software-update section. The
 quick-capture popover is the same composer, always open. Assets and licences: `THIRD_PARTY.md`.
 
 ### What stays on your Mac
@@ -122,10 +131,11 @@ Niyyah stores a task's name, stream and product (and, with the new sync routes, 
 complete it in Niyyah either. Proposed backend follow-up: item fields `link`, `deadline_at` (datetime),
 `tracked_ms`, and a way to update or complete an item with a device token. No backend change is part of this app.
 
-Sync layer, ready for that contract: each panel task has a client UUID (`id`), which travels with its capture
-as `client_id` through the offline queue but is **not sent yet** (`Capture::to_item` in `core/src/payload.rs`
-is the one place that maps app fields to the wire; a test pins that nothing local-only leaks). Adopting the
-contract means adding fields there and in `captureFor` (`ui/tasklogic.js`).
+Sync layer: each panel task has a client UUID (`id`). It is sent as `client_id` with the capture (only when it
+is a real UUID; anything else would be a 422), so a retry after a lost reply is the same task, not a second one:
+the server dedupes on it and the new device routes key on it. `Capture::to_item` in `core/src/payload.rs` is the one
+place that maps app fields to the wire; a test pins that nothing else local-only leaks. Adopting link, deadline and
+timer fields later means adding them there and in `captureFor` (`ui/tasklogic.js`).
 
 ## How a capture travels
 
@@ -136,8 +146,8 @@ contract means adding fields there and in `captureFor` (`ui/tasklogic.js`).
    Network errors, 429 and 5xx back off 5 s, 10 s, 20 s ... up to 15 min. A 401/403 keeps the capture
    and asks you to check the token. Any other 4xx (the server will never accept it) parks the capture
    as "refused" in the popover list, with Retry and Dismiss. Nothing is dropped silently.
-4. The queue is at-least-once: if the server stored a capture but the reply was lost, the retry creates a
-   second task (the items API has no idempotency key).
+4. The queue is at-least-once, but the capture carries its `client_id`, so if the server stored it and the reply
+   was lost, the retry is recognised and answered with the first task (HTTP 200), not a second one.
 
 ## API contract (what the app calls)
 
@@ -173,7 +183,25 @@ while offline.
 - Capture text is not logged either.
 - The webview never reaches the network: its CSP is `default-src 'none'; script-src 'self'; style-src 'self';
   img-src 'self'; connect-src ipc:` (no `unsafe-inline`, no remote host). The Rust core makes every request.
-- Capabilities are `core:default` only: no file, shell, http or opener access from the web layer.
+- Tauri command ACL: Tauri 2.12 enforces capabilities on app commands only when the build has an app manifest
+  (`webview/mod.rs`: the check runs for app commands only if a manifest exists; without one every local window may
+  call every command). `build.rs` therefore registers all commands, and `capabilities/` gives the popover, the
+  panel and the reminder overlay exactly the commands their page calls, plus `core:default`; no file, shell, http
+  or opener access. `core/tests/acl.rs` checks that the manifest, the handler list, the capability files and the
+  `invoke` calls in the page scripts agree in both directions.
+- Changing the server to a different host (scheme, host or port) is **refused** unless you also paste a new device
+  token: the old token belongs to the old host and is never sent to a new one, and queued capture text never goes
+  there either. Settings validate the token first and save nothing if it is bad.
+- The only text beside the tray icon is a timer (`^[0-9:]{0,8}$`, enforced in Rust); anything else is dropped.
+- Local files (`tasks.json`, `focus.json`, `sessions.jsonl`, the queue) are written 0600; the session log rotates at
+  about 1 MiB; the options reply is read at most 1 MiB.
+
+## Known risks
+
+- Accessibility (AX) calls for window titles can block when an app is hung. They run off the UI thread (the window
+  list is an async command, the watcher looks at the screen with its lock released), but a very slow app can still
+  delay a nudge by a poll.
+- Nothing here has been seen on a real macOS screen from this build (see "What is verified").
 
 ## Develop and test (Linux or Mac)
 

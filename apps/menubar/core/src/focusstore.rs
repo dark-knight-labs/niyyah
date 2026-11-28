@@ -15,6 +15,9 @@ use serde_json::Value;
 use crate::error::Error;
 use crate::taskstore::write_atomic;
 
+/// The session log is rotated at about this size.
+const LOG_ROTATE_BYTES: u64 = 1 << 20;
+
 pub struct FocusStore {
     state: PathBuf,
     log: PathBuf,
@@ -39,11 +42,15 @@ impl FocusStore {
         write_atomic(&self.state, state).map_err(Error::from)
     }
 
-    /// Append one finished session as a single JSON line.
+    /// Append one finished session as a single JSON line. When the log reaches about 1 MiB it is rotated to
+    /// `sessions.1.jsonl` (replacing the previous rotation), so it never grows without bound.
     pub fn append_session(&self, session: &Value) -> Result<(), Error> {
         let _guard = self.lock.lock().map_err(|e| Error::Storage(e.to_string()))?;
         if let Some(dir) = self.log.parent() {
             fs::create_dir_all(dir)?;
+        }
+        if fs::metadata(&self.log).is_ok_and(|m| m.len() >= LOG_ROTATE_BYTES) {
+            let _ = fs::rename(&self.log, self.log.with_file_name("sessions.1.jsonl"));
         }
         let mut opts = OpenOptions::new();
         opts.create(true).append(true);
@@ -97,6 +104,20 @@ mod tests {
         store.append_session(&json!({"task": "b", "durationMs": 2})).unwrap();
         let all = store.sessions().unwrap();
         assert_eq!(all.iter().map(|s| s["task"].as_str().unwrap()).collect::<Vec<_>>(), ["a", "b"]);
+    }
+
+    #[test]
+    fn the_log_rotates_at_about_a_megabyte() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = FocusStore::new(dir.path());
+        let big = json!({"task": "x".repeat(4096)});
+        for _ in 0..300 {
+            store.append_session(&big).unwrap();
+        }
+        assert!(dir.path().join("sessions.1.jsonl").exists(), "rotated");
+        let live = fs::metadata(dir.path().join("sessions.jsonl")).unwrap().len();
+        assert!(live < 2 * LOG_ROTATE_BYTES, "the live log stays bounded ({live} bytes)");
+        assert!(store.sessions().unwrap().len() < 300, "the live log starts over after a rotation");
     }
 
     #[cfg(unix)]

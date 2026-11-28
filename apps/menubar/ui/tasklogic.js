@@ -176,6 +176,20 @@
     return rows;
   }
 
+  // The choices made when starting a focus (in the composer or on a task row): which listed window is
+  // primary, which others are allowed, the timer. `windows` is the shell's list ({app, bundle_id, title}).
+  // Returns null when nothing valid was chosen; the primary is never also an allowed window.
+  function readFocusOptions(windows, primaryIndex, allowedIndexes, mode, minutes) {
+    const pick = index => (Number.isInteger(index) && index >= 0 && index < windows.length
+      ? { app: windows[index].app, bundleId: windows[index].bundle_id ?? windows[index].bundleId, title: windows[index].title || '' } : null);
+    const primary = pick(primaryIndex);
+    if (!primary) return null;
+    const allowed = [...new Set(allowedIndexes)].filter(index => index !== primaryIndex).map(pick).filter(Boolean);
+    const down = mode === 'down';
+    const length = Math.min(240, Math.max(1, Math.round(Number(minutes)) || 25));
+    return { primary, allowed, mode: down ? 'down' : 'up', minutes: down ? length : 0 };
+  }
+
   // How a focus state looks in the tray icon and the popup. Mirrors core/src/focus.rs `presentation`
   // (both are tested): calm on the primary, a soft tint on an allowed window, a blink plus popup shake
   // for a window outside the set; Reduce Motion turns the blink into a steady highlight and drops the shake.
@@ -209,7 +223,7 @@
 
   return {
     pickStream, newSession, focusTick, focusState, focusPause, taskEarns, setPrimary, toggleAllowed, windowRows,
-    presentFor, syncable, sameWindow, windowKey, focusShown, focusFinished, focusRecord, trayTitle,
+    presentFor, readFocusOptions, syncable, sameWindow, windowKey, focusShown, focusFinished, focusRecord, trayTitle,
     DEADLINE_SOON_MS, BROWSERS, webLink, formatStamp, creditDelta, addTracked, isDueSoon, moveTask,
     cycleTarget, namesFrom, captureFor,
   };

@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "reminder",
+  "description": "The full-screen reminder overlay: it can only hide itself.",
+  "windows": [
+    "task-reminder"
+  ],
+  "permissions": [
+    "core:default",
+    "allow-hide-task-reminder"
+  ]
+}

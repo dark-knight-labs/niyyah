@@ -5,14 +5,15 @@
 //! not know. Writes are atomic: temp file, fsync, rename, so a crash leaves the old list or the
 //! new one, never half of one. The file is owner-only (mode 0600) on Unix.
 
-use std::fs::{self, File};
-use std::io::{self, Write};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde_json::Value;
 
 use crate::error::Error;
+use crate::queue::{create_private_dir, write_private_atomic};
 
 pub struct TaskStore {
     path: PathBuf,
@@ -43,28 +44,14 @@ impl TaskStore {
     }
 }
 
+/// Atomic, owner-only (0600) JSON write: the same private-file path as the queue, so tasks.json and focus.json
+/// are never world-readable.
 pub(crate) fn write_atomic<T: serde::Serialize + ?Sized>(path: &Path, value: &T) -> io::Result<()> {
     if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
+        create_private_dir(dir).map_err(|e| io::Error::other(e.to_string()))?;
     }
-    let pending = path.with_extension(format!("{}.tmp", std::process::id()));
-    let result = (|| {
-        let mut file = File::create(&pending)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            file.set_permissions(fs::Permissions::from_mode(0o600))?;
-        }
-        serde_json::to_writer(&mut file, value)?;
-        file.flush()?;
-        file.sync_all()?;
-        drop(file);
-        fs::rename(&pending, path)
-    })();
-    if result.is_err() {
-        let _ = fs::remove_file(&pending);
-    }
-    result
+    let bytes = serde_json::to_vec(value)?;
+    write_private_atomic(path, &bytes).map_err(|e| io::Error::other(e.to_string()))
 }
 
 #[cfg(test)]
@@ -93,7 +80,7 @@ mod tests {
         assert_eq!(store.load().unwrap().unwrap(), vec![task()]);
         store.save(&[]).unwrap();
         assert_eq!(fs::read_to_string(store.path()).unwrap(), "[]");
-        assert_eq!(fs::read_dir(dir.path().join("nested")).unwrap().count(), 1);
+        assert_eq!(fs::read_dir(dir.path().join("nested")).unwrap().count(), 1, "no temp file left behind");
     }
 
     #[test]
@@ -120,8 +107,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = TaskStore::new(dir.path());
         store.save(&[task()]).unwrap();
-        // A directory where the temp file would go makes File::create fail.
-        let blocker = store.path().with_extension(format!("{}.tmp", std::process::id()));
+        // A directory where the temp file would go makes the write fail.
+        let blocker = store.path().with_extension("tmp");
         fs::create_dir(&blocker).unwrap();
         assert!(store.save(&[]).is_err());
         assert_eq!(store.load().unwrap().unwrap(), vec![task()]);

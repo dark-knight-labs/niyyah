@@ -55,9 +55,10 @@ impl Default for WatchState {
     }
 }
 
+/// Accessibility calls can block for a moment (a hung app), so this runs off the UI thread.
 #[tauri::command]
-pub fn list_focus_windows() -> WindowList {
-    platform::list()
+pub async fn list_focus_windows() -> Result<WindowList, String> {
+    tauri::async_runtime::spawn_blocking(platform::list).await.map_err(|e| e.to_string())
 }
 
 /// Ask macOS for Accessibility (shows the system prompt once). Returns whether it is granted now.
@@ -80,9 +81,20 @@ pub fn set_focus_targets(primary: Option<Target>, allowed: Vec<Target>, state: S
 pub fn start(window: WebviewWindow, state: WatchState) {
     std::thread::spawn(move || loop {
         std::thread::sleep(std::time::Duration::from_millis(500));
+        // Take the targets, then look at the screen with the lock released: Accessibility calls can block, and
+        // `set_focus_targets` must never wait on them.
+        let (primary, allowed) = match state.0.lock() {
+            Ok(watch) => match watch.primary.clone() {
+                Some(primary) => (primary, watch.allowed.clone()),
+                None => continue,
+            },
+            Err(_) => continue,
+        };
+        let seen = classify(&primary, &allowed);
         let Ok(mut watch) = state.0.lock() else { continue };
-        let Some(primary) = watch.primary.clone() else { continue };
-        let seen = classify(&primary, &watch.allowed);
+        if watch.primary.as_ref() != Some(&primary) {
+            continue; // the targets changed while we looked: this answer is stale
+        }
         if let Some(changed) = watch.monitor.observe(seen) {
             if let Ok(detail) = serde_json::to_string(&changed) {
                 let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('focus-state', {{ detail: {detail} }}))"));

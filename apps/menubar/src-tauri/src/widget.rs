@@ -269,6 +269,9 @@ pub fn log_focus_session(store: State<'_, FocusStore>, session: Value) -> Result
 /// Menu-bar text next to the tray icon (the running timer and task). Empty clears it.
 #[tauri::command]
 pub fn set_tray_title(app: AppHandle, title: String) {
+    // Only a timer such as `12:34` may sit next to the icon: never a window title or task text, whatever
+    // the web layer sends.
+    let title = niyyah_capture_core::focus::tray_label(&title);
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_title(if title.is_empty() { None } else { Some(title) });
     }

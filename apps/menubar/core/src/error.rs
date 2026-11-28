@@ -21,6 +21,8 @@ pub enum Error {
     NoBlock,
     #[error("expected an http or https link without a username or password")]
     BadLink,
+    #[error("this changes the server to a different host: paste a device token for it, or clear the stored token first (the old token is never sent to a new host)")]
+    OriginChanged,
     #[error("storage error: {0}")]
     Storage(String),
     #[error("keychain error: {0}")]

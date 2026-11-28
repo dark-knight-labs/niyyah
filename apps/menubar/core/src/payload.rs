@@ -13,9 +13,7 @@ pub struct Capture {
     /// A product slug, if one was picked.
     #[serde(default)]
     pub product: Option<String>,
-    /// The panel task's UUID. Kept in the queue but NOT sent yet: the server has no idempotency key or
-    /// sync-back. When the backend contract lands, `to_item` is the one place that starts sending it.
-    #[serde(default)]
+    /// The panel task's UUID: the retry key. Sent as `client_id` when it is a valid UUID.
     pub client_id: Option<String>,
 }
 
@@ -39,6 +37,9 @@ impl Capture {
 
     pub fn to_item(&self) -> ItemPayload {
         ItemPayload {
+            // Sent so a retry after a lost reply is the same task, not a second one (the server dedupes on it).
+            // Only a real UUID: anything else would be a 422 and park the capture.
+            client_id: self.client_id.clone().filter(|id| is_uuid(id)),
             text: self.text.clone(),
             stream: self.stream.clone(),
             products: self.product.as_ref().map(|p| vec![p.clone()]),
@@ -54,6 +55,16 @@ pub struct ItemPayload {
     pub stream: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub products: Option<Vec<String>>,
+    /// The retry key (a UUID), when the capture has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+}
+
+/// 8-4-4-4-12 hex, as the server's UUID field expects.
+pub fn is_uuid(s: &str) -> bool {
+    let groups: Vec<&str> = s.split('-').collect();
+    groups.len() == 5
+        && [8, 4, 4, 4, 12].iter().zip(&groups).all(|(n, g)| g.len() == *n && g.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 #[cfg(test)]
@@ -71,6 +82,28 @@ mod tests {
         assert_eq!(serde_json::to_value(&item).unwrap(), json!({"text": "Call the bank #errand", "stream": "kahf", "products": ["dns"]}));
         let bare = serde_json::to_value(cap(None).validated().unwrap().to_item()).unwrap();
         assert_eq!(bare, json!({"text": "Call the bank #errand", "stream": "kahf"}), "a stream alone is a capture");
+    }
+
+    const ID: &str = "3f2b8c1e-6a0d-4a5e-9d57-1c2f0b7a9e11";
+
+    #[test]
+    fn a_valid_client_id_is_sent_as_the_retry_key() {
+        let mut c = cap(Some("dns"));
+        c.client_id = Some(ID.into());
+        assert_eq!(
+            serde_json::to_value(c.validated().unwrap().to_item()).unwrap(),
+            json!({"text": "Call the bank #errand", "stream": "kahf", "products": ["dns"], "client_id": ID})
+        );
+    }
+
+    #[test]
+    fn a_client_id_that_is_not_a_uuid_is_not_sent() {
+        for bad in ["7b1c-uuid", "", "3f2b8c1e6a0d4a5e9d571c2f0b7a9e11", "3f2b8c1e-6a0d-4a5e-9d57-1c2f0b7a9e1", "zzzzzzzz-6a0d-4a5e-9d57-1c2f0b7a9e11"] {
+            let mut c = cap(None);
+            c.client_id = Some(bad.into());
+            let v = serde_json::to_value(c.validated().unwrap().to_item()).unwrap();
+            assert!(v.get("client_id").is_none(), "{bad:?} would be a 422: {v}");
+        }
     }
 
     #[test]
@@ -112,7 +145,7 @@ mod tests {
     #[test]
     fn local_only_fields_never_reach_the_wire() {
         let from_panel = json!({
-            "text": "Call the bank", "stream": "kahf", "product": "dns", "client_id": "7b1c-uuid",
+            "text": "Call the bank", "stream": "kahf", "product": "dns", "client_id": "3f2b8c1e-6a0d-4a5e-9d57-1c2f0b7a9e11",
             "lane": "now", "link": "https://example.com", "deadlineAt": 1, "window": "Quarterly report",
             "title": "Quarterly report", "app": "Safari", "bundle_id": "com.apple.Safari",
             "trackedMs": 5, "startedAt": 2, "done": false,
@@ -120,9 +153,10 @@ mod tests {
         });
         let capture: Capture = serde_json::from_value(from_panel).unwrap();
         let wire = serde_json::to_string(&capture.validated().unwrap().to_item()).unwrap();
-        for key in ["link", "deadline", "tracked", "started", "done", "example.com", "client", "window", "title", "app", "bundle", "Safari", "lane", "now", "Notes", "Outline", "primary", "allowed"] {
+        for key in ["link", "deadline", "tracked", "started", "done", "example.com", "window", "title", "app", "bundle", "Safari", "lane", "now", "Notes", "Outline", "primary", "allowed"] {
             assert!(!wire.contains(key), "{key} leaked into {wire}");
         }
         assert!(wire.contains("Call the bank") && wire.contains("kahf") && wire.contains("dns"));
+        assert!(wire.contains("3f2b8c1e-6a0d-4a5e-9d57-1c2f0b7a9e11"), "the retry key is the one id that goes out");
     }
 }

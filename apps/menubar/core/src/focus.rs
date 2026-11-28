@@ -71,6 +71,16 @@ pub enum FocusState {
     Lost,
 }
 
+/// The only text allowed next to the tray icon: a timer such as `12:34` or `1:02:03`. Anything else (a window
+/// title, task text) is dropped, so a bug or a hostile caller in the web layer cannot put a title in the menu bar.
+pub fn tray_label(title: &str) -> String {
+    if title.len() <= 8 && title.chars().all(|c| c.is_ascii_digit() || c == ':') {
+        title.to_string()
+    } else {
+        String::new()
+    }
+}
+
 /// Debounces observations into state changes: away only after `grace` consecutive "other" ticks (a quick
 /// Cmd-Tab and back is not a drift); primary and allowed apply at once; a closed primary is lost at once.
 pub struct FocusMonitor {
@@ -238,6 +248,16 @@ mod tests {
         m.observe(Gone);
         m.reset();
         assert_eq!(m.state(), FocusState::Primary);
+    }
+
+    #[test]
+    fn the_tray_label_is_a_timer_or_nothing() {
+        for ok in ["", "0:00", "12:34", "1:02:03", "00:00:00"] {
+            assert_eq!(tray_label(ok), ok);
+        }
+        for bad in ["chorki.net invalid response", "Safari", "12:34 · Task", "123456789", "12:34\n", "٣:٠٠", "1.5"] {
+            assert_eq!(tray_label(bad), "", "{bad:?}");
+        }
     }
 
     #[test]

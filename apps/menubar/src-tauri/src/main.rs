@@ -116,13 +116,16 @@ fn get_settings(state: State<'_, Shared>) -> Result<SettingsReply, String> {
     Ok(SettingsReply { server_url: state.server_url(), has_token: state.has_token().map_err(|e| e.to_string())? })
 }
 
-/// Store the server URL and, if one was pasted, the token. The token goes straight to the Keychain.
+/// Store the server URL and, if one was pasted, the token (validated first). Moving to a different host
+/// without a new token is refused: the old token must never go to a new host. The token goes straight to the
+/// Keychain. Runs off the UI thread: it waits for a send in progress, which can take a network timeout.
 #[tauri::command]
-fn save_settings(state: State<'_, Shared>, server_url: String, token: String) -> Result<(), String> {
-    state.set_server_url(&server_url).map_err(|e| e.to_string())?;
-    if !token.trim().is_empty() {
-        state.set_token(&token).map_err(|e| e.to_string())?;
-    }
+async fn save_settings(state: State<'_, Shared>, server_url: String, token: String) -> Result<(), String> {
+    let c = state.inner().clone();
+    let saved = tauri::async_runtime::spawn_blocking(move || c.save_settings(&server_url, &token))
+        .await
+        .map_err(|e| e.to_string())?;
+    saved.map_err(|e| e.to_string())?;
     flush_in_background(state.inner());
     Ok(())
 }
